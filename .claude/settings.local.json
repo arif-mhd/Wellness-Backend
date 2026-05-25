@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git show *)",
+      "Bash(git ls-tree *)",
+      "Bash(mkdir -p \"c:/Users/Lenovo/OneDrive/Desktop/wellness-platform/admin-portal/app/dashboard/doctors/add\")",
+      "Bash(mkdir -p \"c:/Users/Lenovo/OneDrive/Desktop/wellness-platform/admin-portal/app/dashboard/analytics/[slug]\")",
+      "Bash(mkdir -p \"c:/Users/Lenovo/OneDrive/Desktop/wellness-platform/admin-portal/app/dashboard/activity-log\")"
+    ]
+  }
+}

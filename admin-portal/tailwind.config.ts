@@ -7,14 +7,26 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+      },
       colors: {
         brand: {
-          50:  "#faf5ff",
-          100: "#f3e8ff",
-          500: "#a855f7",
-          600: "#9333ea",
-          700: "#7e22ce",
+          50:  "#eff6ff",
+          100: "#dbeafe",
+          400: "#60a5fa",
+          500: "#3b82f6",
+          600: "#2563eb",
+          700: "#1d4ed8",
         },
+        surface: "#F4F6FA",
+      },
+      borderRadius: {
+        "2xl": "1rem",
+        "3xl": "1.5rem",
+      },
+      boxShadow: {
+        card: "0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04)",
       },
     },
   },
