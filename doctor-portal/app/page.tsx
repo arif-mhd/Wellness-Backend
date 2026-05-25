@@ -1,6 +1,12 @@
-import { redirect } from "next/navigation";
+import LandingLayout from "@/components/landing/LandingLayout";
+import LandingHeroImage from "@/components/landing/LandingHeroImage";
+import LandingContent from "@/components/landing/LandingContent";
 
-// Root "/" → go to sign in page.
 export default function HomePage() {
-  redirect("/auth/login");
+  return (
+    <LandingLayout
+      heroImage={<LandingHeroImage />}
+      content={<LandingContent />}
+    />
+  );
 }
