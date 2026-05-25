@@ -73,23 +73,37 @@ export default function ManageDoctorsPage() {
         adminFetch("/api/admin/doctors/approved"),
       ]);
 
-      if (pendingRes.ok) {
-        const { doctors: pending } = await pendingRes.json();
-        setQueue(pending);
-        if (activeTab === "queue" && pending.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(pending[0].id);
-        }
+      // Surface HTTP errors explicitly so they are visible in the UI
+      if (!pendingRes.ok) {
+        const body = await pendingRes.json().catch(() => ({}));
+        setFetchError(
+          pendingRes.status === 403
+            ? "Access denied — make sure your account has the 'admin' role."
+            : `Failed to load queue (${pendingRes.status}): ${body.error ?? "unknown error"}`
+        );
+        return;
       }
 
-      if (approvedRes.ok) {
-        const { doctors: approved } = await approvedRes.json();
-        setDoctors(approved);
-        if (activeTab === "onboard" && approved.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(approved[0].id);
-        }
+      if (!approvedRes.ok) {
+        const body = await approvedRes.json().catch(() => ({}));
+        setFetchError(
+          `Failed to load approved doctors (${approvedRes.status}): ${body.error ?? "unknown error"}`
+        );
+        return;
       }
+
+      const { doctors: pending }  = await pendingRes.json();
+      const { doctors: approved } = await approvedRes.json();
+
+      setQueue(pending);
+      setDoctors(approved);
+
+      // Auto-select first item in the active tab
+      if (activeTab === "queue"   && pending.length  > 0 && !selectedDoctorId) setSelectedDoctorId(pending[0].id);
+      if (activeTab === "onboard" && approved.length > 0 && !selectedDoctorId) setSelectedDoctorId(approved[0].id);
+
     } catch {
-      setFetchError("Could not load doctors. Make sure the backend is running.");
+      setFetchError("Could not reach the backend. Make sure it is running on port 3001.");
     }
   }, [activeTab, selectedDoctorId]);
 
