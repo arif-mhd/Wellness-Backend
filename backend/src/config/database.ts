@@ -1,4 +1,6 @@
 import { Pool } from "pg";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const pool = new Pool({
   host: process.env.DB_HOST || "localhost",
@@ -11,7 +13,7 @@ export const pool = new Pool({
 export async function initDb(): Promise<void> {
   const client = await pool.connect();
   try {
-    // Stores extra profile info beyond what SuperTokens manages
+    // Step 1: base user_profiles table (must exist before migration runs)
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -23,6 +25,14 @@ export async function initDb(): Promise<void> {
         updated_at     TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+
+    // Step 2: run migration 001 — adds all app tables (all statements are idempotent)
+    const migration = readFileSync(
+      join(__dirname, "../migrations/001_schema.sql"),
+      "utf8"
+    );
+    await client.query(migration);
+
     console.log("✅ Database tables ready");
   } catch (err) {
     console.error("❌ Database init failed:", err);
