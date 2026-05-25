@@ -17,6 +17,9 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
+    // For the time being, session check is bypassed to view doctor portal screens.
+    setChecking(false);
+    /*
     doesSessionExist().then((exists) => {
       if (!exists) {
         router.replace("/auth/login");
@@ -24,6 +27,7 @@ export default function ProtectedRoute({
         setChecking(false);
       }
     });
+    */
   }, [router]);
 
   if (checking) {

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Root "/" → always go to login.
-// ProtectedRoute on the dashboard will redirect logged-in users back.
+// Root "/" → go to dashboard while auth session check is bypassed.
 export default function HomePage() {
-  redirect("/auth/login");
+  redirect("/dashboard");
 }
