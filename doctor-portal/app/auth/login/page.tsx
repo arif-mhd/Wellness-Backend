@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "supertokens-web-js/recipe/emailpassword";
+// import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -17,28 +17,11 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await signIn({
-        formFields: [
-          { id: "email",    value: email },
-          { id: "password", value: password },
-        ],
-      });
-
-      if (response.status === "OK") {
-        router.push("/dashboard");
-      } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
-        setError("Invalid email or password. Please try again.");
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your input.");
-      } else {
-        setError("Sign in is not allowed right now. Please contact support.");
-      }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
+    // Simulate login for UI testing
+    setTimeout(() => {
       setLoading(false);
-    }
+      router.push("/dashboard");
+    }, 800);
   }
 
   return (

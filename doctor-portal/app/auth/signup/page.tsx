@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signUp } from "supertokens-web-js/recipe/emailpassword";
+// import { signUp } from "supertokens-web-js/recipe/emailpassword";
 import Link from "next/link";
 
 export default function SignupPage() {
@@ -28,35 +28,12 @@ export default function SignupPage() {
     }
 
     setLoading(true);
-    try {
-      const response = await signUp({
-        formFields: [
-          { id: "email",    value: email },
-          { id: "password", value: password },
-          { id: "name",     value: name },
-          // "doctor" is hardcoded — this portal is only for doctors
-          { id: "role",     value: "doctor" },
-        ],
-      });
 
-      if (response.status === "OK") {
-        // Account created + session started → go to dashboard
-        router.push("/dashboard");
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your input.");
-      } else {
-        setError("Sign up is not allowed right now. Please contact support.");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("401") || msg.includes("Unauthorised") || msg.includes("Unauthorized")) {
-        setError("Session error — please hard-refresh the page (Ctrl+Shift+R) and try again.");
-      } else {
-        setError(`Cannot reach the server: ${msg}. Make sure the backend is running on port 3001.`);
-      }
-    } finally {
+    // Simulate signup for UI testing
+    setTimeout(() => {
       setLoading(false);
-    }
+      router.push("/dashboard");
+    }, 800);
   }
 
   return (
