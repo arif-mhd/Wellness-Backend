@@ -9,6 +9,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { initSuperTokens, allowedOrigins } from "./config/supertokens";
 import { initDb } from "./config/database";
 import authRouter from "./routes/auth";
+import doctorsRouter from "./routes/doctors";
+import adminDoctorsRouter from "./routes/adminDoctors";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -33,6 +35,12 @@ app.use(express.json());
 // ─── 3. Routes ───────────────────────────────────────────────────────────────
 app.use("/auth", authRouter);
 
+// Doctor self-registration (public)
+app.use("/api/doctors", doctorsRouter);
+
+// Admin doctor management (requires admin role)
+app.use("/api/admin/doctors", adminDoctorsRouter);
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -50,9 +58,10 @@ async function main() {
   // Create the three roles in SuperTokens Core.
   // "createNewRoleOrAddPermissions" is idempotent — safe to call every startup.
   try {
-    await UserRoles.createNewRoleOrAddPermissions("patient", []);
-    await UserRoles.createNewRoleOrAddPermissions("doctor",  []);
-    await UserRoles.createNewRoleOrAddPermissions("admin",   []);
+    await UserRoles.createNewRoleOrAddPermissions("patient",        []);
+    await UserRoles.createNewRoleOrAddPermissions("doctor",         []);
+    await UserRoles.createNewRoleOrAddPermissions("doctor_pending", []);
+    await UserRoles.createNewRoleOrAddPermissions("admin",          []);
     console.log("✅ SuperTokens roles ready");
   } catch {
     console.warn("⚠️  Could not create roles — is SuperTokens Core (Docker) running?");

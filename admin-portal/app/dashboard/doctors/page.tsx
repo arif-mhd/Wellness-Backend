@@ -1,367 +1,148 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+// ── Types ────────────────────────────────────────────────────────────────────
 interface Doctor {
-  id: number;
-  name: string;
-  email: string;
-  avatar: string;
-  status: "online" | "offline";
-  specialty: string;
-  consultations: number;
-  avgConsultation: number;
-  prescriptions: number;
-  rating: number;
-  license: string;
-  emiratesId: string;
-  phone: string;
-  gender: string;
-  dob: string;
-  fees: string;
-  languages: string;
-  bio: string;
+  id:           string;
+  supertokens_id: string;
+  fullName:     string;
+  email:        string;
+  phone:        string;
+  gender:       string | null;
+  dateOfBirth:  string | null;
+  emiratesId:   string | null;
+  specialty:    string | null;
+  license:      string | null;
+  bio:          string | null;
+  fees:         string | null;
+  languages:    string | null;
+  status:       "pending_approval" | "approved" | "rejected";
+  registeredAt: string;
+  approvedAt:   string | null;
 }
 
-const initialDoctors: Doctor[] = [
-  {
-    id: 1,
-    name: "Dr. Nusrat Chowdhury",
-    email: "nusrat@wellness.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Cardiology",
-    consultations: 556,
-    avgConsultation: 429,
-    prescriptions: 177,
-    rating: 4,
-    license: "DHA-12345678",
-    emiratesId: "784-1234-5678",
-    phone: "+971 50 123 4567",
-    gender: "Female",
-    dob: "02 January 1990",
-    fees: "AED 200.00",
-    languages: "English, Arabic, +2",
-    bio: "A board-certified physician specializing in internal medicine. I completed my medical degree at Harvard Medical School and my residency at Johns Hopkins Hospital, where I gained extensive experience in patient care and clinical research. I am dedicated to providing comprehensive and compassionate cardiac care.",
-  },
-  {
-    id: 2,
-    name: "Dr. Zafar Islam",
-    email: "zafar@wellness.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Internal Medicine",
-    consultations: 647,
-    avgConsultation: 447,
-    prescriptions: 154,
-    rating: 4,
-    license: "DHA-87654321",
-    emiratesId: "784-8765-4321",
-    phone: "+971 50 765 4321",
-    gender: "Male",
-    dob: "15 August 1985",
-    fees: "AED 150.00",
-    languages: "English, Hindi, Urdu",
-    bio: "Specializing in internal medicine, Dr. Zafar focuses on adult comprehensive care, chronic disease management, and preventive medical health programs.",
-  },
-  {
-    id: 3,
-    name: "Dr. Anika Rahman",
-    email: "anika@wellness.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Pediatrics",
-    consultations: 994,
-    avgConsultation: 877,
-    prescriptions: 883,
-    rating: 4,
-    license: "DHA-24681357",
-    emiratesId: "784-2468-1357",
-    phone: "+971 50 246 8135",
-    gender: "Female",
-    dob: "22 November 1988",
-    fees: "AED 180.00",
-    languages: "English, Bengali",
-    bio: "Compassionate and dedicated pediatrician committed to providing excellent healthcare for infants, toddlers, and adolescents.",
-  },
-  {
-    id: 4,
-    name: "Dr. Aminul Halder",
-    email: "aminul@wellness.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Neurology",
-    consultations: 453,
-    avgConsultation: 738,
-    prescriptions: 492,
-    rating: 4,
-    license: "DHA-13579246",
-    emiratesId: "784-1357-9246",
-    phone: "+971 50 135 7924",
-    gender: "Male",
-    dob: "10 April 1978",
-    fees: "AED 300.00",
-    languages: "English, Arabic, French",
-    bio: "Dr. Aminul is a senior neurologist with expertise in stroke management, epilepsy, neuromuscular diseases, and sleep medicine.",
-  },
-  {
-    id: 5,
-    name: "Dr. Shama Islam",
-    email: "shama@wellness.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Dermatology",
-    consultations: 922,
-    avgConsultation: 426,
-    prescriptions: 429,
-    rating: 4,
-    license: "DHA-95135724",
-    emiratesId: "784-9513-5724",
-    phone: "+971 50 951 3572",
-    gender: "Female",
-    dob: "05 May 1991",
-    fees: "AED 220.00",
-    languages: "English, Tagalog",
-    bio: "Specialist dermatologist focusing on medical acne treatments, cosmetic dermatology, laser treatments, and pediatric conditions.",
-  }
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-const initialQueue: Doctor[] = [
-  {
-    id: 101,
-    name: "Dr. Kabir Ahmed",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Cardiology",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 4,
-    license: "DHA-12345678",
-    emiratesId: "784-1234-5678",
-    phone: "+971 50 123 4567",
-    gender: "Male",
-    dob: "02 January 1990",
-    fees: "AED 200.00",
-    languages: "English, Arabic, +2",
-    bio: "A board-certified physician specializing in internal medicine. I completed my medical degree at Harvard Medical School and my residency at Johns Hopkins Hospital, where I gained extensive experience in patient care and clinical research. I am dedicated to providing comprehensive and compassionate cardiac care.",
-  },
-  {
-    id: 102,
-    name: "Dr. Thomas Mathew",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "General Practitioner",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-99887766",
-    emiratesId: "784-9988-7766",
-    phone: "+971 50 998 8776",
-    gender: "Male",
-    dob: "11 July 1993",
-    fees: "AED 100.00",
-    languages: "English, Malayalam",
-    bio: "Newly qualified general practitioner interested in family health medicine.",
-  },
-  {
-    id: 103,
-    name: "Dr. Aarav Bhatnagar",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Endocrinology",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-66554433",
-    emiratesId: "784-6655-4433",
-    phone: "+971 50 665 5443",
-    gender: "Male",
-    dob: "20 September 1987",
-    fees: "AED 230.00",
-    languages: "English, Hindi",
-    bio: "Endocrinologist focusing on diabetic patient programs and hormone imbalance disorders.",
-  },
-  {
-    id: 104,
-    name: "Dr. Fatima Rizvi",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "online",
-    specialty: "Pediatrics",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-11223344",
-    emiratesId: "784-1122-3344",
-    phone: "+971 50 112 2334",
-    gender: "Female",
-    dob: "14 May 1985",
-    fees: "AED 180.00",
-    languages: "English, Urdu",
-    bio: "Experienced pediatrician.",
-  },
-  {
-    id: 105,
-    name: "Dr. Gaganpreet Narula",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Orthopedics",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-55667788",
-    emiratesId: "784-5566-7788",
-    phone: "+971 50 556 6778",
-    gender: "Male",
-    dob: "09 August 1980",
-    fees: "AED 250.00",
-    languages: "English, Punjabi",
-    bio: "Specializing in sports injuries and rehabilitation.",
-  },
-  {
-    id: 106,
-    name: "Dr. Mariam Begum",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Gynaecology",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-33445566",
-    emiratesId: "784-3344-5566",
-    phone: "+971 50 334 4556",
-    gender: "Female",
-    dob: "23 December 1988",
-    fees: "AED 220.00",
-    languages: "English, Arabic",
-    bio: "Expert in maternal-fetal medicine.",
-  },
-  {
-    id: 107,
-    name: "Dr. Rajesh Sharma",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Dermatology",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-88990011",
-    emiratesId: "784-8899-0011",
-    phone: "+971 50 889 9001",
-    gender: "Male",
-    dob: "17 November 1982",
-    fees: "AED 200.00",
-    languages: "English, Hindi",
-    bio: "Specializing in cosmetic dermatology.",
-  },
-  {
-    id: 108,
-    name: "Dr. Zara Hussain",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Psychiatry",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-22334455",
-    emiratesId: "784-2233-4455",
-    phone: "+971 50 223 3445",
-    gender: "Female",
-    dob: "05 March 1979",
-    fees: "AED 300.00",
-    languages: "English, Urdu",
-    bio: "Consultant psychiatrist for mental wellness.",
-  },
-  {
-    id: 109,
-    name: "Dr. Vishnu Rajendran",
-    email: "yelena@example.com",
-    avatar: "/doctor-avatar.png",
-    status: "offline",
-    specialty: "Ophthalmology",
-    consultations: 0,
-    avgConsultation: 0,
-    prescriptions: 0,
-    rating: 0,
-    license: "DHA-99001122",
-    emiratesId: "784-9900-1122",
-    phone: "+971 50 990 0112",
-    gender: "Male",
-    dob: "30 June 1986",
-    fees: "AED 180.00",
-    languages: "English, Malayalam",
-    bio: "Expert in refractive eye surgeries.",
-  }
-];
+// ── Helper: fetch with admin auth header ─────────────────────────────────────
+async function adminFetch(path: string, options: RequestInit = {}) {
+  const token = await Session.getAccessToken();
+  return fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token ?? ""}`,
+      ...(options.headers ?? {}),
+    },
+  });
+}
 
 const DoubleCaret = () => (
   <div className="flex flex-col items-center gap-[0.5px] opacity-40 ml-1.5 shrink-0">
-    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 15l7-7 7 7" /></svg>
-    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M19 9l-7 7-7-7" /></svg>
+    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 15l7-7 7 7" />
+    </svg>
+    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M19 9l-7 7-7-7" />
+    </svg>
   </div>
 );
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function ManageDoctorsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"onboard" | "queue">("queue");
-  const [doctors, setDoctors] = useState<Doctor[]>(initialDoctors);
-  const [queue, setQueue] = useState<Doctor[]>(initialQueue);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(101);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  
-  const currentList = activeTab === "onboard" ? doctors : queue;
+  const [activeTab, setActiveTab]           = useState<"onboard" | "queue">("queue");
+  const [doctors, setDoctors]               = useState<Doctor[]>([]);
+  const [queue, setQueue]                   = useState<Doctor[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]       = useState("");
+  const [isSearchOpen, setIsSearchOpen]     = useState(false);
+  const [loadingApprove, setLoadingApprove] = useState(false);
+  const [fetchError, setFetchError]         = useState("");
+  const [approveError, setApproveError]     = useState("");
 
-  const sortedDoctors = [...currentList].filter((doc) => {
-    const matchQuery = searchQuery.toLowerCase();
+  // ── Fetch both lists ───────────────────────────────────────────────────────
+  const fetchDoctors = useCallback(async () => {
+    setFetchError("");
+    try {
+      const [pendingRes, approvedRes] = await Promise.all([
+        adminFetch("/api/admin/doctors/pending"),
+        adminFetch("/api/admin/doctors/approved"),
+      ]);
+
+      if (pendingRes.ok) {
+        const { doctors: pending } = await pendingRes.json();
+        setQueue(pending);
+        if (activeTab === "queue" && pending.length > 0 && !selectedDoctorId) {
+          setSelectedDoctorId(pending[0].id);
+        }
+      }
+
+      if (approvedRes.ok) {
+        const { doctors: approved } = await approvedRes.json();
+        setDoctors(approved);
+        if (activeTab === "onboard" && approved.length > 0 && !selectedDoctorId) {
+          setSelectedDoctorId(approved[0].id);
+        }
+      }
+    } catch {
+      setFetchError("Could not load doctors. Make sure the backend is running.");
+    }
+  }, [activeTab, selectedDoctorId]);
+
+  useEffect(() => {
+    fetchDoctors();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Approve action ─────────────────────────────────────────────────────────
+  const handleApprove = async (id: string) => {
+    setLoadingApprove(true);
+    setApproveError("");
+    try {
+      const res = await adminFetch(`/api/admin/doctors/${id}/approve`, { method: "POST" });
+      const data = await res.json();
+
+      if (res.ok) {
+        // Move doctor from queue → onboard in local state
+        const approved = queue.find((d) => d.id === id);
+        if (approved) {
+          setQueue((prev) => prev.filter((d) => d.id !== id));
+          setDoctors((prev) => [{ ...approved, status: "approved", approvedAt: new Date().toISOString() }, ...prev]);
+        }
+        setSelectedDoctorId(null);
+        setActiveTab("onboard");
+      } else {
+        setApproveError(data.error || "Approval failed.");
+      }
+    } catch {
+      setApproveError("Cannot reach the server.");
+    } finally {
+      setLoadingApprove(false);
+    }
+  };
+
+  const currentList  = activeTab === "onboard" ? doctors : queue;
+  const filteredList = currentList.filter((doc) => {
+    const q = searchQuery.toLowerCase();
     return (
-      doc.name.toLowerCase().includes(matchQuery) ||
-      doc.specialty.toLowerCase().includes(matchQuery) ||
-      doc.email.toLowerCase().includes(matchQuery)
+      doc.fullName?.toLowerCase().includes(q) ||
+      doc.email?.toLowerCase().includes(q) ||
+      doc.specialty?.toLowerCase().includes(q)
     );
   });
 
-  const selectedDoctor = 
-    doctors.find((d) => d.id === selectedDoctorId) || 
-    queue.find((q) => q.id === selectedDoctorId);
-
-  const handleApprove = (id: number) => {
-    const docToApprove = queue.find((d) => d.id === id);
-    if (!docToApprove) return;
-
-    setQueue(queue.filter((d) => d.id !== id));
-    const approvedDoc: Doctor = {
-      ...docToApprove,
-      status: "online",
-      rating: 5,
-    };
-    setDoctors([approvedDoc, ...doctors]);
-    setSelectedDoctorId(null);
-  };
+  const selectedDoctor =
+    doctors.find((d) => d.id === selectedDoctorId) ||
+    queue.find((d)   => d.id === selectedDoctorId);
 
   return (
     <ProtectedRoute>
       <div className="max-w-[1440px] mx-auto space-y-7 pb-12 font-sans">
-        
-        {/* Top Header */}
+
+        {/* ── Header ── */}
         <div className="flex items-center justify-between px-1">
           <div>
             <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Doctors</h1>
@@ -377,13 +158,25 @@ export default function ManageDoctorsPage() {
           </button>
         </div>
 
-        {/* Tab Selection & Date Filter */}
+        {/* ── Error banners ── */}
+        {fetchError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-3 text-sm">
+            {fetchError}
+          </div>
+        )}
+        {approveError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-3 text-sm">
+            {approveError}
+          </div>
+        )}
+
+        {/* ── Tab row ── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none px-1">
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => {
                 setActiveTab("onboard");
-                setSelectedDoctorId(doctors[0]?.id || null);
+                setSelectedDoctorId(doctors[0]?.id ?? null);
               }}
               className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${
                 activeTab === "onboard"
@@ -392,289 +185,180 @@ export default function ManageDoctorsPage() {
               }`}
             >
               Doctors Onboard
+              {doctors.length > 0 && (
+                <span className="ml-2 bg-white/20 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {activeTab === "onboard" ? doctors.length : <span className="text-slate-400">{doctors.length}</span>}
+                </span>
+              )}
             </button>
+
             <button
               onClick={() => {
                 setActiveTab("queue");
-                setSelectedDoctorId(queue[0]?.id || null);
+                setSelectedDoctorId(queue[0]?.id ?? null);
               }}
-              className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${
+              className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-2 ${
                 activeTab === "queue"
                   ? "bg-[#1E293B] text-white shadow-md shadow-slate-200"
                   : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
               }`}
             >
               Onboarding Queue
+              {queue.length > 0 && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                  activeTab === "queue" ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-600"
+                }`}>
+                  {queue.length}
+                </span>
+              )}
             </button>
 
-            {/* Expandable Search Trigger */}
+            {/* Search */}
             <div className="relative flex items-center gap-2">
               <button
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className="w-10 h-10 rounded-full bg-white border border-slate-200/70 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition active:scale-95 shadow-sm ml-1"
-                aria-label="Search doctors"
               >
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
               {isSearchOpen && (
-                <div className="animate-in fade-in slide-in-from-left-2 duration-200">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search doctor..."
-                    className="border border-slate-200 bg-white rounded-full px-4 py-2 text-[13px] font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 w-44 shadow-sm"
-                    autoFocus
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search doctor..."
+                  className="border border-slate-200 bg-white rounded-full px-4 py-2 text-[13px] font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 w-44 shadow-sm"
+                  autoFocus
+                />
               )}
             </div>
           </div>
 
-          <div className="flex items-center">
-            <button className="text-[13px] font-bold text-slate-500 bg-transparent flex items-center gap-1.5 hover:text-slate-800 transition">
-              Today
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Sorting Text Links Line (No Background Card) */}
-        <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] px-3 select-none">
-          <div className="flex items-center gap-12 flex-1">
-            <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-              Name
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </span>
-            <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-              Total Consultation
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </span>
-            <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-              Diagnosis
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </span>
-            <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-              Date
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </span>
-          </div>
-          <button aria-label="Filter" className="text-slate-400 hover:text-slate-700 transition mr-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          <button
+            onClick={fetchDoctors}
+            className="text-[12px] font-bold text-slate-400 hover:text-slate-700 flex items-center gap-1.5 transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
+            Refresh
           </button>
         </div>
 
-        {/* Split Grid Layout */}
+        {/* ── Column headers ── */}
+        <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] px-3 select-none">
+          <div className="flex items-center gap-12 flex-1">
+            <span className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition">
+              Name <DoubleCaret />
+            </span>
+            {activeTab === "onboard" && (
+              <>
+                <span className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition">
+                  Specialty <DoubleCaret />
+                </span>
+                <span className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition">
+                  Joined <DoubleCaret />
+                </span>
+              </>
+            )}
+            {activeTab === "queue" && (
+              <span className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition">
+                Applied <DoubleCaret />
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Split grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
-          
-          {/* Main Table panel */}
-          <div className={`${selectedDoctor ? "lg:col-span-8" : "lg:col-span-12"} bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[600px] flex flex-col justify-between`}>
-            <div className="overflow-x-auto">
-              
-              {activeTab === "onboard" ? (
+
+          {/* Left: table */}
+          <div className={`${selectedDoctor ? "lg:col-span-8" : "lg:col-span-12"} bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[400px] flex flex-col justify-between`}>
+
+            {filteredList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 py-16 text-slate-400 gap-3">
+                <svg className="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p className="text-[13px] font-semibold">
+                  {activeTab === "queue" ? "No pending applications" : "No doctors onboarded yet"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="pb-4 pt-1 font-bold pl-2">
-                        <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          Name <DoubleCaret />
-                        </div>
-                      </th>
-                      <th className="pb-4 pt-1 font-bold">
-                        <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          No. of Consultation <DoubleCaret />
-                        </div>
-                      </th>
-                      <th className="pb-4 pt-1 font-bold">
-                        <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          Avg. Consultation <DoubleCaret />
-                        </div>
-                      </th>
-                      <th className="pb-4 pt-1 font-bold">
-                        <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          No. of Prescription <DoubleCaret />
-                        </div>
-                      </th>
-                      <th className="pb-4 pt-1 font-bold">
-                        <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          Ratings <DoubleCaret />
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
                   <tbody>
-                    {sortedDoctors.map((doc) => {
+                    {filteredList.map((doc) => {
                       const isSelected = selectedDoctorId === doc.id;
                       return (
                         <tr
                           key={doc.id}
                           onClick={() => setSelectedDoctorId(doc.id)}
                           className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
-                            isSelected 
-                              ? "bg-[#f8fafd]" 
-                              : "hover:bg-slate-50/50"
+                            isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"
                           }`}
                         >
-                          <td className="py-3 px-2 flex items-center gap-3">
-                            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                              <img src={doc.avatar} alt={doc.name} className="w-full h-full object-cover" />
-                              {doc.status === "online" ? (
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
-                              ) : (
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
-                                {doc.name}
-                              </p>
-                              <p className="text-[11px] font-semibold text-slate-400 truncate">{doc.email}</p>
-                            </div>
-                          </td>
-                          <td className="py-3 text-[13px] text-slate-700 font-bold text-center">
-                            {doc.consultations}
-                          </td>
-                          <td className="py-3 text-[13px] text-slate-700 font-bold text-center">
-                            {doc.avgConsultation}
-                          </td>
-                          <td className="py-3 text-[13px] text-slate-700 font-bold text-center">
-                            {doc.prescriptions}
-                          </td>
-                          <td className="py-3 text-center">
-                            <div className="flex items-center justify-center gap-[3px]">
-                              {Array.from({ length: 5 }).map((_, i) => {
-                                const isFilled = i < doc.rating;
-                                return (
-                                  <svg
-                                    key={i}
-                                    className={`w-3.5 h-3.5 ${isFilled ? "text-[#6A8BFF] fill-[#6A8BFF]" : "text-[#6A8BFF] opacity-25"}`}
-                                    viewBox="0 0 24 24"
-                                    fill={isFilled ? "currentColor" : "none"}
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                  </svg>
-                                );
-                              })}
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-3">
+                              {/* Avatar initials */}
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-[11px] font-black">
+                                  {doc.fullName?.split(" ").slice(0, 2).map((n) => n[0]).join("") || "?"}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
+                                  {doc.fullName}
+                                </p>
+                                <p className="text-[11px] font-semibold text-slate-400 truncate">{doc.email}</p>
+                              </div>
                             </div>
                           </td>
+
+                          {activeTab === "onboard" && (
+                            <>
+                              <td className="py-3 text-[12px] text-slate-500 font-semibold">
+                                {doc.specialty || "—"}
+                              </td>
+                              <td className="py-3 text-[12px] text-slate-400 font-medium">
+                                {doc.approvedAt ? new Date(doc.approvedAt).toLocaleDateString() : "—"}
+                              </td>
+                            </>
+                          )}
+
+                          {activeTab === "queue" && (
+                            <>
+                              <td className="py-3 text-[12px] text-slate-400 font-medium">
+                                {new Date(doc.registeredAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 pr-4 text-right">
+                                <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-600 border border-amber-200 text-[11px] font-bold px-3 py-1 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                  Pending
+                                </span>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-              ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="pb-4 pt-1 font-bold pl-2">
-                        <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">
-                          Name <DoubleCaret />
-                        </div>
-                      </th>
-                      <th className="pb-4 pt-1"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedDoctors.map((doc) => {
-                      const isSelected = selectedDoctorId === doc.id;
-                      return (
-                        <tr
-                          key={doc.id}
-                          onClick={() => setSelectedDoctorId(doc.id)}
-                          className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
-                            isSelected 
-                              ? "bg-[#f8fafd] rounded-2xl" 
-                              : "hover:bg-slate-50/50"
-                          }`}
-                        >
-                          <td className="py-3 px-2 flex items-center gap-3">
-                            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                              <img src={doc.avatar} alt={doc.name} className="w-full h-full object-cover" />
-                              {doc.status === "online" ? (
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
-                              ) : (
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
-                                {doc.name}
-                              </p>
-                              <p className="text-[11px] font-semibold text-slate-400 truncate">{doc.email}</p>
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4 text-right">
-                            {isSelected ? (
-                              <button className="bg-[#6A8BFF] text-white text-[11px] font-bold px-6 py-2 rounded-full shadow-md shadow-blue-200/50">
-                                Verify Manually
-                              </button>
-                            ) : (
-                              <span className="text-[12px] font-bold text-slate-800 mr-6">
-                                Verify Manually
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-
-            </div>
-
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-              <button 
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                aria-label="Previous page"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                <button 
-                  key={num}
-                  className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
-                    num === 1 
-                      ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" 
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
-              <button 
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                aria-label="Next page"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7-7" />
-                </svg>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* Right Doctor Details panel */}
+          {/* Right: doctor details panel */}
           {selectedDoctor && (
-            <div className="lg:col-span-4 bg-[#F6F9FF] rounded-[2rem] shadow-sm border border-white p-7 animate-in slide-in-from-right-3 duration-300">
-              
-              {/* Header */}
+            <div className="lg:col-span-4 bg-[#F6F9FF] rounded-[2rem] shadow-sm border border-white p-7">
+
               <div className="flex items-center justify-between pb-4">
                 <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Doctor Details</h2>
                 <button
                   onClick={() => setSelectedDoctorId(null)}
                   className="w-7 h-7 rounded-full hover:bg-white flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm"
-                  aria-label="Close details"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -682,97 +366,101 @@ export default function ManageDoctorsPage() {
                 </button>
               </div>
 
-              {/* Profile Header Card style */}
+              {/* Profile card */}
               <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-50 mb-5">
                 <div className="flex items-center gap-4">
-                  <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-slate-100">
-                    <img src={selectedDoctor.avatar} alt={selectedDoctor.name} className="w-full h-full object-cover" />
-                    {selectedDoctor.status === "online" && (
-                      <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-[#10b981] border-2 border-white rounded-full" />
-                    )}
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center flex-shrink-0 shadow-md">
+                    <span className="text-white text-[18px] font-black">
+                      {selectedDoctor.fullName?.split(" ").slice(0, 2).map((n) => n[0]).join("") || "?"}
+                    </span>
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-black text-slate-800">{selectedDoctor.name}</h3>
-                    <p className="text-[10px] font-bold text-[#6A8BFF] uppercase tracking-wide mt-1 bg-blue-50/50 inline-block px-1.5 py-0.5 rounded">
-                      LICENSE NUMBER {selectedDoctor.license}
-                    </p>
-                    <div className="flex items-center gap-[3px] mt-2">
-                      {Array.from({ length: 5 }).map((_, i) => {
-                        const isFilled = i < selectedDoctor.rating;
-                        return (
-                          <svg
-                            key={i}
-                            className={`w-3.5 h-3.5 ${isFilled ? "text-[#6A8BFF] fill-[#6A8BFF]" : "text-[#6A8BFF] opacity-25"}`}
-                            viewBox="0 0 24 24"
-                            fill={isFilled ? "currentColor" : "none"}
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                        );
-                      })}
+                    <h3 className="text-[15px] font-black text-slate-800">{selectedDoctor.fullName}</h3>
+                    {selectedDoctor.license && (
+                      <p className="text-[10px] font-bold text-[#6A8BFF] uppercase tracking-wide mt-1 bg-blue-50/50 inline-block px-1.5 py-0.5 rounded">
+                        LICENSE {selectedDoctor.license}
+                      </p>
+                    )}
+                    {/* Status badge */}
+                    <div className={`mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full ${
+                      selectedDoctor.status === "approved"
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                        : "bg-amber-50 text-amber-600 border border-amber-200"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        selectedDoctor.status === "approved" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+                      }`} />
+                      {selectedDoctor.status === "approved" ? "Approved" : "Pending Approval"}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Specialty Tag & Bio */}
-              <div className="mb-6 px-1">
-                <span className="inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-black tracking-wide uppercase mb-4">
-                  {selectedDoctor.specialty}
-                </span>
-                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+              {selectedDoctor.specialty && (
+                <div className="mb-4 px-1">
+                  <span className="inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-black tracking-wide uppercase">
+                    {selectedDoctor.specialty}
+                  </span>
+                </div>
+              )}
+
+              {selectedDoctor.bio && (
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-5 px-1">
                   {selectedDoctor.bio}
                 </p>
+              )}
+
+              {/* Details table */}
+              <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-4 mb-6">
+                {[
+                  { label: "Email",        value: selectedDoctor.email },
+                  { label: "Phone",        value: selectedDoctor.phone },
+                  { label: "Gender",       value: selectedDoctor.gender },
+                  { label: "Date of Birth",value: selectedDoctor.dateOfBirth },
+                  { label: "Emirates ID",  value: selectedDoctor.emiratesId },
+                  { label: "Applied On",   value: selectedDoctor.registeredAt ? new Date(selectedDoctor.registeredAt).toLocaleDateString() : null },
+                ].map(({ label, value }) =>
+                  value ? (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-bold">{label}</span>
+                      <span className="text-[11px] text-slate-800 font-bold truncate max-w-[160px]">{value}</span>
+                    </div>
+                  ) : null
+                )}
               </div>
 
-              {/* Details table in white card */}
-              <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-5 mb-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Emirates ID</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.emiratesId}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.phone}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Email ID</span>
-                  <span className="text-[11px] text-slate-800 font-bold truncate max-w-[170px]">{selectedDoctor.email}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Gender</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.gender}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Date of Birth</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.dob}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">General Consultation Fees</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.fees}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Languages</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedDoctor.languages}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
+              {/* Action buttons */}
               <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => router.push(`/dashboard/doctors/${selectedDoctor.id}`)}
-                  className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
-                >
-                  View Detailed Profile
-                </button>
                 {activeTab === "queue" && (
                   <button
                     onClick={() => handleApprove(selectedDoctor.id)}
-                    className="w-full py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[13px] font-bold transition duration-200 active:scale-[0.98]"
+                    disabled={loadingApprove}
+                    className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
                   >
-                    Complete Onboarding
+                    {loadingApprove ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Approving…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Complete Onboarding
+                      </>
+                    )}
+                  </button>
+                )}
+                {activeTab === "onboard" && (
+                  <button
+                    onClick={() => router.push(`/dashboard/doctors/${selectedDoctor.id}`)}
+                    className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                  >
+                    View Detailed Profile
                   </button>
                 )}
               </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { signUp } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 
 // Import modular step components
@@ -130,6 +129,8 @@ export default function SignupPage() {
   };
 
   // Step 4: Password Creation & Registration Submit
+  // Calls our backend /api/doctors/register — creates ST account with "doctor_pending" role
+  // and saves profile to Cosmos. No dashboard access until admin approves.
   const handleStep4Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -143,24 +144,39 @@ export default function SignupPage() {
       return;
     }
 
-    // Use the email collected in step 3; fall back to emailOrPhone from step 1
+    // email from step 3 basic details; fall back to emailOrPhone from step 1
     const registrationEmail = email.trim() || emailOrPhone.trim();
+
+    if (!registrationEmail) {
+      setError("Please provide a valid email address.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await signUp({
-        formFields: [
-          { id: "email",    value: registrationEmail },
-          { id: "password", value: password },
-        ],
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const res = await fetch(`${apiUrl}/api/doctors/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email:       registrationEmail,
+          password,
+          fullName,
+          phone,
+          dateOfBirth,
+          gender,
+          emiratesId,
+        }),
       });
 
-      if (response.status === "OK") {
+      const data = await res.json();
+
+      if (res.ok) {
         setStep(5);
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your input.");
+      } else if (res.status === 409) {
+        setError("An account with this email already exists. Please log in.");
       } else {
-        setError("Registration is not allowed right now. Please contact support.");
+        setError(data.error || "Registration failed. Please try again.");
       }
     } catch {
       setError("Cannot reach the server. Make sure the backend is running.");
@@ -169,8 +185,9 @@ export default function SignupPage() {
     }
   };
 
+  // After registration, doctor goes back to login (they can't access dashboard until approved)
   const handleFinalComplete = () => {
-    router.push("/dashboard");
+    router.push("/auth/login");
   };
 
   return (
