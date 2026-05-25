@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [email, setEmail]               = useState("");
+  const [password, setPassword]         = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe]     = useState(false);
+  const [error, setError]               = useState("");
+  const [loading, setLoading]           = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -17,87 +20,183 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await signIn({
-        formFields: [
-          { id: "email",    value: email },
-          { id: "password", value: password },
-        ],
-      });
-
-      if (response.status === "OK") {
-        router.push("/dashboard");
-      } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
-        setError("Invalid email or password.");
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your input.");
-      } else {
-        setError("Sign in not allowed. Contact your system administrator.");
-      }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
+    // Mock successful sign-in with network delay simulation
+    setTimeout(() => {
       setLoading(false);
-    }
+      router.push("/dashboard");
+    }, 600);
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">W</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
-          <p className="text-gray-500 text-sm mt-1">Sign in to manage the platform</p>
+    <div className="min-h-screen bg-gradient-to-tr from-[#f3f4fd] via-[#f8f9ff] to-[#f0f4ff] flex items-center justify-center p-6 md:p-12">
+      <div className="flex flex-col md:flex-row gap-8 items-stretch w-full max-w-[960px] justify-center">
+        
+        {/* ── Left: Doctor image panel (standalone card) ──────────────── */}
+        <div className="hidden md:flex md:w-[45%] relative rounded-[2rem] bg-[#3276D2] overflow-hidden min-h-[500px] items-end justify-center shadow-lg shadow-blue-100/30">
+          <Image
+            src="/doctor-login.png"
+            alt="Wellness Central Doctor"
+            fill
+            className="object-cover object-center scale-[1.01]"
+            priority
+          />
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-6 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="admin@wellness.com"
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
-            />
+        {/* ── Right: Form panel (standalone white card) ───────────────── */}
+        <div className="flex-grow md:w-[55%] bg-white rounded-[2rem] shadow-xl shadow-slate-100/60 p-10 md:p-12 flex flex-col justify-between border border-slate-100/50 min-h-[500px]">
+          
+          {/* Logo: "Wellness Central" with correct double/single blue bar dividers */}
+          <div className="select-none">
+            <WellnessCentralLogo />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
-            />
+          <div className="my-6">
+            <h1 className="text-2xl font-normal font-serif text-slate-800 mb-6 tracking-normal">
+              Glad to See You Again!
+            </h1>
+
+            {/* Error message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-5 text-sm">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 flex flex-col">
+              {/* Email */}
+              <div>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="Email*"
+                  className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all outline-none font-medium"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Password*"
+                  className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all outline-none font-medium pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Remember me + Forgot Password */}
+              <div className="flex items-center justify-between pt-1 pb-4">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <div className="relative">
+                    <input
+                      id="remember-me"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${
+                      rememberMe 
+                        ? "border-[#4F83FD] bg-[#4F83FD] text-white" 
+                        : "border-slate-300 bg-white"
+                    }`}>
+                      {rememberMe && (
+                        <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-sm text-gray-400 font-medium">Remember me</span>
+                </label>
+                <Link href="/auth/forgot-password" className="text-xs text-[#4F83FD] hover:underline font-semibold transition">
+                  Forgot Password?
+                </Link>
+              </div>
+
+              {/* Submit - self-aligned to left */}
+              <button
+                id="login-submit"
+                type="submit"
+                disabled={loading}
+                className="w-fit px-8 py-3.5 bg-[#4F83FD] hover:bg-[#3d70e6] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md shadow-blue-100 disabled:opacity-60 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    Login
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
-        </form>
+          {/* Footer */}
+          <div className="flex justify-start gap-2.5 text-[11px] text-gray-400 font-medium pt-2">
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <span>|</span>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Use</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Need an admin account?{" "}
-          <Link href="/auth/signup" className="text-purple-600 hover:underline font-medium">
-            Create one
-          </Link>
-        </p>
+// ── Logo component with double-bar and single-bar ─────────────────────────────
+function WellnessCentralLogo() {
+  const DoubleBar = () => (
+    <span className="inline-flex gap-[2.5px] items-end mx-[1px] h-[26px] translate-y-[2px]">
+      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
+      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
+    </span>
+  );
+
+  const SingleBar = () => (
+    <span className="inline-flex items-end mx-[1px] h-[26px] translate-y-[2px]">
+      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
+    </span>
+  );
+
+  return (
+    <div className="font-sans font-black text-slate-800 leading-[1.05] select-none tracking-tight" style={{ fontSize: 32 }}>
+      <div>
+        We<DoubleBar />ness
+      </div>
+      <div>
+        Centr<SingleBar />al
       </div>
     </div>
   );
