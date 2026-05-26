@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSidebar } from "./SidebarContext";
 import Session, { signOut } from "supertokens-web-js/recipe/session";
 
 // ─── Icons (memoised, never recreated) ───────────────────────────────────────
@@ -86,7 +87,7 @@ const CollapseIcon = () => (
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { href: "/dashboard",               label: "Home",         Icon: HomeIcon },
-  { href: "/dashboard/appointments",  label: "Appointments", Icon: ApptIcon },
+  { href: "/appointments",  label: "Appointments", Icon: ApptIcon },
   { href: "/dashboard/patients",      label: "Patients",     Icon: PatientsIcon },
   { href: "/dashboard/analytics",     label: "Analytics",    Icon: AnalyticsIcon },
   { href: "/dashboard/prescriptions", label: "Tasks",        Icon: TasksIcon },
@@ -99,12 +100,12 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname  = usePathname();
   const router    = useRouter();
-  const [open, setOpen] = useState(true);
+  const { isOpen: open, setIsOpen: setOpen } = useSidebar();
   const [doctorName,  setDoctorName]  = useState("Dr. Jordan Anderson");
   const [doctorEmail, setDoctorEmail] = useState("yelena@example.com");
 
   // Single toggle — no setTimeout, no stacked delays
-  const toggle = () => setOpen(o => !o);
+  const toggle = () => setOpen(!open);
 
   useEffect(() => {
     async function loadProfile() {
