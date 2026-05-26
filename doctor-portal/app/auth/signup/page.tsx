@@ -151,7 +151,15 @@ export default function SignupPage() {
   };
 
   const handleFinalComplete = () => {
-    router.push("/dashboard");
+    const params = new URLSearchParams({
+      name: fullName || "",
+      email: email || "",
+      phone: phone || "",
+      dob: dateOfBirth || "",
+      gender: gender || "",
+      emiratesId: emiratesId || "",
+    });
+    router.push(`/auth/complete-profile?${params.toString()}`);
   };
 
   return (
