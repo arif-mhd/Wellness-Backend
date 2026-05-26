@@ -21,9 +21,17 @@ const BANKS = [
 
 function TrashIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
       <path d="M10 3.5V10.5C10 10.776 9.776 11 9.5 11H2.5C2.224 11 2 10.776 2 10.5V3.5H1V2.5H11V3.5H10ZM3 3.5V10H9V3.5H3ZM3.5 1H8.5V2H3.5V1ZM5.5 5H6.5V8.5H5.5V5Z" fill="#E84949" />
     </svg>
+  );
+}
+
+function RadioCircle({ selected }: { selected: boolean }) {
+  return (
+    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${selected ? "border-[#5476FC] bg-white" : "border-[#D1D5EB] bg-white"}`}>
+      {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#5476FC]" />}
+    </span>
   );
 }
 
@@ -65,100 +73,120 @@ export default function PaymentsPage() {
   }
 
   return (
-    <>
-      {/* ── Earnings Summary ─────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-[#24292E] text-base font-medium tracking-tight">Earnings Summary</h2>
-        <div className="flex items-center gap-3">
-          <button className="px-3.5 py-1.5 bg-[#E0E7FF] text-[#383F45] text-[13px] font-medium rounded-xl hover:bg-[#D0DAFF] transition-colors">
-            View Transaction History
-          </button>
-          <button className="px-3.5 py-1.5 bg-[#E0E7FF] text-[#383F45] text-[13px] font-medium rounded-xl hover:bg-[#D0DAFF] transition-colors">
-            Withdraw Now
-          </button>
+    <div className="flex flex-col gap-6 font-outfit select-none">
+      {/* ── Earnings Summary Section ─────────────────────────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[#383F45] font-medium text-[20px] tracking-[-0.4px]">
+            Earnings Summary
+          </h2>
+          <div className="flex items-center gap-3">
+            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+              View Transaction History
+            </button>
+            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+              Withdraw Now
+            </button>
+          </div>
+        </div>
+
+        {/* Stat cards */}
+        <div className="flex gap-6">
+          {[
+            { label: "Earnings this month", value: "AED 6,000.00" },
+            { label: "Total Earnings",      value: "AED 60,000.00" },
+            { label: "Withdrawn",           value: "AED 60,000.00" },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white border border-[#EBEEF5] rounded-[12px] p-6 flex flex-col gap-2 flex-1 shadow-sm">
+              <span className="text-[#676E76] text-[13px] font-normal">{label}</span>
+              <span className="text-[#24292E] text-[24px] font-bold tracking-tight mt-1 leading-none">
+                {value}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="flex gap-5">
-        {[
-          { label: "Earnings this month", value: "AED 6,000.00" },
-          { label: "Total Earnings",      value: "AED 60,000.00" },
-          { label: "Withdrawn",           value: "AED 60,000.00" },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl p-6 flex flex-col gap-4 flex-1">
-            <span className="text-[#676E76] text-xs">{label}</span>
-            <span className="text-[#24292E] text-[22px] font-medium tracking-tight leading-none">{value}</span>
+      {/* ── Payment Methods Section ───────────────────────────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[#383F45] font-medium text-[20px] tracking-[-0.4px]">
+            Payment Methods
+          </h2>
+          <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+            Add another account
+          </button>
+        </div>
+
+        {/* Bank account management card */}
+        <div className="bg-white border border-[#EBEEF5] rounded-[12px] p-6 flex flex-col gap-5 shadow-sm">
+          <div>
+            <h3 className="text-[#24292E] text-[16px] font-medium tracking-[-0.32px] mb-2">
+              Bank Account Management
+            </h3>
+            <p className="text-[#676E76] text-[13px] leading-[1.6] font-normal">
+              Here you can view and manage your linked bank accounts for receiving payments. You can also add new accounts, set your primary account for withdrawals, or remove any accounts no longer in use.
+            </p>
           </div>
-        ))}
-      </div>
 
-      {/* ── Payment Methods ───────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-[#24292E] text-base font-medium tracking-tight">Payment Methods</h2>
-        <button className="px-3.5 py-1.5 bg-[#E0E7FF] text-[#383F45] text-[13px] font-medium rounded-xl hover:bg-[#D0DAFF] transition-colors">
-          Add another account
-        </button>
-      </div>
+          <div>
+            <p className="text-[#676E76] text-[12px] font-medium tracking-[-0.24px] mb-3">
+              Set primary account
+            </p>
 
-      {/* Bank account management card */}
-      <div className="bg-white rounded-xl p-6 flex flex-col gap-5">
-        <span className="text-[#24292E] text-xs font-normal">Bank Account Management</span>
-        <p className="text-[#676E76] text-xs leading-relaxed">
-          Here you can view and manage your linked bank accounts for receiving payments. You can also add new accounts, set your primary account for withdrawals, or remove any accounts no longer in use.
-        </p>
-        <p className="text-[#676E76] text-xs font-medium">Set primary account</p>
+            <div className="flex flex-col gap-4">
+              {banks.map((bank) => {
+                const selected = primaryBank === bank.id;
+                return (
+                  <div key={bank.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50/50 transition-colors">
+                    {/* Radio selection area */}
+                    <div className="pt-1.5 cursor-pointer" onClick={() => setPrimaryBank(bank.id)}>
+                      <RadioCircle selected={selected} />
+                    </div>
 
-        <div className="flex flex-col gap-4">
-          {banks.map((bank) => {
-            const selected = primaryBank === bank.id;
-            return (
-              <div key={bank.id} className="flex items-center gap-3 px-2 py-1 rounded-xl">
-                {/* Radio */}
-                <button
-                  onClick={() => setPrimaryBank(bank.id)}
-                  className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                  style={{
-                    border: `3px solid ${selected ? "#5476FC" : "#D1D5EB"}`,
-                    background: "white",
-                  }}
-                >
-                  {selected && <span className="w-3 h-3 rounded-full bg-[#5476FC] block" />}
-                </button>
+                    {/* Bank logo */}
+                    <div className="w-[43px] h-[38px] flex items-center justify-center bg-white border border-[#EBEEF5] rounded-[8px] p-1.5 shrink-0 shadow-sm mt-0.5">
+                      <img src={bank.logo} alt={bank.name} className="w-full h-full object-contain" />
+                    </div>
 
-                {/* Bank logo */}
-                <img src={bank.logo} alt={bank.name} className="w-[43px] h-[38px] object-contain shrink-0" />
-
-                {/* Bank details */}
-                <div className="flex flex-col gap-1 flex-1 min-w-0">
-                  <span className="text-[#24292E] text-xs font-normal">{bank.name}</span>
-                  <span className="text-[#676E76] text-[10px]">{bank.label}</span>
-                  <span className="text-[#24292E] text-xs">{bank.account}</span>
-                </div>
-
-                {/* Delete */}
-                <button
-                  onClick={() => removeBank(bank.id)}
-                  title="Remove account"
-                  className="shrink-0 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            );
-          })}
+                    {/* Bank details + Delete Button */}
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className="text-[#24292E] text-[14px] font-medium leading-tight">{bank.name}</span>
+                      <span className="text-[#9EA5AD] text-[12px] font-normal mt-1">{bank.label}</span>
+                      <span className="text-[#676E76] text-[12px] font-normal mt-0.5">{bank.account}</span>
+                      
+                      {/* Trash delete link directly underneath */}
+                      <button
+                        onClick={() => removeBank(bank.id)}
+                        title="Remove account"
+                        className="mt-2.5 flex items-center justify-center p-1.5 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-4">
-        <button className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-base font-medium hover:bg-[#D0DAFF] transition-colors">
+      <div className="flex gap-6 mt-2 w-full">
+        <button 
+          type="button"
+          className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-bold tracking-tight transition-all duration-200"
+        >
           Cancel
         </button>
-        <button className="flex-1 py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-base font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all">
+        <button 
+          type="button"
+          className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-bold tracking-tight transition-all duration-200"
+        >
           Save Changes
         </button>
       </div>
-    </>
+    </div>
   );
 }
