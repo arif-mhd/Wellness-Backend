@@ -2,7 +2,7 @@
 
 import SharedDashboardLayout from "@/components/DashboardLayout";
 
-export default function DashboardLayout({
+export default function AppointmentsLayout({
   children,
 }: {
   children: React.ReactNode;
