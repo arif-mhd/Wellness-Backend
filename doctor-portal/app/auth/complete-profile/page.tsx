@@ -103,10 +103,24 @@ function CompleteProfileContent() {
     console.log("Step 5 (Payment Settings) Saved:", formData);
     setPaymentSettingsInfo(formData);
 
+    // Transform raw File objects into serializable string names
+    const serializablePersonal = {
+      ...personalInfo,
+      profilePic: personalInfo.profilePic ? personalInfo.profilePic.name : null,
+      emiratesIdFile: personalInfo.emiratesIdFile ? personalInfo.emiratesIdFile.name : null,
+    };
+
+    const serializableCerts = {
+      ...certDocumentsInfo,
+      degreeFile: certDocumentsInfo?.degreeFile ? certDocumentsInfo.degreeFile.name : null,
+      specFile: certDocumentsInfo?.specFile ? certDocumentsInfo.specFile.name : null,
+      addFile: certDocumentsInfo?.addFile ? certDocumentsInfo.addFile.name : null,
+    };
+
     const consolidatedData = {
-      personal: personalInfo,
+      personal: serializablePersonal,
       medical: medicalCareerInfo,
-      certifications: certDocumentsInfo,
+      certifications: serializableCerts,
       availability: availabilityInfo,
       payment: formData
     };
@@ -114,8 +128,13 @@ function CompleteProfileContent() {
     console.log("=== Profile Complete Process Successful ===");
     console.log(consolidatedData);
 
-    // Redirect to doctor dashboard
-    router.push("/dashboard");
+    // Save to localStorage so profile pages read the entered details
+    if (typeof window !== "undefined") {
+      localStorage.setItem("doctor_onboarding_profile", JSON.stringify(consolidatedData));
+    }
+
+    // Redirect to doctor profile page
+    router.push("/dashboard/profile");
   };
 
   return (

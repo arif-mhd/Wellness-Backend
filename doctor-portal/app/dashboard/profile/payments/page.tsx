@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const BANKS = [
   {
@@ -30,6 +30,31 @@ function TrashIcon() {
 export default function PaymentsPage() {
   const [primaryBank, setPrimaryBank] = useState("abc");
   const [banks, setBanks] = useState(BANKS);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("doctor_onboarding_profile");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.payment?.bankName && parsed?.payment?.accountNumber) {
+            const last4Digits = parsed.payment.accountNumber.slice(-4) || "2345";
+            const onboardingBank = {
+              id: "onboarding",
+              name: `${parsed.payment.bankName.toUpperCase()} *******${last4Digits}`,
+              label: "Primary Account",
+              account: `Account number: xxxxx xxxxx ${last4Digits}`,
+              logo: "https://api.builder.io/api/v1/image/assets/TEMP/fed1a238a975bbbf86c5944d566774f67d7af750?width=86",
+            };
+            setBanks([onboardingBank, ...BANKS]);
+            setPrimaryBank("onboarding");
+          }
+        } catch (e) {
+          console.error("Failed to parse onboarding payment data:", e);
+        }
+      }
+    }
+  }, []);
 
   function removeBank(id: string) {
     setBanks((prev) => prev.filter((b) => b.id !== id));

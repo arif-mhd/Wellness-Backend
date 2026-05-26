@@ -125,7 +125,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Scrollable Page Body */}
-        <main className="flex-1 overflow-auto min-h-0 relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative scroll-smooth [will-change:transform] [-webkit-overflow-scrolling:touch]">
           {children}
         </main>
       </div>
