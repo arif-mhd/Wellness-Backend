@@ -8,6 +8,8 @@ interface AllConsultationsTableProps {
   selectedPatientId: string | undefined;
   onSelectPatient: (patient: Patient) => void;
   onConsult: (patient: Patient) => void;
+  onViewPreVisitForm?: (patient: Patient) => void;
+  activeTab: "All" | "Upcoming" | "Past";
 }
 
 export default function AllConsultationsTable({
@@ -15,6 +17,8 @@ export default function AllConsultationsTable({
   selectedPatientId,
   onSelectPatient,
   onConsult,
+  onViewPreVisitForm,
+  activeTab,
 }: AllConsultationsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -45,7 +49,14 @@ export default function AllConsultationsTable({
           </div>
           {/* Date/Action col */}
           <div className="flex-shrink-0 w-[293px] text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-            Date and Time
+            {activeTab === "Past" ? (
+              <div className="flex items-center justify-between w-full">
+                <span>Date and Time</span>
+                <span className="pr-4">Earnings</span>
+              </div>
+            ) : (
+              "Date and Time"
+            )}
           </div>
         </div>
 
@@ -96,24 +107,74 @@ export default function AllConsultationsTable({
                 </p>
               </div>
 
-              {/* Date + Action Column — 293px */}
+              {/* Date + Action/Earnings Column — 293px */}
               <div
                 className="flex-shrink-0 w-[293px] flex items-center justify-between gap-2"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Date/time */}
-                <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] truncate">
-                  {patient.dateTime}
-                </span>
+                {activeTab === "Past" ? (
+                  <>
+                    <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] truncate">
+                      {patient.dateTime}
+                    </span>
+                    <span className="text-[#676E76] text-[12px] font-medium leading-[1.5] tracking-[-0.24px] pr-4 select-text">
+                      {patient.earnings ?? "AED 110.00"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* Date/time or Waiting status */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {patient.status === "Waiting" ? (
+                        <div className="flex items-center gap-2">
+                          {/* Animated pulsing dot matching Figma F4A308 */}
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F4A308] opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F4A308]" />
+                          </span>
+                          <span className="text-[#F4A308] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
+                            Waiting
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] truncate">
+                          {patient.dateTime}
+                        </span>
+                      )}
+                    </div>
 
-                {/* Disabled "Consult Now" button — grey text per Figma */}
-                <button
-                  disabled
-                  className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
-                  style={{ minWidth: "100px" }}
-                >
-                  Consult Now
-                </button>
+                    {/* Action button */}
+                    {patient.status === "Completed" ? (
+                      <button
+                        disabled
+                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
+                        style={{ minWidth: "100px" }}
+                      >
+                        Consult Now
+                      </button>
+                    ) : isSelected && patient.status !== "Waiting" ? (
+                      <button
+                        onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
+                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none"
+                        style={{
+                          background:
+                            "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
+                          minWidth: "130px",
+                        }}
+                      >
+                        View&nbsp;Pre-Visit Form
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onConsult(patient)}
+                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#24292E] font-medium text-[13px] leading-5 hover:bg-[#F5F6FA] transition-colors duration-150 select-none shadow-sm"
+                        style={{ minWidth: "100px" }}
+                      >
+                        Consult Now
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           );

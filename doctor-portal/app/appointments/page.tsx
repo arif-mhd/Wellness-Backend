@@ -1,24 +1,25 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { MOCK_NEW_APPOINTMENTS, MOCK_ALL_CONSULTATIONS } from "./mockData";
 import { Patient } from "./types";
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";
 import AllConsultationsTable from "@/components/appointment/AllConsultationsTable";
 import AppointmentDetailsCard from "@/components/appointment/AppointmentDetailsCard";
 import ConsultationModal from "@/components/appointment/ConsultationModal";
-import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import { useSidebar } from "@/components/SidebarContext";
 
 export default function AppointmentsPage() {
+  const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
   const [activeTab, setActiveTab] = useState<"All" | "Upcoming" | "Past">("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [dateFilter, setDateFilter] = useState<"Today" | "All">("Today");
   const [showDateDropdown, setShowDateDropdown] = useState(false);
-  
+
   // Dynamic sorting states
   const [sortField, setSortField] = useState<"name" | "age" | "diagnosis" | "dateTime" | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -26,15 +27,9 @@ export default function AppointmentsPage() {
   // Selection states
   // By default, select Albert Flores (MOCK_NEW_APPOINTMENTS[1]) to match figma page load
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(MOCK_NEW_APPOINTMENTS[1]);
-  
+
   // Call simulation state
   const [activeConsultationPatient, setActiveConsultationPatient] = useState<Patient | null>(null);
-
-  // Pre-visit form modal state
-  const [preVisitFormPatient, setPreVisitFormPatient] = useState<Patient | null>(null);
-
-  // Patient profile state
-  const [profilePatient, setProfilePatient] = useState<Patient | null>(null);
 
   // Success Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -97,7 +92,7 @@ export default function AppointmentsPage() {
 
     // Filter by tab selection
     if (activeTab === "Upcoming") {
-      result = result.filter(c => c.status === "Scheduled");
+      result = result.filter(c => c.status === "Scheduled" || c.status === "Waiting");
     } else if (activeTab === "Past") {
       result = result.filter(c => c.status === "Completed");
     }
@@ -134,21 +129,11 @@ export default function AppointmentsPage() {
     return result;
   }, [activeTab, searchQuery, sortField, sortOrder]);
 
-  if (profilePatient) {
-    return (
-      <PatientProfileModal
-        patient={profilePatient}
-        onClose={() => setProfilePatient(null)}
-      />
-    );
-  }
-
   return (
-    <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${
-      sidebarOpen 
-        ? "md:p-6 lg:p-6 xl:p-8 xl:pl-[24px] xl:pr-[24px]" 
+    <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${sidebarOpen
+        ? "md:p-6 lg:p-6 xl:p-8 xl:pl-[24px] xl:pr-[24px]"
         : "md:p-8 lg:p-10 lg:pl-[40px] lg:pr-[40px]"
-    }`}>
+      }`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#24292E] text-white px-4 py-3 rounded-[12px] flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-white/10 animate-slide-up text-sm font-medium">
@@ -157,13 +142,6 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {/* Pre-Visit Form Modal */}
-      {preVisitFormPatient && (
-        <PreVisitFormModal
-          patient={preVisitFormPatient}
-          onClose={() => setPreVisitFormPatient(null)}
-        />
-      )}
 
       {/* Video Call Modal */}
       {activeConsultationPatient && (
@@ -178,29 +156,20 @@ export default function AppointmentsPage() {
 
       {/* Left Panel - Tables & Filters */}
       <div className="flex-1 flex flex-col gap-6 min-w-0">
-        
+
         {/* Title and Top Action Row */}
         <div className="flex justify-between items-center w-full">
           <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
             Appointments
           </h1>
-          
+
           <button
-            onClick={() => {
-              // Consult the first waiting patient if available
-              const waiting = MOCK_NEW_APPOINTMENTS.find(a => a.status === "Waiting");
-              if (waiting) {
-                setActiveConsultationPatient(waiting);
-                triggerToast(`Joining Waiting Room with ${waiting.name}`);
-              } else {
-                triggerToast("No patients currently in the waiting room.");
-              }
-            }}
+            onClick={() => router.push("/appointments/waitingroom")}
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-md text-white font-medium text-[13px] rounded-[12px] transition-all duration-200"
           >
             <span>Go to Waiting Room</span>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
@@ -211,31 +180,28 @@ export default function AppointmentsPage() {
             {/* Tabs */}
             <button
               onClick={() => setActiveTab("All")}
-              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${
-                activeTab === "All"
+              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "All"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
-              }`}
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setActiveTab("Upcoming")}
-              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${
-                activeTab === "Upcoming"
+              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Upcoming"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
-              }`}
+                }`}
             >
               Upcoming
             </button>
             <button
               onClick={() => setActiveTab("Past")}
-              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${
-                activeTab === "Past"
+              className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Past"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
-              }`}
+                }`}
             >
               Past
             </button>
@@ -244,14 +210,13 @@ export default function AppointmentsPage() {
             <div className="relative flex items-center">
               <button
                 onClick={() => setShowSearchInput(!showSearchInput)}
-                className={`p-2.5 bg-white rounded-full flex items-center justify-center border border-[#EBEEF5] hover:bg-gray-50 transition-all ${
-                  showSearchInput ? "border-[#8AA0FF] bg-[#E0E7FF]/20" : ""
-                }`}
+                className={`p-2.5 bg-white rounded-full flex items-center justify-center border border-[#EBEEF5] hover:bg-gray-50 transition-all ${showSearchInput ? "border-[#8AA0FF] bg-[#E0E7FF]/20" : ""
+                  }`}
                 title="Search Appointments"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6.41667 11.0833C8.994 11.0833 11.0833 8.994 11.0833 6.41667C11.0833 3.83934 8.994 1.75 6.41667 1.75C3.83934 1.75 1.75 3.83934 1.75 6.41667C1.75 8.994 3.83934 11.0833 6.41667 11.0833Z" stroke="#3D4B5A" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12.2484 12.2504L9.71094 9.71289" stroke="#3D4B5A" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M6.41667 11.0833C8.994 11.0833 11.0833 8.994 11.0833 6.41667C11.0833 3.83934 8.994 1.75 6.41667 1.75C3.83934 1.75 1.75 3.83934 1.75 6.41667C1.75 8.994 3.83934 11.0833 6.41667 11.0833Z" stroke="#3D4B5A" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12.2484 12.2504L9.71094 9.71289" stroke="#3D4B5A" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
@@ -276,7 +241,7 @@ export default function AppointmentsPage() {
             >
               <span>{dateFilter === "Today" ? "Today" : "All Dates"}</span>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className={`transition-transform duration-200 ${showDateDropdown ? "rotate-180" : ""}`}>
-                <path d="M4 6L8 10L12 6" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4 6L8 10L12 6" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
 
@@ -308,26 +273,28 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Section 1: New Appointments */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[#24292E] font-medium text-[16px] tracking-[-0.32px]">
-              New Appointments
-            </h2>
-            {searchQuery && (
-              <button onClick={handleResetFilters} className="text-xs text-[#5476FC] hover:underline">
-                Clear Filters
-              </button>
-            )}
-          </div>
+        {activeTab === "All" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[#24292E] font-medium text-[16px] tracking-[-0.32px]">
+                New Appointments
+              </h2>
+              {searchQuery && (
+                <button onClick={handleResetFilters} className="text-xs text-[#5476FC] hover:underline">
+                  Clear Filters
+                </button>
+              )}
+            </div>
 
-          <NewAppointmentsTable
-            appointments={filteredNewAppointments}
-            selectedPatientId={selectedPatient?.id}
-            onSelectPatient={setSelectedPatient}
-            onConsult={setActiveConsultationPatient}
-            onViewPreVisitForm={setPreVisitFormPatient}
-          />
-        </div>
+            <NewAppointmentsTable
+              appointments={filteredNewAppointments}
+              selectedPatientId={selectedPatient?.id}
+              onSelectPatient={setSelectedPatient}
+              onConsult={setActiveConsultationPatient}
+              onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+            />
+          </div>
+        )}
 
         {/* Section 2: All Consultations */}
         <div className="flex flex-col gap-3">
@@ -341,52 +308,48 @@ export default function AppointmentsPage() {
               {/* Name sort */}
               <button
                 onClick={() => handleSort("name")}
-                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${
-                  sortField === "name" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
-                }`}
+                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${sortField === "name" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
+                  }`}
               >
                 <span>Name</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
               {/* Age sort */}
               <button
                 onClick={() => handleSort("age")}
-                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${
-                  sortField === "age" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
-                }`}
+                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${sortField === "age" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
+                  }`}
               >
                 <span>Age</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
               {/* Diagnosis sort */}
               <button
                 onClick={() => handleSort("diagnosis")}
-                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${
-                  sortField === "diagnosis" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
-                }`}
+                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${sortField === "diagnosis" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
+                  }`}
               >
                 <span>Diagnosis</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
               {/* Date sort */}
               <button
                 onClick={() => handleSort("dateTime")}
-                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${
-                  sortField === "dateTime" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
-                }`}
+                className={`flex items-center gap-1.5 text-[12px] font-medium tracking-[-0.24px] ${sortField === "dateTime" ? "text-[#5476FC]" : "text-[#707070] hover:text-[#24292E]"
+                  }`}
               >
                 <span>Date</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
@@ -408,6 +371,8 @@ export default function AppointmentsPage() {
             selectedPatientId={selectedPatient?.id}
             onSelectPatient={setSelectedPatient}
             onConsult={setActiveConsultationPatient}
+            onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+            activeTab={activeTab}
           />
         </div>
       </div>
@@ -421,7 +386,8 @@ export default function AppointmentsPage() {
             setActiveConsultationPatient(patient);
             triggerToast(`Consultation requested for ${patient.name}`);
           }}
-          onViewProfile={setProfilePatient}
+          onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
+          onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
         />
       </div>
     </div>

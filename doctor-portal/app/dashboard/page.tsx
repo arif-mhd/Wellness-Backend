@@ -2,6 +2,7 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 
 interface Patient {
@@ -20,6 +21,7 @@ interface Task {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [doctorName, setDoctorName] = useState<string | null>("Dr. Jordan Anderson");
   const [selectedPatientId, setSelectedPatientId] = useState<number>(2); // Floyd Miles is selected by default
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
@@ -111,7 +113,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Waiting Room Button */}
-            <button className="h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-[26px] rounded-xl font-medium text-[16px] flex items-center justify-center gap-3 shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_12px_24px_rgba(84,118,252,0.35)] transition-all">
+            <button
+              onClick={() => router.push("/appointments/waitingroom")}
+              className="h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-[26px] rounded-xl font-medium text-[16px] flex items-center justify-center gap-3 shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_12px_24px_rgba(84,118,252,0.35)] transition-all"
+            >
               <span style={{ fontFamily: "Outfit, sans-serif" }}>Waiting Room</span>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M13.5 19.5L21 12L13.5 4.5M21 12H3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -355,7 +360,7 @@ export default function DashboardPage() {
             <div className="p-2 rounded-[24px] bg-[#F0F2F2] flex flex-col gap-2 shadow-sm border border-transparent hover:border-gray-200 transition-all">
               {/* Header */}
               <div className="flex justify-between items-center w-full pl-2.5 pr-1 py-1">
-                <span className="text-[#2B2B2B] text-[16px] font-medium leading-[1.5]" style={{ fontFamily: "Bricolage Grotesque, sans-serif" }}>
+                <span className="text-[#2B2B2B] text-[16px] font-medium leading-[1.5] font-bricolage">
                   Todays Tasks
                 </span>
                 <div className="w-[40px] h-[40px] rounded-full bg-white flex items-center justify-center cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
@@ -369,7 +374,7 @@ export default function DashboardPage() {
               {/* Lime Progress Box */}
               <div className="p-5 flex flex-col gap-3 rounded-[12px] bg-[#CDE48C] w-full">
                 <div className="flex flex-col gap-2">
-                  <div className="text-[#2B2B2B] text-[24px] font-medium leading-[1.5]" style={{ fontFamily: "Bricolage Grotesque, sans-serif" }}>
+                  <div className="text-[#2B2B2B] text-[24px] font-medium leading-[1.5] font-bricolage">
                     {tasks.length} Tasks
                   </div>
                   

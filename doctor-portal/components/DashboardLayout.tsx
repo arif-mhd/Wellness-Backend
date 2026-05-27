@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
@@ -18,55 +19,38 @@ export default function SharedDashboardLayout({
 }
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const { isOpen: sidebarOpen, showWaitingRoom, setShowWaitingRoom } = useSidebar();
+  const router = useRouter();
+  const { isOpen: sidebarOpen } = useSidebar();
 
   return (
     <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
       {/* Decorative Blur Blobs behind everything */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Left Blob */}
-        <svg
+        {/* Left Blob - Using CSS radial-gradient for performance */}
+        <div
           className="absolute"
-          style={{ left: "-415px", bottom: "-563px", borderRadius: "1012px", background: "rgba(131, 114, 235, 0.12)", filter: "blur(402.5px)" }}
-          width="1012"
-          height="1012"
-          viewBox="0 0 1012 1012"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <g filter="url(#filter0_f_82_17537)">
-            <circle cx="506" cy="506" r="506" fill="#8372EB" fillOpacity="0.12" />
-          </g>
-          <defs>
-            <filter id="filter0_f_82_17537" x="-805" y="-805" width="2622" height="2622" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feFlood floodOpacity="0" result="BackgroundImageFix" />
-              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-              <feGaussianBlur stdDeviation="402.5" result="effect1_foregroundBlur_82_17537" />
-            </filter>
-          </defs>
-        </svg>
+          style={{
+            left: "-415px",
+            bottom: "-563px",
+            width: "1012px",
+            height: "1012px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(131, 114, 235, 0.12) 0%, rgba(131, 114, 235, 0) 70%)",
+          }}
+        />
 
-        {/* Right Blob */}
-        <svg
+        {/* Right Blob - Using CSS radial-gradient for performance */}
+        <div
           className="absolute"
-          style={{ right: "-422px", top: "-423px", borderRadius: "971px", background: "rgba(96, 156, 255, 0.12)", filter: "blur(400px)" }}
-          width="971"
-          height="971"
-          viewBox="0 0 971 971"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <g filter="url(#filter0_f_82_17538)">
-            <circle cx="485.5" cy="485.5" r="485.5" fill="#609CFF" fillOpacity="0.12" />
-          </g>
-          <defs>
-            <filter id="filter0_f_82_17538" x="-800" y="-800" width="2571" height="2571" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feFlood floodOpacity="0" result="BackgroundImageFix" />
-              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-              <feGaussianBlur stdDeviation="400" result="effect1_foregroundBlur_82_17538" />
-            </filter>
-          </defs>
-        </svg>
+          style={{
+            right: "-422px",
+            top: "-423px",
+            width: "971px",
+            height: "971px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(96, 156, 255, 0.12) 0%, rgba(96, 156, 255, 0) 70%)",
+          }}
+        />
       </div>
 
       {/* Main Sidebar (takes full height) */}
@@ -115,7 +99,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
             {/* Waiting Room (12) Button */}
             <button
-              onClick={() => setShowWaitingRoom(true)}
+              onClick={() => router.push("/appointments/waitingroom")}
               className="h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-5 rounded-xl text-[13px] font-bold flex items-center gap-2.5 shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] transition-all select-none"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -144,12 +128,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Scrollable Page Body */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative scroll-smooth [will-change:transform] [-webkit-overflow-scrolling:touch]">
-          {showWaitingRoom ? (
-            <WaitingRoom onClose={() => setShowWaitingRoom(false)} />
-          ) : (
-            children
-          )}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative scroll-smooth [-webkit-overflow-scrolling:touch]">
+          {children}
         </main>
       </div>
     </div>

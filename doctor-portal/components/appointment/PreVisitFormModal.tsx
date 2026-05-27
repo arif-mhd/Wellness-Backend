@@ -10,7 +10,16 @@ interface PreVisitFormModalProps {
 
 export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModalProps) {
   const [confirmed, setConfirmed] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const form = patient.preVisitForm;
+
+  if (!isVisible) return null;
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsVisible(false);
+    onClose();
+  };
 
   const fields = [
     { label: "Do you have any chronic illnesses?", value: form?.chronicIllnesses ?? "Not provided" },
@@ -25,7 +34,7 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
     /* Backdrop */
     <div
       className="fixed inset-0 z-[9999] flex items-start justify-end bg-black/50 font-outfit"
-      onClick={onClose}
+      onClick={handleClose}
     >
       {/* Modal panel — matches Figma: 371px wide, right-aligned, 32px from top */}
       <div
@@ -40,7 +49,7 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
               Pre-visit Form
             </span>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               aria-label="Close"
             >
@@ -120,7 +129,7 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
 
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="w-full py-3 flex items-center justify-center rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-medium text-[14px] leading-5 transition-colors duration-150"
         >
           Close

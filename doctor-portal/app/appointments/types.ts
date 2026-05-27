@@ -20,4 +20,5 @@ export interface Patient {
   bio: string;
   preVisitFormDate?: string;
   preVisitForm?: PreVisitForm;
+  earnings?: string;
 }

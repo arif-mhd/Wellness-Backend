@@ -116,24 +116,40 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "brooklyn.s@example.com",
     diagnosis: "Fever",
     description: "Recovering from viral fever, seeking follow-up on temperature stability.",
-    status: "Completed",
-    dateTime: "21 Sep, 2020, 11:40 PM",
+    status: "Waiting",
+    dateTime: "Waiting",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/75256e943440be4cb0a85199610fc72cb903d28c?width=72",
     bio: "Brooklyn Simmons is a 32-year-old female who recently recovered from a moderate fever. Her follow-up visit is to ensure that her vital signs are stable and no secondary infection has developed.",
-    preVisitFormDate: "20 Sep, 2020, 06:10 PM"
+    preVisitFormDate: "20 Sep, 2020, 06:10 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "Paracetamol 500mg – As needed.",
+      allergies: "None",
+      primaryConcern: "Recovering from viral fever",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-2",
-    name: "Arlene McCoy",
-    age: 32,
-    email: "arlene.m@example.com",
+    name: "Albert Flores",
+    age: 89,
+    email: "albert.flores@example.com",
     diagnosis: "Cough",
-    description: "Post-nasal drip causing ticklish cough, particularly when lying down.",
-    status: "Completed",
-    dateTime: "1 Feb, 2020, 11:40 PM",
+    description: "I’ve had a persistent dry cough for the past week with throat irritation.",
+    status: "Scheduled",
+    dateTime: "8 Sep, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/2fc70c27396226e96d788f42ab8214ce8f948ab5?width=72",
-    bio: "Arlene McCoy is a 32-year-old female who had a history of bronchial hyperreactivity. She visited in February for a chronic cough evaluation, which has since resolved with inhaled bronchodilators.",
-    preVisitFormDate: "30 Jan, 2020, 10:20 AM"
+    bio: "John Smith is a 45-year-old male from Sharjah, UAE, diagnosed with hypertension. He has a history of Type 2 Diabetes and is currently on medication for both conditions. John follows a regular exercise routine and maintains a controlled diet to manage his health. He regularly attends check-ups and is proactive about his well-being.",
+    preVisitFormDate: "8 Sep, 2020, 11:40 PM",
+    preVisitForm: {
+      chronicIllnesses: "No",
+      currentMedications: "-Amlodipine 10mg - Take one tablet daily.\n-Metformin 500mg - Continue as prescribed.",
+      allergies: "None",
+      primaryConcern: "Persistent headaches and fatigue.",
+      smokes: "No",
+      drinks: "Yes"
+    }
   },
   {
     id: "all-3",
@@ -142,11 +158,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "cameron.w@example.com",
     diagnosis: "Asthma",
     description: "Routine assessment of exercise-induced asthma control.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/b68921b9bb9ab8729018822005356cd9a7bdb3d5?width=72",
     bio: "Cameron Williamson is a 32-year-old male with moderate asthma. His session in October was a routine asthma control assessment, and his inhaler dose was adjusted accordingly.",
-    preVisitFormDate: "21 Oct, 2020, 03:00 PM"
+    preVisitFormDate: "21 Oct, 2020, 03:00 PM",
+    preVisitForm: {
+      chronicIllnesses: "Moderate asthma",
+      currentMedications: "-Albuterol inhaler – As needed.",
+      allergies: "Dust, pollen",
+      primaryConcern: "Routine assessment of exercise-induced asthma control.",
+      smokes: "No",
+      drinks: "Occasionally"
+    }
   },
   {
     id: "all-4",
@@ -155,11 +179,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "courtney.h@example.com",
     diagnosis: "Cough",
     description: "Mild bronchitis symptoms following cold, seeking guidance.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "8 Sep, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/05a901293de2a84f45dff39e0efa33b0984e765e?width=72",
     bio: "Courtney Henry is a 32-year-old female who presented with an acute cough following a viral upper respiratory infection. Her symptoms cleared up after a course of supportive therapy.",
-    preVisitFormDate: "7 Sep, 2020, 01:40 PM"
+    preVisitFormDate: "7 Sep, 2020, 01:40 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "None currently",
+      allergies: "None",
+      primaryConcern: "Mild bronchitis symptoms following cold.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-5",
@@ -168,11 +200,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "bessie.cooper@example.com",
     diagnosis: "Fever",
     description: "Fever for three days with chills and fatigue.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/a6e1aefad7124efd79b13f8c10e84778817f96f0?width=72",
     bio: "Bessie Cooper is a 32-year-old female who presented with fever and body aches. A routine evaluation was done to rule out influenza.",
-    preVisitFormDate: "22 Oct, 2020, 10:10 AM"
+    preVisitFormDate: "22 Oct, 2020, 10:10 AM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "Paracetamol as needed",
+      allergies: "None",
+      primaryConcern: "Fever for three days with chills and fatigue.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-6",
@@ -181,11 +221,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "bessie.c2@example.com",
     diagnosis: "Fever",
     description: "Recurring mild fever in evenings.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/70edbe32982956e0679a8ff727695d9b1777fc72?width=72",
     bio: "Bessie Cooper, 28, presented with low-grade evening fevers. Blood panels were ordered to check for inflammatory markers.",
-    preVisitFormDate: "22 Oct, 2020, 08:30 AM"
+    preVisitFormDate: "22 Oct, 2020, 08:30 AM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "Paracetamol as needed",
+      allergies: "None",
+      primaryConcern: "Recurring mild fever in evenings.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-7",
@@ -194,11 +242,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "bessie.c3@example.com",
     diagnosis: "Fever",
     description: "High fever accompanied by severe sore throat.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/849e04b65fc61409106af3d69a42e91596c64bd2?width=72",
     bio: "Bessie Cooper, 35, complained of a sudden fever and throat discomfort. Swift strep test was conducted during the call.",
-    preVisitFormDate: "21 Oct, 2020, 11:00 PM"
+    preVisitFormDate: "21 Oct, 2020, 11:00 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "None",
+      allergies: "None",
+      primaryConcern: "High fever accompanied by severe sore throat.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-8",
@@ -207,11 +263,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "bessie.c4@example.com",
     diagnosis: "Fever",
     description: "Post-vaccination high fever and chills.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/9095e778a7eba1729febd7b2a1d7026c11d62d63?width=72",
     bio: "Bessie Cooper, 41, experienced immune response fevers following booster immunizations. Recommended paracetamol regimen.",
-    preVisitFormDate: "22 Oct, 2020, 09:00 AM"
+    preVisitFormDate: "22 Oct, 2020, 09:00 AM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "None",
+      allergies: "None",
+      primaryConcern: "Post-vaccination high fever and chills.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-9",
@@ -220,11 +284,19 @@ export const MOCK_ALL_CONSULTATIONS: Patient[] = [
     email: "bessie.c5@example.com",
     diagnosis: "Fever",
     description: "Fever, body aches, joint stiffness.",
-    status: "Completed",
+    status: "Scheduled",
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/5c080405a4cfd0cc48c023c7e3ca5054f6c0c807?width=72",
     bio: "Bessie Cooper, 50, sought consultation for a fever combined with joint pain. Referred to rheumatology for a follow-up check.",
-    preVisitFormDate: "20 Oct, 2020, 05:45 PM"
+    preVisitFormDate: "20 Oct, 2020, 05:45 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "None",
+      allergies: "None",
+      primaryConcern: "Fever, body aches, joint stiffness.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "all-10",

@@ -8,6 +8,7 @@ interface AppointmentDetailsCardProps {
   onClose: () => void;
   onConsult: (patient: Patient) => void;
   onViewProfile?: (patient: Patient) => void;
+  onViewPreVisitForm?: (patient: Patient) => void;
 }
 
 export default function AppointmentDetailsCard({
@@ -15,6 +16,7 @@ export default function AppointmentDetailsCard({
   onClose,
   onConsult,
   onViewProfile,
+  onViewPreVisitForm,
 }: AppointmentDetailsCardProps) {
   if (!patient) {
     return (
@@ -130,45 +132,78 @@ export default function AppointmentDetailsCard({
           </p>
         </div>
 
-        {/* Pre-visit Form */}
-        <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
-          <div className="text-[12px] leading-[1.5] tracking-[-0.24px]">
-            <span className="text-[#24292E] font-medium">Pre-visit Form </span>
-            <span className="text-[#24292E] font-light">(Last Edited: </span>
-            <span className="text-[#5476FC] font-light">
-              {patient.preVisitFormDate ?? "17 Oct, 2020, 11:40 PM"}
+        {/* Pre-visit Form or placeholder field */}
+        {patient.status === "Completed" ? (
+          <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
+            <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+              &lt;Some other field&gt;
             </span>
-            <span className="text-[#24292E] font-light">)</span>
+            <p className="text-[#676E76] text-[12px] leading-[1.4] select-text">
+              Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,
+            </p>
           </div>
-          <p className="text-[#676E76] text-[12px] leading-[1.4]">
-            Review the patient's pre-visit form to understand their medical history and reason for the appointment.
-          </p>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
+            <div className="text-[12px] leading-[1.5] tracking-[-0.24px]">
+              <span className="text-[#24292E] font-medium">Pre-visit Form </span>
+              <span className="text-[#24292E] font-light">(Last Edited: </span>
+              <span className="text-[#5476FC] font-light">
+                {patient.preVisitFormDate ?? "17 Oct, 2020, 11:40 PM"}
+              </span>
+              <span className="text-[#24292E] font-light">)</span>
+            </div>
+            <p className="text-[#676E76] text-[12px] leading-[1.4]">
+              Review the patient's pre-visit form to understand their medical history and reason for the appointment.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex flex-col gap-3 w-full mt-2">
-        {/* Chat Button */}
-        <button className="flex w-full justify-center items-center gap-2 py-3 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[14px] transition-all duration-200">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M15.75 8.62502C15.7526 9.61492 15.5213 10.5914 15.075 11.475C14.5458 12.5338 13.7323 13.4244 12.7256 14.047C11.7189 14.6696 10.5587 14.9996 9.375 15C8.3851 15.0026 7.40859 14.7713 6.525 14.325L2.25 15.75L3.675 11.475C3.2287 10.5914 2.99742 9.61492 3 8.62502C3.00046 7.44134 3.33046 6.28116 3.95304 5.27443C4.57562 4.26771 5.46619 3.4542 6.525 2.92502C7.40859 2.47872 8.3851 2.24744 9.375 2.25002H9.75C11.3133 2.33627 12.7898 2.99609 13.8969 4.10317C15.0039 5.21024 15.6638 6.68676 15.75 8.25002V8.62502Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>Chat with Patient</span>
-        </button>
+        {patient.status === "Completed" ? (
+          <>
+            {/* Send Reminder */}
+            <button
+              onClick={() => alert(`Reminder sent to ${patient.name}`)}
+              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[14px] transition-all duration-200"
+            >
+              Send Reminder
+            </button>
 
-        {/* View Pre-visit Form Button */}
-        <button
-          onClick={() => onConsult(patient)}
-          className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[13px] transition-all duration-200"
-        >
-          View Pre-Visit Form
-        </button>
+            {/* View Summary */}
+            <button
+              onClick={() => alert(`Showing Summary for ${patient.name}`)}
+              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-white border border-[#EBEEF5] hover:bg-[#F5F6FA] text-[#24292E] font-semibold text-[14px] transition-all duration-200 shadow-sm"
+            >
+              View Summary
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Chat Button */}
+            <button className="flex w-full justify-center items-center gap-2 py-3 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[14px] transition-all duration-200">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M15.75 8.62502C15.7526 9.61492 15.5213 10.5914 15.075 11.475C14.5458 12.5338 13.7323 13.4244 12.7256 14.047C11.7189 14.6696 10.5587 14.9996 9.375 15C8.3851 15.0026 7.40859 14.7713 6.525 14.325L2.25 15.75L3.675 11.475C3.2287 10.5914 2.99742 9.61492 3 8.62502C3.00046 7.44134 3.33046 6.28116 3.95304 5.27443C4.57562 4.26771 5.46619 3.4542 6.525 2.92502C7.40859 2.47872 8.3851 2.24744 9.375 2.25002H9.75C11.3133 2.33627 12.7898 2.99609 13.8969 4.10317C15.0039 5.21024 15.6638 6.68676 15.75 8.25002V8.62502Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Chat with Patient</span>
+            </button>
+
+            {/* View Pre-visit Form Button */}
+            <button
+              onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
+              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[13px] transition-all duration-200"
+            >
+              View Pre-Visit Form
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
