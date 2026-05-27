@@ -86,22 +86,22 @@ const CollapseIcon = () => (
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { href: "/dashboard",               label: "Home",         Icon: HomeIcon },
-  { href: "/appointments",  label: "Appointments", Icon: ApptIcon },
-  { href: "/dashboard/patients",      label: "Patients",     Icon: PatientsIcon },
-  { href: "/dashboard/analytics",     label: "Analytics",    Icon: AnalyticsIcon },
-  { href: "/dashboard/prescriptions", label: "Tasks",        Icon: TasksIcon },
-  { href: "/dashboard/calendar",      label: "Schedule",     Icon: ScheduleIcon },
-  { href: "/dashboard/video-calls",   label: "Messages",     Icon: MessagesIcon },
-  { href: "/dashboard/wallet",        label: "Payment",      Icon: PaymentIcon },
+  { href: "/dashboard", label: "Home", Icon: HomeIcon },
+  { href: "/appointments", label: "Appointments", Icon: ApptIcon },
+  { href: "/dashboard/patients", label: "Patients", Icon: PatientsIcon },
+  { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
+  { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon },
+  { href: "/dashboard/calendar", label: "Schedule", Icon: ScheduleIcon },
+  { href: "/dashboard/video-calls", label: "Messages", Icon: MessagesIcon },
+  { href: "/dashboard/wallet", label: "Payment", Icon: PaymentIcon },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function Sidebar() {
-  const pathname  = usePathname();
-  const router    = useRouter();
+  const pathname = usePathname();
+  const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
-  const [doctorName,  setDoctorName]  = useState("Dr. Jordan Anderson");
+  const [doctorName, setDoctorName] = useState("Dr. Jordan Anderson");
   const [doctorEmail, setDoctorEmail] = useState("yelena@example.com");
 
   // Single toggle — no setTimeout, no stacked delays
@@ -119,8 +119,8 @@ export default function Sidebar() {
         if (res.ok) {
           const data = await res.json();
           if (data.profile) {
-            setDoctorName(data.profile.name   ?? "Dr. Jordan Anderson");
-            setDoctorEmail(data.email          ?? "yelena@example.com");
+            setDoctorName(data.profile.name ?? "Dr. Jordan Anderson");
+            setDoctorEmail(data.email ?? "yelena@example.com");
           }
         }
       } catch { /* keep defaults */ }
@@ -165,9 +165,8 @@ export default function Sidebar() {
           <img
             src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
             alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${
-              open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
-            }`}
+            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
+              }`}
           />
           {/* Toggle button — always visible */}
           <button
@@ -217,16 +216,15 @@ export default function Sidebar() {
 
         {/* Help & Settings */}
         {[
-          { href: "/dashboard/help",     label: "Help & Support", Icon: HelpIcon },
-          { href: "/dashboard/settings", label: "Settings",       Icon: SettingsIcon },
+          { href: "/dashboard/help", label: "Help & Support", Icon: HelpIcon },
+          { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
         ].map(({ href, label, Icon }) => (
           <Link
             key={href}
             href={href}
             title={open ? undefined : label}
-            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors ${
-              open ? "px-3" : "justify-center px-2"
-            }`}
+            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors ${open ? "px-3" : "justify-center px-2"
+              }`}
           >
             <span className="shrink-0 w-5 h-5 flex items-center justify-center">
               <Icon />
@@ -248,9 +246,8 @@ export default function Sidebar() {
 
           {/* Name / email — stays in DOM */}
           <div
-            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
-              open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"
-            }`}
+            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"
+              }`}
           >
             <span className="text-[#24292E] font-medium text-sm truncate">{doctorName}</span>
             <span className="text-[#9EA5AD] text-xs truncate">{doctorEmail}</span>
