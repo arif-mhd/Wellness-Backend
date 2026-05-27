@@ -179,7 +179,10 @@ export default function AppointmentsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Tabs */}
             <button
-              onClick={() => setActiveTab("All")}
+              onClick={() => {
+                setActiveTab("All");
+                setSelectedPatient(MOCK_NEW_APPOINTMENTS[1] || MOCK_NEW_APPOINTMENTS[0]);
+              }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "All"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
@@ -188,7 +191,11 @@ export default function AppointmentsPage() {
               All
             </button>
             <button
-              onClick={() => setActiveTab("Upcoming")}
+              onClick={() => {
+                setActiveTab("Upcoming");
+                const upcoming = MOCK_NEW_APPOINTMENTS.find(p => p.status === "Scheduled" || p.status === "Waiting") || MOCK_NEW_APPOINTMENTS[1];
+                setSelectedPatient(upcoming);
+              }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Upcoming"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
@@ -197,7 +204,13 @@ export default function AppointmentsPage() {
               Upcoming
             </button>
             <button
-              onClick={() => setActiveTab("Past")}
+              onClick={() => {
+                setActiveTab("Past");
+                const completed = MOCK_ALL_CONSULTATIONS.find(c => c.status === "Completed");
+                if (completed) {
+                  setSelectedPatient(completed);
+                }
+              }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Past"
                   ? "bg-[#2E344E] text-white"
                   : "bg-white text-[#222530] hover:bg-gray-50 border border-[#EBEEF5]"
@@ -388,6 +401,7 @@ export default function AppointmentsPage() {
           }}
           onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
           onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+          activeTab={activeTab}
         />
       </div>
     </div>

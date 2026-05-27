@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { Patient } from "@/app/appointments/types";
 
 interface AppointmentDetailsCardProps {
@@ -9,6 +10,7 @@ interface AppointmentDetailsCardProps {
   onConsult: (patient: Patient) => void;
   onViewProfile?: (patient: Patient) => void;
   onViewPreVisitForm?: (patient: Patient) => void;
+  activeTab?: "All" | "Upcoming" | "Past";
 }
 
 export default function AppointmentDetailsCard({
@@ -17,7 +19,9 @@ export default function AppointmentDetailsCard({
   onConsult,
   onViewProfile,
   onViewPreVisitForm,
+  activeTab,
 }: AppointmentDetailsCardProps) {
+  const router = useRouter();
   if (!patient) {
     return (
       <div
@@ -133,7 +137,7 @@ export default function AppointmentDetailsCard({
         </div>
 
         {/* Pre-visit Form or placeholder field */}
-        {patient.status === "Completed" ? (
+        {patient.status === "Completed" || activeTab === "Past" ? (
           <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
             <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
               &lt;Some other field&gt;
@@ -161,11 +165,11 @@ export default function AppointmentDetailsCard({
 
       {/* Actions */}
       <div className="flex flex-col gap-3 w-full mt-2">
-        {patient.status === "Completed" ? (
+        {patient.status === "Completed" || activeTab === "Past" ? (
           <>
             {/* Send Reminder */}
             <button
-              onClick={() => alert(`Reminder sent to ${patient.name}`)}
+              onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary`)}
               className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[14px] transition-all duration-200"
             >
               Send Reminder
@@ -173,7 +177,7 @@ export default function AppointmentDetailsCard({
 
             {/* View Summary */}
             <button
-              onClick={() => alert(`Showing Summary for ${patient.name}`)}
+              onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary`)}
               className="flex w-full justify-center items-center py-3 rounded-[12px] bg-white border border-[#EBEEF5] hover:bg-[#F5F6FA] text-[#24292E] font-semibold text-[14px] transition-all duration-200 shadow-sm"
             >
               View Summary

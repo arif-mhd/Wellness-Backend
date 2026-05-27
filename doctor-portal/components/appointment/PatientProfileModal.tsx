@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Patient } from "@/app/appointments/types";
 
 interface PatientProfileModalProps {
   patient: Patient;
   onClose: () => void;
+  mode?: string | null;
 }
 
 type ProfileTab = "Consultations" | "Medications" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
@@ -71,6 +73,19 @@ const EMR_DETAIL = {
   ],
 };
 
+const MOCK_LAB_REPORTS = [
+  {
+    name: "Complete Blood Count (CBC) Report",
+    status: "Pending",
+    description: "A common blood test that evaluates several components of blood, providing important information about a person's overall health and helping to diagnose various conditions."
+  },
+  {
+    name: "Basic Metabolic Panel (BMP)",
+    status: "Available",
+    description: "A blood test that measures various substances in the blood to assess a person's metabolic state and overall health."
+  }
+];
+
 const TABS: ProfileTab[] = ["Consultations", "Medications", "Labs", "Radiology", "Diagnostics", "Vaccinations", "Allergies", "Surgeries"];
 
 const DiamondIcon = ({ color }: { color: string }) => (
@@ -91,9 +106,38 @@ const GradientPillIcon = () => (
   </div>
 );
 
-export default function PatientProfileModal({ patient, onClose }: PatientProfileModalProps) {
+export default function PatientProfileModal({ patient, onClose, mode }: PatientProfileModalProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ProfileTab>("Consultations");
   const [selectedConsultation, setSelectedConsultation] = useState(MOCK_CONSULTATIONS[0]);
+  const [prescribedMedicines, setPrescribedMedicines] = useState([
+    { name: "Paracetamol 500 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
+    { name: "Ibuprofen 200 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
+    { name: "Diclofenac 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
+    { name: "Tramadol 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
+  ]);
+
+  const handleAddMedicine = () => {
+    const name = prompt("Enter medicine name (e.g. Aspirin 100 mg):");
+    if (!name) return;
+    const dose = prompt("Enter dose (e.g. 1x After Breakfast):", "1x After Breakfast");
+    const duration = prompt("Enter duration (e.g. 5 days):", "5 days");
+    const notes = prompt("Enter notes (e.g. Take with water):", "Take with water");
+
+    setPrescribedMedicines([
+      ...prescribedMedicines,
+      {
+        name,
+        dose: dose || "1x After Breakfast",
+        duration: duration || "3 days",
+        notes: notes || "Take with food every morning"
+      }
+    ]);
+  };
+
+  const handleDeleteMedicine = (name: string) => {
+    setPrescribedMedicines(prescribedMedicines.filter((m) => m.name !== name));
+  };
 
   return (
     <div className="w-full min-h-full flex flex-col font-outfit bg-[#F7F9FC] overflow-auto animate-fade-in">
@@ -110,7 +154,7 @@ export default function PatientProfileModal({ patient, onClose }: PatientProfile
           </svg>
         </button>
         <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
-          Patient Details
+          {mode === "summary" ? "Consultation Summary" : "Patient Details"}
         </h1>
       </div>
 
@@ -247,129 +291,132 @@ export default function PatientProfileModal({ patient, onClose }: PatientProfile
               </div>
 
               {/* Scrollable content */}
-              <div className="flex flex-col gap-4 p-4 overflow-y-auto">
+              <div className="flex flex-col lg:flex-row gap-6 p-6 overflow-y-auto min-h-0 flex-1">
 
-                {/* Reason for visit */}
-                <div className="flex flex-col gap-2">
-                  <div className="px-2 text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                    Reason for visit
+                {/* Sub-column 1: Summary, Medicines, Labs */}
+                <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
+                  {/* Reason for visit */}
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                      Reason for visit
+                    </div>
+                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex items-center gap-2">
+                      <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] flex-shrink-0">
+                        {EMR_DETAIL.reasonForVisit}
+                      </span>
+                      <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] line-clamp-2">
+                        {EMR_DETAIL.reasonDescription}
+                      </span>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-[12px] px-4 py-6 flex items-center gap-2">
-                    <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] flex-shrink-0">
-                      {EMR_DETAIL.reasonForVisit}
-                    </span>
-                    <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] line-clamp-2">
-                      {EMR_DETAIL.reasonDescription}
-                    </span>
-                  </div>
-                </div>
 
-                {/* EMR */}
-                <div className="flex flex-col gap-2">
-                  <div className="px-2 text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                    EMR
+                  {/* EMR Summary */}
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                      EMR
+                    </div>
+                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4">
+                      <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px]">
+                        {EMR_DETAIL.emrSummary}
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-[12px] px-4 py-6 flex flex-col gap-4">
-                    {/* Summary */}
-                    <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] line-clamp-2">
-                      {EMR_DETAIL.emrSummary}
-                    </p>
-                    <div className="w-full h-px bg-[#EBEEF5]" />
 
-                    {/* SOAP notes */}
-                    {[
-                      { label: "Subjective", color: "#8AA0FF", text: EMR_DETAIL.subjective },
-                      { label: "Objective", color: "#3CB3DA", text: EMR_DETAIL.objective },
-                      { label: "Assessment", color: "#8AA0FF", text: EMR_DETAIL.assessment },
-                      { label: "Plan", color: "#3CB3DA", text: EMR_DETAIL.plan },
-                    ].map((section, i) => (
-                      <React.Fragment key={section.label}>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <DiamondIcon color={section.color} />
-                            <span className="flex-1 text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                              {section.label}
-                            </span>
-                          </div>
-                          <p className="text-[#676E76] text-[12px] leading-[16px] whitespace-pre-line">
-                            {section.text}
-                          </p>
-                        </div>
-                        {i < 3 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Medicines */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between px-2">
-                    <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
-                    <button className="flex items-center gap-2 px-[13px] py-[6px] bg-[#E0E7FF] rounded-[12px] text-[#182A6F] text-[13px] font-medium leading-5">
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                        <path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.3269 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/>
-                      </svg>
-                      Download Prescription
-                    </button>
-                  </div>
-                  <div className="bg-white rounded-[12px] px-4 py-6 flex flex-col gap-4">
-                    {EMR_DETAIL.medicines.map((med, i) => (
-                      <React.Fragment key={med.name}>
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            <GradientPillIcon />
-                            <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                              {med.name}
-                            </span>
-                          </div>
-                          <p className="text-[12px] leading-[16px]">
-                            <span className="text-[#5476FC]">{med.dose.split(" ")[0]}</span>
-                            <span className="text-[#676E76]"> {med.dose.split(" ").slice(1).join(" ")}</span>
-                            <span className="text-[#5476FC]"> ({med.duration})</span>
-                          </p>
-                          <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {med.notes}</p>
-                        </div>
-                        {i < EMR_DETAIL.medicines.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Lab Tests */}
-                <div className="flex flex-col gap-2">
-                  <div className="px-2 text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                    Lab Tests
-                  </div>
-                  <div className="bg-white rounded-[12px] px-4 py-6 flex flex-col gap-4">
-                    {EMR_DETAIL.labTests.map((lab, i) => (
-                      <React.Fragment key={lab.name}>
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
+                  {/* Medicines */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
+                      <button className="flex items-center gap-2 px-[13px] py-[6px] bg-[#E0E7FF] rounded-[12px] text-[#182A6F] text-[13px] font-medium leading-5">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/>
+                        </svg>
+                        Download Prescription
+                      </button>
+                    </div>
+                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
+                      {EMR_DETAIL.medicines.map((med, i) => (
+                        <React.Fragment key={med.name}>
+                          <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}>
-                                <span className="text-white text-[10px] font-bold">{lab.name[0]}</span>
-                              </div>
+                              <GradientPillIcon />
                               <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                                {lab.name}
+                                {med.name}
                               </span>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
-                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M12.0028 7.06066L5.54784 13.5156L4.48718 12.4549L10.9421 6H5.2528V4.5H13.5028V12.75H12.0028V7.06066Z" fill="#182A6E"/></svg>
-                                View
-                              </button>
-                              <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
-                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.3269 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/></svg>
-                                Download Report
-                              </button>
-                            </div>
+                            <p className="text-[12px] leading-[16px]">
+                              <span className="text-[#5476FC]">{med.dose.split(" ")[0]}</span>
+                              <span className="text-[#676E76]"> {med.dose.split(" ").slice(1).join(" ")}</span>
+                              <span className="text-[#5476FC]"> ({med.duration})</span>
+                            </p>
+                            <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {med.notes}</p>
                           </div>
-                          <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {lab.notes}</p>
-                        </div>
-                        {i < EMR_DETAIL.labTests.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                      </React.Fragment>
-                    ))}
+                          {i < EMR_DETAIL.medicines.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
+                        </React.Fragment>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Lab Tests */}
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                      Lab Tests
+                    </div>
+                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
+                      {EMR_DETAIL.labTests.map((lab, i) => (
+                        <React.Fragment key={lab.name}>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}>
+                                  <span className="text-white text-[10px] font-bold">{lab.name[0]}</span>
+                                </div>
+                                <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                                  {lab.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
+                                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M12.0028 7.06066L5.54784 13.5156L4.48718 12.4549L10.9421 6H5.2528V4.5H13.5028V12.75H12.0028V7.06066Z" fill="#182A6E"/></svg>
+                                  View
+                                </button>
+                                <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
+                                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V13.2692H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/></svg>
+                                  Download Report
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {lab.notes}</p>
+                          </div>
+                          {i < EMR_DETAIL.labTests.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-column 2: SOAP details */}
+                <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
+                  {[
+                    { label: "Subjective", color: "#8AA0FF", text: EMR_DETAIL.subjective },
+                    { label: "Objective", color: "#3CB3DA", text: EMR_DETAIL.objective },
+                    { label: "Assessment", color: "#8AA0FF", text: EMR_DETAIL.assessment },
+                    { label: "Plan", color: "#3CB3DA", text: EMR_DETAIL.plan },
+                  ].map((section, i) => (
+                    <React.Fragment key={section.label}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <DiamondIcon color={section.color} />
+                          <span className="flex-1 text-[#24292E] text-[14px] font-medium leading-[1.2] tracking-[-0.28px]">
+                            {section.label}
+                          </span>
+                        </div>
+                        <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">
+                          {section.text}
+                        </p>
+                      </div>
+                      {i < 3 && <div className="w-full h-px bg-[#EBEEF5]" />}
+                    </React.Fragment>
+                  ))}
                 </div>
 
               </div>
@@ -377,8 +424,230 @@ export default function PatientProfileModal({ patient, onClose }: PatientProfile
           </div>
         )}
 
+        {/* Medications tab content */}
+        {activeTab === "Medications" && (
+          <div className="flex flex-col md:flex-row gap-8 items-start w-full animate-fade-in">
+            {/* Left: Medicines Prescribed */}
+            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                  Medicines Prescribed
+                </span>
+                <button
+                  onClick={handleAddMedicine}
+                  className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
+                >
+                  Add Medicine
+                </button>
+              </div>
+
+              {prescribedMedicines.length === 0 ? (
+                <p className="text-gray-400 text-center py-6 text-sm">No medicines prescribed.</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {prescribedMedicines.map((med, i) => (
+                    <React.Fragment key={med.name + i}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <GradientPillIcon />
+                            <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
+                              {med.name}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteMedicine(med.name)}
+                            className="text-[#E84949] hover:bg-red-50 p-1.5 rounded-full transition-colors flex-shrink-0"
+                            aria-label={`Delete ${med.name}`}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path d="M10 3.5V10.5C10 10.7761 9.77615 11 9.5 11H2.5C2.22386 11 2 10.7761 2 10.5V3.5H1V2.5H11V3.5H10ZM3 3.5V10H9V3.5H3ZM3.5 1H8.5V2H3.5V1ZM5.5 5H6.5V8.5H5.5V5Z" fill="currentColor"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="text-[12px] leading-[16px] font-normal pl-[48px]">
+                          <span className="text-[#5476FC] font-semibold">{med.dose.split(" ")[0]}</span>
+                          <span className="text-[#676E76]"> {med.dose.split(" ").slice(1).join(" ")}</span>
+                          <span className="text-[#5476FC] font-semibold"> ({med.duration.includes("day") ? med.duration : `${med.duration} days`})</span>
+                        </p>
+                        <p className="text-[#676E76] text-[12px] leading-[16px] pl-[48px]">
+                          Notes: {med.notes}
+                        </p>
+                      </div>
+                      {i < prescribedMedicines.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Consultation Details */}
+            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-6 border border-white shadow-sm">
+              <div className="border-b border-gray-100 pb-4">
+                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                  Consultation Details
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {/* Reason for visit */}
+                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                    Reason for visit
+                  </span>
+                  <p className="text-[#676E76] text-[12px] leading-[1.4]">
+                    {patient.description || "I’ve had a fever for three days with chills, body aches, and fatigue."}
+                  </p>
+                </div>
+
+                {/* Pre-visit Form */}
+                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                    Pre-vist Form
+                  </span>
+                  <p className="text-[#676E76] text-[12px] leading-[1.4] mb-2">
+                    Review the patient's pre-visit form to understand their medical history and reason for the appointment.
+                  </p>
+                  <button
+                    onClick={() => router.push(`/appointments/previsit-form?id=${patient.id}&from=patientdetails`)}
+                    className="flex items-center gap-2 text-[#182A6F] hover:text-[#2E48A0] font-semibold text-[13px] transition-colors self-start"
+                  >
+                    <span>Read Pre-visit form</span>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Labs tab content */}
+        {activeTab === "Labs" && (
+          <div className="flex flex-col md:flex-row gap-8 items-start w-full animate-fade-in">
+            {/* Left: Reports */}
+            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                  Reports
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] p-0.5">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <rect x="1" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                      <rect x="1" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                      <rect x="7" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                      <rect x="7" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                    </svg>
+                  </div>
+                  <div className="flex items-center justify-center w-5 h-5 rounded border border-[#E2E2E2] bg-[#F4F4F4] p-0.5">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.4 0H9.6C10.1 0 10.5 0.4 10.5 0.9V11.1C10.5 11.6 10.1 12 9.6 12H2.4C1.9 12 1.5 11.6 1.5 11.1V0.9C1.5 0.4 1.9 0 2.4 0Z" stroke="#948F8F" strokeWidth="0.8" />
+                      <path d="M3.5 3H8.5" stroke="#948F8F" strokeWidth="0.8" />
+                      <path d="M3.5 6H8.5" stroke="#948F8F" strokeWidth="0.8" />
+                      <path d="M3.5 9H6.5" stroke="#948F8F" strokeWidth="0.8" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                {MOCK_LAB_REPORTS.map((report, i) => (
+                  <React.Fragment key={report.name}>
+                    <div className="flex flex-col gap-3">
+                      {/* Title row */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <GradientPillIcon />
+                          <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
+                            {report.name}
+                          </span>
+                        </div>
+                        {report.status === "Pending" ? (
+                          <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                            Report Pending
+                          </span>
+                        ) : (
+                          <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                            Report Available
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
+                        {report.description}
+                      </p>
+
+                      {/* Actions for Available reports */}
+                      {report.status === "Available" && (
+                        <div className="flex items-center gap-4 pl-[48px] mt-1">
+                          <button
+                            onClick={() => alert(`Viewing ${report.name}...`)}
+                            className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
+                          >
+                            View Report
+                          </button>
+                          <button
+                            onClick={() => alert(`Downloading ${report.name}...`)}
+                            className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
+                          >
+                            Download Report
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {i < MOCK_LAB_REPORTS.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Consultation Details */}
+            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-6 border border-white shadow-sm">
+              <div className="border-b border-gray-100 pb-4">
+                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                  Consultation Details
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {/* Reason for visit */}
+                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                    Reason for visit
+                  </span>
+                  <p className="text-[#676E76] text-[12px] leading-[1.4]">
+                    {patient.description || "I’ve had a fever for three days with chills, body aches, and fatigue."}
+                  </p>
+                </div>
+
+                {/* Pre-visit Form */}
+                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                    Pre-vist Form
+                  </span>
+                  <p className="text-[#676E76] text-[12px] leading-[1.4] mb-2">
+                    Review the patient's pre-visit form to understand their medical history and reason for the appointment.
+                  </p>
+                  <button
+                    onClick={() => router.push(`/appointments/previsit-form?id=${patient.id}&from=patientdetails`)}
+                    className="flex items-center gap-2 text-[#182A6F] hover:text-[#2E48A0] font-semibold text-[13px] transition-colors self-start"
+                  >
+                    <span>Read Pre-visit form</span>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Placeholder for other tabs */}
-        {activeTab !== "Consultations" && (
+        {activeTab !== "Consultations" && activeTab !== "Medications" && activeTab !== "Labs" && (
           <div className="flex items-center justify-center h-48 bg-white rounded-[12px] text-[#9EA5AD] text-[14px]">
             {activeTab} data will appear here.
           </div>
