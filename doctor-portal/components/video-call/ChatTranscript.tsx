@@ -58,8 +58,14 @@ export default function ChatTranscript() {
   const [inputText, setInputText] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to bottom of messages
+  const isFirstRender = useRef(true);
+
+  // Auto-scroll to bottom ONLY when a new message is sent (not on initial mount)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
