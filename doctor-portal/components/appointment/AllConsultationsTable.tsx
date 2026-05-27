@@ -58,13 +58,12 @@ export default function AllConsultationsTable({
             <div
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
-                isSelected
+              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${isSelected
                   ? "bg-[#EEF1FF]/60 border border-[#8AA0FF]/40"
                   : isAlternate
-                  ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
-                  : "bg-white border border-transparent hover:bg-[#F9FAFB]"
-              }`}
+                    ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
+                    : "bg-white border border-transparent hover:bg-[#F9FAFB]"
+                }`}
             >
               {/* Name Column — 200px */}
               <div className="flex-shrink-0 w-[200px] flex items-center gap-4">
@@ -126,11 +125,10 @@ export default function AllConsultationsTable({
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className={`flex items-center justify-center transition-colors duration-150 ${
-              currentPage === 1
+            className={`flex items-center justify-center transition-colors duration-150 ${currentPage === 1
                 ? "opacity-40 cursor-not-allowed"
                 : "hover:opacity-70"
-            }`}
+              }`}
             aria-label="Previous page"
           >
             <svg width="8" height="16" viewBox="0 0 8 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -151,11 +149,10 @@ export default function AllConsultationsTable({
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center font-outfit text-[14px] tracking-[-0.02em] transition-all duration-150 ${
-                    isActive
+                  className={`w-7 h-7 rounded-full flex items-center justify-center font-outfit text-[14px] tracking-[-0.02em] transition-all duration-150 ${isActive
                       ? "bg-[#8AA0FF] text-white"
                       : "text-[#656565] hover:text-[#24292E]"
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>
@@ -167,11 +164,10 @@ export default function AllConsultationsTable({
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className={`flex items-center justify-center transition-colors duration-150 ${
-              currentPage === totalPages
+            className={`flex items-center justify-center transition-colors duration-150 ${currentPage === totalPages
                 ? "opacity-40 cursor-not-allowed"
                 : "hover:opacity-70"
-            }`}
+              }`}
             aria-label="Next page"
           >
             <svg width="8" height="16" viewBox="0 0 8 16" fill="none" xmlns="http://www.w3.org/2000/svg">

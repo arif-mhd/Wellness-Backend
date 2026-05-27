@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { label: "Profile",          href: "/dashboard/profile" },
   { label: "Notification",     href: "/dashboard/profile/notifications" },
-  { label: "Activities",       href: "/dashboard/profile/activities" },
   { label: "Privacy",          href: "/dashboard/profile/privacy" },
   { label: "Info",             href: "/dashboard/profile/info" },
   { label: "Payments",         href: "/dashboard/profile/payments" },
@@ -26,12 +25,6 @@ function getIcon(label: string) {
       return (
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
           <path d="M14.6693 13.334H1.33594V12.0007H2.0026V7.35492C2.0026 4.02964 4.6889 1.33398 8.0026 1.33398C11.3163 1.33398 14.0026 4.02964 14.0026 7.35492V12.0007H14.6693V13.334ZM3.33594 12.0007H12.6693V7.35492C12.6693 4.76602 10.5799 2.66732 8.0026 2.66732C5.42528 2.66732 3.33594 4.76602 3.33594 7.35492V12.0007ZM6.33594 14.0007H9.66927C9.66927 14.9211 8.92307 15.6673 8.0026 15.6673C7.08214 15.6673 6.33594 14.9211 6.33594 14.0007Z" fill="currentColor"/>
-        </svg>
-      );
-    case "Activities":
-      return (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
-          <path d="M8 13.334V14.6673H2.66227C2.29651 14.6673 2 14.3638 2 14.0061V1.99518C2 1.63002 2.29833 1.33398 2.66567 1.33398H10.6667L13.9999 4.66732V9.33398H12.6667V5.33398H10V2.66732H3.33333V13.334H8ZM9.64307 12.9771L12.0001 15.3341L15.2999 12.0343L14.3571 11.0915L12.0001 13.4485L10.5859 12.0343L9.64307 12.9771Z" fill="currentColor"/>
         </svg>
       );
     case "Privacy":

@@ -152,7 +152,7 @@ export default function Sidebar() {
       className={[
         "relative z-10 h-full shrink-0 flex flex-col justify-between",
         "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
-        "transition-none",
+        "transition-[width] duration-300 ease-in-out",
         open ? "w-[255px]" : "w-[80px]",
       ].join(" ")}
     >
@@ -160,12 +160,12 @@ export default function Sidebar() {
       <div className="flex flex-col gap-2 w-full">
 
         {/* Header row: logo + toggle */}
-        <div className={`flex items-center h-[72px] px-5 ${open ? "justify-between" : "justify-center"}`}>
+        <div className="relative flex items-center h-[72px] px-5 w-full">
           {/* Logo — stays in DOM, fades out */}
           <img
             src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
             alt="Wellness Central"
-            className={`object-contain h-[27px] transition-none ${
+            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${
               open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
             }`}
           />
@@ -173,7 +173,7 @@ export default function Sidebar() {
           <button
             onClick={toggle}
             title={open ? "Collapse sidebar" : "Expand sidebar"}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-[#3D4B5A] hover:bg-gray-50 hover:text-[#5476FC] transition-colors shrink-0"
+            className="absolute right-5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-[#3D4B5A] hover:bg-gray-50 hover:text-[#5476FC] transition-colors shrink-0 z-20"
           >
             {open ? <CollapseIcon /> : <HamburgerIcon />}
           </button>
@@ -202,7 +202,7 @@ export default function Sidebar() {
                 </span>
                 {/* Label — stays in DOM, clips via max-width + opacity */}
                 <span
-                  className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-none ${labelCls}`}
+                  className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin] duration-300 ease-in-out ${labelCls}`}
                 >
                   {label}
                 </span>
@@ -232,7 +232,7 @@ export default function Sidebar() {
               <Icon />
             </span>
             <span
-              className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-none ${labelCls}`}
+              className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin] duration-300 ease-in-out ${labelCls}`}
             >
               {label}
             </span>
@@ -248,7 +248,7 @@ export default function Sidebar() {
 
           {/* Name / email — stays in DOM */}
           <div
-            className={`flex flex-col min-w-0 overflow-hidden transition-none ${
+            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
               open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"
             }`}
           >

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 const TIMEZONES = [
   "(UTC-12:00) International Date Line West",
@@ -61,6 +62,11 @@ function TwoFAModal({ onClose, onSuccess }: TwoFAModalProps) {
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
   const [timer, setTimer] = useState(85); // 1 minute 25 seconds
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Count down timer for OTP resend
   useEffect(() => {
@@ -120,7 +126,9 @@ function TwoFAModal({ onClose, onSuccess }: TwoFAModalProps) {
     onClose();
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       {step === "phone" && (
         <div className="w-[656px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl relative">
@@ -299,7 +307,8 @@ function TwoFAModal({ onClose, onSuccess }: TwoFAModalProps) {
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 

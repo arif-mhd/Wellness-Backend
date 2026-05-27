@@ -20,12 +20,12 @@ export default function AppointmentDetailsCard({
     return (
       <div
         style={{
-          width: "372px",
-          height: "646px",
+          width: "100%",
+          maxWidth: "372px",
           gap: "20px",
           opacity: 1,
         }}
-        className="flex flex-col items-center justify-center p-8 bg-[#F5F6FA] border border-[#EBEEF5] rounded-[12px] text-center font-outfit"
+        className="flex flex-col items-center justify-center p-8 bg-[#F5F6FA] border border-[#EBEEF5] rounded-[12px] text-center font-outfit min-h-[646px]"
       >
         <svg
           width="48"
@@ -53,12 +53,12 @@ export default function AppointmentDetailsCard({
   return (
     <div
       style={{
-        width: "372px",
-        height: "646px",
+        width: "100%",
+        maxWidth: "372px",
         gap: "20px",
         opacity: 1,
       }}
-      className="flex flex-col items-start p-6 border border-[#EBEEF5] bg-[#F5F6FA] rounded-[12px] font-outfit shadow-sm transition-all duration-300 justify-between"
+      className="flex flex-col items-start p-6 border border-[#EBEEF5] bg-[#F5F6FA] rounded-[12px] font-outfit shadow-sm transition-all duration-300 justify-between min-h-[646px]"
     >
       {/* Header */}
       <div className="flex justify-between items-center w-full">

@@ -77,9 +77,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Right Content Area */}
       <div className="flex-1 flex flex-col min-w-0 z-10 h-full">
         {/* Header inside the right panel */}
-        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${
-          sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"
-        }`}>
+        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"
+          }`}>
           {/* Logo Frame */}
           <div className="flex items-center">
             <img
@@ -145,7 +144,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Scrollable Page Body */}
-        <main className="flex-1 overflow-auto min-h-0 relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative scroll-smooth [will-change:transform] [-webkit-overflow-scrolling:touch]">
           {showWaitingRoom ? (
             <WaitingRoom onClose={() => setShowWaitingRoom(false)} />
           ) : (

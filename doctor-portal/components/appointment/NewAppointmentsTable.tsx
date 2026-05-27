@@ -48,13 +48,12 @@ export default function NewAppointmentsTable({
             <div
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
-                isSelected
+              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${isSelected
                   ? "bg-[#EEF1FF]/60 border border-[#8AA0FF]/40"
                   : isAlternate
-                  ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
-                  : "bg-white border border-transparent hover:bg-[#F9FAFB]"
-              }`}
+                    ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
+                    : "bg-white border border-transparent hover:bg-[#F9FAFB]"
+                }`}
             >
               {/* Name Column — 200px */}
               <div className="flex-shrink-0 w-[200px] flex items-center gap-4">

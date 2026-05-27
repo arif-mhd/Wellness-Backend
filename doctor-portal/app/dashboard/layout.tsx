@@ -7,5 +7,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <SharedDashboardLayout>{children}</SharedDashboardLayout>;
+  return (
+    <SharedDashboardLayout>{children}</SharedDashboardLayout>
+  );
 }
