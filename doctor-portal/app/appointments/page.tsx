@@ -7,6 +7,8 @@ import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable"
 import AllConsultationsTable from "@/components/appointment/AllConsultationsTable";
 import AppointmentDetailsCard from "@/components/appointment/AppointmentDetailsCard";
 import ConsultationModal from "@/components/appointment/ConsultationModal";
+import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
+import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import { useSidebar } from "@/components/SidebarContext";
 
 export default function AppointmentsPage() {
@@ -27,6 +29,12 @@ export default function AppointmentsPage() {
   
   // Call simulation state
   const [activeConsultationPatient, setActiveConsultationPatient] = useState<Patient | null>(null);
+
+  // Pre-visit form modal state
+  const [preVisitFormPatient, setPreVisitFormPatient] = useState<Patient | null>(null);
+
+  // Patient profile state
+  const [profilePatient, setProfilePatient] = useState<Patient | null>(null);
 
   // Success Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -126,6 +134,15 @@ export default function AppointmentsPage() {
     return result;
   }, [activeTab, searchQuery, sortField, sortOrder]);
 
+  if (profilePatient) {
+    return (
+      <PatientProfileModal
+        patient={profilePatient}
+        onClose={() => setProfilePatient(null)}
+      />
+    );
+  }
+
   return (
     <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${
       sidebarOpen 
@@ -138,6 +155,14 @@ export default function AppointmentsPage() {
           <div className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]"></div>
           <span>{toastMessage}</span>
         </div>
+      )}
+
+      {/* Pre-Visit Form Modal */}
+      {preVisitFormPatient && (
+        <PreVisitFormModal
+          patient={preVisitFormPatient}
+          onClose={() => setPreVisitFormPatient(null)}
+        />
       )}
 
       {/* Video Call Modal */}
@@ -300,6 +325,7 @@ export default function AppointmentsPage() {
             selectedPatientId={selectedPatient?.id}
             onSelectPatient={setSelectedPatient}
             onConsult={setActiveConsultationPatient}
+            onViewPreVisitForm={setPreVisitFormPatient}
           />
         </div>
 
@@ -395,6 +421,7 @@ export default function AppointmentsPage() {
             setActiveConsultationPatient(patient);
             triggerToast(`Consultation requested for ${patient.name}`);
           }}
+          onViewProfile={setProfilePatient}
         />
       </div>
     </div>

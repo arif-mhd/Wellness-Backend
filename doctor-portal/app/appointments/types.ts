@@ -1,3 +1,12 @@
+export interface PreVisitForm {
+  chronicIllnesses: string;
+  currentMedications: string;
+  allergies: string;
+  primaryConcern: string;
+  smokes: string;
+  drinks: string;
+}
+
 export interface Patient {
   id: string;
   name: string;
@@ -10,4 +19,5 @@ export interface Patient {
   avatar: string;
   bio: string;
   preVisitFormDate?: string;
+  preVisitForm?: PreVisitForm;
 }

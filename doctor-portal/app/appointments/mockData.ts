@@ -12,7 +12,15 @@ export const MOCK_NEW_APPOINTMENTS: Patient[] = [
     dateTime: "Waiting",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72",
     bio: "Yelena Isinbaeva is a 32-year-old female diagnosed with a high fever. She has a history of seasonal allergies and is proactive about seeking treatment when symptoms persist. She is looking for an immediate consultation to address the fever, chills, and body aches.",
-    preVisitFormDate: "17 Oct, 2020, 11:40 PM"
+    preVisitFormDate: "17 Oct, 2020, 11:40 PM",
+    preVisitForm: {
+      chronicIllnesses: "Seasonal allergies",
+      currentMedications: "-Cetirizine 10mg – Take one tablet daily.\n-Paracetamol 500mg – As needed for fever.",
+      allergies: "Dust, pollen",
+      primaryConcern: "High fever for three days with chills and body aches.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "new-2",
@@ -25,7 +33,15 @@ export const MOCK_NEW_APPOINTMENTS: Patient[] = [
     dateTime: "17 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/193603633a5140267134f1748cf7c4365ae534a9?width=72",
     bio: "John Smith is a 45-year-old male from Sharjah, UAE, diagnosed with hypertension. He has a history of Type 2 Diabetes and is currently on medication for both conditions. John follows a regular exercise routine and maintains a controlled diet to manage his health. He regularly attends check-ups and is proactive about his well-being.",
-    preVisitFormDate: "17 Oct, 2020, 11:40 PM"
+    preVisitFormDate: "17 Oct, 2020, 11:40 PM",
+    preVisitForm: {
+      chronicIllnesses: "No",
+      currentMedications: "-Amlodipine 10mg - Take one tablet daily.\n-Metformin 500mg - Continue as prescribed.\n-Ibuprofen 400mg - As needed for headache relief.",
+      allergies: "None",
+      primaryConcern: "Persistent headaches and fatigue.",
+      smokes: "No",
+      drinks: "Yes"
+    }
   },
   {
     id: "new-3",
@@ -38,7 +54,15 @@ export const MOCK_NEW_APPOINTMENTS: Patient[] = [
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/2fc70c27396226e96d788f42ab8214ce8f948ab5?width=72",
     bio: "Savannah Nguyen is a 32-year-old female who has been managing mild asthma since childhood. She uses a rescue inhaler when needed and is visiting for a routine check-up and prescription renewal. She is otherwise in good health and maintains an active lifestyle.",
-    preVisitFormDate: "20 Oct, 2020, 09:15 AM"
+    preVisitFormDate: "20 Oct, 2020, 09:15 AM",
+    preVisitForm: {
+      chronicIllnesses: "Asthma (since childhood)",
+      currentMedications: "-Albuterol inhaler – As needed.\n-Fluticasone 100mcg – Daily preventive.",
+      allergies: "Pollen, dust mites",
+      primaryConcern: "Worsening shortness of breath due to weather change.",
+      smokes: "No",
+      drinks: "Occasionally"
+    }
   },
   {
     id: "new-4",
@@ -51,7 +75,15 @@ export const MOCK_NEW_APPOINTMENTS: Patient[] = [
     dateTime: "21 Sep, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/05a901293de2a84f45dff39e0efa33b0984e765e?width=72",
     bio: "Darlene Robertson is a 32-year-old female presenting with a persistent dry cough for the past week. She has no significant medical history but reports mild throat irritation and congestion. She is seeking advice on symptomatic relief.",
-    preVisitFormDate: "19 Sep, 2020, 02:30 PM"
+    preVisitFormDate: "19 Sep, 2020, 02:30 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "None currently",
+      allergies: "Penicillin",
+      primaryConcern: "Dry cough with chest tightness for one week.",
+      smokes: "No",
+      drinks: "No"
+    }
   },
   {
     id: "new-5",
@@ -64,7 +96,15 @@ export const MOCK_NEW_APPOINTMENTS: Patient[] = [
     dateTime: "22 Oct, 2020, 11:40 PM",
     avatar: "https://api.builder.io/api/v1/image/assets/TEMP/b4cc7594fc29dd53530bda4ab8cd965eebd0526d?width=72",
     bio: "Cody Fisher is a 32-year-old male who has been experiencing a fever, fatigue, and muscle aches for three days. He has no chronic conditions and is looking for a professional assessment and potential treatment options.",
-    preVisitFormDate: "21 Oct, 2020, 04:45 PM"
+    preVisitFormDate: "21 Oct, 2020, 04:45 PM",
+    preVisitForm: {
+      chronicIllnesses: "None",
+      currentMedications: "Paracetamol 500mg – As needed for fever.",
+      allergies: "None known",
+      primaryConcern: "High fever with body aches and severe headache.",
+      smokes: "No",
+      drinks: "Occasionally"
+    }
   }
 ];
 

@@ -7,12 +7,14 @@ interface AppointmentDetailsCardProps {
   patient: Patient | null;
   onClose: () => void;
   onConsult: (patient: Patient) => void;
+  onViewProfile?: (patient: Patient) => void;
 }
 
 export default function AppointmentDetailsCard({
   patient,
   onClose,
   onConsult,
+  onViewProfile,
 }: AppointmentDetailsCardProps) {
   if (!patient) {
     return (
@@ -105,7 +107,10 @@ export default function AppointmentDetailsCard({
         </div>
 
         {/* View Profile Button */}
-        <button className="flex w-full justify-center items-center py-2.5 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[13px] transition-all duration-200">
+        <button
+          onClick={() => onViewProfile && onViewProfile(patient)}
+          className="flex w-full justify-center items-center py-2.5 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[13px] transition-all duration-200"
+        >
           View Profile
         </button>
       </div>
