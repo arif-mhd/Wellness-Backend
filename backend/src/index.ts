@@ -11,6 +11,8 @@ import { initDb } from "./config/database";
 import authRouter from "./routes/auth";
 import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
+import patientsRouter from "./routes/patients";
+import adminPatientsRouter from "./routes/adminPatients";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -40,6 +42,12 @@ app.use("/api/doctors", doctorsRouter);
 
 // Admin doctor management (requires admin role)
 app.use("/api/admin/doctors", adminDoctorsRouter);
+
+// Patient self-registration + profile updates (public register, rest require patient role)
+app.use("/api/patients", patientsRouter);
+
+// Admin patient management (requires admin role)
+app.use("/api/admin/patients", adminPatientsRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

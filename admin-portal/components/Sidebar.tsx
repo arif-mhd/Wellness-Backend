@@ -44,7 +44,7 @@ const navItems = [
     ),
   },
   {
-    href: "#patients",
+    href: "/dashboard/patients",
     label: "Patients",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -55,7 +55,6 @@ const navItems = [
         <path d="M18 18v3h-2" />
       </svg>
     ),
-    isPlaceholder: true,
   },
   {
     href: "/dashboard/pharmacy",

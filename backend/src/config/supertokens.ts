@@ -4,12 +4,29 @@ import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { pool } from "./database";
 
-// All frontends that are allowed to talk to this backend
-export const allowedOrigins = [
+// Browser-based portals that are allowed to make CORS requests.
+const browserOrigins = [
   process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
   process.env.ADMIN_PORTAL_URL  || "http://localhost:3003",
   process.env.PATIENT_APP_URL   || "http://localhost:8081",
 ];
+
+/**
+ * CORS origin function:
+ * - Browser requests from the listed portals → allow with credentials.
+ * - Requests with NO Origin header (React Native, Postman, curl) → allow.
+ *   (Native apps are not subject to CORS, so they never block on this.)
+ */
+export const allowedOrigins = (
+  origin: string | undefined,
+  callback: (err: Error | null, allow?: boolean) => void
+) => {
+  if (!origin || browserOrigins.includes(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  }
+};
 
 export function initSuperTokens(): void {
   SuperTokens.init({
