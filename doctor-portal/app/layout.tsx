@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Marcellus, Outfit } from "next/font/google";
+import { Inter, Marcellus, Outfit, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
 
@@ -16,6 +16,11 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+});
+
 export const metadata: Metadata = {
   title: "Wellness – Doctor Portal",
   description: "Manage your patients, appointments, and consultations",
@@ -28,7 +33,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${marcellus.variable} ${outfit.variable}`}>
+      <body className={`${inter.className} ${marcellus.variable} ${outfit.variable} ${bricolage.variable}`}>
         {/*
           SuperTokensProvider is a Client Component.
           It initialises the SuperTokens SDK in the browser.

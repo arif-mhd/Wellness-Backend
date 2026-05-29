@@ -7,14 +7,16 @@ import Image from "next/image";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
+import TwoFactorAuth from "@/components/auth/TwoFactorAuth";
 
 export default function LoginPage() {
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
-  const [rememberMe, setRememberMe]     = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError]               = useState("");
-  const [loading, setLoading]           = useState(false);
+  const [show2FA, setShow2FA] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -25,25 +27,42 @@ export default function LoginPage() {
     try {
       const response = await signIn({
         formFields: [
-          { id: "email",    value: email },
+          { id: "email", value: email },
           { id: "password", value: password },
         ],
       });
 
       if (response.status === "OK") {
-        router.push("/dashboard");
+        setLoading(false);
+        setShow2FA(true);
       } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
-        setError("Invalid email or password. Please try again.");
+        setError("Invalid email or password.");
       } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your input.");
+        setError(response.formFields[0]?.error || "Please check your credentials.");
       } else {
-        setError("Sign in is not allowed right now. Please contact support.");
+        setError("Login failed. Please try again.");
       }
     } catch {
       setError("Cannot reach the server. Make sure the backend is running.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (show2FA) {
+    return (
+      <TwoFactorAuth
+        phoneNumber="+91 81298398**"
+        onVerify={(otp) => {
+          setLoading(true);
+          // Simulate OTP verification and redirect to dashboard
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 800);
+        }}
+        onGoBack={() => setShow2FA(false)}
+      />
+    );
   }
 
   return (
@@ -91,7 +110,7 @@ export default function LoginPage() {
 
             {/* Error Banner */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center font-outfit">
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center font-outfit animate-fadeIn">
                 {error}
               </div>
             )}

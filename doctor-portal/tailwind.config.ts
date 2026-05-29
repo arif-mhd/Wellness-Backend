@@ -11,6 +11,7 @@ const config: Config = {
       fontFamily: {
         marcellus: ["var(--font-marcellus)", "serif"],
         outfit: ["var(--font-outfit)", "sans-serif"],
+        bricolage: ["var(--font-bricolage)", "sans-serif"],
       },
       colors: {
         brand: {

@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
       setError("Please ensure your password meets all criteria.");
       return;
     }
-
+    
     setError("");
     setLoading(true);
 
