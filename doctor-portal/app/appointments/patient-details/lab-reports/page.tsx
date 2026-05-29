@@ -2,9 +2,9 @@
 
 import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MOCK_NEW_APPOINTMENTS, MOCK_ALL_CONSULTATIONS } from "../mockData";
+import { MOCK_NEW_APPOINTMENTS, MOCK_ALL_CONSULTATIONS } from "../../mockData";
 import { MOCK_WAITING_PATIENTS } from "@/components/waiting-room/mockData";
-import { Patient } from "../types";
+import { Patient } from "../../types";
 import { WaitingPatient } from "@/components/waiting-room/types";
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 
@@ -30,13 +30,10 @@ const mapToPatient = (wp: WaitingPatient): Patient => ({
   }
 });
 
-function PatientDetailsContent() {
+function LabReportsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
-  const from = searchParams.get("from");
-  const mode = searchParams.get("mode");
-  const tab = searchParams.get("tab") as any;
 
   const allPatients: Patient[] = [
     ...MOCK_NEW_APPOINTMENTS,
@@ -47,24 +44,20 @@ function PatientDetailsContent() {
   const patient = allPatients.find((p) => p.id === id) || allPatients[0];
 
   const handleClose = () => {
-    if (from === "waitingroom") {
-      router.push("/appointments/waitingroom");
-    } else {
-      router.push("/appointments");
-    }
+    router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=Labs`);
   };
 
-  return <PatientProfileModal patient={patient} onClose={handleClose} mode={mode} initialTab={tab} />;
+  return <PatientProfileModal patient={patient} onClose={handleClose} mode="lab-reports" />;
 }
 
-export default function PatientDetailsPage() {
+export default function LabReportsPage() {
   return (
     <Suspense fallback={
       <div className="flex h-screen w-full items-center justify-center bg-[#F7F9FC] text-gray-500 font-outfit">
-        Loading patient details...
+        Loading lab reports...
       </div>
     }>
-      <PatientDetailsContent />
+      <LabReportsContent />
     </Suspense>
   );
 }
