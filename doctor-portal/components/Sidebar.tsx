@@ -88,7 +88,7 @@ const CollapseIcon = () => (
 const NAV_ITEMS = [
   { href: "/dashboard",               label: "Home",         Icon: HomeIcon },
   { href: "/appointments",  label: "Appointments", Icon: ApptIcon },
-  { href: "/dashboard/patients",      label: "Patients",     Icon: PatientsIcon },
+  { href: "/patients",      label: "Patients",     Icon: PatientsIcon },
   { href: "/dashboard/analytics",     label: "Analytics",    Icon: AnalyticsIcon },
   { href: "/dashboard/prescriptions", label: "Tasks",        Icon: TasksIcon },
   { href: "/dashboard/calendar",      label: "Schedule",     Icon: ScheduleIcon },
