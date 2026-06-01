@@ -92,7 +92,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/analytics",     label: "Analytics",    Icon: AnalyticsIcon },
   { href: "/dashboard/prescriptions", label: "Tasks",        Icon: TasksIcon },
   { href: "/dashboard/calendar",      label: "Schedule",     Icon: ScheduleIcon },
-  { href: "/dashboard/video-calls",   label: "Messages",     Icon: MessagesIcon },
+  { href: "/messages",                label: "Messages",     Icon: MessagesIcon },
   { href: "/dashboard/wallet",        label: "Payment",      Icon: PaymentIcon },
 ];
 
