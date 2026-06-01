@@ -48,6 +48,8 @@ function PreVisitFormContent() {
   const handleClose = () => {
     if (from === "waitingroom") {
       router.push("/appointments/waitingroom");
+    } else if (from === "patientdetails") {
+      router.push(`/appointments/patient-details?id=${id}`);
     } else {
       router.push("/appointments");
     }
