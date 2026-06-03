@@ -201,36 +201,27 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
     <div className="w-full min-h-full flex flex-col font-outfit bg-[#F7F9FC] overflow-auto animate-fade-in">
 
       {/* Page header area */}
-      {mode === "lab-reports" ? (
-        <div className="flex items-center gap-2 px-8 pt-8 pb-4">
-          <button
-            onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=Labs`)}
-            className="flex items-center gap-2 text-[#5476FC] hover:text-[#4065FB] transition-colors focus:outline-none"
-            type="button"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="#5476FC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-outfit text-[16px] font-medium leading-6">Consultation Summary</span>
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3 px-8 pt-8 pb-4">
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm hover:bg-gray-50 transition-all"
-            aria-label="Go back"
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
-            {mode === "summary" ? "Consultation Summary" : "Patient Details"}
-          </h1>
-        </div>
-      )}
+      <div className="flex items-center gap-3 px-8 pt-8 pb-4">
+        <button
+          onClick={() => {
+            if (mode === "lab-reports") {
+              router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=Labs`);
+            } else {
+              onClose();
+            }
+          }}
+          className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm hover:bg-gray-50 transition-all"
+          aria-label="Go back"
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
+          {mode === "summary" || mode === "lab-reports" ? "Consultation Summary" : "Patient Details"}
+        </h1>
+      </div>
 
       <div className="flex flex-col gap-6 px-8 pb-10 flex-1">
 
