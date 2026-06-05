@@ -11,6 +11,7 @@
     font-family: var(--font-sans), sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-size: 17px;
   }
 
   .font-serif {
@@ -19,8 +20,16 @@
 
   body {
     background-color: #F4F6FA;
+    font-size: 1rem;
+  }
+
+  /* Ensure text sizes scale with the root */
+  p, span, td, th, li, label, input, button {
+    font-size: inherit;
   }
 }
+
+
 
 @layer utilities {
   .scrollbar-thin {

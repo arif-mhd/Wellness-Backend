@@ -8,7 +8,7 @@ export default function AddDoctorPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-[1440px] mx-auto space-y-7 pb-12 font-sans px-1 animate-in fade-in duration-300">
+      <div className="w-full space-y-7 pb-12 font-sans animate-in fade-in duration-300">
         
         {/* Top Header */}
         <div className="flex items-center gap-4">

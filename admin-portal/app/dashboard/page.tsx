@@ -464,7 +464,7 @@ export default function AdminDashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-2">
+      <div className="w-full space-y-8 pb-12">
         
         {/* Page Header */}
         <div className="flex items-center justify-between">

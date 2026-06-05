@@ -97,7 +97,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
   return (
     <ProtectedRoute>
-      <div className="max-w-[1440px] mx-auto space-y-7 pb-12 font-sans px-1">
+      <div className="w-full space-y-7 pb-12 font-sans">
         
         {/* Top Header */}
         <div className="flex items-center gap-4">

@@ -24,7 +24,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
 
   return (
     <ProtectedRoute>
-      <div className="max-w-[1440px] mx-auto pb-12 font-sans px-1 animate-in fade-in duration-300">
+      <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
         
         {/* Dynamic Header */}
         <div className="flex items-center gap-4 pt-2 mb-8">
