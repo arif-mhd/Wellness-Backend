@@ -188,29 +188,15 @@ export default function TopBar() {
   );
 }
 
-// ── Stacked Logo component ───────────────────────────────────────────────────
+// ── Logo component ───────────────────────────────────────────────────────────
 function WellnessCentralLogo() {
-  const DoubleBar = () => (
-    <span className="inline-flex gap-[1.5px] items-end mx-[0.5px] h-[18px] translate-y-[1px]">
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
-  const SingleBar = () => (
-    <span className="inline-flex items-end mx-[0.5px] h-[18px] translate-y-[1px]">
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
   return (
-    <div className="font-sans font-black text-slate-800 leading-[1.05] select-none text-[20px] tracking-tight">
-      <div>
-        We<DoubleBar />ness
-      </div>
-      <div>
-        Centr<SingleBar />al
-      </div>
+    <div className="select-none">
+      <img
+        src="/wellness-logo.png"
+        alt="Wellness Central"
+        className="h-12 w-auto object-contain"
+      />
     </div>
   );
 }

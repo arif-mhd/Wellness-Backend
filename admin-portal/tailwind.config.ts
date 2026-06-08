@@ -8,7 +8,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["Outfit", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["Marcellus", "Georgia", "serif"],
       },
       colors: {
         brand: {
