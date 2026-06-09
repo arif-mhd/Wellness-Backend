@@ -99,42 +99,61 @@ function CompleteProfileContent() {
   };
 
   // Step 5 Submit: Payment settings -> Final submission and redirect
-  const handleStep5Submit = (formData: any) => {
-    console.log("Step 5 (Payment Settings) Saved:", formData);
+  const handleStep5Submit = async (formData: any) => {
     setPaymentSettingsInfo(formData);
 
-    // Transform raw File objects into serializable string names
-    const serializablePersonal = {
-      ...personalInfo,
-      profilePic: personalInfo.profilePic ? personalInfo.profilePic.name : null,
-      emiratesIdFile: personalInfo.emiratesIdFile ? personalInfo.emiratesIdFile.name : null,
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+    // Build the payload from all collected steps
+    const payload: Record<string, any> = {
+      // Personal
+      bio:           personalInfo.bio           || null,
+      businessEmail: personalInfo.businessEmail || null,
+      bloodGroup:    personalInfo.bloodGroup     || null,
+      height:        personalInfo.height         || null,
+      weight:        personalInfo.weight         || null,
+      maritalStatus: personalInfo.maritalStatus  || null,
+      address:       personalInfo.address        || null,
+      postalCode:    personalInfo.postalCode      || null,
+      languages:     personalInfo.languages       || null,
+      // Medical career
+      specialty:     medicalCareerInfo?.specialty    || null,
+      license:       medicalCareerInfo?.license      || null,
+      experience:    medicalCareerInfo?.experience   || null,
+      medicalSchool: medicalCareerInfo?.medicalSchool|| null,
+      residency:     medicalCareerInfo?.residency    || null,
+      // Fees — single value + per-emirate breakdown
+      fees:          formData?.consultationFee || formData?.fees || null,
+      feesPerEmirate: formData?.feesPerEmirate || null,
+      // Availability
+      slots:         availabilityInfo?.selectedSlots || availabilityInfo?.slots || null,
+      // Documents (URLs if uploaded, filenames otherwise)
+      degreeFileUrl: certDocumentsInfo?.degreeFileUrl || certDocumentsInfo?.degreeFile?.name || null,
+      specFileUrl:   certDocumentsInfo?.specFileUrl   || certDocumentsInfo?.specFile?.name   || null,
+      otherFileUrl:  certDocumentsInfo?.otherFileUrl  || certDocumentsInfo?.addFile?.name    || null,
     };
 
-    const serializableCerts = {
-      ...certDocumentsInfo,
-      degreeFile: certDocumentsInfo?.degreeFile ? certDocumentsInfo.degreeFile.name : null,
-      specFile: certDocumentsInfo?.specFile ? certDocumentsInfo.specFile.name : null,
-      addFile: certDocumentsInfo?.addFile ? certDocumentsInfo.addFile.name : null,
-    };
+    try {
+      const token = typeof window !== "undefined"
+        ? document.cookie.match(/sAccessToken=([^;]+)/)?.[1] ?? ""
+        : "";
 
-    const consolidatedData = {
-      personal: serializablePersonal,
-      medical: medicalCareerInfo,
-      certifications: serializableCerts,
-      availability: availabilityInfo,
-      payment: formData
-    };
-
-    console.log("=== Profile Complete Process Successful ===");
-    console.log(consolidatedData);
-
-    // Save to localStorage so profile pages read the entered details
-    if (typeof window !== "undefined") {
-      localStorage.setItem("doctor_onboarding_profile", JSON.stringify(consolidatedData));
+      await fetch(`${API_URL}/api/doctors/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error("Failed to save doctor profile:", err);
+      // Don't block navigation — admin can still see partial data
     }
 
-    // Redirect to doctor profile page
-    router.push("/dashboard/profile");
+    // Profile complete — now await admin approval
+    router.push("/auth/pending");
   };
 
   return (

@@ -86,6 +86,69 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
+// ─── PUT /api/doctors/profile ───────────────────────────────────────────────
+// Doctor submits their full onboarding profile after signup.
+// Called by the complete-profile wizard. Saves all details to Cosmos.
+router.put("/profile", requireRole("doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const {
+    // Personal
+    bio, businessEmail, bloodGroup, height, weight,
+    maritalStatus, address, postalCode, languages,
+    avatarUrl, emiratesIdFileUrl,
+    // Medical career
+    specialty, license, experience, medicalSchool, residency,
+    // Fees
+    fees, feesPerEmirate,
+    // Availability slots
+    slots,
+    // Documents
+    degreeFileUrl, specFileUrl, otherFileUrl,
+  } = req.body;
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+
+    const updated = {
+      ...doctor,
+      bio:              bio              ?? doctor.bio,
+      businessEmail:    businessEmail    ?? doctor.businessEmail,
+      bloodGroup:       bloodGroup       ?? doctor.bloodGroup,
+      height:           height           ?? doctor.height,
+      weight:           weight           ?? doctor.weight,
+      maritalStatus:    maritalStatus    ?? doctor.maritalStatus,
+      address:          address          ?? doctor.address,
+      postalCode:       postalCode       ?? doctor.postalCode,
+      languages:        languages        ?? doctor.languages,
+      avatarUrl:        avatarUrl        ?? doctor.avatarUrl,
+      emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
+      specialty:        specialty        ?? doctor.specialty,
+      license:          license          ?? doctor.license,
+      experience:       experience       ?? doctor.experience,
+      medicalSchool:    medicalSchool    ?? doctor.medicalSchool,
+      residency:        residency        ?? doctor.residency,
+      fees:             fees             ?? doctor.fees,
+      feesPerEmirate:   feesPerEmirate   ?? doctor.feesPerEmirate,
+      slots:            slots            ?? doctor.slots,
+      degreeFileUrl:    degreeFileUrl    ?? doctor.degreeFileUrl,
+      specFileUrl:      specFileUrl      ?? doctor.specFileUrl,
+      otherFileUrl:     otherFileUrl     ?? doctor.otherFileUrl,
+      profileCompletedAt: new Date().toISOString(),
+      updatedAt:        new Date().toISOString(),
+    };
+
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", doctor: updated });
+  } catch (err) {
+    console.error("Update doctor profile error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── PUT /api/doctors/slots ──────────────────────────────────────────────────
 // Doctor sets their weekly availability. Slots shape:
 // [{ dayOfWeek: 1, startTime: "09:00", endTime: "17:00", slotDurationMins: 30, isActive: true }]
