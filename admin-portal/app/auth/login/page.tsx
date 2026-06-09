@@ -20,18 +20,35 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    // Mock successful sign-in with network delay simulation
-    setTimeout(() => {
+    try {
+      const response = await signIn({
+        formFields: [
+          { id: "email",    value: email },
+          { id: "password", value: password },
+        ],
+      });
+
+      if (response.status === "OK") {
+        router.push("/dashboard");
+      } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
+        setError("Invalid email or password. Please try again.");
+      } else if (response.status === "FIELD_ERROR") {
+        setError(response.formFields[0]?.error || "Please check your input.");
+      } else {
+        setError("Sign in is not allowed right now. Please contact support.");
+      }
+    } catch {
+      setError("Cannot reach the server. Make sure the backend is running.");
+    } finally {
       setLoading(false);
-      router.push("/dashboard");
-    }, 600);
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#f3f4fd] via-[#f8f9ff] to-[#f0f4ff] flex items-center justify-center p-6 md:p-12">
       <div className="flex flex-col md:flex-row gap-8 items-stretch w-full max-w-[960px] justify-center">
-        
-        {/* ── Left: Doctor image panel (standalone card) ──────────────── */}
+
+        {/* ── Left: Doctor image panel ──────────────────────────────── */}
         <div className="hidden md:flex md:w-[45%] relative rounded-[2rem] bg-[#3276D2] overflow-hidden min-h-[500px] items-end justify-center shadow-lg shadow-blue-100/30">
           <Image
             src="/doctor-login.png"
@@ -42,10 +59,10 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* ── Right: Form panel (standalone white card) ───────────────── */}
+        {/* ── Right: Form panel ─────────────────────────────────────── */}
         <div className="flex-grow md:w-[55%] bg-white rounded-[2rem] shadow-xl shadow-slate-100/60 p-10 md:p-12 flex flex-col justify-between border border-slate-100/50 min-h-[500px]">
-          
-          {/* Logo: "Wellness Central" with correct double/single blue bar dividers */}
+
+          {/* Logo */}
           <div className="select-none">
             <WellnessCentralLogo />
           </div>
@@ -55,7 +72,6 @@ export default function LoginPage() {
               Glad to See You Again!
             </h1>
 
-            {/* Error message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-5 text-sm">
                 {error}
@@ -64,17 +80,15 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4 flex flex-col">
               {/* Email */}
-              <div>
-                <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Email*"
-                  className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all outline-none font-medium"
-                />
-              </div>
+              <input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                required
+                placeholder="Email*"
+                className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all font-medium"
+              />
 
               {/* Password */}
               <div className="relative">
@@ -82,10 +96,10 @@ export default function LoginPage() {
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   required
                   placeholder="Password*"
-                  className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all outline-none font-medium pr-12"
+                  className="w-full bg-[#f4f6fa] border-none rounded-2xl px-6 py-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F83FD]/20 focus:bg-white transition-all font-medium pr-12"
                 />
                 <button
                   type="button"
@@ -111,17 +125,12 @@ export default function LoginPage() {
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <div className="relative">
                     <input
-                      id="remember-me"
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${
-                      rememberMe 
-                        ? "border-[#4F83FD] bg-[#4F83FD] text-white" 
-                        : "border-slate-300 bg-white"
-                    }`}>
+                    <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${rememberMe ? "border-[#4F83FD] bg-[#4F83FD] text-white" : "border-slate-300 bg-white"}`}>
                       {rememberMe && (
                         <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -136,12 +145,12 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              {/* Submit - self-aligned to left */}
+              {/* Submit */}
               <button
                 id="login-submit"
                 type="submit"
                 disabled={loading}
-                className="w-fit px-8 py-3.5 bg-[#4F83FD] hover:bg-[#3d70e6] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md shadow-blue-100 disabled:opacity-60 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0"
+                className="w-fit px-8 py-3.5 bg-[#4F83FD] hover:bg-[#3d70e6] text-white rounded-xl text-sm font-bold flex items-center gap-2.5 transition-all duration-200 shadow-md shadow-blue-100 disabled:opacity-60 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0"
               >
                 {loading ? (
                   <>
@@ -164,10 +173,18 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-start gap-2.5 text-[11px] text-gray-400 font-medium pt-2">
-            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
-            <span>|</span>
-            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Use</Link>
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex gap-2.5 text-[11px] text-gray-400 font-medium">
+              <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+              <span>|</span>
+              <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Use</Link>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              No account?{" "}
+              <Link href="/auth/signup" className="text-[#4F83FD] hover:underline font-semibold">
+                Create one
+              </Link>
+            </p>
           </div>
         </div>
       </div>
@@ -175,7 +192,7 @@ export default function LoginPage() {
   );
 }
 
-// ── Logo component with double-bar and single-bar ─────────────────────────────
+// ── Logo component ─────────────────────────────────────────────────────────────
 function WellnessCentralLogo() {
   const DoubleBar = () => (
     <span className="inline-flex gap-[2.5px] items-end mx-[1px] h-[26px] translate-y-[2px]">
@@ -192,12 +209,8 @@ function WellnessCentralLogo() {
 
   return (
     <div className="font-sans font-black text-slate-800 leading-[1.05] select-none tracking-tight" style={{ fontSize: 32 }}>
-      <div>
-        We<DoubleBar />ness
-      </div>
-      <div>
-        Centr<SingleBar />al
-      </div>
+      <div>We<DoubleBar />ness</div>
+      <div>Centr<SingleBar />al</div>
     </div>
   );
 }

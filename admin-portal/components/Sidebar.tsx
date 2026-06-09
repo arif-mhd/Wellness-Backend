@@ -79,6 +79,15 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/vaccination",
+    label: "Vaccination",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/forms",
     label: "Forms",
     icon: (
@@ -168,8 +177,9 @@ const navItems = [
     label: "Settings",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <circle cx="12" cy="11" r="2" />
+        <path d="M9 16a3 3 0 0 1 6 0" />
       </svg>
     ),
   },
@@ -184,17 +194,17 @@ export default function Sidebar() {
     try {
       await signOut();
     } catch {
-      // Ignore during frontend-only offline testing
+      // session may already be expired
     }
     router.replace("/auth/login");
   }
 
   return (
     <aside className="w-[84px] min-h-screen bg-white border-r border-slate-100 flex flex-col items-center justify-between shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-30">
-      
+
       {/* Top: Menu icon */}
       <div className="pt-6 pb-4">
-        <button 
+        <button
           className="w-10 h-10 rounded-full bg-transparent hover:bg-slate-50 flex items-center justify-center text-slate-800 transition-all active:scale-95"
           aria-label="Menu"
         >
@@ -207,9 +217,9 @@ export default function Sidebar() {
       {/* Middle: Navigation Links */}
       <nav className="flex-1 w-full flex flex-col items-center gap-[18px] py-4 overflow-y-auto no-scrollbar">
         {navItems.map((item, idx) => {
-          const isActive = 
-            pathname === item.href || 
-            (item.href !== "/dashboard" && item.href !== "#" && pathname.startsWith(item.href));
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
           return (
             <div key={idx} className="relative group flex justify-center w-full">
@@ -245,8 +255,8 @@ export default function Sidebar() {
 
         {showProfileMenu && (
           <>
-            <div 
-              className="fixed inset-0 z-40" 
+            <div
+              className="fixed inset-0 z-40"
               onClick={() => setShowProfileMenu(false)}
             />
             <div className="absolute bottom-14 left-6 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 w-44 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">

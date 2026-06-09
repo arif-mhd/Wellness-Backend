@@ -6,8 +6,13 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  theme: {
+      theme: {
     extend: {
+      fontFamily: {
+        marcellus: ["var(--font-marcellus)", "serif"],
+        outfit: ["var(--font-outfit)", "sans-serif"],
+        bricolage: ["var(--font-bricolage)", "sans-serif"],
+      },
       colors: {
         brand: {
           50:  "#eff6ff",

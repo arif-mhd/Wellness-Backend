@@ -1,7 +1,12 @@
-import { redirect } from "next/navigation";
+import LandingLayout from "@/components/landing/LandingLayout";
+import LandingHeroImage from "@/components/landing/LandingHeroImage";
+import LandingContent from "@/components/landing/LandingContent";
 
-// Root "/" → always go to login.
-// ProtectedRoute on the dashboard will redirect logged-in users back.
 export default function HomePage() {
-  redirect("/auth/login");
+  return (
+    <LandingLayout
+      heroImage={<LandingHeroImage />}
+      content={<LandingContent />}
+    />
+  );
 }

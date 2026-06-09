@@ -22,7 +22,7 @@ export default function ActivityLogPage() {
 
   return (
     <ProtectedRoute>
-      <div className="w-full space-y-8 pb-12 font-sans animate-in fade-in duration-300">
+      <div className="max-w-[1440px] mx-auto space-y-8 pb-12 font-sans px-1 animate-in fade-in duration-300">
         
         {/* Top Header */}
         <div className="pt-2">

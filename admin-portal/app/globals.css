@@ -11,20 +11,6 @@
     font-family: var(--font-sans), sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* 16px root → 1rem = 16px, 0.75rem = 12px (smallest content) */
-    font-size: 16px;
-  }
-
-  /* Marcellus for all headings */
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-serif), Georgia, serif;
-  }
-
-  /* h1 keeps its page-defined size — no override here */
-
-  /* Subheadings: 14px */
-  h2, h3, h4, h5, h6 {
-    font-size: 14px;
   }
 
   .font-serif {
@@ -33,23 +19,8 @@
 
   body {
     background-color: #F4F6FA;
-    /* General content: 14px */
-    font-size: 14px;
-    font-family: var(--font-sans), sans-serif;
-  }
-
-  /* General text elements inherit body's 14px */
-  p, span, td, th, li, label, input, button {
-    font-size: inherit;
-  }
-
-  /* Smallest content floor: 0.75rem = 12px */
-  small, .text-tiny, caption, figcaption {
-    font-size: 0.75rem; /* 12px */
   }
 }
-
-
 
 @layer utilities {
   .scrollbar-thin {
