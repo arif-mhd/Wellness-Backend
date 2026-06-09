@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { requireRole } from "../middleware/requireRole";
@@ -9,7 +9,7 @@ const router = Router();
 // All routes here require the "admin" role
 // ─── GET /api/admin/doctors/pending ─────────────────────────────────────────
 // Returns all doctors whose status is "pending_approval" (the onboarding queue).
-router.get("/pending", requireRole("admin"), async (_req, res) => {
+router.get("/pending", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
     const { resources } = await doctorsContainer.items
       .query({
@@ -27,7 +27,7 @@ router.get("/pending", requireRole("admin"), async (_req, res) => {
 
 // ─── GET /api/admin/doctors/approved ────────────────────────────────────────
 // Returns all doctors whose status is "approved" (the onboarded list).
-router.get("/approved", requireRole("admin"), async (_req, res) => {
+router.get("/approved", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
     const { resources } = await doctorsContainer.items
       .query({
@@ -43,11 +43,29 @@ router.get("/approved", requireRole("admin"), async (_req, res) => {
   }
 });
 
+// ─── GET /api/admin/doctors/:id ─────────────────────────────────────────────
+// Must come after /pending and /approved to avoid those being captured as :id
+router.get("/:id", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    // Use a query instead of .item().read() to be partition-key-agnostic
+    const { resources } = await doctorsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.id = @id",
+      parameters: [{ name: "@id", value: id }],
+    }).fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Doctor not found." }); return; }
+    res.json({ doctor: resources[0] });
+  } catch (err) {
+    console.error("Fetch doctor error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/admin/doctors/:id/approve ────────────────────────────────────
 // Promotes a pending doctor to approved:
 //   1. Swaps role from "doctor_pending" → "doctor" in SuperTokens
 //   2. Updates Cosmos document status to "approved"
-router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, res) => {
+router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   const adminId = req.session!.getUserId();
 
@@ -88,7 +106,7 @@ router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, re
 
 // ─── POST /api/admin/doctors/:id/reject ─────────────────────────────────────
 // Rejects a pending doctor: removes their ST account marker, updates Cosmos.
-router.post("/:id/reject", requireRole("admin"), async (req: SessionRequest, res) => {
+router.post("/:id/reject", requireRole("admin"), async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   const adminId = req.session!.getUserId();
 

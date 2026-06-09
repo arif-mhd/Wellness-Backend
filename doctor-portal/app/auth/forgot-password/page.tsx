@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { sendPasswordResetEmail } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 import linkCheckImg from "@/assets/images/linkcheck.png";
 
@@ -13,7 +12,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError("Please enter a valid email address.");
@@ -22,23 +21,11 @@ export default function ForgotPasswordPage() {
     setError("");
     setLoading(true);
 
-    try {
-      const response = await sendPasswordResetEmail({
-        formFields: [{ id: "email", value: email }],
-      });
-
-      if (response.status === "OK") {
-        setSubmitted(true);
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please enter a valid email.");
-      } else {
-        setError("Unable to send reset email. Please try again.");
-      }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
+    // Simulate sending reset link
+    setTimeout(() => {
       setLoading(false);
-    }
+      setSubmitted(true);
+    }, 1200);
   };
 
   return (

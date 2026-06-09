@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
+import { usePathname } from "next/navigation";
 
 export default function SharedDashboardLayout({
   children,
@@ -21,6 +22,8 @@ export default function SharedDashboardLayout({
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
+  const pathname = usePathname();
+  const isVideoCall = pathname === "/video-calls";
 
   return (
     <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
@@ -54,14 +57,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main Sidebar (takes full height) */}
-      <div className="z-10 h-full flex flex-col justify-between">
-        <Sidebar />
-      </div>
+      {!isVideoCall && (
+        <div className="z-10 h-full flex flex-col justify-between">
+          <Sidebar />
+        </div>
+      )}
 
       {/* Right Content Area */}
       <div className="flex-1 flex flex-col min-w-0 z-10 h-full">
         {/* Header inside the right panel */}
-        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"
+        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${isVideoCall ? "px-10 lg:px-[40px]" : sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"
           }`}>
           {/* Logo Frame */}
           <div className="flex items-center">

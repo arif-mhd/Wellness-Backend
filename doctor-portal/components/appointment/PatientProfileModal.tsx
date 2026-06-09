@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Patient } from "@/app/appointments/types";
 
@@ -8,6 +8,7 @@ interface PatientProfileModalProps {
   patient: Patient;
   onClose: () => void;
   mode?: string | null;
+  initialTab?: ProfileTab;
 }
 
 type ProfileTab = "Consultations" | "Medications" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
@@ -86,6 +87,51 @@ const MOCK_LAB_REPORTS = [
   }
 ];
 
+interface LabReportRow {
+  item: string;
+  values: { [date: string]: string };
+  isAbnormal?: boolean;
+}
+
+const CHEMISTRY_DATA: LabReportRow[] = [
+  { item: "Sodium Lvl", values: { "13/05/2024": "140 mmol/L", "14/05/2024": "140 mmol/L", "15/05/2024": "140 mmol/L", "16/05/2024": "140 mmol/L" } },
+  { item: "Potassium Lvl", values: { "13/05/2024": "3.4 mmol/L", "14/05/2024": "3.4 mmol/L", "15/05/2024": "3.4 mmol/L", "16/05/2024": "3.4 mmol/L" } },
+  { item: "Chloride Lvl", values: { "13/05/2024": "102 mmol/L", "14/05/2024": "102 mmol/L", "15/05/2024": "102 mmol/L", "16/05/2024": "102 mmol/L" } },
+  { item: "CO2", values: { "13/05/2024": "28 mmol/L", "14/05/2024": "28 mmol/L", "15/05/2024": "28 mmol/L", "16/05/2024": "28 mmol/L" } },
+  { item: "Creatinine Lvl", values: { "13/05/2024": "41 micromol/l", "14/05/2024": "41 micromol/l", "15/05/2024": "41 micromol/l", "16/05/2024": "41 micromol/l" }, isAbnormal: true },
+  { item: "Urea Lvl", values: { "13/05/2024": "6.30 mmol/L", "14/05/2024": "6.30 mmol/L", "15/05/2024": "6.30 mmol/L", "16/05/2024": "6.30 mmol/L" } },
+  { item: "Magnesium Lvl", values: { "13/05/2024": "", "14/05/2024": "", "15/05/2024": "", "16/05/2024": "" } },
+  { item: "Procalcitonin", values: { "13/05/2024": "0.11 ng/ ml", "14/05/2024": "0.11 ng/ ml", "15/05/2024": "0.11 ng/ ml", "16/05/2024": "0.11 ng/ ml" } },
+];
+
+const CBC_DATA: LabReportRow[] = [
+  { item: "WBC", values: { "13/05/2024": "7.6x10/L", "14/05/2024": "", "15/05/2024": "7.6x10/L", "16/05/2024": "" } },
+  { item: "RBC", values: { "13/05/2024": "*3.46x10", "14/05/2024": "", "15/05/2024": "*3.46x10", "16/05/2024": "" } },
+  { item: "Hgb", values: { "13/05/2024": "106 g/L", "14/05/2024": "", "15/05/2024": "106 g/L", "16/05/2024": "" } },
+  { item: "Hct", values: { "13/05/2024": "0.33 L/L", "14/05/2024": "", "15/05/2024": "0.33 L/L", "16/05/2024": "" } },
+  { item: "MCH", values: { "13/05/2024": "94.2 fl", "14/05/2024": "", "15/05/2024": "94.2 fl", "16/05/2024": "" } },
+  { item: "MCHC", values: { "13/05/2024": "30.6 pg", "14/05/2024": "", "15/05/2024": "30.6 pg", "16/05/2024": "" } },
+  { item: "Platelet", values: { "13/05/2024": "157.9/L", "14/05/2024": "", "15/05/2024": "157.9/L", "16/05/2024": "" } },
+  { item: "RDW-CV", values: { "13/05/2024": "17.5%", "14/05/2024": "", "15/05/2024": "17.5%", "16/05/2024": "" }, isAbnormal: true },
+];
+
+const LAB_DATES = ["13/05/2024", "14/05/2024", "15/05/2024", "16/05/2024"];
+
+const CheckboxIcon = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
+  <button onClick={onChange} className="focus:outline-none flex items-center justify-center p-1 hover:bg-gray-100 rounded transition-colors" type="button">
+    {checked ? (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect x="2.5" y="2.5" width="15" height="15" rx="3.5" fill="#5476FC" stroke="#5476FC" strokeWidth="1.5" />
+        <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ) : (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect x="2.5" y="2.5" width="15" height="15" rx="3.5" stroke="#1D2433" strokeOpacity="0.8" strokeWidth="1.5" />
+      </svg>
+    )}
+  </button>
+);
+
 const TABS: ProfileTab[] = ["Consultations", "Medications", "Labs", "Radiology", "Diagnostics", "Vaccinations", "Allergies", "Surgeries"];
 
 const DiamondIcon = ({ color }: { color: string }) => (
@@ -106,9 +152,11 @@ const GradientPillIcon = () => (
   </div>
 );
 
-export default function PatientProfileModal({ patient, onClose, mode }: PatientProfileModalProps) {
+export default function PatientProfileModal({ patient, onClose, mode, initialTab }: PatientProfileModalProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<ProfileTab>("Consultations");
+  const [activeTab, setActiveTab] = useState<ProfileTab>(
+    initialTab || (mode === "lab-reports" ? "Labs" : "Consultations")
+  );
   const [selectedConsultation, setSelectedConsultation] = useState(MOCK_CONSULTATIONS[0]);
   const [prescribedMedicines, setPrescribedMedicines] = useState([
     { name: "Paracetamol 500 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
@@ -116,6 +164,16 @@ export default function PatientProfileModal({ patient, onClose, mode }: PatientP
     { name: "Diclofenac 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
     { name: "Tramadol 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
   ]);
+  const [labsViewMode, setLabsViewMode] = useState<"cards" | "table">(
+    mode === "lab-reports" ? "table" : "cards"
+  );
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const handleAddMedicine = () => {
     const name = prompt("Enter medicine name (e.g. Aspirin 100 mg):");
@@ -143,20 +201,36 @@ export default function PatientProfileModal({ patient, onClose, mode }: PatientP
     <div className="w-full min-h-full flex flex-col font-outfit bg-[#F7F9FC] overflow-auto animate-fade-in">
 
       {/* Page header area */}
-      <div className="flex items-center gap-3 px-8 pt-8 pb-4">
-        <button
-          onClick={onClose}
-          className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm hover:bg-gray-50 transition-all"
-          aria-label="Go back"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
-          {mode === "summary" ? "Consultation Summary" : "Patient Details"}
-        </h1>
-      </div>
+      {mode === "lab-reports" ? (
+        <div className="flex items-center gap-2 px-8 pt-8 pb-4">
+          <button
+            onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=Labs`)}
+            className="flex items-center gap-2 text-[#5476FC] hover:text-[#4065FB] transition-colors focus:outline-none"
+            type="button"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="#5476FC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="font-outfit text-[16px] font-medium leading-6">Consultation Summary</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 px-8 pt-8 pb-4">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm hover:bg-gray-50 transition-all"
+            aria-label="Go back"
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
+            {mode === "summary" ? "Consultation Summary" : "Patient Details"}
+          </h1>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 px-8 pb-10 flex-1">
 
@@ -202,7 +276,13 @@ export default function PatientProfileModal({ patient, onClose, mode }: PatientP
           {TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                if (mode === "lab-reports" && tab !== "Labs") {
+                  router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=${tab}`);
+                } else {
+                  setActiveTab(tab);
+                }
+              }}
               className={`px-4 py-3 rounded-full text-[14px] font-normal leading-[1.3] tracking-[-0.28px] transition-all duration-200 ${
                 activeTab === tab
                   ? "bg-[#2E344E] text-white"
@@ -525,124 +605,335 @@ export default function PatientProfileModal({ patient, onClose, mode }: PatientP
 
         {/* Labs tab content */}
         {activeTab === "Labs" && (
-          <div className="flex flex-col md:flex-row gap-8 items-start w-full animate-fade-in">
-            {/* Left: Reports */}
-            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-                  Reports
-                </span>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] p-0.5">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <rect x="1" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
-                      <rect x="1" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
-                      <rect x="7" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
-                      <rect x="7" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center justify-center w-5 h-5 rounded border border-[#E2E2E2] bg-[#F4F4F4] p-0.5">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M2.4 0H9.6C10.1 0 10.5 0.4 10.5 0.9V11.1C10.5 11.6 10.1 12 9.6 12H2.4C1.9 12 1.5 11.6 1.5 11.1V0.9C1.5 0.4 1.9 0 2.4 0Z" stroke="#948F8F" strokeWidth="0.8" />
-                      <path d="M3.5 3H8.5" stroke="#948F8F" strokeWidth="0.8" />
-                      <path d="M3.5 6H8.5" stroke="#948F8F" strokeWidth="0.8" />
-                      <path d="M3.5 9H6.5" stroke="#948F8F" strokeWidth="0.8" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-6">
-                {MOCK_LAB_REPORTS.map((report, i) => (
-                  <React.Fragment key={report.name}>
-                    <div className="flex flex-col gap-3">
-                      {/* Title row */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <GradientPillIcon />
-                          <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
-                            {report.name}
-                          </span>
-                        </div>
-                        {report.status === "Pending" ? (
-                          <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                            Report Pending
-                          </span>
-                        ) : (
-                          <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                            Report Available
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
-                        {report.description}
-                      </p>
-
-                      {/* Actions for Available reports */}
-                      {report.status === "Available" && (
-                        <div className="flex items-center gap-4 pl-[48px] mt-1">
-                          <button
-                            onClick={() => alert(`Viewing ${report.name}...`)}
-                            className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
-                          >
-                            View Report
-                          </button>
-                          <button
-                            onClick={() => alert(`Downloading ${report.name}...`)}
-                            className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
-                          >
-                            Download Report
-                          </button>
-                        </div>
-                      )}
+          <div className="w-full animate-fade-in">
+            {labsViewMode === "cards" ? (
+              <div className="flex flex-col md:flex-row gap-8 items-start w-full">
+                {/* Left: Reports */}
+                <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                      Reports
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setLabsViewMode("cards")}
+                        className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] p-0.5 focus:outline-none"
+                        title="Grid view"
+                        type="button"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <rect x="1" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                          <rect x="1" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                          <rect x="7" y="1" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                          <rect x="7" y="7" width="4" height="4" rx="0.5" stroke="white" strokeWidth="0.8" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => router.push(`/appointments/patient-details/lab-reports?id=${patient.id}`)}
+                        className="flex items-center justify-center w-5 h-5 rounded border border-[#E2E2E2] bg-[#F4F4F4] p-0.5 focus:outline-none"
+                        title="Table view"
+                        type="button"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M2.4 0H9.6C10.1 0 10.5 0.4 10.5 0.9V11.1C10.5 11.6 10.1 12 9.6 12H2.4C1.9 12 1.5 11.6 1.5 11.1V0.9C1.5 0.4 1.9 0 2.4 0Z" stroke="#948F8F" strokeWidth="0.8" />
+                          <path d="M3.5 3H8.5" stroke="#948F8F" strokeWidth="0.8" />
+                          <path d="M3.5 6H8.5" stroke="#948F8F" strokeWidth="0.8" />
+                          <path d="M3.5 9H6.5" stroke="#948F8F" strokeWidth="0.8" />
+                        </svg>
+                      </button>
                     </div>
-                    {i < MOCK_LAB_REPORTS.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
+                  </div>
 
-            {/* Right: Consultation Details */}
-            <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-6 border border-white shadow-sm">
-              <div className="border-b border-gray-100 pb-4">
-                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-                  Consultation Details
-                </span>
-              </div>
+                  <div className="flex flex-col gap-6">
+                    {MOCK_LAB_REPORTS.map((report, i) => (
+                      <React.Fragment key={report.name}>
+                        <div className="flex flex-col gap-3">
+                          {/* Title row */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <GradientPillIcon />
+                              <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
+                                {report.name}
+                              </span>
+                            </div>
+                            {report.status === "Pending" ? (
+                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                                Report Pending
+                              </span>
+                            ) : (
+                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                                Report Available
+                              </span>
+                            )}
+                          </div>
 
-              <div className="flex flex-col gap-4">
-                {/* Reason for visit */}
-                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
-                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
-                    Reason for visit
-                  </span>
-                  <p className="text-[#676E76] text-[12px] leading-[1.4]">
-                    {patient.description || "I’ve had a fever for three days with chills, body aches, and fatigue."}
-                  </p>
+                          {/* Description */}
+                          <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
+                            {report.description}
+                          </p>
+
+                          {/* Actions for Available reports */}
+                          {report.status === "Available" && (
+                            <div className="flex items-center gap-4 pl-[48px] mt-1">
+                              <button
+                                onClick={() => router.push(`/appointments/patient-details/lab-reports?id=${patient.id}`)}
+                                className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
+                                type="button"
+                              >
+                                View Report
+                              </button>
+                              <button
+                                onClick={() => alert(`Downloading ${report.name}...`)}
+                                className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
+                                type="button"
+                              >
+                                Download Report
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {i < MOCK_LAB_REPORTS.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
+                      </React.Fragment>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Pre-visit Form */}
-                <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
-                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
-                    Pre-vist Form
-                  </span>
-                  <p className="text-[#676E76] text-[12px] leading-[1.4] mb-2">
-                    Review the patient's pre-visit form to understand their medical history and reason for the appointment.
-                  </p>
-                  <button
-                    onClick={() => router.push(`/appointments/previsit-form?id=${patient.id}&from=patientdetails`)}
-                    className="flex items-center gap-2 text-[#182A6F] hover:text-[#2E48A0] font-semibold text-[13px] transition-colors self-start"
-                  >
-                    <span>Read Pre-visit form</span>
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                      <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+                {/* Right: Consultation Details */}
+                <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-6 border border-white shadow-sm">
+                  <div className="border-b border-gray-100 pb-4">
+                    <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                      Consultation Details
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-4">
+                    {/* Reason for visit */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                      <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                        Reason for visit
+                      </span>
+                      <p className="text-[#676E76] text-[12px] leading-[1.4]">
+                        {patient.description || "I’ve had a fever for three days with chills, body aches, and fatigue."}
+                      </p>
+                    </div>
+
+                    {/* Pre-visit Form */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                      <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
+                        Pre-vist Form
+                      </span>
+                      <p className="text-[#676E76] text-[12px] leading-[1.4] mb-2">
+                        Review the patient's pre-visit form to understand their medical history and reason for the appointment.
+                      </p>
+                      <button
+                        onClick={() => router.push(`/appointments/previsit-form?id=${patient.id}&from=patientdetails`)}
+                        className="flex items-center gap-2 text-[#182A6F] hover:text-[#2E48A0] font-semibold text-[13px] transition-colors self-start"
+                        type="button"
+                      >
+                        <span>Read Pre-visit form</span>
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                  <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                    Reports
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary&tab=Labs`)}
+                      className="flex items-center justify-center w-5 h-5 rounded border border-[#E2E2E2] bg-[#F4F4F4] p-0.5 focus:outline-none"
+                      title="Grid view"
+                      type="button"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <rect x="1" y="1" width="4" height="4" rx="0.5" stroke="#948F8F" strokeWidth="0.8" />
+                        <rect x="1" y="7" width="4" height="4" rx="0.5" stroke="#948F8F" strokeWidth="0.8" />
+                        <rect x="7" y="1" width="4" height="4" rx="0.5" stroke="#948F8F" strokeWidth="0.8" />
+                        <rect x="7" y="7" width="4" height="4" rx="0.5" stroke="#948F8F" strokeWidth="0.8" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setLabsViewMode("table")}
+                      className="flex items-center justify-center w-5 h-5 rounded bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] p-0.5 focus:outline-none"
+                      title="Table view"
+                      type="button"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.4 0H9.6C10.1 0 10.5 0.4 10.5 0.9V11.1C10.5 11.6 10.1 12 9.6 12H2.4C1.9 12 1.5 11.6 1.5 11.1V0.9C1.5 0.4 1.9 0 2.4 0Z" stroke="white" strokeWidth="0.8" />
+                        <path d="M3.5 3H8.5" stroke="white" strokeWidth="0.8" />
+                        <path d="M3.5 6H8.5" stroke="white" strokeWidth="0.8" />
+                        <path d="M3.5 9H6.5" stroke="white" strokeWidth="0.8" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  {/* General Chemistry Section */}
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-[#F5F6FA] rounded-[8px] px-4 py-2 text-[#24292E] font-medium text-[14px] tracking-[-0.28px]">
+                      General Chemistry
+                    </div>
+                    <div className="w-full overflow-x-auto rounded-[8px] border border-[#EBEEF5] shadow-sm">
+                      <table className="w-full border-collapse text-left">
+                        <thead>
+                          <tr className="bg-[#F1F3F9] h-10 border-b border-[#EBEEF5]">
+                            <th className="w-12 px-3 text-center align-middle">
+                              <CheckboxIcon
+                                checked={CHEMISTRY_DATA.every(row => selectedRows.includes(`chem-${row.item}`))}
+                                onChange={() => {
+                                  const allChemIds = CHEMISTRY_DATA.map(row => `chem-${row.item}`);
+                                  const areAllSelected = allChemIds.every(id => selectedRows.includes(id));
+                                  if (areAllSelected) {
+                                    setSelectedRows(prev => prev.filter(id => !allChemIds.includes(id)));
+                                  } else {
+                                    setSelectedRows(prev => [...new Set([...prev, ...allChemIds])]);
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="px-4 text-[#1D2433] font-semibold text-[14px] tracking-[0.28px] capitalize align-middle">
+                              Items
+                            </th>
+                            {LAB_DATES.map((date) => (
+                              <th key={date} className="px-4 text-[#24292E] font-medium text-[14px] tracking-[-0.28px] align-middle">
+                                {date}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {CHEMISTRY_DATA.map((row, index) => {
+                            const rowId = `chem-${row.item}`;
+                            const isChecked = selectedRows.includes(rowId);
+                            return (
+                              <tr
+                                key={row.item}
+                                className={`h-10 border-b border-[#EBEEF5]/60 transition-colors hover:bg-blue-50/10 ${
+                                  index % 2 === 0 ? "bg-white" : "bg-[#F8F9FC]"
+                                }`}
+                              >
+                                <td className="w-12 px-3 text-center align-middle">
+                                  <CheckboxIcon
+                                    checked={isChecked}
+                                    onChange={() =>
+                                      setSelectedRows(prev =>
+                                        prev.includes(rowId) ? prev.filter(id => id !== rowId) : [...prev, rowId]
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td className="px-4 text-[#1D2433] font-normal text-[14px] align-middle">
+                                  {row.item}
+                                </td>
+                                {LAB_DATES.map((date) => {
+                                  const val = row.values[date];
+                                  return (
+                                    <td
+                                      key={date}
+                                      className={`px-4 text-[12px] font-normal leading-[1.5] tracking-[-0.24px] align-middle ${
+                                        row.isAbnormal && val ? "text-[#E84949] font-medium" : "text-[#676E76]"
+                                      }`}
+                                    >
+                                      {val}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Complete Blood Count Section */}
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-[#F5F6FA] rounded-[8px] px-4 py-2 text-[#24292E] font-medium text-[14px] tracking-[-0.28px]">
+                      Complete Blood Count
+                    </div>
+                    <div className="w-full overflow-x-auto rounded-[8px] border border-[#EBEEF5] shadow-sm">
+                      <table className="w-full border-collapse text-left">
+                        <thead>
+                          <tr className="bg-[#F1F3F9] h-10 border-b border-[#EBEEF5]">
+                            <th className="w-12 px-3 text-center align-middle">
+                              <CheckboxIcon
+                                checked={CBC_DATA.every(row => selectedRows.includes(`cbc-${row.item}`))}
+                                onChange={() => {
+                                  const allCbcIds = CBC_DATA.map(row => `cbc-${row.item}`);
+                                  const areAllSelected = allCbcIds.every(id => selectedRows.includes(id));
+                                  if (areAllSelected) {
+                                    setSelectedRows(prev => prev.filter(id => !allCbcIds.includes(id)));
+                                  } else {
+                                    setSelectedRows(prev => [...new Set([...prev, ...allCbcIds])]);
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="px-4 text-[#1D2433] font-semibold text-[14px] tracking-[0.28px] capitalize align-middle">
+                              Items
+                            </th>
+                            {LAB_DATES.map((date) => (
+                              <th key={date} className="px-4 text-[#24292E] font-medium text-[14px] tracking-[-0.28px] align-middle">
+                                {date}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {CBC_DATA.map((row, index) => {
+                            const rowId = `cbc-${row.item}`;
+                            const isChecked = selectedRows.includes(rowId);
+                            return (
+                              <tr
+                                key={row.item}
+                                className={`h-10 border-b border-[#EBEEF5]/60 transition-colors hover:bg-blue-50/10 ${
+                                  index % 2 === 0 ? "bg-white" : "bg-[#F8F9FC]"
+                                }`}
+                              >
+                                <td className="w-12 px-3 text-center align-middle">
+                                  <CheckboxIcon
+                                    checked={isChecked}
+                                    onChange={() =>
+                                      setSelectedRows(prev =>
+                                        prev.includes(rowId) ? prev.filter(id => id !== rowId) : [...prev, rowId]
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td className="px-4 text-[#1D2433] font-normal text-[14px] align-middle">
+                                  {row.item}
+                                </td>
+                                {LAB_DATES.map((date) => {
+                                  const val = row.values[date];
+                                  return (
+                                    <td
+                                      key={date}
+                                      className={`px-4 text-[12px] font-normal leading-[1.5] tracking-[-0.24px] align-middle ${
+                                        row.isAbnormal && val ? "text-[#E84949] font-medium" : "text-[#676E76]"
+                                      }`}
+                                    >
+                                      {val}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

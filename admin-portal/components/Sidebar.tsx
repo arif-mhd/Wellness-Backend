@@ -68,8 +68,28 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/activity-log",
-    label: "Activity Log",
+    href: "/dashboard/lab-service",
+    label: "Lab Service",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18" />
+        <path d="M3 9h18" />
+        <path d="M3 15h18" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/vaccination",
+    label: "Vaccination",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/forms",
+    label: "Forms",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -80,20 +100,34 @@ const navItems = [
     ),
   },
   {
-    href: "#departments",
-    label: "Departments",
+    href: "/dashboard/emergencies",
+    label: "Emergencies",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="8" width="16" height="12" rx="2" />
-        <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-        <path d="M12 12v4" />
-        <path d="M10 14h4" />
+        <path d="M10 10H6" />
+        <path d="M14 10h1" />
+        <path d="M3 14h1" />
+        <path d="M20 14h1" />
+        <path d="M9 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h10l4 4v3" />
+        <circle cx="17" cy="18" r="2" />
+        <circle cx="8" cy="18" r="2" />
+        <path d="M8 10V7" />
+        <path d="M8 7h4" />
       </svg>
     ),
-    isPlaceholder: true,
   },
   {
-    href: "#support",
+    href: "/dashboard/feedback",
+    label: "Feedback",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M12 7l4 4-5 5h-4v-4z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/support",
     label: "Support",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -103,11 +137,10 @@ const navItems = [
         <path d="M20 17v2a2 2 0 0 1-2 2H9" />
       </svg>
     ),
-    isPlaceholder: true,
   },
   {
-    href: "#billing",
-    label: "Billing",
+    href: "/dashboard/earnings",
+    label: "Earnings",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
@@ -115,11 +148,33 @@ const navItems = [
         <path d="M18 12a2 2 0 0 0 0 4h4v-4z" />
       </svg>
     ),
-    isPlaceholder: true,
   },
   {
-    href: "#security",
-    label: "Security",
+    href: "/dashboard/orders",
+    label: "Orders",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="21" r="1" />
+        <circle cx="20" cy="21" r="1" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        <path d="M14 10h4" />
+        <path d="M16 8l2 2-2 2" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/roles",
+    label: "Roles",
+    icon: (
+      <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M8 11l3 3 5-5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/settings",
+    label: "Settings",
     icon: (
       <svg className="w-[1.25rem] h-[1.25rem]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -127,7 +182,6 @@ const navItems = [
         <path d="M9 16a3 3 0 0 1 6 0" />
       </svg>
     ),
-    isPlaceholder: true,
   },
 ];
 
@@ -165,7 +219,7 @@ export default function Sidebar() {
         {navItems.map((item, idx) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" && !item.href.startsWith("#") && pathname.startsWith(item.href));
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
           return (
             <div key={idx} className="relative group flex justify-center w-full">

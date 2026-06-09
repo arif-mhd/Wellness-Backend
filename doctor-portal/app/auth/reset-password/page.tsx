@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { submitNewPassword } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 
 export default function ResetPasswordPage() {
@@ -15,7 +14,6 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Live password validation
   const isMinLength = password.length >= 8;
@@ -25,7 +23,7 @@ export default function ResetPasswordPage() {
     /[0-9]/.test(password) && 
     /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -39,25 +37,11 @@ export default function ResetPasswordPage() {
     setError("");
     setLoading(true);
 
-    try {
-      const response = await submitNewPassword({
-        formFields: [{ id: "password", value: password }],
-      });
-
-      if (response.status === "OK") {
-        router.push("/auth/login");
-      } else if (response.status === "RESET_PASSWORD_INVALID_TOKEN_ERROR") {
-        setError("This reset link is invalid or has expired. Please request a new one.");
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your password.");
-      } else {
-        setError("Unable to reset password. Please try again.");
-      }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
+    // Simulate resetting password and redirect directly to the login page!
+    setTimeout(() => {
       setLoading(false);
-    }
+      router.push("/auth/login");
+    }, 1500);
   };
 
   return (

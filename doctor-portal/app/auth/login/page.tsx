@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
 import TwoFactorAuth from "@/components/auth/TwoFactorAuth";
@@ -24,29 +23,11 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await signIn({
-        formFields: [
-          { id: "email", value: email },
-          { id: "password", value: password },
-        ],
-      });
-
-      if (response.status === "OK") {
-        setLoading(false);
-        setShow2FA(true);
-      } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
-        setError("Invalid email or password.");
-      } else if (response.status === "FIELD_ERROR") {
-        setError(response.formFields[0]?.error || "Please check your credentials.");
-      } else {
-        setError("Login failed. Please try again.");
-      }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
+    // Simulate login verification, then transition to Two-Factor Auth
+    setTimeout(() => {
       setLoading(false);
-    }
+      setShow2FA(true);
+    }, 1000);
   }
 
   if (show2FA) {
@@ -123,7 +104,7 @@ export default function LoginPage() {
                   required
                   placeholder="Email*"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#f3f4fd] border-0 rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit"
                 />
               </div>
@@ -135,7 +116,7 @@ export default function LoginPage() {
                   required
                   placeholder="Password*"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-[#f3f4fd] border-0 rounded-xl pl-5 pr-12 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit"
                 />
                 <button
@@ -177,23 +158,13 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95"
                 >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Signing in…
-                    </>
-                  ) : (
-                    <>
-                      <span>Login</span>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </>
+                  <span>Login</span>
+                  {!loading && (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   )}
                 </button>
 

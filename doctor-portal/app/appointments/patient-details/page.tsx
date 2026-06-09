@@ -36,6 +36,7 @@ function PatientDetailsContent() {
   const id = searchParams.get("id");
   const from = searchParams.get("from");
   const mode = searchParams.get("mode");
+  const tab = searchParams.get("tab") as any;
 
   const allPatients: Patient[] = [
     ...MOCK_NEW_APPOINTMENTS,
@@ -53,7 +54,7 @@ function PatientDetailsContent() {
     }
   };
 
-  return <PatientProfileModal patient={patient} onClose={handleClose} mode={mode} />;
+  return <PatientProfileModal patient={patient} onClose={handleClose} mode={mode} initialTab={tab} />;
 }
 
 export default function PatientDetailsPage() {

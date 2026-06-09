@@ -296,4 +296,216 @@ router.post(
   }
 );
 
+// ── PUT /api/patients/insurance ──────────────────────────────────────────────
+// Body: { insurance: InsuranceItem[] }
+router.put("/insurance", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { insurance } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    await patientsContainer.items.upsert({ ...existing, insurance, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Insurance update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/family/:memberId/avatar ───────────────────────────────
+// Uploads a family member's avatar to blob storage and stores the URL on the member object.
+router.post(
+  "/family/:memberId/avatar",
+  requireRole("patient"),
+  upload.single("avatar"),
+  async (req: SessionRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "No image file provided." });
+        return;
+      }
+
+      const userId = req.session!.getUserId();
+      const { memberId } = req.params;
+      const ext = req.file.mimetype.split("/")[1] ?? "jpg";
+      const blobPath = `patients/${userId}/family/${memberId}/avatar.${ext}`;
+
+      try { await deleteBlob(blobPath); } catch { /* ignore */ }
+      await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+      const avatarUrl = generateSasUrl(blobPath, 365);
+
+      let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+      try {
+        const { resource } = await patientsContainer.item(userId, userId).read();
+        if (resource) existing = resource;
+      } catch { /* ignore */ }
+
+      const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+        m.id === memberId ? { ...m, avatarUrl } : m
+      );
+      await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+
+      res.json({ status: "OK", avatarUrl });
+    } catch (err) {
+      console.error("Family avatar upload error:", err);
+      res.status(500).json({ error: "Avatar upload failed." });
+    }
+  }
+);
+
+// ── GET /api/patients/family ─────────────────────────────────────────────────
+router.get("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { resource } = await patientsContainer.item(userId, userId).read();
+    res.json({ familyMembers: resource?.familyMembers ?? [] });
+  } catch (err) {
+    console.error("Family fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/family ────────────────────────────────────────────────
+// Body: FamilyMemberItem (without id)
+router.post("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const member = { ...req.body, id: Date.now().toString() };
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = [...((existing.familyMembers as any[]) ?? []), member];
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ member });
+  } catch (err) {
+    console.error("Add family member error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/patients/family/:memberId ───────────────────────────────────────
+router.put("/family/:memberId", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      m.id === memberId ? { ...m, ...req.body } : m
+    );
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Update family member error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/patients/family/:memberId ────────────────────────────────────
+router.delete("/family/:memberId", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).filter((m: any) => m.id !== memberId);
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Delete family member error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/patients/family/:memberId/allergies ─────────────────────────────
+router.put("/family/:memberId/allergies", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+    const { allergies } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      m.id === memberId ? { ...m, allergies } : m
+    );
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Family member allergies error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/patients/family/:memberId/medications ───────────────────────────
+router.put("/family/:memberId/medications", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+    const { medications } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      m.id === memberId ? { ...m, medications } : m
+    );
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Family member medications error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/patients/family/:memberId/chronic-diseases ──────────────────────
+router.put("/family/:memberId/chronic-diseases", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+    const { chronicDiseases } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      m.id === memberId ? { ...m, chronicDiseases } : m
+    );
+    await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Family member chronic diseases error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

@@ -129,8 +129,6 @@ export default function SignupPage() {
   };
 
   // Step 4: Password Creation & Registration Submit
-  // Calls our backend /api/doctors/register — creates ST account with "doctor_pending" role
-  // and saves profile to Cosmos. No dashboard access until admin approves.
   const handleStep4Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -144,18 +142,15 @@ export default function SignupPage() {
       return;
     }
 
-    // email from step 3 basic details; fall back to emailOrPhone from step 1
+    // Use the email collected in step 3; fall back to emailOrPhone from step 1
     const registrationEmail = email.trim() || emailOrPhone.trim();
-
-    if (!registrationEmail) {
-      setError("Please provide a valid email address.");
-      return;
-    }
 
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const res = await fetch(`${apiUrl}/api/doctors/register`, {
+      // Call our backend register endpoint which creates the SuperTokens account,
+      // assigns doctor_pending role, and saves the profile to Cosmos.
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const res = await fetch(`${API_URL}/api/doctors/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -174,7 +169,7 @@ export default function SignupPage() {
       if (res.ok) {
         setStep(5);
       } else if (res.status === 409) {
-        setError("An account with this email already exists. Please log in.");
+        setError("An account with this email already exists.");
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
@@ -185,9 +180,9 @@ export default function SignupPage() {
     }
   };
 
-  // After registration, doctor goes back to login (they can't access dashboard until approved)
   const handleFinalComplete = () => {
-    router.push("/auth/login");
+    // Doctor is now pending approval — send to pending page
+    router.push("/auth/pending");
   };
 
   return (

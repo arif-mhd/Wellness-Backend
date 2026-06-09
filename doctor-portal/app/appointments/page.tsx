@@ -1,13 +1,37 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MOCK_NEW_APPOINTMENTS, MOCK_ALL_CONSULTATIONS } from "./mockData";
 import { Patient } from "./types";
+import Session from "supertokens-web-js/recipe/session";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+function mapToPatient(apt: any, index: number): Patient {
+  const d = new Date(apt.scheduledAt);
+  const isToday = d.toDateString() === new Date().toDateString();
+  let status: Patient["status"] = "Scheduled";
+  if (apt.status === "in_progress") status = "Waiting";
+  else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
+  return {
+    id: apt.id,
+    name: apt.patientName ?? "Patient",
+    age: 0,
+    email: apt.patientEmail ?? "",
+    diagnosis: apt.reason ?? "Consultation",
+    description: apt.reason ?? "",
+    status,
+    dateTime: isToday
+      ? (status === "Waiting" ? "Waiting" : d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }))
+      : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
+    avatar: index % 2 === 0 ? "/patient-avatar-1.png" : "/patient-avatar-2.png",
+    bio: apt.reason ?? "",
+    earnings: `${apt.paymentAmount ?? 250} AED`,
+  };
+}
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";
 import AllConsultationsTable from "@/components/appointment/AllConsultationsTable";
 import AppointmentDetailsCard from "@/components/appointment/AppointmentDetailsCard";
-import ConsultationModal from "@/components/appointment/ConsultationModal";
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import { useSidebar } from "@/components/SidebarContext";
 
@@ -26,10 +50,33 @@ export default function AppointmentsPage() {
 
   // Selection states
   // By default, select Albert Flores (MOCK_NEW_APPOINTMENTS[1]) to match figma page load
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(MOCK_NEW_APPOINTMENTS[1]);
+  const [allAppointments, setAllAppointments] = useState<Patient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  // Call simulation state
-  const [activeConsultationPatient, setActiveConsultationPatient] = useState<Patient | null>(null);
+  const fetchAppointments = useCallback(async () => {
+    try {
+      const accessToken = await Session.getAccessToken();
+      if (!accessToken) return;
+      const res = await fetch(`${API_URL}/api/appointments/doctor`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return;
+      const { appointments } = await res.json();
+      const mapped = (appointments ?? []).map(mapToPatient);
+      setAllAppointments(mapped);
+      if (mapped.length > 0) setSelectedPatient(mapped[0]);
+    } catch { /* silently ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+    const id = setInterval(() => fetchAppointments(), 30_000);
+    return () => clearInterval(id);
+  }, [fetchAppointments]);
+
+  const startConsult = (patient: Patient) => {
+    router.push(`/appointments/consult?appointmentId=${patient.id}&patientName=${encodeURIComponent(patient.name)}`);
+  };
 
   // Success Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -63,7 +110,11 @@ export default function AppointmentsPage() {
 
   // Filter New Appointments list
   const filteredNewAppointments = useMemo(() => {
-    let result = [...MOCK_NEW_APPOINTMENTS];
+    const todayStr = new Date().toDateString();
+    let result = allAppointments.filter(a => {
+      // "New" = today's scheduled or waiting appointments
+      return a.status !== "Completed";
+    });
 
     // Filter by tab selection
     if (activeTab === "Upcoming") {
@@ -84,11 +135,11 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, allAppointments]);
 
   // Filter & Sort All Consultations list
   const filteredAllConsultations = useMemo(() => {
-    let result = [...MOCK_ALL_CONSULTATIONS];
+    let result = [...allAppointments];
 
     // Filter by tab selection
     if (activeTab === "Upcoming") {
@@ -127,7 +178,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery, sortField, sortOrder]);
+  }, [activeTab, searchQuery, sortField, sortOrder, allAppointments]);
 
   return (
     <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${sidebarOpen
@@ -143,16 +194,6 @@ export default function AppointmentsPage() {
       )}
 
 
-      {/* Video Call Modal */}
-      {activeConsultationPatient && (
-        <ConsultationModal
-          patient={activeConsultationPatient}
-          onClose={() => {
-            triggerToast(`Completed consultation with ${activeConsultationPatient.name}`);
-            setActiveConsultationPatient(null);
-          }}
-        />
-      )}
 
       {/* Left Panel - Tables & Filters */}
       <div className="flex-1 flex flex-col gap-6 min-w-0">
@@ -303,7 +344,7 @@ export default function AppointmentsPage() {
               appointments={filteredNewAppointments}
               selectedPatientId={selectedPatient?.id}
               onSelectPatient={setSelectedPatient}
-              onConsult={setActiveConsultationPatient}
+              onConsult={startConsult}
               onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
             />
           </div>
@@ -383,7 +424,7 @@ export default function AppointmentsPage() {
             consultations={filteredAllConsultations}
             selectedPatientId={selectedPatient?.id}
             onSelectPatient={setSelectedPatient}
-            onConsult={setActiveConsultationPatient}
+            onConsult={startConsult}
             onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
             activeTab={activeTab}
           />
@@ -395,10 +436,7 @@ export default function AppointmentsPage() {
         <AppointmentDetailsCard
           patient={selectedPatient}
           onClose={() => setSelectedPatient(null)}
-          onConsult={(patient) => {
-            setActiveConsultationPatient(patient);
-            triggerToast(`Consultation requested for ${patient.name}`);
-          }}
+          onConsult={startConsult}
           onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
           onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
           activeTab={activeTab}

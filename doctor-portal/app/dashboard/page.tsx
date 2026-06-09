@@ -1,16 +1,41 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
 interface Patient {
-  id: number;
+  id: string;
   name: string;
   avatar: string;
   tags: string[];
   time: string;
+}
+
+interface SlotDef {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
+const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+function fmt12(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2,"0")}${h >= 12 ? "PM" : "AM"}`;
+}
+
+function timeUntil(iso: string) {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return "Now";
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `Consultation in ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  return `Consultation in ${hrs}h ${mins % 60}m`;
 }
 
 interface Task {
@@ -22,21 +47,13 @@ interface Task {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [doctorName, setDoctorName] = useState<string | null>("Dr. Jordan Anderson");
-  const [selectedPatientId, setSelectedPatientId] = useState<number>(2); // Floyd Miles is selected by default
-  const [isAvailable, setIsAvailable] = useState<boolean>(true);
-  const [consultingPatient, setConsultingPatient] = useState<Patient | null>(null);
-
-  const [patients, setPatients] = useState<Patient[]>([
-    { id: 1, name: "Yelena Isinbaeva", avatar: "/patient-avatar-2.png", tags: ["Fever", "Cough"], time: "Consultation in 32 min" },
-    { id: 2, name: "Floyd Miles", avatar: "/patient-avatar-1.png", tags: ["Fever", "Headache", "Cough"], time: "Consultation in 32 min" },
-    { id: 3, name: "Leslie Alexander", avatar: "/patient-avatar-2.png", tags: ["Fever", "Cough"], time: "Consultation in 32 min" },
-    { id: 4, name: "Jerome Bell", avatar: "/patient-avatar-1.png", tags: ["Fever", "Cough"], time: "Consultation in 32 min" },
-    { id: 5, name: "Eleanor Pena", avatar: "/patient-avatar-2.png", tags: ["Fever", "Cough"], time: "Consultation in 32 min" },
-    { id: 6, name: "Cameron Williamson", avatar: "/patient-avatar-1.png", tags: ["Headache", "Cough"], time: "Consultation in 32 min" },
-    { id: 7, name: "Eleanor Pena", avatar: "/patient-avatar-2.png", tags: ["Fever", "Cough"], time: "Consultation in 32 min" },
-    { id: 8, name: "Cameron Williamson", avatar: "/patient-avatar-1.png", tags: ["Headache", "Cough"], time: "Consultation in 32 min" },
-  ]);
+  const [doctorName, setDoctorName]         = useState<string | null>("Dr. Jordan Anderson");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [isAvailable, setIsAvailable]       = useState<boolean>(true);
+  const [patients, setPatients]             = useState<Patient[]>([]);
+  const [totalAppointments, setTotalAppointments] = useState(0);
+  const [todayCount, setTodayCount]         = useState(0);
+  const [slots, setSlots]                   = useState<SlotDef[]>([]);
 
   const [tasks, setTasks] = useState<Task[]>([
     { id: 1, title: "Test Results for Mark Robinson", desc: "Mark's blood test results for cholesterol and liver function have arrived. Review the results and provide recommendations on managing elevated cholesterol levels.", completed: true },
@@ -45,25 +62,69 @@ export default function DashboardPage() {
     { id: 4, title: "Follow-up notes for Yelena Isinbaeva", desc: "Log post-consultation details from morning call and assign medication details.", completed: false },
   ]);
 
-  useEffect(() => {
-    async function loadName() {
-      try {
-        const accessToken = await Session.getAccessToken();
-        if (!accessToken) return;
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/auth/me`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setDoctorName(data.profile?.name ?? "Dr. Jordan Anderson");
-        }
-      } catch {
-        // silently ignore — greeting falls back to "Dr. Jordan Anderson"
+  const fetchData = useCallback(async () => {
+    try {
+      const accessToken = await Session.getAccessToken();
+      if (!accessToken) return;
+      const headers = { Authorization: `Bearer ${accessToken}` };
+
+      // Doctor name
+      const meRes = await fetch(`${API_URL}/auth/me`, { headers });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
       }
+
+      // Appointments
+      const apptRes = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+      if (apptRes.ok) {
+        const { appointments } = await apptRes.json();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const todays = (appointments ?? []).filter(
+          (a: any) => a.scheduledAt?.startsWith(todayStr) && a.status !== "cancelled"
+        );
+        setTotalAppointments((appointments ?? []).length);
+        setTodayCount(todays.length);
+        setPatients(todays.map((a: any, i: number) => ({
+          id: a.id,
+          name: a.patientName ?? "Patient",
+          avatar: i % 2 === 0 ? "/patient-avatar-1.png" : "/patient-avatar-2.png",
+          tags: [a.reason ?? "Consultation"],
+          time: timeUntil(a.scheduledAt),
+        })));
+        if (todays.length > 0) setSelectedPatientId(todays[0].id);
+      }
+
+      // Doctor slots for availability panel
+      const slotsRes = await fetch(`${API_URL}/api/doctors/slots`, { headers });
+      if (slotsRes.ok) {
+        const { slots: s } = await slotsRes.json();
+        if (s && s.length > 0) {
+          setSlots(s);
+        } else {
+          // No slots configured — seed default 9AM–7PM every day
+          const defaultSlots = [0,1,2,3,4,5,6].map(day => ({
+            dayOfWeek: day,
+            startTime: "09:00",
+            endTime: "19:00",
+            slotDurationMins: 30,
+            isActive: true,
+          }));
+          setSlots(defaultSlots);
+          // Persist so patients can book
+          fetch(`${API_URL}/api/doctors/slots`, {
+            method: "PUT",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ slots: defaultSlots }),
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // silently fall back to defaults
     }
-    loadName();
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const toggleTask = (id: number) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
@@ -133,7 +194,7 @@ export default function DashboardPage() {
               Consultations Today
             </div>
             <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              24 Consultations
+              {todayCount} Consultation{todayCount !== 1 ? "s" : ""}
             </div>
             <div className="flex items-center gap-1">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -204,7 +265,7 @@ export default function DashboardPage() {
                 {/* Total consultations */}
                 <div className="flex items-center gap-2">
                   <span className="text-[#383F45] text-[32px] font-medium leading-none tracking-[-0.64px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    86
+                    {totalAppointments}
                   </span>
                   <span className="text-[#676E76] text-xs font-normal leading-[1.3] tracking-[-0.24px] max-w-[80px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                     Total Consultations
@@ -217,7 +278,7 @@ export default function DashboardPage() {
                 {/* Scheduled Today */}
                 <div className="flex items-center gap-2">
                   <span className="text-[#383F45] text-[32px] font-medium leading-none tracking-[-0.64px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    14
+                    {todayCount}
                   </span>
                   <span className="text-[#5476FC] text-xs font-semibold leading-[1.3] tracking-[-0.24px] max-w-[80px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                     Scheduled Today
@@ -231,12 +292,15 @@ export default function DashboardPage() {
 
             {/* Patients List */}
             <div className="flex flex-col gap-2">
+              {patients.length === 0 && (
+                <p className="text-sm text-[#676E76] py-6 text-center">No appointments today</p>
+              )}
               {patients.map((p) => {
                 const isSelected = selectedPatientId === p.id;
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedPatientId(p.id)}
+                    onClick={() => setSelectedPatientId(p.id as string)}
                     className={`flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded-lg cursor-pointer transition-all border ${
                       isSelected
                         ? "bg-[#F5F6FA] border-transparent"
@@ -279,7 +343,7 @@ export default function DashboardPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setConsultingPatient(p);
+                          router.push(`/appointments/consult?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
                         }}
                         className={`h-[32px] px-[13px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all ${
                           isSelected
@@ -319,18 +383,10 @@ export default function DashboardPage() {
 
               {/* Day slots */}
               <div className="flex flex-col gap-3">
-                {[
-                  { day: "Monday", hours: "10AM - 06PM" },
-                  { day: "Tuesday", hours: "10AM - 06PM" },
-                  { day: "Wednesday", hours: "10AM - 06PM" },
-                  { day: "Thursday", hours: "10AM - 06PM" },
-                  { day: "Friday", hours: "10AM - 06PM" },
-                  { day: "Saturday", hours: "10AM - 06PM" },
-                  { day: "Sunday", hours: "10AM - 06PM" },
-                ].map((sched) => (
-                  <div key={sched.day} className="flex justify-between items-center text-xs">
-                    <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{sched.day}</span>
-                    <span className="text-[#24292E] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{sched.hours}</span>
+                {slots.filter(s => s.isActive).map((s) => (
+                  <div key={s.dayOfWeek} className="flex justify-between items-center text-xs">
+                    <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{DAY_NAMES[s.dayOfWeek]}</span>
+                    <span className="text-[#24292E] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{fmt12(s.startTime)} - {fmt12(s.endTime)}</span>
                   </div>
                 ))}
               </div>
@@ -429,76 +485,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Video Consultation Simulation Modal */}
-      {consultingPatient && (
-        <div className="fixed inset-0 bg-[#1C2038]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-2xl w-full border border-gray-100 flex flex-col">
-            {/* Header */}
-            <div className="bg-[#1C2038] px-6 py-4 flex items-center justify-between text-white border-b border-gray-800">
-              <div className="flex items-center gap-3">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                </span>
-                <span className="font-bold text-sm tracking-wide">Live Consultation</span>
-              </div>
-              <button
-                onClick={() => setConsultingPatient(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Video Screens Body */}
-            <div className="relative bg-[#111322] aspect-video w-full flex items-center justify-center">
-              {/* Patient Main Video (Simulated Feed) */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-t from-black/60 to-transparent">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#5872F5] shadow-lg animate-pulse mb-4">
-                  <img src={consultingPatient.avatar} alt={consultingPatient.name} className="w-full h-full object-cover" />
-                </div>
-                <h3 className="text-white text-lg font-black">{consultingPatient.name}</h3>
-                <p className="text-gray-300 text-xs mt-1">Connecting video feed…</p>
-              </div>
-
-              {/* Doctor Pip Video (Bottom Right Corner) */}
-              <div className="absolute bottom-4 right-4 w-32 h-20 bg-black rounded-xl overflow-hidden border-2 border-white/20 shadow-lg">
-                <img src="/doctor-avatar.png" alt="Doctor" className="w-full h-full object-cover" />
-                <div className="absolute bottom-1.5 left-1.5 bg-black/40 text-[9px] font-bold text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
-                  You
-                </div>
-              </div>
-            </div>
-
-            {/* Call Control Actions Footer */}
-            <div className="bg-[#1C2038] px-6 py-6 flex items-center justify-center gap-4 border-t border-gray-800">
-              <button className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                </svg>
-              </button>
-
-              <button className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
-                </svg>
-              </button>
-
-              <button
-                onClick={() => setConsultingPatient(null)}
-                className="w-14 h-14 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-white transition-colors shadow-lg shadow-red-900/30"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-6 h-6">
-                  <path d="M4.5 3.75a.75.75 0 00-1.5 0v16.5a.75.75 0 001.5 0V3.75zM19.5 3.75a.75.75 0 00-1.5 0v16.5a.75.75 0 001.5 0V3.75zM8.25 6.75a.75.75 0 00-1.5 0v10.5a.75.75 0 001.5 0V6.75zM15.75 6.75a.75.75 0 00-1.5 0v10.5a.75.75 0 001.5 0V6.75z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </ProtectedRoute>
   );
 }

@@ -20,4 +20,20 @@ router.get("/", requireRole("admin"), async (_req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/admin/patients/:patientId ──────────────────────────────────────
+router.get("/:patientId", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+    const { resources } = await patientsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.id = @id",
+      parameters: [{ name: "@id", value: patientId }],
+    }).fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Patient not found" }); return; }
+    res.json({ patient: resources[0] });
+  } catch (err) {
+    console.error("Admin patient fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

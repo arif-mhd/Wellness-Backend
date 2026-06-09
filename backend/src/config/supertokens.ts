@@ -6,9 +6,10 @@ import { pool } from "./database";
 
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
-  process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
-  process.env.ADMIN_PORTAL_URL  || "http://localhost:3003",
-  process.env.PATIENT_APP_URL   || "http://localhost:8081",
+  process.env.DOCTOR_PORTAL_URL   || "http://localhost:3002",
+  process.env.ADMIN_PORTAL_URL    || "http://localhost:3003",
+  process.env.PHARMACY_PORTAL_URL || "http://localhost:3004",
+  process.env.PATIENT_APP_URL     || "http://localhost:8081",
 ];
 
 /**
