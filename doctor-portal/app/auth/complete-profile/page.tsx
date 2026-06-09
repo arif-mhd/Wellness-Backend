@@ -133,8 +133,8 @@ function CompleteProfileContent() {
       localStorage.setItem("doctor_onboarding_profile", JSON.stringify(consolidatedData));
     }
 
-    // Redirect to doctor profile page
-    router.push("/dashboard/profile");
+    // Profile complete — now await admin approval
+    router.push("/auth/pending");
   };
 
   return (

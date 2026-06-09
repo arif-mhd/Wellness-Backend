@@ -181,8 +181,8 @@ export default function SignupPage() {
   };
 
   const handleFinalComplete = () => {
-    // Doctor is now pending approval — send to pending page
-    router.push("/auth/pending");
+    // Send doctor to complete their profile before awaiting approval
+    router.push(`/auth/complete-profile?name=${encodeURIComponent(fullName)}&email=${encodeURIComponent(email || emailOrPhone)}&phone=${encodeURIComponent(phone)}&dob=${encodeURIComponent(dateOfBirth)}&gender=${encodeURIComponent(gender)}&emiratesId=${encodeURIComponent(emiratesId)}`);
   };
 
   return (
