@@ -87,6 +87,9 @@ export const supportContainer: Container = db.container("support");
 /** Reminders — partition key: /patientId */
 export const remindersContainer: Container = db.container("reminders");
 
+/** Feedback collection — partition key: /id */
+export const feedbackContainer: Container = db.container("feedback");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -120,6 +123,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "vaccinationBookings",    partitionKey: { paths: ["/patientId"] } },
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
+    { id: "feedback",               partitionKey: { paths: ["/id"] } },
   ];
 
   for (const spec of required) {
@@ -187,7 +191,11 @@ export async function deleteDocument(
  */
 export async function queryDocuments<T>(
   container: Container,
+<<<<<<< HEAD
   spec: { query: string; parameters?: { name: string; value: string | number | boolean | null }[] }
+=======
+  spec: { query: string; parameters?: { name: string; value: any }[] }
+>>>>>>> 8614aee154d497783d36ecd050b24d988b65bf7d
 ): Promise<T[]> {
   const { resources } = await container.items.query<T>(spec as any).fetchAll();
   return resources;

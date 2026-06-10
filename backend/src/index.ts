@@ -29,6 +29,7 @@ import adminVaccinesRouter from "./routes/adminVaccines";
 import vaccinesRouter from "./routes/vaccines";
 import supportRouter from "./routes/support";
 import remindersRouter from "./routes/reminders";
+import feedbackRouter from "./routes/feedback";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -50,7 +51,7 @@ app.use(middleware());
 
 app.use(express.json());
 
-// ─── 3. Routes ───────────────────────────────────────────────────────────────
+// ─── 3. Routes ───
 app.use("/auth", authRouter);
 
 // Doctor self-registration (public)
@@ -91,6 +92,7 @@ app.use("/api/admin/vaccines", adminVaccinesRouter);
 app.use("/api/vaccines",       vaccinesRouter);
 app.use("/api/support",        supportRouter);
 app.use("/api/reminders",      remindersRouter);
+app.use("/api/feedback",       feedbackRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
