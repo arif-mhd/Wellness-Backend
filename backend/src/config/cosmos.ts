@@ -191,11 +191,7 @@ export async function deleteDocument(
  */
 export async function queryDocuments<T>(
   container: Container,
-<<<<<<< HEAD
-  spec: { query: string; parameters?: { name: string; value: string | number | boolean | null }[] }
-=======
   spec: { query: string; parameters?: { name: string; value: any }[] }
->>>>>>> 8614aee154d497783d36ecd050b24d988b65bf7d
 ): Promise<T[]> {
   const { resources } = await container.items.query<T>(spec as any).fetchAll();
   return resources;
