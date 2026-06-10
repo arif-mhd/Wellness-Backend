@@ -1,12 +1,24 @@
 import { Pool } from "pg";
 
-export const pool = new Pool({
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "5432"),
-  database: process.env.DB_NAME || "wellness_db",
-  user: process.env.DB_USER || "postgres",
-  password: process.env.DB_PASSWORD,
-});
+const dbHost = process.env.DB_HOST || "localhost";
+const isUnixSocket = dbHost.startsWith("/");
+
+export const pool = new Pool(
+  isUnixSocket
+    ? {
+        host: dbHost,
+        database: process.env.DB_NAME || "wellness_db",
+        user: process.env.DB_USER || "postgres",
+        password: process.env.DB_PASSWORD,
+      }
+    : {
+        host: dbHost,
+        port: parseInt(process.env.DB_PORT || "5432"),
+        database: process.env.DB_NAME || "wellness_db",
+        user: process.env.DB_USER || "postgres",
+        password: process.env.DB_PASSWORD,
+      }
+);
 
 export async function initDb(): Promise<void> {
   const client = await pool.connect();

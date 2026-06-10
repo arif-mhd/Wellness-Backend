@@ -1,5 +1,6 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
+import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
 import { supportContainer, patientsContainer } from "../config/cosmos";
@@ -8,7 +9,7 @@ const router = Router();
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function requireRole(req: Request, res: Response, role: string): Promise<boolean> {
+async function requireRole(req: SessionRequest, res: Response, role: string): Promise<boolean> {
   const session = req.session!;
   const { roles } = await UserRoles.getRolesForUser("public", session.getUserId());
   if (!roles.includes(role)) {
@@ -32,7 +33,7 @@ async function getPatientName(patientId: string): Promise<string> {
 // ── Patient routes ────────────────────────────────────────────────────────────
 
 // POST /api/support — patient creates a ticket
-router.post("/", verifySession(), async (req: Request, res: Response) => {
+router.post("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
   const patientId = session.getUserId();
   const { subject, description, category } = req.body;
@@ -58,7 +59,7 @@ router.post("/", verifySession(), async (req: Request, res: Response) => {
 });
 
 // GET /api/support — patient gets their tickets
-router.get("/", verifySession(), async (req: Request, res: Response) => {
+router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
   const patientId = session.getUserId();
 
@@ -73,7 +74,7 @@ router.get("/", verifySession(), async (req: Request, res: Response) => {
 });
 
 // GET /api/support/:ticketId — patient gets a single ticket
-router.get("/:ticketId", verifySession(), async (req: Request, res: Response) => {
+router.get("/:ticketId", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
   const patientId = session.getUserId();
   const { ticketId } = req.params;
@@ -95,7 +96,7 @@ router.get("/:ticketId", verifySession(), async (req: Request, res: Response) =>
 // ── Admin routes ──────────────────────────────────────────────────────────────
 
 // GET /api/support/admin/all — admin gets all tickets
-router.get("/admin/all", verifySession(), async (req: Request, res: Response) => {
+router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
   const { status, category } = req.query;
@@ -130,7 +131,7 @@ router.get("/admin/all", verifySession(), async (req: Request, res: Response) =>
 });
 
 // GET /api/support/admin/:ticketId — admin gets a single ticket
-router.get("/admin/:ticketId", verifySession(), async (req: Request, res: Response) => {
+router.get("/admin/:ticketId", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
   const { ticketId } = req.params;
@@ -149,7 +150,7 @@ router.get("/admin/:ticketId", verifySession(), async (req: Request, res: Respon
 });
 
 // PATCH /api/support/admin/:ticketId/reply — admin adds reply
-router.patch("/admin/:ticketId/reply", verifySession(), async (req: Request, res: Response) => {
+router.patch("/admin/:ticketId/reply", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
   const { ticketId } = req.params;
@@ -175,7 +176,7 @@ router.patch("/admin/:ticketId/reply", verifySession(), async (req: Request, res
 });
 
 // PATCH /api/support/admin/:ticketId/status — admin changes status
-router.patch("/admin/:ticketId/status", verifySession(), async (req: Request, res: Response) => {
+router.patch("/admin/:ticketId/status", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
   const { ticketId } = req.params;

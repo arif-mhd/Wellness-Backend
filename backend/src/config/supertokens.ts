@@ -39,9 +39,9 @@ export function initSuperTokens(): void {
     appInfo: {
       appName: "Wellness",
       // The URL of THIS backend
-      apiDomain: `http://localhost:${process.env.PORT || 3001}`,
+      apiDomain: process.env.API_DOMAIN || `http://localhost:${process.env.PORT || 3001}`,
       // Primary frontend (doctor portal). CORS handles the rest.
-      websiteDomain: process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
+      websiteDomain: process.env.WEBSITE_DOMAIN || process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
       apiBasePath: "/auth",
       websiteBasePath: "/auth",
     },
@@ -111,9 +111,7 @@ export function initSuperTokens(): void {
       }),
 
       Session.init({
-        // Header-based tokens avoid cookie cross-domain issues
-        // between localhost:3001 (backend) and localhost:3002/3003 (portals)
-        tokenTransferMethod: "header",
+        getTokenTransferMethod: () => "header",
       }),
 
       UserRoles.init(),

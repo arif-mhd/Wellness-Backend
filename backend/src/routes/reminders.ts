@@ -1,12 +1,13 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
+import { SessionRequest } from "supertokens-node/framework/express";
 import { v4 as uuidv4 } from "uuid";
 import { remindersContainer } from "../config/cosmos";
 
 const router = Router();
 
 // GET /api/reminders — patient gets their reminders
-router.get("/", verifySession(), async (req: Request, res: Response) => {
+router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
 
   const { resources } = await remindersContainer.items
@@ -20,7 +21,7 @@ router.get("/", verifySession(), async (req: Request, res: Response) => {
 });
 
 // POST /api/reminders — patient creates a reminder
-router.post("/", verifySession(), async (req: Request, res: Response) => {
+router.post("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { name, dose, time, repeatDays } = req.body;
 
@@ -44,7 +45,7 @@ router.post("/", verifySession(), async (req: Request, res: Response) => {
 });
 
 // PATCH /api/reminders/:reminderId — update reminder
-router.patch("/:reminderId", verifySession(), async (req: Request, res: Response) => {
+router.patch("/:reminderId", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { reminderId } = req.params;
 
@@ -66,7 +67,7 @@ router.patch("/:reminderId", verifySession(), async (req: Request, res: Response
 });
 
 // DELETE /api/reminders/:reminderId — delete reminder
-router.delete("/:reminderId", verifySession(), async (req: Request, res: Response) => {
+router.delete("/:reminderId", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { reminderId } = req.params;
 

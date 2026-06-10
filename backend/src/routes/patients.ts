@@ -40,7 +40,7 @@ router.post("/register", async (req: Request, res: Response) => {
       return;
     }
     if (signUpResult.status !== "OK") {
-      res.status(400).json({ error: signUpResult.status });
+      res.status(400).json({ error: (signUpResult as any).status });
       return;
     }
 
@@ -76,7 +76,7 @@ router.post("/register", async (req: Request, res: Response) => {
 // ── PUT /api/patients/profile ────────────────────────────────────────────────
 // Protected — requires a valid "patient" session.
 // Merges the submitted fields into the existing Cosmos document.
-router.put("/profile", requireRole("patient"), async (req: SessionRequest, res) => {
+router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
     const {
@@ -119,7 +119,7 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res) 
 
 // ── PUT /api/patients/allergies ──────────────────────────────────────────────
 // Body: { allergies: Array<{ category: string; selected: string[] }> }
-router.put("/allergies", requireRole("patient"), async (req: SessionRequest, res) => {
+router.put("/allergies", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
     const { allergies } = req.body;
@@ -145,7 +145,7 @@ router.put("/allergies", requireRole("patient"), async (req: SessionRequest, res
 
 // ── PUT /api/patients/medications ────────────────────────────────────────────
 // Body: { medications: { current: MedItem[]; past: MedItem[] } }
-router.put("/medications", requireRole("patient"), async (req: SessionRequest, res) => {
+router.put("/medications", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
     const { medications } = req.body;
@@ -171,7 +171,7 @@ router.put("/medications", requireRole("patient"), async (req: SessionRequest, r
 
 // ── PUT /api/patients/chronic-diseases ───────────────────────────────────────
 // Body: { chronicDiseases: string[] }
-router.put("/chronic-diseases", requireRole("patient"), async (req: SessionRequest, res) => {
+router.put("/chronic-diseases", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
     const { chronicDiseases } = req.body;
