@@ -4,16 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
-import TwoFactorAuth from "@/components/auth/TwoFactorAuth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -23,27 +22,28 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    // Simulate login verification, then transition to Two-Factor Auth
-    setTimeout(() => {
-      setLoading(false);
-      setShow2FA(true);
-    }, 1000);
-  }
+    try {
+      const response = await signIn({
+        formFields: [
+          { id: "email", value: email },
+          { id: "password", value: password },
+        ],
+      });
 
-  if (show2FA) {
-    return (
-      <TwoFactorAuth
-        phoneNumber="+91 81298398**"
-        onVerify={(otp) => {
-          setLoading(true);
-          // Simulate OTP verification and redirect to dashboard
-          setTimeout(() => {
-            router.push("/dashboard");
-          }, 800);
-        }}
-        onGoBack={() => setShow2FA(false)}
-      />
-    );
+      if (response.status === "OK") {
+        router.push("/dashboard");
+      } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
+        setError("Invalid email or password.");
+      } else if (response.status === "FIELD_ERROR") {
+        setError(response.formFields[0]?.error || "Please check your input.");
+      } else {
+        setError("Sign in is not allowed right now.");
+      }
+    } catch {
+      setError("Cannot reach the server. Make sure the backend is running.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

@@ -2,6 +2,7 @@ import SuperTokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
+import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
 
 // Browser-based portals that are allowed to make CORS requests.
@@ -19,6 +20,9 @@ const browserOrigins = [
   // LAN IP for Expo web served over the local network
   "http://192.168.29.127:8081",
   "http://192.168.29.127:8082",
+  // Allow SuperTokens dashboard (served from the backend itself)
+  "https://backend-741878858011.asia-south1.run.app",
+  process.env.API_DOMAIN || "",
 ];
 
 /**
@@ -124,6 +128,8 @@ export function initSuperTokens(): void {
       }),
 
       UserRoles.init(),
+
+      Dashboard.init(),
     ],
   });
 }
