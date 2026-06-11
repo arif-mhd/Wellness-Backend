@@ -41,7 +41,13 @@ const app = express();
 app.use(
   cors({
     origin: allowedOrigins,
-    allowedHeaders: ["content-type", ...SuperTokens.getAllCORSHeaders()],
+    allowedHeaders: [
+      "content-type",
+      "authorization",
+      "rid",
+      "ngrok-skip-browser-warning",
+      ...SuperTokens.getAllCORSHeaders(),
+    ],
     credentials: true,
   })
 );

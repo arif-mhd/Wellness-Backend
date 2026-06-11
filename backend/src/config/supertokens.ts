@@ -10,6 +10,15 @@ const browserOrigins = [
   process.env.ADMIN_PORTAL_URL    || "http://localhost:3003",
   process.env.PHARMACY_PORTAL_URL || "http://localhost:3004",
   process.env.PATIENT_APP_URL     || "http://localhost:8081",
+  // Always allow standard localhost dev ports
+  "http://localhost:3002",
+  "http://localhost:3003",
+  "http://localhost:3004",
+  "http://localhost:8081",
+  "http://localhost:8082",
+  // LAN IP for Expo web served over the local network
+  "http://192.168.29.127:8081",
+  "http://192.168.29.127:8082",
 ];
 
 /**
