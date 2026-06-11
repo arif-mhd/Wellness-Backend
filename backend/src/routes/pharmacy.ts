@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { pharmaciesContainer, pharmacyProductsContainer } from "../config/cosmos";
+import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -338,6 +338,25 @@ router.delete("/products/:productId", requireRole("pharmacy"), async (req: Sessi
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Delete product error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/pharmacy/orders ─────────────────────────────────────────────────
+// Returns all orders that contain at least one item belonging to this pharmacy
+router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resources } = await medicineOrdersContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.pharmacyId = @pid) ORDER BY c.createdAt DESC",
+        parameters: [{ name: "@pid", value: pharmacyId }],
+      }
+    ).fetchAll();
+
+    res.json({ orders: resources });
+  } catch (err) {
+    console.error("Pharmacy orders error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

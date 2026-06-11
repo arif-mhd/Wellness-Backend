@@ -77,9 +77,11 @@ export default function AddProductPage() {
   if (success) return (
     <div className="flex-1 flex items-center justify-center min-h-[60vh]">
       <div className="text-center animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-green-50 border-2 border-green-100 flex items-center justify-center mx-auto mb-4 text-4xl">✅</div>
+        <div className="w-20 h-20 rounded-full bg-blue-50 border-2 border-blue-100 flex items-center justify-center mx-auto mb-4 text-[#5476FC]">
+          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+        </div>
         <h2 className="text-xl font-bricolage font-bold text-[#1a2332] mb-2">
-          {productStatus === "approved" ? "Product is Live!" : "Product Submitted!"}
+          {productStatus === "approved" ? "Product Added!" : "Product Submitted!"}
         </h2>
         <p className="text-sm font-outfit text-slate-500">
           {productStatus === "approved"
@@ -91,7 +93,7 @@ export default function AddProductPage() {
     </div>
   );
 
-  const inputCls = "w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition";
+  const inputCls = "w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition";
   const labelCls = "block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
 
   return (
@@ -119,14 +121,16 @@ export default function AddProductPage() {
           <label className={labelCls}>Product Image</label>
           <div
             onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-slate-200 rounded-xl h-44 flex flex-col items-center justify-center cursor-pointer hover:border-[#22c55e]/50 hover:bg-green-50/30 transition group"
+            className="border-2 border-dashed border-slate-200 rounded-xl h-44 flex flex-col items-center justify-center cursor-pointer hover:border-[#5476FC]/50 hover:bg-blue-50/30 transition group"
           >
             {imagePreview ? (
               <img src={imagePreview} alt="Preview" className="h-full w-full object-contain rounded-xl p-2" />
             ) : (
               <>
-                <div className="text-3xl mb-2">🖼️</div>
-                <p className="text-sm font-outfit text-slate-500 group-hover:text-[#22c55e] transition">Click to upload image</p>
+                <div className="mb-2 text-slate-300">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <p className="text-sm font-outfit text-slate-500 group-hover:text-[#5476FC] transition">Click to upload image</p>
                 <p className="text-xs font-outfit text-slate-400 mt-1">JPG, PNG up to 5MB</p>
               </>
             )}
@@ -159,13 +163,13 @@ export default function AddProductPage() {
             <textarea value={description} onChange={e => setDescription(e.target.value)}
               placeholder="Brief description of the product, dosage, indications…"
               rows={3}
-              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition resize-none" />
+              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
           </div>
 
           <div>
             <label className={labelCls}>Category *</label>
             <select value={category} onChange={e => setCategory(e.target.value)}
-              className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition appearance-none">
+              className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition appearance-none">
               <option value="" disabled>Select a category</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -195,7 +199,7 @@ export default function AddProductPage() {
             <div>
               <label className={labelCls}>Expiry Date</label>
               <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
-                className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition" />
+                className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
             </div>
           </div>
 
@@ -216,7 +220,7 @@ export default function AddProductPage() {
             <button
               type="button"
               onClick={() => setRequiresPrescription(v => !v)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${requiresPrescription ? "bg-[#22c55e]" : "bg-slate-200"}`}
+              className={`relative w-12 h-6 rounded-full transition-colors ${requiresPrescription ? "bg-[#5476FC]" : "bg-slate-200"}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${requiresPrescription ? "translate-x-6" : ""}`} />
             </button>
@@ -229,7 +233,7 @@ export default function AddProductPage() {
         </div>
 
         <button type="submit" disabled={loading}
-          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white font-outfit font-semibold text-base shadow-lg shadow-green-200/50 hover:shadow-green-300/60 transition-all disabled:opacity-60">
+          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white font-outfit font-semibold text-base shadow-lg shadow-blue-200/50 hover:shadow-blue-300/60 transition-all disabled:opacity-60">
           {loading ? "Submitting…" : "Add Product"}
         </button>
       </form>

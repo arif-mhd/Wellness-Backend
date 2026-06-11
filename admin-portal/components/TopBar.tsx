@@ -20,10 +20,6 @@ export default function TopBar() {
 
   return (
     <header className="h-20 bg-transparent flex items-center justify-between px-8 shrink-0 z-40 w-full relative">
-      {/* Left: Stacked Wellness Central Logo */}
-      <div className="flex items-center gap-4">
-        <WellnessCentralLogo />
-      </div>
 
       {/* Middle: Pill Search Input */}
       <div className="flex-1 max-w-lg mx-auto relative">
@@ -212,25 +208,3 @@ export default function TopBar() {
   );
 }
 
-// ── Stacked Logo component ───────────────────────────────────────────────────
-function WellnessCentralLogo() {
-  const DoubleBar = () => (
-    <span className="inline-flex gap-[1.5px] items-end mx-[0.5px] h-[18px] translate-y-[1px]">
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
-  const SingleBar = () => (
-    <span className="inline-flex items-end mx-[0.5px] h-[18px] translate-y-[1px]">
-      <span className="w-[2.5px] h-[16px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
-  return (
-    <div className="font-sans font-black text-slate-800 leading-[1.05] select-none text-[20px] tracking-tight">
-      <div>We<DoubleBar />ness</div>
-      <div>Centr<SingleBar />al</div>
-    </div>
-  );
-}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import Image from "next/image";
 import Link from "next/link";
+import WellnessCentralLogo from "@/components/WellnessCentralLogo";
 
 export default function LoginPage() {
   const [email, setEmail]               = useState("");
@@ -188,29 +189,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Logo component ─────────────────────────────────────────────────────────────
-function WellnessCentralLogo() {
-  const DoubleBar = () => (
-    <span className="inline-flex gap-[2.5px] items-end mx-[1px] h-[26px] translate-y-[2px]">
-      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
-      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
-  const SingleBar = () => (
-    <span className="inline-flex items-end mx-[1px] h-[26px] translate-y-[2px]">
-      <span className="w-[4px] h-[24px] rounded-full bg-[#3276D2]" />
-    </span>
-  );
-
-  return (
-    <div className="font-sans font-black text-slate-800 leading-[1.05] select-none tracking-tight" style={{ fontSize: 32 }}>
-      <div>We<DoubleBar />ness</div>
-      <div>Centr<SingleBar />al</div>
     </div>
   );
 }
