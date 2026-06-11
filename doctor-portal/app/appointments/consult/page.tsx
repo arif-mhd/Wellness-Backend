@@ -7,7 +7,7 @@ import Session from "supertokens-web-js/recipe/session";
 import {
   Room, RoomEvent, Track,
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
-  LocalVideoTrack,
+  LocalTrackPublication,
 } from "livekit-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -67,65 +67,106 @@ function ConsultRoom() {
 
   // LiveKit connect
   useEffect(() => {
-    let room: Room;
+    // Guard against React StrictMode double-invoke: if a room is already
+    // connected or connecting, don't create a second one.
+    if (roomRef.current) return;
+
+    const room = new Room();
+    roomRef.current = room;
+    let cancelled = false;
+
+    function attachRemoteTrack(track: RemoteTrack) {
+      if (track.kind === Track.Kind.Video && remoteVideoEl.current) track.attach(remoteVideoEl.current);
+      if (track.kind === Track.Kind.Audio) track.attach();
+    }
+
+    room.on(RoomEvent.ParticipantConnected, () => {
+      if (!cancelled) setConnected(true);
+    });
+    room.on(RoomEvent.ParticipantDisconnected, () => {
+      if (!cancelled) {
+        setConnected(false);
+        if (remoteVideoEl.current) remoteVideoEl.current.srcObject = null;
+      }
+    });
+    room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _p: RemoteTrackPublication, _r: RemoteParticipant) => {
+      if (!cancelled) attachRemoteTrack(track);
+    });
+    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+      track.detach();
+      if (track.kind === Track.Kind.Video && remoteVideoEl.current) remoteVideoEl.current.srcObject = null;
+    });
+    // Attach local camera as soon as it is published (more reliable than getTrackPublication after enable)
+    room.on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => {
+      if (pub.source === Track.Source.Camera && pub.track && localVideoEl.current) {
+        pub.track.attach(localVideoEl.current);
+      }
+    });
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+      if (cancelled) return;
+      try {
+        const data = JSON.parse(new TextDecoder().decode(payload));
+        if (data.type === "chat") {
+          setMessages(prev => [...prev, { id: `${Date.now()}${Math.random()}`, sender: "patient", text: data.text, time: fmt(new Date()) }]);
+          setUnread(u => u + 1);
+        }
+      } catch {}
+    });
+    room.on(RoomEvent.Disconnected, () => {
+      if (cancelled) return;
+      if (didConnectRef.current) setEnded(true);
+      else setError("Could not connect to the call. Please try again.");
+    });
+
     async function init() {
       if (!appointmentId) { setError("Missing appointment ID"); return; }
       try {
         const token = await Session.getAccessToken();
+        if (cancelled) return;
         tokenRef.current = token ?? "";
         const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/livekit-token`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) { setError("Could not get call token"); return; }
         const { token: lkToken, wsUrl } = await res.json();
-
-        room = new Room();
-        roomRef.current = room;
-
-        room.on(RoomEvent.ParticipantConnected, () => setConnected(true));
-        room.on(RoomEvent.ParticipantDisconnected, () => {
-          setConnected(false);
-          if (remoteVideoEl.current) remoteVideoEl.current.srcObject = null;
-        });
-        room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _p: RemoteTrackPublication, _r: RemoteParticipant) => {
-          if (track.kind === Track.Kind.Video && remoteVideoEl.current) track.attach(remoteVideoEl.current);
-          if (track.kind === Track.Kind.Audio) track.attach();
-        });
-        room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-          track.detach();
-          if (track.kind === Track.Kind.Video && remoteVideoEl.current) remoteVideoEl.current.srcObject = null;
-        });
-        room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
-          try {
-            const data = JSON.parse(new TextDecoder().decode(payload));
-            if (data.type === "chat") {
-              setMessages(prev => [...prev, { id: `${Date.now()}${Math.random()}`, sender: "patient", text: data.text, time: fmt(new Date()) }]);
-              setUnread(u => u + 1);
-            }
-          } catch {}
-        });
-        room.on(RoomEvent.Disconnected, () => {
-          if (didConnectRef.current) setEnded(true);
-          else setError("Could not connect. Ensure LiveKit is running with --node-ip <your-LAN-IP>.");
-        });
+        if (cancelled) return;
 
         await room.connect(wsUrl, lkToken, { autoSubscribe: true });
+        if (cancelled) { room.disconnect(); return; }
         didConnectRef.current = true;
+
+        // If patient is already in the room, attach their existing tracks
+        room.remoteParticipants.forEach(participant => {
+          setConnected(true);
+          participant.trackPublications.forEach(pub => {
+            if (pub.isSubscribed && pub.track) attachRemoteTrack(pub.track as RemoteTrack);
+          });
+        });
+
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
-
-        const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-        if (camPub?.track && localVideoEl.current) (camPub.track as LocalVideoTrack).attach(localVideoEl.current);
 
         fetch(`${API_URL}/api/appointments/${appointmentId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ status: "in_progress" }),
         }).catch(() => {});
-      } catch (e: any) { setError(`Connection error: ${e?.message}`); }
+      } catch (e: any) {
+        if (!cancelled) setError(`Connection error: ${e?.message}`);
+      }
     }
+
     init();
-    return () => { room?.disconnect(); };
+
+    return () => {
+      cancelled = true;
+      // Only disconnect if we actually connected — avoids killing the room
+      // during React StrictMode's cleanup of the first (no-op) mount.
+      if (didConnectRef.current) {
+        room.disconnect();
+      }
+      roomRef.current = null;
+    };
   }, [appointmentId]);
 
   const disconnect = useCallback(async () => {
