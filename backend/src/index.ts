@@ -29,6 +29,7 @@ import adminVaccinesRouter from "./routes/adminVaccines";
 import vaccinesRouter from "./routes/vaccines";
 import supportRouter from "./routes/support";
 import remindersRouter from "./routes/reminders";
+import feedbackRouter from "./routes/feedback";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -40,17 +41,24 @@ const app = express();
 app.use(
   cors({
     origin: allowedOrigins,
-    allowedHeaders: ["content-type", ...SuperTokens.getAllCORSHeaders()],
+    allowedHeaders: [
+      "content-type",
+      "authorization",
+      "rid",
+      "ngrok-skip-browser-warning",
+      ...SuperTokens.getAllCORSHeaders(),
+    ],
     credentials: true,
   })
 );
 
+// MUST be before SuperTokens middleware so /auth/* routes can read the body
+app.use(express.json());
+
 // SuperTokens middleware handles all /auth/* routes automatically
 app.use(middleware());
 
-app.use(express.json());
-
-// ─── 3. Routes ───────────────────────────────────────────────────────────────
+// ─── 3. Routes ───
 app.use("/auth", authRouter);
 
 // Doctor self-registration (public)
@@ -91,6 +99,7 @@ app.use("/api/admin/vaccines", adminVaccinesRouter);
 app.use("/api/vaccines",       vaccinesRouter);
 app.use("/api/support",        supportRouter);
 app.use("/api/reminders",      remindersRouter);
+app.use("/api/feedback",       feedbackRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -103,34 +112,39 @@ app.use(errorHandler());
 const PORT = parseInt(process.env.PORT || "3001");
 
 async function main() {
-  // Init PostgreSQL tables
-  await initDb();
+  // Start listening immediately so Cloud Run health checks pass
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 Backend running at http://0.0.0.0:${PORT}`);
+  });
 
-  // Ensure all Cosmos DB containers exist (idempotent)
-  await initCosmosContainers();
-
-  // Create the three roles in SuperTokens Core.
-  // "createNewRoleOrAddPermissions" is idempotent — safe to call every startup.
+  // Init PostgreSQL tables (non-fatal)
   try {
-    await UserRoles.createNewRoleOrAddPermissions("patient",        []);
-    await UserRoles.createNewRoleOrAddPermissions("doctor",         []);
+    await initDb();
+  } catch (err) {
+    console.warn("⚠️  DB init failed (will retry on next request):", err);
+  }
+
+  // Ensure all Cosmos DB containers exist (non-fatal)
+  try {
+    await initCosmosContainers();
+  } catch (err) {
+    console.warn("⚠️  Cosmos init failed:", err);
+  }
+
+  // Create SuperTokens roles (non-fatal)
+  try {
+    await UserRoles.createNewRoleOrAddPermissions("patient",          []);
+    await UserRoles.createNewRoleOrAddPermissions("doctor",           []);
     await UserRoles.createNewRoleOrAddPermissions("doctor_pending",   []);
     await UserRoles.createNewRoleOrAddPermissions("admin",            []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy",         []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy_pending", []);
     console.log("✅ SuperTokens roles ready");
   } catch {
-    console.warn("⚠️  Could not create roles — is SuperTokens Core (Docker) running?");
+    console.warn("⚠️  Could not create roles — SuperTokens may not be reachable yet");
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n🚀 Backend running at http://0.0.0.0:${PORT}`);
-    console.log(`   Auth endpoints:  http://localhost:${PORT}/auth`);
-    console.log(`   Health check:    http://localhost:${PORT}/health\n`);
-  });
 }
 
 main().catch((err) => {
   console.error("Fatal startup error:", err);
-  process.exit(1);
 });

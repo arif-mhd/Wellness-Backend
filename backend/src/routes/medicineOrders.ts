@@ -174,4 +174,34 @@ router.get("/prescriptions", requireRole("patient"), async (req: SessionRequest,
   }
 });
 
+// ─── PATCH /api/pharmacy/orders/:orderId/status ───────────────────────────────
+router.patch("/orders/:orderId/status", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const allowed = ["confirmed", "shipped", "delivered", "cancelled"];
+    if (!allowed.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
+      return;
+    }
+
+    const { resources } = await medicineOrdersContainer.items.query({
+      query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @pid",
+      parameters: [{ name: "@id", value: orderId }, { name: "@pid", value: patientId }],
+    }, { partitionKey: patientId }).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Order not found" }); return; }
+    
+    const order = resources[0];
+    const updated = { ...order, status, updatedAt: new Date().toISOString() };
+    await medicineOrdersContainer.items.upsert(updated);
+    res.json(updated);
+  } catch (err) {
+    console.error("Update order status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

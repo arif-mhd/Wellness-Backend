@@ -87,6 +87,9 @@ export const supportContainer: Container = db.container("support");
 /** Reminders — partition key: /patientId */
 export const remindersContainer: Container = db.container("reminders");
 
+/** Feedback collection — partition key: /id */
+export const feedbackContainer: Container = db.container("feedback");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -120,6 +123,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "vaccinationBookings",    partitionKey: { paths: ["/patientId"] } },
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
+    { id: "feedback",               partitionKey: { paths: ["/id"] } },
   ];
 
   for (const spec of required) {
@@ -141,11 +145,11 @@ export function getContainer(name: string): Container {
  * Upsert a document into a container.
  * The document must have an `id` field (string).
  */
-export async function upsertDocument<T extends { id: string }>(
+export async function upsertDocument<T>(
   container: Container,
   document: T
 ): Promise<T> {
-  const { resource } = await container.items.upsert<T>(document);
+  const { resource } = await container.items.upsert(document as any);
   return resource as T;
 }
 
@@ -158,8 +162,8 @@ export async function getDocument<T>(
   id: string
 ): Promise<T | null> {
   try {
-    const { resource } = await container.item(id, id).read<T>();
-    return resource ?? null;
+    const { resource } = await container.item(id, id).read();
+    return (resource as T) ?? null;
   } catch (err: any) {
     if (err.code === 404) return null;
     throw err;
@@ -187,8 +191,8 @@ export async function deleteDocument(
  */
 export async function queryDocuments<T>(
   container: Container,
-  spec: { query: string; parameters?: { name: string; value: unknown }[] }
+  spec: { query: string; parameters?: { name: string; value: any }[] }
 ): Promise<T[]> {
-  const { resources } = await container.items.query<T>(spec).fetchAll();
+  const { resources } = await container.items.query<T>(spec as any).fetchAll();
   return resources;
 }

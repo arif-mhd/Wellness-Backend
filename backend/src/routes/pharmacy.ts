@@ -18,7 +18,7 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     const { search, category, limit = "50", skip = "0" } = req.query as Record<string, string>;
 
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
-    const params: { name: string; value: unknown }[] = [];
+    const params: { name: string; value: string | number | boolean | null }[] = [];
 
     if (category) {
       query += " AND c.category = @category";
@@ -31,7 +31,7 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     query += " ORDER BY c.approvedAt DESC";
 
     const { resources } = await pharmacyProductsContainer.items.query(
-      { query, parameters: params }
+      { query, parameters: params } as any
     ).fetchAll();
 
     // Adapt to the Medicine shape the patient app expects

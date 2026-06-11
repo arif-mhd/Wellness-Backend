@@ -170,4 +170,34 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
   }
 });
 
+// ─── PATCH /api/lab/bookings/:bookingId/status ────────────────────────────────
+router.patch("/bookings/:bookingId/status", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const { status } = req.body;
+
+    const allowed = ["awaiting", "confirmed", "analyzing", "results", "cancelled"];
+    if (!allowed.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
+      return;
+    }
+
+    const { resources } = await labBookingsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @pid",
+      parameters: [{ name: "@id", value: bookingId }, { name: "@pid", value: patientId }],
+    }, { partitionKey: patientId }).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+    
+    const booking = resources[0];
+    const updated = { ...booking, status, updatedAt: new Date().toISOString() };
+    await labBookingsContainer.items.upsert(updated);
+    res.json(updated);
+  } catch (err) {
+    console.error("Update booking status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

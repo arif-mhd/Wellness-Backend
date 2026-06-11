@@ -19,6 +19,13 @@ async function adminFetch(path: string, options: RequestInit = {}) {
   });
 }
 
+interface AvailabilitySlot {
+  dayOfWeek: number; // 0=Sun, 1=Mon, ..., 6=Sat
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
 interface Doctor {
   id: string;
   fullName: string;
@@ -31,6 +38,7 @@ interface Doctor {
   license: string | null;
   bio: string | null;
   fees: string | null;
+  feesPerEmirate?: Record<string, string> | null;
   languages: string | null;
   avatarUrl?: string | null;
   height?: string | null;
@@ -44,6 +52,10 @@ interface Doctor {
   avgConsultation?: number;
   prescriptions?: number;
   rating?: number;
+  slots?: AvailabilitySlot[];
+  degreeFileUrl?: string | null;
+  specFileUrl?: string | null;
+  otherFileUrl?: string | null;
 }
 
 type Tab = "about" | "diagnosis" | "reviews";
@@ -65,10 +77,10 @@ const DetailRow = ({
   </div>
 );
 
-const DocLink = ({ title, filename }: { title: string; filename: string }) => (
+const DocLink = ({ title, filename, href = "#" }: { title: string; filename: string; href?: string }) => (
   <div className="flex flex-col gap-1">
     <span className="text-[11px] text-slate-600 font-medium">{title}</span>
-    <a href="#" className="text-[11px] font-bold text-[#6A8BFF] hover:underline underline-offset-2">{filename}</a>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-[#6A8BFF] hover:underline underline-offset-2">{filename}</a>
   </div>
 );
 
@@ -284,9 +296,10 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
                     <h3 className="text-[14px] font-black text-slate-800 mb-6">Consultation Fee</h3>
                     <div className="space-y-4">
-                      {["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al-Quwain", "Ras Al Khaimah", "Fujairah"].map(emirate => (
-                        <DetailRow key={emirate} label={emirate} value={doctor.fees || "AED 200.00"} labelClass="font-medium text-slate-500" />
-                      ))}
+                      {["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al-Quwain", "Ras Al Khaimah", "Fujairah"].map(emirate => {
+                        const fee = doctor.feesPerEmirate?.[emirate] ?? doctor.fees ?? "—";
+                        return <DetailRow key={emirate} label={emirate} value={fee ? `AED ${fee}` : "—"} labelClass="font-medium text-slate-500" />;
+                      })}
                     </div>
                   </div>
 
@@ -294,9 +307,18 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
                     <h3 className="text-[14px] font-black text-slate-800 mb-6">Documents</h3>
                     <div className="space-y-6">
-                      <DocLink title="Medical Degree Certificate" filename="Med_certificate.pdf" />
-                      <DocLink title="Specialization Certificates" filename="Spec_certificate.pdf" />
-                      <DocLink title="Other Certificates" filename="Certificate.pdf" />
+                      {doctor.degreeFileUrl
+                        ? <DocLink title="Medical Degree Certificate" filename={doctor.degreeFileUrl.split("/").pop() || "Med_certificate.pdf"} href={doctor.degreeFileUrl} />
+                        : <p className="text-[11px] text-slate-400">No degree certificate uploaded</p>
+                      }
+                      {doctor.specFileUrl
+                        ? <DocLink title="Specialization Certificate" filename={doctor.specFileUrl.split("/").pop() || "Spec_certificate.pdf"} href={doctor.specFileUrl} />
+                        : <p className="text-[11px] text-slate-400">No specialization certificate uploaded</p>
+                      }
+                      {doctor.otherFileUrl
+                        ? <DocLink title="Other Certificates" filename={doctor.otherFileUrl.split("/").pop() || "Certificate.pdf"} href={doctor.otherFileUrl} />
+                        : null
+                      }
                     </div>
                   </div>
                 </div>
@@ -394,12 +416,30 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
               {/* Schedule */}
               <div className="space-y-5 px-1">
-                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
-                  <div key={day} className="flex justify-between items-center text-[12px] pb-5 border-b border-slate-50 last:border-0 last:pb-0">
-                    <span className="text-slate-500 font-medium">{day}</span>
-                    <span className="text-slate-800 font-bold">10AM – 06PM</span>
-                  </div>
-                ))}
+                {[
+                  { label: "Monday",    dow: 1 },
+                  { label: "Tuesday",   dow: 2 },
+                  { label: "Wednesday", dow: 3 },
+                  { label: "Thursday",  dow: 4 },
+                  { label: "Friday",    dow: 5 },
+                  { label: "Saturday",  dow: 6 },
+                  { label: "Sunday",    dow: 0 },
+                ].map(({ label, dow }) => {
+                  const slot = doctor.slots?.find(s => s.dayOfWeek === dow && s.isActive);
+                  const formatT = (t: string) => {
+                    const [h, m] = t.split(":").map(Number);
+                    const ampm = h >= 12 ? "PM" : "AM";
+                    return `${h % 12 || 12}${m ? `:${m.toString().padStart(2,"0")}` : ""}${ampm}`;
+                  };
+                  return (
+                    <div key={label} className="flex justify-between items-center text-[12px] pb-5 border-b border-slate-50 last:border-0 last:pb-0">
+                      <span className="text-slate-500 font-medium">{label}</span>
+                      <span className={`font-bold ${slot ? "text-slate-800" : "text-slate-300"}`}>
+                        {slot ? `${formatT(slot.startTime)} – ${formatT(slot.endTime)}` : "Off"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

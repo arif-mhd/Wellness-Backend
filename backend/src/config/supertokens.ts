@@ -10,6 +10,15 @@ const browserOrigins = [
   process.env.ADMIN_PORTAL_URL    || "http://localhost:3003",
   process.env.PHARMACY_PORTAL_URL || "http://localhost:3004",
   process.env.PATIENT_APP_URL     || "http://localhost:8081",
+  // Always allow standard localhost dev ports
+  "http://localhost:3002",
+  "http://localhost:3003",
+  "http://localhost:3004",
+  "http://localhost:8081",
+  "http://localhost:8082",
+  // LAN IP for Expo web served over the local network
+  "http://192.168.29.127:8081",
+  "http://192.168.29.127:8082",
 ];
 
 /**
@@ -39,9 +48,9 @@ export function initSuperTokens(): void {
     appInfo: {
       appName: "Wellness",
       // The URL of THIS backend
-      apiDomain: `http://localhost:${process.env.PORT || 3001}`,
+      apiDomain: process.env.API_DOMAIN || `http://localhost:${process.env.PORT || 3001}`,
       // Primary frontend (doctor portal). CORS handles the rest.
-      websiteDomain: process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
+      websiteDomain: process.env.WEBSITE_DOMAIN || process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
       apiBasePath: "/auth",
       websiteBasePath: "/auth",
     },
@@ -111,9 +120,7 @@ export function initSuperTokens(): void {
       }),
 
       Session.init({
-        // Header-based tokens avoid cookie cross-domain issues
-        // between localhost:3001 (backend) and localhost:3002/3003 (portals)
-        tokenTransferMethod: "header",
+        getTokenTransferMethod: () => "header",
       }),
 
       UserRoles.init(),
