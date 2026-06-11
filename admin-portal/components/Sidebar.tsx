@@ -246,18 +246,18 @@ export default function Sidebar() {
       ].join(" ")}
     >
       {/* ── TOP ──────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1 w-full">
+      <div className="flex flex-col flex-1 min-h-0 gap-1 w-full">
 
         {/* Header: logo + toggle */}
-        <div className="relative flex items-center h-[72px] px-5 w-full border-b border-slate-50">
+        <div className="relative shrink-0 flex items-center h-[72px] px-5 w-full border-b border-slate-50">
           {/* Logo — fades in/out with sidebar */}
-          <div
-            className={`overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
-              open ? "opacity-100 max-w-[180px]" : "opacity-0 max-w-0 pointer-events-none"
+          <img
+            src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
+            alt="Wellness Central"
+            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${
+              open ? "opacity-100 max-w-[150px]" : "opacity-0 max-w-0 pointer-events-none"
             }`}
-          >
-            <WellnessCentralLogo size={26} />
-          </div>
+          />
 
           {/* Toggle button — always visible */}
           <button
@@ -270,7 +270,7 @@ export default function Sidebar() {
         </div>
 
         {/* Nav links */}
-        <nav className={`flex flex-col gap-0.5 w-full pt-3 ${open ? "px-4" : "px-3"}`}>
+        <nav className={`flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col gap-0.5 w-full pt-3 pb-3 ${open ? "px-4" : "px-3"}`}>
           {navItems.map(({ href, label, icon }) => {
             const isActive =
               pathname === href ||
@@ -282,7 +282,7 @@ export default function Sidebar() {
                 href={href}
                 title={open ? undefined : label}
                 className={[
-                  "flex items-center py-2.5 transition-all duration-150 rounded-[92px] overflow-hidden",
+                  "flex items-center py-2.5 transition-all duration-150 rounded-[92px] overflow-hidden shrink-0",
                   open ? "px-4" : "px-3 justify-center",
                   isActive
                     ? "bg-gradient-to-r from-[#869DFE] to-[#6A8BFF] text-white shadow-lg shadow-blue-200/40 scale-[1.02]"
@@ -305,20 +305,20 @@ export default function Sidebar() {
 
       {/* ── BOTTOM ───────────────────────────────────────────────────────────── */}
       <div
-        className={`flex flex-col gap-2 w-full border-t border-slate-100 pt-4 pb-6 ${
+        className={`shrink-0 flex flex-col gap-2 w-full border-t border-slate-100 pt-4 pb-6 ${
           open ? "px-5" : "px-3 items-center"
         }`}
       >
         {/* Profile row */}
-        <div className={`flex items-center gap-3 ${open ? "flex-row" : "flex-col"}`}>
+        <div className={`flex items-center ${open ? "flex-row" : "flex-col"}`}>
           <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(106,139,255,0.15)]">
             <img src="/doctor-avatar.png" alt="Admin Avatar" className="w-full h-full object-cover" />
           </div>
 
           {/* Name / email */}
           <div
-            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
-              open ? "opacity-100 max-w-[140px]" : "opacity-0 max-w-0 pointer-events-none"
+            className={`flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
+              open ? "opacity-100 max-w-[140px] max-h-[100px] ml-3" : "opacity-0 max-w-0 max-h-0 ml-0 pointer-events-none"
             }`}
           >
             <span className="text-slate-800 font-semibold text-sm truncate">Admin User</span>
@@ -329,7 +329,9 @@ export default function Sidebar() {
           <button
             onClick={handleSignOut}
             title="Sign Out"
-            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors ml-auto"
+            className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all duration-300 ease-in-out ${
+              open ? "ml-auto opacity-100 max-w-[32px] max-h-[32px]" : "opacity-0 max-w-0 max-h-0 m-0 pointer-events-none"
+            }`}
           >
             <LogoutIcon />
           </button>

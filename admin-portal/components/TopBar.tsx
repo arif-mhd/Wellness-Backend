@@ -21,6 +21,15 @@ export default function TopBar() {
   return (
     <header className="h-20 bg-transparent flex items-center justify-between px-8 shrink-0 z-40 w-full relative">
 
+      {/* Left: Logo */}
+      <div className="flex items-center w-[200px]">
+        <img
+          src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
+          className="w-[100px] object-contain"
+          alt="Wellness Central"
+        />
+      </div>
+
       {/* Middle: Pill Search Input */}
       <div className="flex-1 max-w-lg mx-auto relative">
         <svg

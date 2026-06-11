@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import Image from "next/image";
 import Link from "next/link";
-import WellnessCentralLogo from "@/components/WellnessCentralLogo";
+
 
 export default function LoginPage() {
   const [email, setEmail]               = useState("");
@@ -64,8 +64,15 @@ export default function LoginPage() {
         <div className="flex-grow md:w-[55%] bg-white rounded-[2rem] shadow-xl shadow-slate-100/60 p-10 md:p-12 flex flex-col justify-between border border-slate-100/50 min-h-[500px]">
 
           {/* Logo */}
-          <div className="select-none">
-            <WellnessCentralLogo />
+          <div className="select-none mb-2">
+            <Image
+              src="/wellness-logo.png"
+              alt="Wellness Central Logo"
+              width={160}
+              height={50}
+              className="object-contain hover:opacity-90 transition-opacity"
+              priority
+            />
           </div>
 
           <div className="my-6">
