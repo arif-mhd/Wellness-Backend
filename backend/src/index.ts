@@ -52,10 +52,11 @@ app.use(
   })
 );
 
+// MUST be before SuperTokens middleware so /auth/* routes can read the body
+app.use(express.json());
+
 // SuperTokens middleware handles all /auth/* routes automatically
 app.use(middleware());
-
-app.use(express.json());
 
 // ─── 3. Routes ───
 app.use("/auth", authRouter);
