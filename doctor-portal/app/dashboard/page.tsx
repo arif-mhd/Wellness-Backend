@@ -1,9 +1,10 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
+import { createPortal } from "react-dom";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -77,6 +78,51 @@ export default function DashboardPage() {
   const [tasksLoaded, setTasksLoaded] = useState(false);
 
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // ── Specialist invite state ──────────────────────────────────────────────
+  interface SpecialistInvite {
+    appointmentId: string;
+    primaryDoctorName: string;
+    primaryDoctorEmail: string;
+    primaryDoctorAvatar: string | null;
+    patientName: string;
+    patientEmail: string;
+    patientAvatar: string | null;
+  }
+  const [specialistInvite, setSpecialistInvite] = useState<SpecialistInvite | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  // Track which appointment invite has already been shown so the poll doesn't re-open the modal
+  const shownInviteIdRef = useRef<string | null>(null);
+
+  // Poll backend every 10s for a pending invite
+  const pollForInvite = useCallback(async () => {
+    try {
+      const accessToken = await Session.getAccessToken();
+      if (!accessToken) return;
+      const res = await fetch(`${API_URL}/api/appointments/my-invite`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const { invite } = await res.json();
+        if (invite && invite.appointmentId !== shownInviteIdRef.current) {
+          shownInviteIdRef.current = invite.appointmentId;
+          setSpecialistInvite(invite);
+          setShowInviteModal(true);
+        }
+      }
+    } catch {
+      // silent — network errors are non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    // Poll immediately on mount, then every 10 seconds
+    pollForInvite();
+    const interval = setInterval(pollForInvite, 10000);
+    return () => { setMounted(false); clearInterval(interval); };
+  }, [pollForInvite]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -155,6 +201,119 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // ── Specialist Invite Notification Modal (portal to body) ─────────────────
+  const inviteModalContent = showInviteModal && specialistInvite && mounted ? createPortal(
+    <div className="fixed inset-0 w-screen h-screen z-[999999] flex items-end justify-end p-6 pointer-events-none font-outfit">
+      {/* Semi-transparent backdrop */}
+      <div
+        className="fixed inset-0 w-screen h-screen bg-slate-900/30 backdrop-blur-[2px] pointer-events-auto"
+        onClick={() => setShowInviteModal(false)}
+      />
+
+      {/* Invitation Card — bottom-right like a notification, matching the screenshot design */}
+      <div className="bg-white w-full max-w-[400px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col pointer-events-auto select-none relative" style={{ animation: 'slideInInvite 0.3s ease-out' }}>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes slideInInvite {
+            from { opacity: 0; transform: translateY(20px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+          }
+        `}} />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F1F3F7]">
+          <h3 className="text-[#24292E] font-semibold text-[15px] tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            New Consultation Invitation!
+          </h3>
+          <button
+            onClick={() => setShowInviteModal(false)}
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 flex flex-col gap-4">
+          {/* Subtitle */}
+          <p className="text-[#676E76] text-[11.5px] font-normal leading-relaxed" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            You have been invited to join a consultation call with{" "}
+            <span className="font-semibold text-[#383F45]">{specialistInvite.primaryDoctorName}</span>
+          </p>
+
+          {/* Provider Details */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>Provider Details</span>
+            <div className="flex items-center gap-2.5">
+              <div className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={specialistInvite.primaryDoctorAvatar ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(specialistInvite.primaryDoctorName)}&background=5476FC&color=fff`}
+                  alt={specialistInvite.primaryDoctorName}
+                  className="w-9 h-9 rounded-full object-cover border border-slate-100"
+                />
+                <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[#383F45] text-xs font-semibold" style={{ fontFamily: 'Outfit, sans-serif' }}>{specialistInvite.primaryDoctorName}</span>
+                <span className="text-[#838B95] text-[10px] font-normal" style={{ fontFamily: 'Outfit, sans-serif' }}>{specialistInvite.primaryDoctorEmail}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Patient Details */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>Patient Details</span>
+            <div className="flex items-center gap-2.5">
+              <div className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={specialistInvite.patientAvatar ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(specialistInvite.patientName)}&background=E8F1FF&color=5476FC`}
+                  alt={specialistInvite.patientName}
+                  className="w-9 h-9 rounded-full object-cover border border-slate-100"
+                />
+                <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[#383F45] text-xs font-semibold" style={{ fontFamily: 'Outfit, sans-serif' }}>{specialistInvite.patientName}</span>
+                <span className="text-[#838B95] text-[10px] font-normal" style={{ fontFamily: 'Outfit, sans-serif' }}>{specialistInvite.patientEmail}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="px-5 pb-5 pt-1 flex items-center gap-3">
+          {/* Decline */}
+          <button
+            onClick={() => setShowInviteModal(false)}
+            className="flex-1 h-11 rounded-xl bg-[#FF3B30] hover:bg-[#E02D22] text-white text-xs font-bold shadow-sm transition-all active:scale-[0.98] select-none"
+            style={{ fontFamily: 'Outfit, sans-serif' }}
+          >
+            Decline
+          </button>
+          {/* Join Consultation */}
+          <button
+            onClick={() => {
+              setShowInviteModal(false);
+              router.push(`/video-calls?appointmentId=${specialistInvite.appointmentId}&role=specialist`);
+            }}
+            className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
+            style={{ fontFamily: 'Outfit, sans-serif' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+            Join Consultation
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   // Load tasks from localStorage on mount; start empty if none saved
   useEffect(() => {
     try {
@@ -189,6 +348,8 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
+      {/* Specialist Invite Popup — rendered via portal to document.body */}
+      {inviteModalContent}
       <div className="px-8 pb-12 select-none">
 
         {/* Top Greeting Row */}
@@ -440,7 +601,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-[#A0A8B0]" style={{ fontFamily: "Outfit, sans-serif" }}>No availability set</p>
                 ) : (
                   slots.filter(s => s.isActive).map(s => (
-                    <div key={s.dayOfWeek} className="flex justify-between items-center text-xs">
+                    <div key={`${s.dayOfWeek}-${s.startTime}-${s.endTime}`} className="flex justify-between items-center text-xs">
                       <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{DAY_NAMES[s.dayOfWeek]}</span>
                       <span className="text-[#24292E] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{fmt12(s.startTime)} - {fmt12(s.endTime)}</span>
                     </div>

@@ -2,7 +2,8 @@ import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { requireRole } from "../middleware/requireRole";
-import { doctorsContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, feedbackContainer, queryDocuments } from "../config/cosmos";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
@@ -97,6 +98,16 @@ router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, re
 
     await doctorsContainer.items.upsert(updatedDoctor);
 
+    logActivity({
+      source: "admin",
+      action: "Doctor Approved",
+      details: `Dr. ${doctor.fullName ?? id} (${doctor.specialty ?? ""}) profile approved`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "doctor",
+      entityId: id,
+    });
+
     res.json({ status: "OK", message: "Doctor approved successfully." });
   } catch (err) {
     console.error("Approve doctor error:", err);
@@ -128,9 +139,112 @@ router.post("/:id/reject", requireRole("admin"), async (req: SessionRequest, res
 
     await doctorsContainer.items.upsert(updatedDoctor);
 
+    logActivity({
+      source: "admin",
+      action: "Doctor Rejected",
+      details: `Dr. ${doctor.fullName ?? id} application rejected`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "doctor",
+      entityId: id,
+    });
+
     res.json({ status: "OK", message: "Doctor application rejected." });
   } catch (err) {
     console.error("Reject doctor error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/admin/doctors/:id/diagnosis ───────────────────────────────────
+// Aggregates appointment reasons for a doctor, returning the top 10 by count.
+router.get("/:id/diagnosis", requireRole("admin"), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const appointments = await queryDocuments<any>(appointmentsContainer, {
+      query: "SELECT c.reason FROM c WHERE c.doctorId = @doctorId AND c.status != 'cancelled'",
+      parameters: [{ name: "@doctorId", value: id }],
+    });
+
+    const counts: Record<string, number> = {};
+    for (const apt of appointments) {
+      if (apt.reason) {
+        const key = apt.reason.trim();
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+    }
+
+    const diagnosis = Object.entries(counts)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    res.json({ diagnosis, total: appointments.length });
+  } catch (err) {
+    console.error("Diagnosis fetch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/admin/doctors/:id/reviews ─────────────────────────────────────
+// Returns all feedback submitted for a doctor (folder = "doctor:{id}").
+router.get("/:id/reviews", requireRole("admin"), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const reviews = await queryDocuments<any>(feedbackContainer, {
+      query: "SELECT * FROM c WHERE c.folder = @folder ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@folder", value: `doctor:${id}` }],
+    });
+
+    const total = reviews.length;
+    const avgRating = total > 0
+      ? Math.round((reviews.reduce((s: number, r: any) => s + (r.rating ?? 0), 0) / total) * 10) / 10
+      : null;
+
+    res.json({ reviews, total, avgRating });
+  } catch (err) {
+    console.error("Reviews fetch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/doctors/:id/verify-slots ────────────────────────────────
+// Verifies/approves updated slots for a doctor.
+router.post("/:id/verify-slots", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.session!.getUserId();
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(id, id).read();
+
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+
+    const updatedDoctor = {
+      ...doctor,
+      slots: doctor.tempSlots ?? doctor.slots,
+      slotsPending: false,
+      slotsVerifiedAt: new Date().toISOString(),
+      slotsVerifiedBy: adminId,
+    };
+
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    logActivity({
+      source: "admin",
+      action: "Doctor Slots Verified",
+      details: `Dr. ${doctor.fullName ?? id} availability slots verified`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "doctor",
+      entityId: id,
+    });
+
+    res.json({ status: "OK", message: "Doctor slots verified successfully." });
+  } catch (err) {
+    console.error("Verify doctor slots error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

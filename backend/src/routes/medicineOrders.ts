@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { medicineOrdersContainer, prescriptionsContainer, pharmacyProductsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
@@ -67,6 +68,18 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
     };
 
     await medicineOrdersContainer.items.upsert(order);
+
+    const itemNames = validatedItems.map(i => i.name).join(", ");
+    logActivity({
+      source: "patient",
+      action: "Medicine Order Placed",
+      details: `Order AED ${total_amount.toFixed(2)} — ${itemNames}`,
+      performedBy: "Patient",
+      performedById: patientId,
+      entityType: "medicineOrder",
+      entityId: order.id,
+    });
+
     res.status(201).json({ status: "OK", order });
   } catch (err) {
     console.error("Create order error:", err);

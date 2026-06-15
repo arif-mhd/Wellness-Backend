@@ -4,6 +4,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { pharmaciesContainer, pharmacyProductsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -176,6 +177,17 @@ router.post("/:pharmacyId/approve", async (req: SessionRequest, res: Response) =
       approvedBy: adminId,
     };
     await pharmaciesContainer.items.upsert(updated);
+
+    logActivity({
+      source: "admin",
+      action: "Pharmacy Approved",
+      details: `${pharmacy.pharmacyName ?? pharmacyId} approved`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "pharmacy",
+      entityId: pharmacyId,
+    });
+
     res.json({ status: "OK", pharmacy: updated });
   } catch (err) {
     console.error("Pharmacy approve error:", err);

@@ -105,11 +105,11 @@ const StarRating = ({ rating }: { rating: number }) => (
 function UserAvatar({ user, size = "md" }: { user: RoleUser; size?: "sm" | "md" | "lg" }) {
   const sz = size === "sm" ? "w-9 h-9 text-xs" : size === "lg" ? "w-14 h-14 text-base" : "w-10 h-10 text-[11px]";
   if (user.avatarUrl) {
-    return <img src={user.avatarUrl} alt={user.name} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
+    return <img src={user.avatarUrl} alt={user.name ?? ""} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
   }
   return (
     <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-black shrink-0`}>
-      {user.name.split(" ").slice(0, 2).map(n => n[0]).join("")}
+      {(user.name ?? "?").split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
     </div>
   );
 }
@@ -125,6 +125,8 @@ export default function RolesPage() {
   const [draftPerms, setDraftPerms] = useState<Permissions | null>(null);
   const [saving, setSaving]         = useState(false);
   const [saveMsg, setSaveMsg]       = useState("");
+  const [search, setSearch]         = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const fetchUsers = useCallback(async (tab: Tab) => {
     setLoading(true);
@@ -154,7 +156,7 @@ export default function RolesPage() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(activeTab); }, [activeTab, fetchUsers]);
+  useEffect(() => { fetchUsers(activeTab); setSearch(""); setSearchOpen(false); }, [activeTab, fetchUsers]);
 
   function selectUser(user: RoleUser) {
     setSelectedId(user.id);
@@ -189,6 +191,30 @@ export default function RolesPage() {
 
   const selected = users.find(u => u.id === selectedId) ?? null;
 
+  // True when draftPerms differs from what's stored on the selected user
+  const hasChanges = !!selected && !!draftPerms &&
+    Object.keys(draftPerms).some(
+      k => draftPerms[k as keyof Permissions] !== selected.permissions[k as keyof Permissions]
+    );
+
+  function selectUserWithGuard(user: RoleUser) {
+    if (hasChanges) {
+      if (!confirm(`You have unsaved changes for ${selected?.name ?? "this user"}. Discard and switch?`)) return;
+    }
+    selectUser(user);
+  }
+
+  const filteredUsers = users.filter(u => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (u.name ?? "").toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.specialty ?? "").toLowerCase().includes(q) ||
+      (u.emiratesId ?? "").toLowerCase().includes(q)
+    );
+  });
+
   return (
     <ProtectedRoute>
       <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
@@ -213,9 +239,27 @@ export default function RolesPage() {
                     {tab}
                   </button>
                 ))}
-                <button className="ml-2 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 shadow-sm border border-slate-100 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                </button>
+                <div className="ml-2 flex items-center gap-2">
+                  {searchOpen && (
+                    <input
+                      autoFocus
+                      type="text"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder={`Search ${activeTab.toLowerCase()}…`}
+                      className="w-44 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm transition-all"
+                    />
+                  )}
+                  <button
+                    onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearch(""); }}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
+                  >
+                    {searchOpen
+                      ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                      : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    }
+                  </button>
+                </div>
               </div>
               <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                 Today
@@ -251,12 +295,12 @@ export default function RolesPage() {
                   <div className="w-8 h-8 border-[3px] border-[#6A8BFF]/30 border-t-[#6A8BFF] rounded-full animate-spin" />
                   <p className="text-sm text-slate-400 font-semibold">Loading {activeTab.toLowerCase()}…</p>
                 </div>
-              ) : users.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center flex-1 py-24 text-slate-400">
                   <svg className="w-12 h-12 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <p className="text-sm font-semibold">No {activeTab.toLowerCase()} found</p>
+                  <p className="text-sm font-semibold">{search ? `No results for "${search}"` : `No ${activeTab.toLowerCase()} found`}</p>
                 </div>
               ) : (
                 <>
@@ -277,12 +321,12 @@ export default function RolesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map(user => {
+                        {filteredUsers.map(user => {
                           const isSelected = selectedId === user.id;
                           return (
                             <tr
                               key={user.id}
-                              onClick={() => selectUser(user)}
+                              onClick={() => selectUserWithGuard(user)}
                               className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
                             >
                               <td className="py-4 pl-2">
@@ -377,34 +421,52 @@ export default function RolesPage() {
 
               {/* Access Controls */}
               <div className="border-t border-slate-50 pt-6">
-                <h3 className="text-[13px] font-bold text-slate-800 mb-5">Access Controls</h3>
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-[13px] font-bold text-slate-800">Access Controls</h3>
+                  {hasChanges && (
+                    <span className="text-[10px] font-bold text-amber-500 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
 
                 <div className="space-y-3">
-                  {PERMISSION_LABELS.map(({ key, title, description }) => (
-                    <div
-                      key={key}
-                      className="flex items-start gap-4 p-4 rounded-[1.25rem] border border-slate-100 hover:border-slate-200 transition-colors bg-white shadow-[0_2px_10px_rgba(0,0,0,0.01)]"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12.5px] font-bold text-slate-800 mb-1">{title}</p>
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed pr-2">{description}</p>
+                  {PERMISSION_LABELS.map(({ key, title, description }) => {
+                    const changed = draftPerms[key] !== selected.permissions[key];
+                    return (
+                      <div
+                        key={key}
+                        className={`flex items-start gap-4 p-4 rounded-[1.25rem] border transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.01)] ${
+                          changed
+                            ? "border-amber-200 bg-amber-50/40"
+                            : "border-slate-100 hover:border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12.5px] font-bold text-slate-800 mb-1">{title}</p>
+                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed pr-2">{description}</p>
+                        </div>
+                        <ToggleSwitch
+                          checked={draftPerms[key]}
+                          onChange={v => setDraftPerms(prev => prev ? { ...prev, [key]: v } : prev)}
+                        />
                       </div>
-                      <ToggleSwitch
-                        checked={draftPerms[key]}
-                        onChange={v => setDraftPerms(prev => prev ? { ...prev, [key]: v } : prev)}
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Save CTA */}
               <button
                 onClick={handleSave}
-                disabled={saving}
-                className="w-full py-4 mt-6 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold shadow-md shadow-blue-200/50 transition duration-200 active:scale-[0.98] disabled:opacity-60"
+                disabled={saving || !hasChanges}
+                className={`w-full py-4 mt-6 rounded-[1rem] text-[13px] font-bold shadow-md transition duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+                  hasChanges
+                    ? "bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white shadow-blue-200/50"
+                    : "bg-slate-100 text-slate-400 shadow-none"
+                }`}
               >
-                {saving ? "Saving…" : "Save Changes"}
+                {saving ? "Saving…" : hasChanges ? "Save Changes" : "No Changes"}
               </button>
 
               {saveMsg && (

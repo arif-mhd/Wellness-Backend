@@ -30,6 +30,7 @@ import vaccinesRouter from "./routes/vaccines";
 import supportRouter from "./routes/support";
 import remindersRouter from "./routes/reminders";
 import feedbackRouter from "./routes/feedback";
+import adminActivityLogRouter from "./routes/adminActivityLog";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -100,6 +101,7 @@ app.use("/api/vaccines",       vaccinesRouter);
 app.use("/api/support",        supportRouter);
 app.use("/api/reminders",      remindersRouter);
 app.use("/api/feedback",       feedbackRouter);
+app.use("/api/admin/activity-logs", adminActivityLogRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 
 export interface ScheduleItem {
-  id: number;
+  id: string | number;
   patientName: string;
   patientAge: number;
   patientAvatar: string;
@@ -17,7 +17,7 @@ export interface ScheduleItem {
 
 interface ScheduleListViewProps {
   items: ScheduleItem[];
-  selectedItemId: number | null;
+  selectedItemId: string | number | null;
   onSelectItem: (item: ScheduleItem) => void;
   onRescheduleClick?: (item: ScheduleItem) => void;
   onConsultClick?: (item: ScheduleItem) => void;

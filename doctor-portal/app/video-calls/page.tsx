@@ -1,771 +1,690 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
-import VideoFeed from "@/components/video-call/VideoFeed";
-import ChatTranscript from "@/components/video-call/ChatTranscript";
-import IntakePlan from "@/components/video-call/IntakePlan";
-import AddMedicines from "@/components/video-call/AddMedicines";
-import AddLabs from "@/components/video-call/AddLabs";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
+import {
+  Room, RoomEvent, Track,
+  RemoteTrack, RemoteTrackPublication, RemoteParticipant,
+  LocalTrackPublication,
+} from "livekit-client";
 
-interface Doctor {
-  id: number;
-  name: string;
-  email: string;
-  rating: number;
-  avatar: string;
-  isOnline?: boolean;
-  isRecent?: boolean;
-  timeRange?: string;
-  fee?: string;
-  added?: boolean;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+function fmt(d: Date) {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function VideoCallsPage() {
-  const [showSpecialistModal, setShowSpecialistModal] = useState(false);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showInvitationModal, setShowInvitationModal] = useState(false);
-  const [specialistJoined, setSpecialistJoined] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [mounted, setMounted] = useState(false);
+interface ChatMsg { id: string; sender: "you" | "other"; name: string; text: string; time: string; }
 
-  // Specialist list state
-  const [doctors, setDoctors] = useState<Doctor[]>([
-    {
-      id: 1,
-      name: "Dr. Jahid Rahman",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: true,
-      isRecent: true,
-      timeRange: "06:00 PM - 08:00 PM",
-      fee: "AED 200.00",
-      added: true,
-    },
-    {
-      id: 2,
-      name: "Dr. Anwar Hossain",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: true,
-      isRecent: true,
-      added: false,
-    },
-    {
-      id: 3,
-      name: "Dr. Shefali Khan",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: true,
-      isRecent: true,
-      added: false,
-    },
-    {
-      id: 4,
-      name: "Dr. Iqbal Khan",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: false,
-      added: false,
-    },
-    {
-      id: 5,
-      name: "Dr. Abul Haque",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: false,
-      added: false,
-    },
-    {
-      id: 6,
-      name: "Dr. Saeed Khan",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1637059824899-a441006a6875?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: false,
-      added: false,
-    },
-    {
-      id: 7,
-      name: "Dr. Yasmin Rahman",
-      email: "yelena@example.com",
-      rating: 5,
-      avatar: "https://images.unsplash.com/photo-1527613426441-4da17471b66d?auto=format&fit=crop&w=200&h=200&q=80",
-      isOnline: false,
-      added: false,
-    },
-  ]);
+interface RemoteVideoTile {
+  participantId: string;
+  name: string;
+  trackSid: string | undefined;
+}
 
+interface AvailableDoctor {
+  id: string;
+  fullName: string;
+  specialty: string;
+  avatarUrl: string | null;
+  email: string;
+  fees: string | null;
+  rating: number;
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[...Array(5)].map((_, i) => (
+        <svg key={i} width="10" height="10" viewBox="0 0 24 24"
+          className={i < Math.floor(rating) ? "fill-[#5476FC] stroke-[#5476FC]" : "fill-gray-200 stroke-gray-200"}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+const EMR_SECTIONS = [
+  "Visit Information",
+  "History of Present Illness",
+  "Review System",
+  "Health Status",
+  "Histories",
+  "Physical Examination",
+  "Medical Decision Making",
+  "Procedure",
+  "Impression and Plan",
+  "Professional Services",
+];
+
+function VideoCallInner() {
+  const searchParams  = useSearchParams();
+  const router        = useRouter();
+  const appointmentId = searchParams.get("appointmentId") ?? "";
+  const isSpecialist  = searchParams.get("role") === "specialist";
+
+  const [connected,  setConnected]  = useState(false);
+  const [ended,      setEnded]      = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
+  const [micOn,      setMicOn]      = useState(true);
+  const [camOn,      setCamOn]      = useState(true);
+  const [timer,      setTimer]      = useState(0);
+
+  const [messages,   setMessages]   = useState<ChatMsg[]>([]);
+  const [chatInput,  setChatInput]  = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [unread,     setUnread]     = useState(0);
+
+  const [notes,      setNotes]      = useState("");
+  const [expandedSection, setExpandedSection] = useState<string | null>("Visit Information");
+  const [savingEmr,  setSavingEmr]  = useState(false);
+  const [emrSaved,   setEmrSaved]   = useState(false);
+
+  // Specialist invite (primary doctor only)
+  const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
+  const [doctorsLoading,     setDoctorsLoading]     = useState(false);
+  const [specialistSearch,   setSpecialistSearch]   = useState("");
+  const [selectedSpecialist, setSelectedSpecialist] = useState<AvailableDoctor | null>(null);
+  const [showSpecialistList, setShowSpecialistList] = useState(false);
+  const [showApprovalModal,  setShowApprovalModal]  = useState(false);
+  const [showSuccessModal,   setShowSuccessModal]   = useState(false);
+  const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "waiting" | "accepted" | "declined">("idle");
+  const patientPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // LiveKit
+  const roomRef      = useRef<Room | null>(null);
+  const localVideoEl = useRef<HTMLVideoElement>(null);
+  const didConnectRef = useRef(false);
+  const tokenRef     = useRef("");
+  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+
+  // Timer
   useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
+    if (!connected) return;
+    const id = setInterval(() => setTimer(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [connected]);
+  const timerStr = `${String(Math.floor(timer / 60)).padStart(2,"0")}:${String(timer % 60).padStart(2,"0")}`;
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // LiveKit connect
+  useEffect(() => {
+    if (roomRef.current) return;
+
+    const room = new Room();
+    roomRef.current = room;
+    let cancelled = false;
+
+    function attachRemoteTrack(track: RemoteTrack, participant: RemoteParticipant) {
+      if (track.kind === Track.Kind.Video) {
+        setRemoteTiles(prev => {
+          if (prev.find(t => t.trackSid === track.sid)) return prev;
+          return [...prev, { participantId: participant.identity, name: participant.name ?? participant.identity, trackSid: track.sid }];
+        });
+        requestAnimationFrame(() => {
+          const el = remoteVideoRefs.current.get(participant.identity);
+          if (el) track.attach(el);
+        });
+      }
+      if (track.kind === Track.Kind.Audio) track.attach();
+    }
+
+    room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+      if (!cancelled) {
+        setConnected(true);
+        setPinnedId(prev => prev ?? p.identity);
+      }
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
+      if (!cancelled) {
+        setRemoteTiles(prev => prev.filter(t => t.participantId !== p.identity));
+        remoteVideoRefs.current.delete(p.identity);
+        setPinnedId(prev => prev === p.identity ? null : prev);
+        if (room.remoteParticipants.size === 0) setConnected(false);
+      }
+    });
+    room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+      if (!cancelled) attachRemoteTrack(track, participant);
+    });
+    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+      track.detach();
+      if (track.kind === Track.Kind.Video) {
+        setRemoteTiles(prev => prev.filter(t => t.participantId !== participant.identity || t.trackSid !== track.sid));
+      }
+    });
+    room.on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => {
+      if (pub.source === Track.Source.Camera && pub.track && localVideoEl.current) {
+        pub.track.attach(localVideoEl.current);
+      }
+    });
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+      if (cancelled) return;
+      try {
+        const data = JSON.parse(new TextDecoder().decode(payload));
+        if (data.type === "chat") {
+          setMessages(prev => [...prev, { id: `${Date.now()}${Math.random()}`, sender: "other", name: data.senderName ?? "Other", text: data.text, time: fmt(new Date()) }]);
+          setUnread(u => u + 1);
+        } else if (data.type === "specialist_accepted" && !isSpecialist) {
+          if (patientPollRef.current) clearInterval(patientPollRef.current);
+          setInviteStatus("accepted");
+          setShowSuccessModal(true);
+        } else if (data.type === "specialist_declined" && !isSpecialist) {
+          if (patientPollRef.current) clearInterval(patientPollRef.current);
+          setInviteStatus("declined");
+        }
+      } catch {}
+    });
+    room.on(RoomEvent.Disconnected, () => {
+      if (cancelled) return;
+      if (didConnectRef.current) setEnded(true);
+      else setError("Could not connect to the call.");
+    });
+
+    async function init() {
+      if (!appointmentId) { setError("Missing appointment ID"); return; }
+      try {
+        const token = await Session.getAccessToken();
+        if (cancelled) return;
+        tokenRef.current = token ?? "";
+        const endpoint = isSpecialist
+          ? `${API_URL}/api/appointments/${appointmentId}/specialist-join`
+          : `${API_URL}/api/appointments/${appointmentId}/livekit-token`;
+        const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) { setError("Could not get call token"); return; }
+        const { token: lkToken, wsUrl } = await res.json();
+        if (cancelled) return;
+
+        await room.connect(wsUrl, lkToken, { autoSubscribe: true });
+        if (cancelled) { room.disconnect(); return; }
+        didConnectRef.current = true;
+
+        room.remoteParticipants.forEach(participant => {
+          setConnected(true);
+          participant.trackPublications.forEach(pub => {
+            if (pub.isSubscribed && pub.track) attachRemoteTrack(pub.track as RemoteTrack, participant);
+          });
+        });
+
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+      } catch (e: any) {
+        if (!cancelled) setError(`Connection error: ${e?.message}`);
+      }
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      if (didConnectRef.current) room.disconnect();
+      roomRef.current = null;
+    };
+  }, [appointmentId, isSpecialist]);
+
+  const setRemoteVideoRef = useCallback((participantId: string, el: HTMLVideoElement | null) => {
+    if (!el) { remoteVideoRefs.current.delete(participantId); return; }
+    remoteVideoRefs.current.set(participantId, el);
+    const room = roomRef.current;
+    if (!room) return;
+    const participant = room.remoteParticipants.get(participantId);
+    if (!participant) return;
+    participant.trackPublications.forEach(pub => {
+      if (pub.kind === Track.Kind.Video && pub.isSubscribed && pub.track) {
+        (pub.track as RemoteTrack).attach(el);
+      }
+    });
   }, []);
 
-  const handleOpenApproval = (doc: Doctor) => {
-    setSelectedDoctor(doc);
-    setShowSpecialistModal(false); // Close right drawer
-    setShowApprovalModal(true); // Open central approval modal
-  };
+  const disconnect = useCallback(async () => {
+    await roomRef.current?.disconnect();
+    setEnded(true);
+  }, []);
 
-  const handleAddDoctorDirect = (id: number) => {
-    setDoctors(
-      doctors.map((doc) => (doc.id === id ? { ...doc, added: !doc.added } : doc))
+  const sendChat = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || !roomRef.current) return;
+    const role = isSpecialist ? "Specialist" : "Doctor";
+    await roomRef.current.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: "chat", senderName: role, text })),
+      { reliable: true }
     );
+    setMessages(prev => [...prev, { id: `${Date.now()}${Math.random()}`, sender: "you", name: role, text, time: fmt(new Date()) }]);
+    setChatInput("");
+    setUnread(0);
+  }, [chatInput, isSpecialist]);
+
+  const toggleMic = async () => { await roomRef.current?.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); };
+  const toggleCam = async () => { await roomRef.current?.localParticipant.setCameraEnabled(!camOn);   setCamOn(v => !v); };
+
+  const fetchAvailableDoctors = useCallback(async () => {
+    if (!appointmentId || isSpecialist) return;
+    setDoctorsLoading(true);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/available-doctors`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) { const { doctors: list } = await res.json(); setAvailableDoctors(list ?? []); }
+    } catch {} finally { setDoctorsLoading(false); }
+  }, [appointmentId, isSpecialist]);
+
+  const handleSelectDoctor = (doc: AvailableDoctor) => {
+    setSelectedSpecialist(doc);
+    setShowSpecialistList(false);
+    setShowApprovalModal(true);
   };
 
-  const filteredAllDoctors = doctors.filter(
-    (doc) =>
-      !doc.isRecent &&
-      (doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const recentDoctors = doctors.filter((doc) => doc.isRecent);
-
-  // 1. Right-side Specialist Drawer Content
-  const specialistModalContent = showSpecialistModal && mounted ? createPortal(
-    <div className="fixed inset-0 w-screen h-screen z-[999999] flex justify-end items-start p-6 pointer-events-none font-outfit">
-      {/* Backdrop spanning the full screen at all times */}
-      <div
-        className="fixed inset-0 w-screen h-screen bg-slate-900/40 backdrop-blur-xs pointer-events-auto transition-opacity duration-300"
-        onClick={() => setShowSpecialistModal(false)}
-      />
-
-      {/* Specialist Popup Card - floating top-right unconstrained */}
-      <div className="bg-white w-full max-w-[400px] rounded-3xl p-7 shadow-2xl relative border border-slate-100 flex flex-col gap-5 pointer-events-auto transition-all duration-300 max-h-[85vh] overflow-y-auto mt-16 md:mt-20 animate-[slideInSpecialist_0.3s_ease-out]">
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes slideInSpecialist {
-            from {
-              transform: translateX(30px);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 1;
+  const handleRequestApproval = async () => {
+    if (!selectedSpecialist || !appointmentId) return;
+    setInviteStatus("sending");
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/invite-specialist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ specialistDoctorId: selectedSpecialist.id }),
+      });
+      if (res.ok) {
+        setInviteStatus("waiting");
+        setShowApprovalModal(false);
+        if (patientPollRef.current) clearInterval(patientPollRef.current);
+        patientPollRef.current = setInterval(async () => {
+          const t = await Session.getAccessToken();
+          const r = await fetch(`${API_URL}/api/appointments/${appointmentId}/specialist-status`, {
+            headers: { Authorization: `Bearer ${t}` },
+          });
+          if (r.ok) {
+            const { patientDecision } = await r.json();
+            if (patientDecision === "accepted") {
+              clearInterval(patientPollRef.current!);
+              setInviteStatus("accepted");
+              setShowSuccessModal(true);
+            } else if (patientDecision === "declined") {
+              clearInterval(patientPollRef.current!);
+              setInviteStatus("declined");
             }
           }
-        `}} />
+        }, 5000);
+      } else { setInviteStatus("idle"); }
+    } catch { setInviteStatus("idle"); }
+  };
 
-        {/* Close button */}
-        <button
-          onClick={() => setShowSpecialistModal(false)}
-          className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 p-1.5 rounded-full transition-colors"
-          title="Close popup"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+  useEffect(() => { return () => { if (patientPollRef.current) clearInterval(patientPollRef.current); }; }, []);
 
-        {/* Recent Peer Supports Title */}
-        <div className="flex flex-col gap-3">
-          <span className="text-[#24292E] font-medium text-[13.5px] select-none tracking-tight pt-1">
-            Recent peer supports
-          </span>
+  const filteredDoctors = availableDoctors.filter(d =>
+    d.fullName.toLowerCase().includes(specialistSearch.toLowerCase()) ||
+    d.specialty.toLowerCase().includes(specialistSearch.toLowerCase())
+  );
 
-          {/* Peers List */}
-          <div className="flex flex-col gap-2">
-            {recentDoctors.map((doc, idx) => (
-              <div key={doc.id} className="w-full">
-                <div className="flex flex-col py-2.5 w-full bg-white gap-2.5">
-                  <div className="flex items-center justify-between gap-3 w-full">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {/* Avatar Container with Active Green Indicator */}
-                      <div className="relative w-10 h-10 shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={doc.avatar}
-                          alt={doc.name}
-                          className="w-10 h-10 rounded-full object-cover border border-slate-100"
-                        />
-                        {doc.isOnline && (
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0 shadow-sm" />
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-[#383F45] text-xs font-semibold truncate">
-                          {doc.name}
-                        </span>
-                        <span className="text-[#838B95] text-[10px] font-normal truncate leading-tight mt-0.5">
-                          {doc.email}
-                        </span>
-                        {/* Stars Rating */}
-                        <div className="flex items-center gap-0.5 mt-0.5">
-                          {[...Array(doc.rating)].map((_, i) => (
-                            <svg
-                              key={i}
-                              width="10"
-                              height="10"
-                              viewBox="0 0 24 24"
-                              className="fill-[#5476FC] stroke-[#5476FC]"
-                            >
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
-                          ))}
-                        </div>
-                      </div>
+  const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+    " | " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  if (ended) return (
+    <div className="flex flex-col items-center justify-center h-screen gap-4 bg-[#f7f9fc]">
+      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-2xl">✓</div>
+      <h2 className="text-[#24292e] text-xl font-semibold">Call Ended</h2>
+      <p className="text-[#676e76] text-sm">Duration: {timerStr}</p>
+      <button onClick={() => router.push("/dashboard")}
+        className="px-6 py-2.5 bg-[#5476fc] text-white text-sm font-medium rounded-xl hover:bg-[#4466ec]">
+        Back to Dashboard
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 96px)" }}>
+
+      {/* ── Specialist selection drawer ── */}
+      {showSpecialistList && !isSpecialist && (
+        <div className="fixed inset-0 z-[99999] flex items-start justify-end">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowSpecialistList(false)}/>
+          <div className="relative bg-white w-[360px] h-full shadow-2xl flex flex-col animate-[slideIn_0.25s_ease-out]">
+            <style dangerouslySetInnerHTML={{__html:`@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}`}}/>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <span className="text-[#24292e] font-semibold text-sm">Add Specialist</span>
+              <button onClick={() => setShowSpecialistList(false)} className="text-gray-400 hover:text-gray-600">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input value={specialistSearch} onChange={e => setSpecialistSearch(e.target.value)}
+                  placeholder="Search…" className="w-full bg-gray-50 rounded-lg pl-8 pr-3 py-2 text-xs outline-none"/>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {doctorsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+                </div>
+              ) : filteredDoctors.map((doc, idx) => (
+                <div key={doc.id}>
+                  <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50">
+                    <div className="relative flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={doc.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.fullName)}&background=5476FC&color=fff`}
+                        alt={doc.fullName} className="w-10 h-10 rounded-full object-cover"/>
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-white absolute bottom-0 right-0"/>
                     </div>
-
-                    {/* Add Specialist Pill Button */}
-                    <button
-                      onClick={() => handleOpenApproval(doc)}
-                      className={`h-7 px-5 rounded-full text-[10.5px] font-semibold transition-all shadow-sm shrink-0 ${
-                        doc.added
-                          ? "bg-[#5476FC] text-white hover:bg-[#3B5BFC]"
-                          : "border border-[#EBEEF5] bg-white text-[#383F45] hover:bg-[#F5F6FA]"
-                      }`}
-                    >
-                      {doc.added ? "Add" : "Add"}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#24292e] text-xs font-semibold truncate">{doc.fullName}</p>
+                      <StarRating rating={doc.rating}/>
+                      {doc.fees && <p className="text-[10px] text-gray-400">AED {doc.fees}</p>}
+                    </div>
+                    <button onClick={() => handleSelectDoctor(doc)}
+                      className="h-7 px-4 rounded-full text-[10px] font-semibold border border-gray-200 text-gray-600 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">
+                      Add
                     </button>
                   </div>
+                  {idx < filteredDoctors.length - 1 && <div className="h-px bg-gray-50 mx-5"/>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-                  {/* Additional Fee and Available Time slots for Jahid Rahman */}
-                  {doc.id === 1 && (
-                    <div className="mt-2 pt-2 border-t border-[#EBEEF5] flex flex-col gap-1.5">
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-[#676E76] font-normal">
-                          This provider is available now
-                        </span>
-                        <span className="text-[#383F45] font-semibold">
-                          {doc.timeRange}
-                        </span>
+      {/* ── Approval modal ── */}
+      {showApprovalModal && selectedSpecialist && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowApprovalModal(false)}/>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[520px] mx-4 p-8 animate-[zoomIn_0.2s_ease-out]">
+            <style dangerouslySetInnerHTML={{__html:`@keyframes zoomIn{from{transform:scale(0.94);opacity:0}to{transform:scale(1);opacity:1}}`}}/>
+            <button onClick={() => setShowApprovalModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-600">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <h3 className="text-[#24292e] font-semibold text-lg text-center mb-1">Add Specialist</h3>
+            <p className="text-gray-400 text-xs text-center mb-6">Add this provider to the consultation.</p>
+            <div className="flex items-center gap-3 mb-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selectedSpecialist.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedSpecialist.fullName)}&background=5476FC&color=fff`}
+                alt={selectedSpecialist.fullName} className="w-11 h-11 rounded-full object-cover"/>
+              <div className="flex-1">
+                <p className="text-[#24292e] text-sm font-semibold">{selectedSpecialist.fullName}</p>
+                <p className="text-gray-400 text-[11px]">{selectedSpecialist.email}</p>
+                <StarRating rating={selectedSpecialist.rating}/>
+              </div>
+              <button className="h-8 px-4 rounded-full text-[11px] font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">View Profile in New Tab</button>
+            </div>
+            <div className="divide-y divide-gray-100">
+              <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Consultation Fee</span><span className="font-semibold">{selectedSpecialist.fees ? `AED ${selectedSpecialist.fees}` : "AED 200.00"}</span></div>
+              <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Specialty</span><span className="font-semibold">{selectedSpecialist.specialty}</span></div>
+              <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Insurance Eligibility of Patient</span><span className="text-[#5476fc] font-semibold">Eligible</span></div>
+            </div>
+            <p className="text-red-500 text-[10.5px] mt-4 mb-5 leading-relaxed">Important: Please consult with the patient before adding this specialist and inform them about insurance eligibility and payment options, if applicable.</p>
+            <div className="flex justify-end">
+              <button onClick={handleRequestApproval} disabled={inviteStatus === "sending"}
+                className="h-10 px-8 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 disabled:opacity-60">
+                {inviteStatus === "sending" ? "Sending..." : "Request Patient Approval"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Success modal ── */}
+      {showSuccessModal && selectedSpecialist && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)}/>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[300px] mx-4 p-7 flex flex-col items-center gap-3 animate-[zoomIn_0.2s_ease-out]">
+            <h3 className="text-[#24292e] font-semibold text-base text-center">Specialist Added<br/>Successfully</h3>
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selectedSpecialist.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedSpecialist.fullName)}&background=5476FC&color=fff`}
+                alt={selectedSpecialist.fullName} className="w-14 h-14 rounded-full object-cover"/>
+              <span className="w-3 h-3 rounded-full bg-green-400 border-2 border-white absolute bottom-0 right-0"/>
+            </div>
+            <p className="text-[#24292e] text-xs font-semibold">{selectedSpecialist.fullName}</p>
+            <StarRating rating={selectedSpecialist.rating}/>
+            <p className="text-gray-500 text-[11px] text-center leading-relaxed">Patient approved. The specialist has been notified and will join shortly.</p>
+            <button onClick={() => setShowSuccessModal(false)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold hover:opacity-90">
+              Connect Now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Top bar ── */}
+      <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <p className="text-[#24292e] text-xs font-semibold">[Internal] Calling{isSpecialist ? " · Specialist" : ""}</p>
+          <span className="text-gray-300">|</span>
+          <p className="text-gray-400 text-[10px] hidden sm:block">{dateStr}</p>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className={`w-2 h-2 rounded-full ${connected ? "bg-red-500 animate-pulse" : "bg-yellow-400"}`}/>
+            <span className="text-[#24292e] font-mono text-xs font-bold">{timerStr}</span>
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          {inviteStatus === "waiting" && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-600 text-[10px] font-semibold animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"/>Waiting for patient…
+            </div>
+          )}
+          {inviteStatus === "declined" && (
+            <div className="px-3 py-1.5 bg-red-50 border border-red-100 rounded-full text-red-600 text-[10px] font-semibold">Patient declined</div>
+          )}
+          <button className="h-8 px-4 rounded-lg border border-gray-200 text-gray-600 text-[11px] font-semibold hover:bg-gray-50 transition-colors">
+            View Detailed EHR
+          </button>
+          {!isSpecialist && (
+            <button onClick={() => { setShowSpecialistList(true); fetchAvailableDoctors(); }}
+              className="h-8 px-4 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-[11px] font-bold shadow-[0_2px_6px_rgba(84,118,252,0.3)] hover:opacity-90">
+              Add Specialist
+            </button>
+          )}
+          <button onClick={toggleMic}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${micOn ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-red-50 text-red-500"}`}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              {micOn ? <><path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></> : <><line x1="1" y1="1" x2="23" y2="23"/><path strokeLinecap="round" strokeLinejoin="round" d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path strokeLinecap="round" strokeLinejoin="round" d="M17 16.95A7 7 0 0 1 5 12v-2M12 19v4M8 23h8"/></>}
+            </svg>
+          </button>
+          <button onClick={toggleCam}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${camOn ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-red-50 text-red-500"}`}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              {camOn ? <><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></> : <><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06A4 4 0 1 1 7.88 8.88"/></>}
+            </svg>
+          </button>
+          <button onClick={disconnect}
+            className="flex items-center gap-1.5 h-8 px-3 bg-[#e84949] text-white text-[11px] font-semibold rounded-lg hover:bg-[#d43f3f]">
+            End
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main body ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Left: Video + Chat */}
+        <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
+
+          {/* Video */}
+          <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "420px" }}>
+            {remoteTiles.length === 0 ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                {!error ? (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-[#5476fc]/10 border border-[#5476fc]/30 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+                    </div>
+                    <p className="text-white text-xs font-medium">Connecting to call…</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-lg">⚠️</div>
+                    <p className="text-red-400 text-xs">{error}</p>
+                    <button onClick={() => window.location.reload()} className="px-3 py-1.5 bg-[#5476fc] text-white text-xs rounded-lg">Retry</button>
+                  </>
+                )}
+              </div>
+            ) : (() => {
+              const mainTile = remoteTiles.find(t => t.participantId === pinnedId) ?? remoteTiles[0];
+              const pipTiles = remoteTiles.filter(t => t.participantId !== mainTile.participantId);
+              return (
+                <>
+                  <video ref={el => setRemoteVideoRef(mainTile.participantId, el)}
+                    autoPlay playsInline className="absolute inset-0 w-full h-full object-cover"/>
+                  <div className="absolute bottom-16 left-3 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-md z-10">
+                    {mainTile.name}
+                  </div>
+                  {pipTiles.map((tile, i) => (
+                    <button key={tile.participantId}
+                      onClick={() => setPinnedId(tile.participantId)}
+                      className="absolute z-20 group"
+                      style={{ bottom: `${88 + (pipTiles.length - 1 - i) * 88}px`, right: "8px" }}
+                      title="Click to make main">
+                      <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/30 bg-[#1a2035] shadow-xl relative hover:border-[#5476fc] transition-colors">
+                        <video ref={el => setRemoteVideoRef(tile.participantId, el)} autoPlay playsInline className="w-full h-full object-cover"/>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <svg className="opacity-0 group-hover:opacity-100 transition-opacity" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-[#676E76] font-normal">
-                          Consultation Fee
-                        </span>
-                        <span className="text-[#5476FC] font-semibold">
-                          {doc.fee}
-                        </span>
-                      </div>
+                      <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">{tile.name}</p>
+                    </button>
+                  ))}
+                </>
+              );
+            })()}
+
+            {/* Local PiP — bottom-right corner */}
+            <div className="absolute bottom-14 right-2 z-20">
+              <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/20 bg-[#1a2035] shadow-xl">
+                <video ref={localVideoEl} autoPlay playsInline muted className="w-full h-full object-cover"/>
+              </div>
+              <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">You</p>
+            </div>
+
+            {/* Controls overlay */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+              <button onClick={toggleMic}
+                className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg ${micOn ? "bg-white/20 text-white" : "bg-red-500 text-white"}`}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  {micOn ? <><path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></> : <><line x1="1" y1="1" x2="23" y2="23"/><path strokeLinecap="round" strokeLinejoin="round" d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path strokeLinecap="round" strokeLinejoin="round" d="M17 16.95A7 7 0 0 1 5 12v-2M12 19v4M8 23h8"/></>}
+                </svg>
+              </button>
+              <button onClick={disconnect}
+                className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 012 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.63 19.79 19.79 0 01.36 1a2 2 0 012-2H6a2 2 0 012 2 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L7.08 8.96"/>
+                </svg>
+              </button>
+              <button onClick={toggleCam}
+                className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg ${camOn ? "bg-white/20 text-white" : "bg-red-500 text-white"}`}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  {camOn ? <><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></> : <><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06A4 4 0 1 1 7.88 8.88"/></>}
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Chat */}
+          <div className="flex-1 flex flex-col overflow-hidden border-t border-gray-100">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-500"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+              <span className="text-[#24292e] text-xs font-semibold">Chat</span>
+              {unread > 0 && <span className="min-w-[16px] h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center px-1">{unread}</span>}
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3" onClick={() => setUnread(0)}>
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                  <p className="text-gray-300 text-[11px]">No messages yet</p>
+                </div>
+              ) : messages.map(m => (
+                <div key={m.id} className={`flex items-start gap-2 ${m.sender === "you" ? "flex-row-reverse" : ""}`}>
+                  <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${m.sender === "you" ? "bg-[#5476fc]/15 text-[#5476fc]" : "bg-gray-100 text-gray-500"}`}>
+                    {m.name.slice(0,2).toUpperCase()}
+                  </div>
+                  <div className={`max-w-[75%] flex flex-col gap-0.5 ${m.sender === "you" ? "items-end" : "items-start"}`}>
+                    <p className="text-[9px] text-gray-400 font-medium px-1">{m.name}</p>
+                    <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${m.sender === "you" ? "bg-[#5476fc] text-white rounded-tr-none" : "bg-gray-100 text-gray-700 rounded-tl-none"}`}>
+                      {m.text}
+                    </div>
+                    <p className="text-[9px] text-gray-300 px-1">{m.time}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef}/>
+            </div>
+            <div className="p-3 border-t border-gray-100 flex gap-2 items-center flex-shrink-0">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-300 flex-shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                placeholder="Type Something..."
+                className="flex-1 bg-transparent text-xs text-gray-700 placeholder-gray-300 outline-none"/>
+              <button onClick={sendChat} disabled={!chatInput.trim()}
+                className="w-7 h-7 rounded-full bg-[#5476fc] flex items-center justify-center disabled:opacity-30 hover:bg-[#4466ec] flex-shrink-0">
+                <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: EMR */}
+        <div className="flex-1 overflow-hidden flex flex-col border-l border-gray-100">
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-6 pt-4 pb-2 border-b border-gray-100">
+              <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wide">Intake plan</p>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {EMR_SECTIONS.map(section => (
+                <div key={section}>
+                  <button onClick={() => setExpandedSection(expandedSection === section ? null : section)}
+                    className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
+                    <span className={`text-xs font-semibold ${expandedSection === section ? "text-[#5476fc]" : "text-[#24292e]"}`}>{section}</span>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
+                      className={`text-gray-300 transition-transform ${expandedSection === section ? "rotate-180" : ""}`}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+                  {expandedSection === section && (
+                    <div className="px-6 pb-4 bg-gray-50/50">
+                      <textarea
+                        value={section === "Impression and Plan" ? notes : ""}
+                        onChange={e => section === "Impression and Plan" && setNotes(e.target.value)}
+                        placeholder={`Add ${section} notes…`}
+                        rows={3}
+                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/40 resize-none mt-2"
+                      />
                     </div>
                   )}
                 </div>
-                {/* Horizontal divider below recent supports */}
-                {idx < recentDoctors.length - 1 && <div className="w-full h-[1px] bg-[#F1F3F7] mt-1.5" />}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* All Doctors Section */}
-        <div className="flex flex-col gap-4 border-t border-[#F1F3F7] pt-4">
-          <span className="text-[#24292E] font-medium text-[13.5px] select-none tracking-tight">
-            All Doctors
-          </span>
-
-          {/* Search bar inside specialist menu */}
-          <div className="relative w-full">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Doctor's Name or Speciality"
-              className="w-full h-11 pl-10 pr-4 rounded-full bg-[#F5F6FA] text-xs font-normal text-[#383F45] placeholder-[#838B95] outline-none focus:ring-1 focus:ring-[#5476FC]/20 focus:bg-white transition-all"
-            />
-            <div className="absolute inset-y-0 left-3.5 flex items-center text-[#838B95] pointer-events-none">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              ))}
             </div>
           </div>
-
-          {/* List of All Doctors */}
-          <div className="flex flex-col gap-1">
-            {filteredAllDoctors.length === 0 ? (
-              <div className="text-center text-[11px] font-semibold text-slate-400 py-4">
-                No doctors found matching "{searchQuery}"
-              </div>
-            ) : (
-              filteredAllDoctors.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between gap-3 w-full py-2.5 hover:bg-[#F5F6FA]/30 rounded-xl transition-all px-2"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={doc.avatar}
-                      alt={doc.name}
-                      className="w-8 h-8 rounded-full object-cover border border-slate-100 shrink-0"
-                    />
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-[#383F45] text-xs font-semibold truncate">
-                        {doc.name}
-                      </span>
-                      <span className="text-[#838B95] text-[10px] font-normal truncate leading-tight mt-0.5">
-                        {doc.email}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenApproval(doc)}
-                    className={`h-7 px-5 rounded-full text-[10.5px] font-semibold transition-all shadow-sm shrink-0 ${
-                      doc.added
-                        ? "bg-[#5476FC] text-white hover:bg-[#3B5BFC]"
-                        : "border border-[#EBEEF5] bg-white text-[#383F45] hover:bg-[#F5F6FA]"
-                    }`}
-                  >
-                    {doc.added ? "Add" : "Add"}
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  // 2. Central Add Specialist Approval Modal Content
-  const approvalModalContent = showApprovalModal && selectedDoctor && mounted ? createPortal(
-    <div className="fixed inset-0 w-screen h-screen z-[999999] flex items-center justify-center p-4 pointer-events-none font-outfit">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 w-screen h-screen bg-slate-900/40 backdrop-blur-xs pointer-events-auto transition-opacity duration-300"
-        onClick={() => setShowApprovalModal(false)}
-      />
-
-      {/* Center Modal Card */}
-      <div className="bg-white w-full max-w-[680px] rounded-3xl py-6 px-9 md:py-7 md:px-10 shadow-2xl relative border border-slate-100 flex flex-col gap-4 pointer-events-auto transition-all duration-300 animate-[zoomInApproval_0.25s_ease-out] select-none">
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes zoomInApproval {
-            from {
-              transform: scale(0.95);
-              opacity: 0;
-            }
-            to {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}} />
-
-        {/* Close button */}
-        <button
-          onClick={() => setShowApprovalModal(false)}
-          className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-50 transition-colors"
-          title="Close modal"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-
-        {/* Header Titles */}
-        <div className="flex flex-col gap-1 items-center text-center">
-          <h3 className="text-[#24292E] font-marcellus font-medium text-[22px] tracking-tight pt-1">
-            Add Specialist
-          </h3>
-          <span className="text-[#838B95] text-xs font-normal">
-            Add this provider to the consultation.
-          </span>
-        </div>
-
-        {/* Doctor Row Info - direct on white background, no outer borders */}
-        <div className="flex items-center justify-between gap-4 w-full py-1">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Avatar with Active Green Indicator */}
-            <div className="relative w-11 h-11 shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedDoctor.avatar}
-                alt={selectedDoctor.name}
-                className="w-11 h-11 rounded-full object-cover border border-slate-100"
-              />
-              {selectedDoctor.isOnline && (
-                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0 shadow-sm" />
-              )}
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-[#383F45] text-xs font-semibold truncate">
-                {selectedDoctor.name}
-              </span>
-              <span className="text-[#838B95] text-[10px] font-normal truncate mt-0.5">
-                {selectedDoctor.email}
-              </span>
-              {/* Stars */}
-              <div className="flex items-center gap-0.5 mt-0.5">
-                {[...Array(selectedDoctor.rating)].map((_, i) => (
-                  <svg
-                    key={i}
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    className="fill-[#5476FC] stroke-[#5476FC]"
-                  >
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Soft lavender-blue solid capsule pill button */}
-          <button
-            onClick={() => alert("Viewing Profile in New Tab...")}
-            className="h-9 px-5 rounded-full bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D9E7FF] text-[11px] font-semibold transition-all shrink-0 border-none flex items-center justify-center"
-          >
-            View Profile in New Tab
-          </button>
-        </div>
-
-        {/* Divider under doctor info row */}
-        <div className="w-full h-[1px] bg-[#F1F3F7]" />
-
-        {/* Detailed Breakdown */}
-        <div className="flex flex-col gap-2.5 py-0.5">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-[#676E76] font-normal">Consultation Fee</span>
-            <span className="text-[#383F45] font-semibold">AED 200.00</span>
-          </div>
-          <div className="w-full h-[1px] bg-[#F1F3F7]" />
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-[#676E76] font-normal">Licenses</span>
-            <span className="text-[#383F45] font-semibold">DHA-12345678</span>
-          </div>
-          <div className="w-full h-[1px] bg-[#F1F3F7]" />
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-[#676E76] font-normal">Insurance Eligibility of Patient</span>
-            <span className="text-[#5476FC] font-semibold">Eligible</span>
-          </div>
-          <div className="w-full h-[1px] bg-[#F1F3F7]" />
-        </div>
-
-        {/* Warning Note */}
-        <p className="text-[#E84949] text-[10.5px] font-normal leading-relaxed mt-0.5">
-          Important: Please consult with the patient before adding this specialist and inform them about insurance eligibility and payment options, if applicable.
-        </p>
-
-        {/* Center/Right Align Request Approval Button */}
-        <div className="flex justify-end pt-1">
-          <button
-            onClick={() => {
-              handleAddDoctorDirect(selectedDoctor.id);
-              setShowApprovalModal(false);
-              setShowSuccessModal(true); // Transition directly to success
-            }}
-            className="h-10 px-8 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-xs font-bold shadow-[0_2.5px_8px_rgba(84,118,252,0.25)] hover:shadow-[0_4px_12px_rgba(84,118,252,0.35)] active:scale-98 transition-all select-none flex items-center justify-center"
-          >
-            Request Patient Approval
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  // 3. Specialist Added Successfully Modal Content
-  const successModalContent = showSuccessModal && selectedDoctor && mounted ? createPortal(
-    <div className="fixed inset-0 w-screen h-screen z-[999999] flex items-center justify-center p-4 pointer-events-none font-outfit">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 w-screen h-screen bg-slate-900/40 backdrop-blur-xs pointer-events-auto transition-opacity duration-300"
-        onClick={() => setShowSuccessModal(false)}
-      />
-
-      {/* Center Modal Card - highly compact max-w-[340px] with overflow-hidden to clip docked button */}
-      <div className="bg-white w-full max-w-[340px] rounded-3xl shadow-2xl relative border border-slate-100 flex flex-col pointer-events-auto transition-all duration-300 animate-[zoomInSuccess_0.25s_ease-out] select-none">
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes zoomInSuccess {
-            from {
-              transform: scale(0.95);
-              opacity: 0;
-            }
-            to {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}} />
-
-        {/* Padded Content Block */}
-        <div className="pt-7 px-8 pb-7 flex flex-col gap-4 items-center w-full">
-          {/* Close button */}
-          <button
-            onClick={() => setShowSuccessModal(false)}
-            className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-50 transition-colors"
-            title="Close modal"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-
-          {/* Success Title */}
-          <div className="flex flex-col gap-1 items-center text-center">
-            <h3 className="text-[#24292E] font-marcellus font-medium text-[20px] tracking-tight leading-tight pt-2">
-              Specialist Added<br />Successfully
-            </h3>
-          </div>
-
-          {/* Doctor Row Info */}
-          <div className="flex flex-col items-center text-center gap-1.5 py-1">
-            {/* Avatar with Active Green Indicator */}
-            <div className="relative w-12 h-12 shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedDoctor.avatar}
-                alt={selectedDoctor.name}
-                className="w-12 h-12 rounded-full object-cover border border-slate-100"
-              />
-              {selectedDoctor.isOnline && (
-                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0 shadow-sm" />
-              )}
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[#383F45] text-xs font-semibold">
-                {selectedDoctor.name}
-              </span>
-              <span className="text-[#838B95] text-[10px] font-normal mt-0.5">
-                {selectedDoctor.email}
-              </span>
-              {/* Stars */}
-              <div className="flex items-center gap-0.5 mt-1">
-                {[...Array(selectedDoctor.rating)].map((_, i) => (
-                  <svg
-                    key={i}
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    className="fill-[#5476FC] stroke-[#5476FC]"
-                  >
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Connect Now — opens invitation modal on specialist's end */}
-          <button
-            onClick={() => {
-              setShowSuccessModal(false);
-              setShowInvitationModal(true);
-            }}
-            className="w-full h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:from-[#7990FF] hover:to-[#3B5BFC] hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] active:scale-[0.98] transition-all select-none flex items-center justify-center"
-          >
-            Connect Now
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  // 4. New Consultation Invitation Modal (simulates what specialist sees on their dashboard)
-  const invitationModalContent = showInvitationModal && selectedDoctor && mounted ? createPortal(
-    <div className="fixed inset-0 w-screen h-screen z-[999999] flex items-end justify-end p-6 pointer-events-none font-outfit">
-      {/* Semi-transparent backdrop */}
-      <div
-        className="fixed inset-0 w-screen h-screen bg-slate-900/30 backdrop-blur-[2px] pointer-events-auto"
-        onClick={() => setShowInvitationModal(false)}
-      />
-
-      {/* Invitation Card — bottom-right corner like a notification */}
-      <div className="bg-white w-full max-w-[380px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col pointer-events-auto animate-[slideInCard_0.3s_ease-out] select-none relative">
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes slideInCard {
-            from { opacity: 0; transform: translateY(20px) scale(0.97); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-          }
-        `}} />
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F1F3F7]">
-          <h3 className="text-[#24292E] font-semibold text-[15px] tracking-tight">
-            New Consultation Invitation!
-          </h3>
-          <button
-            onClick={() => setShowInvitationModal(false)}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 flex flex-col gap-4">
-          {/* Subtitle */}
-          <p className="text-[#676E76] text-[11.5px] font-normal leading-relaxed">
-            You have been invited to join a consultation call with{" "}
-            <span className="font-semibold text-[#383F45]">{selectedDoctor.name}</span>
-          </p>
-
-          {/* Provider Details */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide">Provider Details</span>
-            <div className="flex items-center gap-2.5">
-              <div className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={selectedDoctor.avatar} alt={selectedDoctor.name} className="w-9 h-9 rounded-full object-cover border border-slate-100" />
-                {selectedDoctor.isOnline && <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#383F45] text-xs font-semibold">{selectedDoctor.name}</span>
-                <span className="text-[#838B95] text-[10px] font-normal">{selectedDoctor.email}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Patient Details */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide">Patient Details</span>
-            <div className="flex items-center gap-2.5">
-              <div className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&h=200&q=80"
-                  alt="Kathryn Murphy"
-                  className="w-9 h-9 rounded-full object-cover border border-slate-100"
-                />
-                <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#383F45] text-xs font-semibold">Kathryn Murphy</span>
-                <span className="text-[#838B95] text-[10px] font-normal">yelena@example.com</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="px-5 pb-5 pt-1 flex items-center gap-3">
-          {/* Decline */}
-          <button
-            onClick={() => setShowInvitationModal(false)}
-            className="flex-1 h-11 rounded-xl bg-[#FF3B30] hover:bg-[#E02D22] text-white text-xs font-bold shadow-sm transition-all active:scale-[0.98] select-none"
-          >
-            Decline
-          </button>
-          {/* Join Consultation */}
-          <button
-            onClick={() => {
-              setShowInvitationModal(false);
-              setSpecialistJoined(true);
-            }}
-            className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            Join Consultation
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <div className="w-full bg-slate-50 p-6 flex flex-col gap-6 select-none font-outfit">
-      {/* ── Patient Consultation Header row ─────────────────────────────────── */}
-      <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#EBEEF5] pb-5">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-slate-800 text-lg font-bold tracking-tight">
-              [Internal] Calling - Albert Flores
-            </h1>
-            {/* pulsing live calling indicator */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-100 rounded-full text-red-500 text-[10px] font-bold shadow-sm select-none">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span>00:30</span>
-            </div>
-          </div>
-          <span className="text-[#676E76] text-xs font-semibold">
-            June 12th, 2022 | 11:00 AM
-          </span>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => alert("EHR view requested")}
-            className="h-10 px-5 rounded-lg border border-[#EBEEF5] bg-white text-[#383F45] text-xs font-bold hover:bg-[#F5F6FA] active:scale-98 transition-all shadow-sm"
-          >
-            View Detailed EHR
-          </button>
-          <button
-            onClick={() => setShowSpecialistModal(true)}
-            className="h-10 px-5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-xs font-bold shadow-[0_2.5px_8px_rgba(84,118,252,0.25)] hover:shadow-[0_4px_12px_rgba(84,118,252,0.35)] active:scale-98 transition-all"
-          >
-            Add Specialist
-          </button>
-        </div>
-      </div>
-
-      {/* Render the Portals connected directly under the document body root */}
-      {specialistModalContent}
-      {approvalModalContent}
-      {successModalContent}
-      {invitationModalContent}
-
-      {/* ── Two-Column Main Layout Grid ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
-        {/* Left Column (col-span-5) - Video Feed & Live Chat */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <VideoFeed
-            specialistJoined={specialistJoined}
-            specialist={selectedDoctor ? { name: selectedDoctor.name, avatar: selectedDoctor.avatar } : null}
-          />
-          <ChatTranscript />
-        </div>
-
-        {/* Right Column (col-span-7) - Embedded entirely in a solid grey card box */}
-        <div className="lg:col-span-7 bg-[#F5F6FA] border border-[#EBEEF5] rounded-3xl p-6 flex flex-col gap-5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-          <IntakePlan />
-
-          {/* Medicines & Labs Unified Card - Renders in pure white on top of the grey wrapper */}
-          <div className="w-full bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col md:flex-row gap-0">
-            <div className="flex-1 min-w-0 p-2">
-              <AddMedicines />
-            </div>
-
-            {/* Vertical Divider (visible on desktop) */}
-            <div className="hidden md:block w-[1px] bg-[#EBEEF5] self-stretch shrink-0 mx-2" />
-
-            <div className="flex-1 min-w-0 p-2">
-              <AddLabs />
-            </div>
-          </div>
-
-          {/* Footer EMR actions */}
-          <div className="w-full flex items-center justify-end gap-3 pt-2">
-            <button
-              onClick={() => alert("EMR intake cancelled")}
-              className="h-10 px-6 rounded-full bg-white border border-[#EBEEF5] text-slate-700 text-xs font-bold hover:bg-slate-50 shadow-sm active:scale-98 transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => alert("EMR entries saved successfully!")}
-              className="h-10 px-6 rounded-xl bg-[#5476FC] hover:bg-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.25)] hover:scale-[1.01] active:scale-99 transition-all"
-            >
-              Save EMR
+          <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
+            <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50">Cancel</button>
+            <button onClick={async () => {
+              setSavingEmr(true);
+              await new Promise(r => setTimeout(r, 800));
+              setEmrSaved(true);
+              setSavingEmr(false);
+              setTimeout(() => setEmrSaved(false), 2500);
+            }} disabled={savingEmr}
+              className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec]"}`}>
+              {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
             </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VideoCallsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+      </div>
+    }>
+      <VideoCallInner/>
+    </Suspense>
   );
 }

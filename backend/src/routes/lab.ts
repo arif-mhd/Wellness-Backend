@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { labTestsContainer, labBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
@@ -108,6 +109,18 @@ router.post("/bookings", requireRole("patient"), async (req: SessionRequest, res
     };
 
     await labBookingsContainer.items.upsert(booking);
+
+    const testNames = validatedItems.map((i: any) => i.testName).join(", ");
+    logActivity({
+      source: "patient",
+      action: "Lab Test Booked",
+      details: `Lab booking AED ${total_amount.toFixed(2)} — ${testNames}`,
+      performedBy: "Patient",
+      performedById: patientId,
+      entityType: "labBooking",
+      entityId: bookingId,
+    });
+
     res.status(201).json({ status: "OK", booking });
   } catch (err) {
     console.error("Create lab booking error:", err);

@@ -1,10 +1,9 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { feedbackContainer } from "../config/cosmos";
-import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
-import UserRoles from "supertokens-node/recipe/userroles";
 import { requireRole } from "../middleware/requireRole";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
@@ -58,6 +57,17 @@ router.post("/", async (req: Request, res: Response) => {
     };
 
     await feedbackContainer.items.create(feedbackDoc);
+
+    logActivity({
+      source: "patient",
+      action: "Feedback Submitted",
+      details: `${feedbackDoc.reviewer.name} rated ${feedbackDoc.provider.name} — ${rating}/5${comment ? `: ${String(comment).slice(0, 80)}` : ""}`,
+      performedBy: feedbackDoc.reviewer.name,
+      performedById: feedbackDoc.reviewer.id,
+      entityType: "feedback",
+      entityId: feedbackId,
+    });
+
     return res.status(201).json(feedbackDoc);
   } catch (err: any) {
     console.error("Error creating feedback:", err);
@@ -66,24 +76,8 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 // GET /api/feedback/admin — retrieve all feedback (requires admin role)
-async function requireAdmin(req: SessionRequest, res: Response): Promise<boolean> {
-  const session = req.session;
-  if (!session) {
-    res.status(401).json({ error: "Unauthorized" });
-    return false;
-  }
-  const { roles } = await UserRoles.getRolesForUser("public", session.getUserId());
-  if (!roles.includes("admin")) {
-    res.status(403).json({ error: "Forbidden: Requires Admin role" });
-    return false;
-  }
-  return true;
-}
-
-router.get("/admin", verifySession(), async (req: SessionRequest, res: Response) => {
+router.get("/admin", requireRole("admin"), async (req: SessionRequest, res: Response) => {
   try {
-    if (!(await requireAdmin(req, res))) return;
-
     const { folder } = req.query;
     let query = "SELECT * FROM c";
     const params: any[] = [];

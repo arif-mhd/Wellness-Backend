@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 export interface CalendarAppointment {
-  id: number;
+  id: string | number;
   patientName: string;
   patientAvatar: string;
   patientAge: number;
-  day: string; // TUE, WED, THU, FRI, SAT
-  hour: string; // "7 AM", "8 AM" etc
+  day: string; // SUN, MON, TUE, WED, THU, FRI, SAT
+  hour: string; // "7 AM", "8 AM" etc.
   patientBio: string;
   reasonForVisit: string;
 }
@@ -18,22 +18,48 @@ interface ScheduleCalendarViewProps {
   onConsultClick?: (appointment: CalendarAppointment) => void;
 }
 
-const DAYS = [
-  { label: "TUE", num: "23" },
-  { label: "WED", num: "24" },
-  { label: "THU", num: "25" },
-  { label: "FRI", num: "26" },
-  { label: "SAT", num: "27" },
+const HOURS = [
+  "7 AM", "8 AM", "9 AM", "10 AM", "11 AM", "12 PM",
+  "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM",
+  "7 PM", "8 PM", "9 PM"
 ];
 
-const HOURS = ["7 AM", "8 AM", "9 AM", "10 AM", "11 AM", "12 AM", "01 PM", "02 PM"];
-
 export default function ScheduleCalendarView({
-  appointments,
+  appointments = [],
   onConsultClick,
 }: ScheduleCalendarViewProps) {
   const [selectedAppt, setSelectedAppt] = useState<CalendarAppointment | null>(null);
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
+
+  // Dynamically calculate the dates of the current week (Sunday to Saturday)
+  const currentWeekDays = useMemo(() => {
+    const current = new Date();
+    const week = [];
+    const distance = current.getDay(); // Sunday is index 0
+    const sunday = new Date(current);
+    sunday.setDate(current.getDate() - distance);
+
+    const dayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      week.push({
+        label: dayLabels[i],
+        num: String(d.getDate()),
+        isToday: d.toDateString() === current.toDateString(),
+      });
+    }
+    return week;
+  }, []);
+
+  const currentMonthYear = useMemo(() => {
+    const d = new Date();
+    const monthLabels = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    return `${monthLabels[d.getMonth()]} ${d.getFullYear()}`;
+  }, []);
 
   const getCellAppointments = (day: string, hour: string) =>
     appointments.filter(
@@ -46,36 +72,13 @@ export default function ScheduleCalendarView({
       {/* ── Calendar Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-2">
         <div className="flex items-center gap-3">
-          {/* Prev / Today / Next */}
-          <div className="flex items-center gap-1">
-            <button className="w-8 h-8 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#676E76] hover:bg-slate-50 hover:text-[#5879FC] transition-colors">
-              <svg width="6" height="10" viewBox="0 0 6 10" fill="none">
-                <path d="M5 9L1 5L5 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button
-              className="px-4 py-1.5 border border-[#EBEEF5] rounded-full text-xs font-semibold text-[#676E76] bg-white hover:bg-slate-50 transition-all"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              Today
-            </button>
-            <button className="w-8 h-8 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#676E76] hover:bg-slate-50 hover:text-[#5879FC] transition-colors">
-              <svg width="6" height="10" viewBox="0 0 6 10" fill="none">
-                <path d="M1 9L5 5L1 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-
           {/* Month label */}
-          <button
-            className="flex items-center gap-1.5 text-[#24292E] font-medium text-[15px] tracking-[-0.3px] hover:opacity-75 transition-opacity"
+          <span
+            className="text-[#24292E] font-medium text-[16px] tracking-[-0.3px]"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
-            October 2024
-            <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-              <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+            {currentMonthYear}
+          </span>
         </div>
 
         {/* Day / Week toggle */}
@@ -101,25 +104,23 @@ export default function ScheduleCalendarView({
       </div>
 
       {/* ── Grid ─────────────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto">
-        {/* Use a table-like structure with explicit rows to avoid last:border-r-0 leaking across rows */}
-        <div className="min-w-[720px] border border-[#EBEEF5] rounded-[16px] overflow-hidden bg-white">
+      <div className="overflow-x-auto relative">
+        <div className="min-w-[840px] border border-[#EBEEF5] rounded-[16px] overflow-hidden bg-white max-h-[600px] overflow-y-auto">
 
-          {/* Header row: Left GMT + 5 day columns + Right GMT */}
-          <div className="grid" style={{ gridTemplateColumns: "72px repeat(5, 1fr) 72px" }}>
+          {/* Header row: Left GMT + 7 day columns + Right GMT */}
+          <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "72px repeat(7, 1fr) 72px" }}>
             {/* GMT corner Left */}
             <div
               className="bg-[#F9FAFC] border-b border-r border-[#EBEEF5] py-3 px-2 flex items-center justify-center text-[10px] font-bold text-[#9EA5AD]"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
-              GMT-5
+              GMT
             </div>
-            {DAYS.map((day, idx) => {
-              const isToday = day.label === "THU";
+            {currentWeekDays.map((day) => {
               return (
                 <div
                   key={day.label}
-                  className={`${isToday ? "bg-[#F2F5FF]" : "bg-[#F9FAFC]"} border-b border-r border-[#EBEEF5] py-3 px-2 flex flex-col items-center justify-center gap-0.5`}
+                  className={`${day.isToday ? "bg-[#F2F5FF]" : "bg-[#F9FAFC]"} border-b border-r border-[#EBEEF5] py-3 px-2 flex flex-col items-center justify-center gap-0.5`}
                   style={{ fontFamily: "Outfit, sans-serif" }}
                 >
                   <span className="text-[9px] font-bold text-[#9EA5AD] tracking-widest uppercase">{day.label}</span>
@@ -132,7 +133,7 @@ export default function ScheduleCalendarView({
               className="bg-[#F9FAFC] border-b border-[#EBEEF5] py-3 px-2 flex items-center justify-center text-[10px] font-bold text-[#9EA5AD]"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
-              GMT-5
+              GMT
             </div>
           </div>
 
@@ -141,7 +142,7 @@ export default function ScheduleCalendarView({
             <div
               key={hour}
               className="grid border-b border-[#EBEEF5] last:border-b-0"
-              style={{ gridTemplateColumns: "72px repeat(5, 1fr) 72px" }}
+              style={{ gridTemplateColumns: "72px repeat(7, 1fr) 72px" }}
             >
               {/* Time label Left */}
               <div
@@ -152,27 +153,25 @@ export default function ScheduleCalendarView({
               </div>
 
               {/* Day cells */}
-              {DAYS.map((day, idx) => {
+              {currentWeekDays.map((day) => {
                 const cellAppts = getCellAppointments(day.label, hour);
-                const isToday = day.label === "THU";
                 return (
                   <div
                     key={`${day.label}-${hour}`}
-                    className={`${isToday ? "bg-[#F2F5FF]" : "bg-white"} border-r border-[#EBEEF5] min-h-[60px] p-1.5 flex flex-col gap-1 justify-center`}
+                    className={`${day.isToday ? "bg-[#F2F5FF]" : "bg-white"} border-r border-[#EBEEF5] min-h-[60px] p-1.5 flex flex-col gap-1 justify-center`}
                   >
                     {cellAppts.map((appt) => (
                       <button
                         key={appt.id}
                         onClick={() => setSelectedAppt(selectedAppt?.id === appt.id ? null : appt)}
-                        className="w-full flex items-center gap-2 p-1 transition-all cursor-pointer text-left hover:opacity-80 shrink-0"
+                        className="w-full flex items-center gap-2 p-1.5 rounded-lg bg-[#ECEFFE]/50 hover:bg-[#ECEFFE] transition-all cursor-pointer text-left shrink-0"
                       >
                         <img
                           src={appt.patientAvatar}
                           alt={appt.patientName}
                           className="w-6 h-6 rounded-full object-cover shrink-0 border border-white shadow-sm"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
+                            (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
                           }}
                         />
                         <span
@@ -229,8 +228,7 @@ export default function ScheduleCalendarView({
                 alt={selectedAppt.patientName}
                 className="w-12 h-12 rounded-full object-cover border-2 border-[#EBEEF5] shadow-sm"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
+                  (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
                 }}
               />
               <div>
@@ -242,14 +240,6 @@ export default function ScheduleCalendarView({
                 </p>
               </div>
             </div>
-
-            {/* View Profile button */}
-            <button
-              className="w-full py-2.5 rounded-[12px] bg-[#EEF2FF] text-[#5476FC] hover:bg-[#5476FC] hover:text-white font-semibold text-[13px] transition-all duration-200"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              View Profile
-            </button>
           </div>
 
           {/* Bio */}
@@ -267,28 +257,12 @@ export default function ScheduleCalendarView({
             </p>
           </div>
 
-          {/* Pre-visit Form */}
-          <div className="bg-[#F5F6FA] rounded-[14px] p-3.5 flex flex-col gap-1.5">
-            <span className="text-[#24292E] font-bold text-[9px] uppercase tracking-[0.08em]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Pre-visit Form
-            </span>
-            <p className="text-[#676E76] text-[11px] leading-[1.6]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Review the patient's pre-visit form to understand their medical history and reason for the appointment.
-            </p>
-            <button
-              className="flex items-center gap-1 text-[#5476FC] hover:text-[#4065FB] text-[11px] font-semibold transition-colors mt-1"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              Read Pre-visit form
-              <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                <path d="M1 5h10M7 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-
           {/* Consult Now */}
           <button
-            onClick={() => onConsultClick?.(selectedAppt)}
+            onClick={() => {
+              onConsultClick?.(selectedAppt);
+              setSelectedAppt(null);
+            }}
             className="w-full py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.3)] text-white font-bold text-[14px] tracking-[-0.28px] transition-all duration-200"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >

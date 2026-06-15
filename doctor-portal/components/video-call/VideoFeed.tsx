@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useImperativeHandle, forwardRef } from "react";
 import patientVideoCall from "@/assets/images/patient_video_call.png";
 import doctorAvatar from "@/assets/images/videocall.jpg";
 
@@ -12,9 +12,13 @@ interface SpecialistInfo {
 interface VideoFeedProps {
   specialistJoined?: boolean;
   specialist?: SpecialistInfo | null;
+  onDataMessage?: (payload: string) => void;
 }
 
-export default function VideoFeed({ specialistJoined = false, specialist = null }: VideoFeedProps) {
+// VideoFeed is a mock component — in production this would wrap the LiveKit Room.
+// The parent (video-calls/page.tsx) passes onDataMessage to receive real-time
+// signals (specialist_accepted / specialist_declined) from the LiveKit data channel.
+export default function VideoFeed({ specialistJoined = false, specialist = null, onDataMessage }: VideoFeedProps) {
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(true);
 

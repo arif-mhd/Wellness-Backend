@@ -3,19 +3,21 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 
-// Use this middleware to protect routes that need a specific role.
+// Use this middleware to protect routes that need one or more roles (OR logic).
 // Example:  router.get("/doctor-only", requireRole("doctor"), handler)
-export function requireRole(role: string) {
+// Example:  router.get("/either",      requireRole("doctor", "doctor_pending"), handler)
+export function requireRole(...roles: string[]) {
   return [
     verifySession({ sessionRequired: false }),
     async (req: SessionRequest, res: Response, next: NextFunction) => {
       if (req.session) {
         const userId = req.session.getUserId();
-        const { roles } = await UserRoles.getRolesForUser("public", userId);
+        const { roles: userRoles } = await UserRoles.getRolesForUser("public", userId);
 
-        if (!roles.includes(role)) {
+        const hasRole = roles.some(r => userRoles.includes(r));
+        if (!hasRole) {
           res.status(403).json({
-            error: `Access denied. Required role: ${role}`,
+            error: `Access denied. Required role: ${roles.join(" or ")}`,
           });
           return;
         }
@@ -23,9 +25,8 @@ export function requireRole(role: string) {
         return;
       }
 
-      // In development or local environments, if there is no active session and the patient role is requested,
-      // fall back to the default profile 'patient_1' to facilitate mock client authentication.
-      if (role === "patient") {
+      // Dev fallback: if patient role is among the required roles, use mock session
+      if (roles.includes("patient")) {
         req.session = {
           getUserId: () => "patient_1",
           getHandle: () => "mock-handle",
