@@ -687,14 +687,16 @@ function ConsultRoom() {
                     {mainTile.name}
                   </div>
 
-                  {/* PiP tiles — stacked bottom-right above local video */}
+                  {/* PiP column — right side, stacked from bottom up.
+                      Slot 0 = local "You", slot 1+ = remote PiPs.
+                      Each slot is 80px tall + 8px gap = 88px step. */}
                   {pipTiles.map((tile, i) => (
                     <button key={tile.participantId}
                       onClick={() => setPinnedId(tile.participantId)}
                       className="absolute z-20 group"
-                      style={{ bottom: `${88 + (pipTiles.length - 1 - i) * 88}px`, right: "8px" }}
+                      style={{ bottom: `${52 + (i + 1) * 88}px`, right: "8px" }}
                       title="Click to make main">
-                      <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/30 bg-[#1a2035] shadow-xl relative hover:border-[#5476fc] transition-colors">
+                      <div className="w-28 h-20 rounded-xl overflow-hidden border-2 border-white/30 bg-[#1a2035] shadow-xl relative hover:border-[#5476fc] transition-colors">
                         <video ref={el => setRemoteVideoRef(tile.participantId, el)} autoPlay playsInline className="w-full h-full object-cover"/>
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                           <svg className="opacity-0 group-hover:opacity-100 transition-opacity" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
@@ -707,16 +709,16 @@ function ConsultRoom() {
               );
             })()}
 
-            {/* Local video PiP — bottom-right corner */}
-            <div className="absolute bottom-14 right-2 z-20">
-              <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/20 bg-[#1a2035] shadow-xl">
+            {/* Local video PiP — slot 0 in the right column */}
+            <div className="absolute z-20" style={{ bottom: "52px", right: "8px" }}>
+              <div className="w-28 h-20 rounded-xl overflow-hidden border-2 border-white/20 bg-[#1a2035] shadow-xl">
                 <video ref={localVideoEl} autoPlay playsInline muted className="w-full h-full object-cover"/>
               </div>
               <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">You</p>
             </div>
 
-            {/* Call controls overlay */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+            {/* Call controls — bottom-center, left of PiP column */}
+            <div className="absolute bottom-3 z-20 flex items-center gap-2" style={{ left: "50%", transform: "translateX(calc(-50% - 72px))" }}>
               <button onClick={toggleMic}
                 className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-colors ${micOn ? "bg-white/20 text-white hover:bg-white/30" : "bg-red-500 text-white"}`}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
