@@ -496,7 +496,7 @@ function VideoCallInner() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left: Video + Chat */}
-        <div className="flex flex-col" style={{ width: "420px", flexShrink: 0 }}>
+        <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
 
           {/* Video */}
           <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "420px" }}>
