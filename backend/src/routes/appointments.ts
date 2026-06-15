@@ -108,13 +108,64 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
       appointments.map(async (apt) => {
         try {
           const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+          
+          // Format chronic illnesses/diseases
+          const chronicIllnesses = Array.isArray(patient?.chronicDiseases) 
+            ? patient.chronicDiseases.join(", ") 
+            : (patient?.chronicDiseases || "None reported");
+
+          // Format current medications
+          let currentMedications = "None";
+          if (patient?.medications?.current) {
+            currentMedications = Array.isArray(patient.medications.current)
+              ? patient.medications.current.map((m: any) => typeof m === "string" ? m : `${m.name || ""} ${m.dosage || ""}`.trim()).join("\n")
+              : String(patient.medications.current);
+          }
+
+          // Format allergies
+          let allergies = "None";
+          if (patient?.allergies) {
+            allergies = Array.isArray(patient.allergies)
+              ? patient.allergies.map((a: any) => {
+                  if (typeof a === "string") return a;
+                  const category = a.category ?? "";
+                  const selected = Array.isArray(a.selected) ? a.selected.join(", ") : (a.selected ?? "");
+                  return `${category}: ${selected}`.trim();
+                }).join("\n")
+              : String(patient.allergies);
+          }
+
           return {
             ...apt,
             patientName: patient?.fullName ?? "Unknown Patient",
             patientEmail: patient?.email ?? "",
+            patientPhone: patient?.phone ?? "",
+            patientGender: patient?.gender ?? "",
+            patientDob: patient?.dateOfBirth ?? patient?.dob ?? "",
+            patientAvatarUrl: patient?.avatarUrl ?? null,
+            patientBloodGroup: patient?.bloodGroup ?? "",
+            patientHeight: patient?.height ?? "",
+            patientWeight: patient?.weight ?? "",
+            patientChronicIllnesses: chronicIllnesses,
+            patientCurrentMedications: currentMedications,
+            patientAllergies: allergies,
           };
         } catch {
-          return { ...apt, patientName: "Unknown Patient", patientEmail: "" };
+          return {
+            ...apt,
+            patientName: "Unknown Patient",
+            patientEmail: "",
+            patientPhone: "",
+            patientGender: "",
+            patientDob: "",
+            patientAvatarUrl: null,
+            patientBloodGroup: "",
+            patientHeight: "",
+            patientWeight: "",
+            patientChronicIllnesses: "None reported",
+            patientCurrentMedications: "None",
+            patientAllergies: "None",
+          };
         }
       })
     );

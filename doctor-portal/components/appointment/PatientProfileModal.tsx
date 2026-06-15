@@ -257,11 +257,11 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
           {/* Patient stats row */}
           <div className="flex items-start gap-5 flex-wrap">
             {[
-              { label: "Gender", value: "Male" },
-              { label: "Date of Birth", value: "22 Oct, 1972" },
-              { label: "Blood Group", value: "O Positive" },
-              { label: "Height (cm)", value: "172" },
-              { label: "Weight (kg)", value: "85" },
+              { label: "Gender", value: patient.gender || "N/A" },
+              { label: "Date of Birth", value: patient.dob ? (isNaN(new Date(patient.dob).getTime()) ? patient.dob : new Date(patient.dob).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })) : "N/A" },
+              { label: "Blood Group", value: patient.bloodGroup || "N/A" },
+              { label: "Height (cm)", value: patient.height || "N/A" },
+              { label: "Weight (kg)", value: patient.weight || "N/A" },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col gap-2 flex-1 min-w-[100px]">
                 <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">{stat.label}</span>

@@ -4,8 +4,27 @@ import { feedbackContainer } from "../config/cosmos";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
+import { requireRole } from "../middleware/requireRole";
 
 const router = Router();
+
+// GET /api/feedback/doctor — retrieve feedback for currently logged-in doctor
+router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  try {
+    const doctorId = req.session!.getUserId();
+    const { resources } = await feedbackContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.provider.id = @doctorId AND c.folder = 'appointment' ORDER BY c.createdAt DESC",
+        parameters: [{ name: "@doctorId", value: doctorId }]
+      })
+      .fetchAll();
+
+    return res.json(resources);
+  } catch (err: any) {
+    console.error("Error fetching doctor feedback:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // POST /api/feedback — submit feedback (publicly accessible by patient app)
 router.post("/", async (req: Request, res: Response) => {

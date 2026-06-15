@@ -35,6 +35,8 @@ import AppointmentDetailsCard from "@/components/appointment/AppointmentDetailsC
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import { useSidebar } from "@/components/SidebarContext";
 
+
+
 export default function AppointmentsPage() {
   const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
@@ -222,7 +224,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("All");
-                setSelectedPatient(MOCK_NEW_APPOINTMENTS[1] || MOCK_NEW_APPOINTMENTS[0]);
+                setSelectedPatient(allAppointments[1] || allAppointments[0] || null);
               }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "All"
                   ? "bg-[#2E344E] text-white"
@@ -234,7 +236,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("Upcoming");
-                const upcoming = MOCK_NEW_APPOINTMENTS.find(p => p.status === "Scheduled" || p.status === "Waiting") || MOCK_NEW_APPOINTMENTS[1];
+                const upcoming = allAppointments.find(p => p.status === "Scheduled" || p.status === "Waiting") || allAppointments[0] || null;
                 setSelectedPatient(upcoming);
               }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Upcoming"
@@ -247,7 +249,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("Past");
-                const completed = MOCK_ALL_CONSULTATIONS.find(c => c.status === "Completed");
+                const completed = allAppointments.find(c => c.status === "Completed");
                 if (completed) {
                   setSelectedPatient(completed);
                 }
