@@ -80,7 +80,7 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
   try {
     const userId = req.session!.getUserId();
     const {
-      phone, emiratesId, exrNumber, email, gender, bloodGroup,
+      fullName, name, phone, emiratesId, exrNumber, email, gender, bloodGroup,
       dob, maritalStatus, height, weight, location, language,
     } = req.body;
 
@@ -94,13 +94,14 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
 
     const updated = {
       ...existing,
+      ...((fullName !== undefined || name !== undefined) && { fullName: fullName || name }),
       ...(phone        !== undefined && { phone }),
       ...(emiratesId   !== undefined && { emiratesId }),
       ...(exrNumber    !== undefined && { exrNumber }),
       ...(email        !== undefined && { email }),
       ...(gender       !== undefined && { gender }),
       ...(bloodGroup   !== undefined && { bloodGroup }),
-      ...(dob          !== undefined && { dob }),
+      ...(dob          !== undefined && { dob, dateOfBirth: dob }),
       ...(maritalStatus !== undefined && { maritalStatus }),
       ...(height       !== undefined && { height }),
       ...(weight       !== undefined && { weight }),
@@ -205,6 +206,14 @@ router.get("/profile", requireRole("patient"), async (req: SessionRequest, res: 
       res.status(404).json({ error: "Profile not found" });
       return;
     }
+    
+    // Normalize date of birth properties
+    if (resource.dateOfBirth && !resource.dob) {
+      resource.dob = resource.dateOfBirth;
+    } else if (resource.dob && !resource.dateOfBirth) {
+      resource.dateOfBirth = resource.dob;
+    }
+
     res.json({ profile: resource });
   } catch (err) {
     console.error("Profile fetch error:", err);
