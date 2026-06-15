@@ -62,8 +62,10 @@ function ConsultRoom() {
   const [doctorsLoading,     setDoctorsLoading]     = useState(false);
   const [specialistSearch,   setSpecialistSearch]   = useState("");
   const [selectedSpecialist, setSelectedSpecialist] = useState<AvailableDoctor | null>(null);
-  const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "sent" | "patient_accepted" | "patient_declined" | "error">("idle");
   const [inviteError,        setInviteError]        = useState("");
+  const [showConnectModal,   setShowConnectModal]   = useState(false);
+  const patientPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const roomRef       = useRef<Room | null>(null);
   const remoteVideoEl = useRef<HTMLVideoElement>(null);
@@ -127,6 +129,13 @@ function ConsultRoom() {
         if (data.type === "chat") {
           setMessages(prev => [...prev, { id: `${Date.now()}${Math.random()}`, sender: "patient", text: data.text, time: fmt(new Date()) }]);
           setUnread(u => u + 1);
+        } else if (data.type === "specialist_accepted") {
+          if (patientPollRef.current) clearInterval(patientPollRef.current);
+          setInviteStatus("patient_accepted");
+          setShowConnectModal(true);
+        } else if (data.type === "specialist_declined") {
+          if (patientPollRef.current) clearInterval(patientPollRef.current);
+          setInviteStatus("patient_declined");
         }
       } catch {}
     });
@@ -246,6 +255,25 @@ function ConsultRoom() {
       });
       if (res.ok) {
         setInviteStatus("sent");
+        // Poll every 5s waiting for patient to accept/decline
+        if (patientPollRef.current) clearInterval(patientPollRef.current);
+        patientPollRef.current = setInterval(async () => {
+          const t = await Session.getAccessToken();
+          const r = await fetch(`${API_URL}/api/appointments/${appointmentId}/specialist-status`, {
+            headers: { Authorization: `Bearer ${t}` },
+          });
+          if (r.ok) {
+            const { patientDecision } = await r.json();
+            if (patientDecision === "accepted") {
+              clearInterval(patientPollRef.current!);
+              setInviteStatus("patient_accepted");
+              setShowConnectModal(true);
+            } else if (patientDecision === "declined") {
+              clearInterval(patientPollRef.current!);
+              setInviteStatus("patient_declined");
+            }
+          }
+        }, 5000);
       } else {
         const body = await res.json().catch(() => ({}));
         setInviteError(body.error ?? "Failed to send invite");
@@ -256,6 +284,11 @@ function ConsultRoom() {
       setInviteStatus("error");
     }
   };
+
+  // Clean up patient poll on unmount
+  useEffect(() => {
+    return () => { if (patientPollRef.current) clearInterval(patientPollRef.current); };
+  }, []);
 
   const saveEmr = async () => {
     setSavingEmr(true);
@@ -287,6 +320,34 @@ function ConsultRoom() {
 
   return (
     <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 96px)" }}>
+
+      {/* ── "Patient accepted — Connect Now" modal ── */}
+      {showConnectModal && selectedSpecialist && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-7 flex flex-col items-center gap-4 animate-[zoomIn_0.2s_ease-out]">
+            <style dangerouslySetInnerHTML={{__html:`@keyframes zoomIn{from{transform:scale(0.92);opacity:0}to{transform:scale(1);opacity:1}}`}}/>
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-2xl">✓</div>
+            <div className="text-center">
+              <h3 className="text-[#24292e] font-semibold text-base">Patient Approved!</h3>
+              <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                <span className="font-semibold text-gray-600">{selectedSpecialist.fullName}</span> has been notified and will join the call shortly.
+              </p>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedSpecialist.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedSpecialist.fullName)}&background=5476FC&color=fff`}
+              alt={selectedSpecialist.fullName}
+              className="w-12 h-12 rounded-full object-cover border-2 border-[#5476fc]/20"
+            />
+            <button
+              onClick={() => setShowConnectModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#5476fc] text-white text-sm font-semibold hover:bg-[#4466ec] transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Top call bar ── */}
       <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
@@ -477,19 +538,18 @@ function ConsultRoom() {
           {panel === "specialist" && (
             <div className="flex-1 flex flex-col overflow-hidden">
 
-              {/* Invite sent banner */}
-              {inviteStatus === "sent" && selectedSpecialist && (
-                <div className="mx-3 mt-3 flex items-start gap-2.5 bg-green-50 border border-green-100 rounded-xl p-3">
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-green-700 text-[11px] font-semibold">Invite sent!</p>
-                    <p className="text-green-600 text-[10px] mt-0.5 leading-relaxed">
-                      Waiting for <span className="font-semibold">{selectedSpecialist.fullName}</span> to accept.
-                      They will receive a notification on their dashboard.
-                    </p>
-                  </div>
-                  <button onClick={() => { setInviteStatus("idle"); setSelectedSpecialist(null); fetchAvailableDoctors(); }}
-                    className="text-green-400 hover:text-green-600 text-xs flex-shrink-0">✕</button>
+              {inviteStatus === "patient_accepted" && selectedSpecialist && (
+                <div className="mx-3 mt-3 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                  <p className="text-blue-700 text-[11px]">Waiting for patient approval...</p>
+                </div>
+              )}
+
+              {inviteStatus === "patient_declined" && (
+                <div className="mx-3 mt-3 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-[10px] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                  Patient declined the specialist invite.
+                  <button onClick={() => { setInviteStatus("idle"); setSelectedSpecialist(null); }} className="ml-auto underline text-red-400">Dismiss</button>
                 </div>
               )}
 
@@ -538,7 +598,7 @@ function ConsultRoom() {
                       d.specialty.toLowerCase().includes(specialistSearch.toLowerCase())
                     )
                     .map(doc => {
-                      const isSelected = selectedSpecialist?.id === doc.id && inviteStatus === "sent";
+                      const isSelected = selectedSpecialist?.id === doc.id && (inviteStatus === "sent" || inviteStatus === "patient_accepted");
                       return (
                         <div key={doc.id} className={`flex items-center gap-3 px-3 py-3 border-b border-gray-50 transition-colors ${isSelected ? "bg-green-50" : "hover:bg-gray-50"}`}>
                           {/* Avatar */}
@@ -567,7 +627,7 @@ function ConsultRoom() {
                           ) : (
                             <button
                               onClick={() => sendInvite(doc)}
-                              disabled={inviteStatus === "sending" || inviteStatus === "sent"}
+                              disabled={inviteStatus === "sending" || inviteStatus === "sent" || inviteStatus === "patient_accepted"}
                               className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] font-semibold border border-[#5476fc] text-[#5476fc] hover:bg-[#5476fc] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               {inviteStatus === "sending" && selectedSpecialist?.id === doc.id ? "…" : "Invite"}

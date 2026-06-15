@@ -167,9 +167,9 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
 router.get("/my-invite", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const specialistId = req.session!.getUserId();
   try {
-    // Find appointments where this doctor is the invited specialist
+    // Find appointments where this doctor is invited, patient accepted, and specialist hasn't joined yet
     const results = await queryDocuments<any>(appointmentsContainer, {
-      query: `SELECT * FROM c WHERE c.specialistInvite.doctorId = @sid AND c.specialistInvite.status = 'pending'`,
+      query: `SELECT * FROM c WHERE c.specialistInvite.doctorId = @sid AND c.specialistInvite.status = 'pending' AND c.specialistInvite.patientDecision = 'accepted'`,
       parameters: [{ name: "@sid", value: specialistId }],
     });
     if (results.length === 0) {
@@ -319,7 +319,7 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
 });
 
 // ─── GET /api/appointments/:id/specialist-join ───────────────────────────────
-// Specialist doctor calls this to retrieve their LiveKit token and join the room.
+// Specialist doctor calls this to get a fresh LiveKit token and join the room.
 router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const specialistId = req.session!.getUserId();
   const { id } = req.params;
@@ -329,14 +329,16 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
     if (!apt.specialistInvite || apt.specialistInvite.doctorId !== specialistId) {
       res.status(403).json({ error: "No invite found for this specialist." }); return;
     }
-    // Mark invite as accepted
+    // Mark invite as accepted on the appointment document
     const updated = {
       ...apt,
       specialistInvite: { ...apt.specialistInvite, status: "accepted", acceptedAt: new Date().toISOString() },
       updatedAt: new Date().toISOString(),
     };
     await appointmentsContainer.items.upsert(updated);
-    res.json({ token: apt.specialistInvite.token, wsUrl: apt.specialistInvite.wsUrl, room: apt.livekitRoom });
+    // Generate a fresh token using the same wsUrl the primary doctor uses
+    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom);
+    res.json({ token: await token, wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
     res.status(500).json({ error: "Internal server error." });
