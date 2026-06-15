@@ -31,7 +31,6 @@ export default function VideoCallsPage() {
   const [showSpecialistModal, setShowSpecialistModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [specialistJoined, setSpecialistJoined] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,8 +44,28 @@ export default function VideoCallsPage() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "sending" | "waiting" | "accepted" | "declined">("idle");
   const [specialistInfo, setSpecialistInfo] = useState<{ name: string; avatar: string | null; fees: string | null } | null>(null);
 
-  // Ref to the VideoFeed so we can send data messages through it
-  const videoFeedRef = useRef<{ sendData: (payload: string) => void } | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startPollingPatient = useCallback((apptId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${apptId}/specialist-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { patientDecision } = await res.json();
+        if (patientDecision === "accepted") {
+          clearInterval(pollIntervalRef.current!);
+          setInviteStatus("accepted");
+          setShowSuccessModal(true);
+        } else if (patientDecision === "declined") {
+          clearInterval(pollIntervalRef.current!);
+          setInviteStatus("declined");
+        }
+      }
+    }, 5000);
+  }, []);
 
   useEffect(() => { setMounted(true); return () => setMounted(false); }, []);
 
@@ -75,6 +94,63 @@ export default function VideoCallsPage() {
     setShowSpecialistModal(true);
     fetchAvailableDoctors();
   };
+
+  const filteredAllDoctors = doctors.filter(
+    (doc) =>
+      doc.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleOpenApproval = (doc: Doctor) => {
+    setSelectedDoctor(doc);
+    setShowSpecialistModal(false);
+    setShowApprovalModal(true);
+  };
+
+  const handleRequestApproval = async () => {
+    if (!selectedDoctor || !appointmentId) return;
+    setInviteStatus("sending");
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/invite-specialist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ specialistDoctorId: selectedDoctor.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSpecialistInfo({ name: data.specialistName, avatar: data.specialistAvatar, fees: data.fees });
+        setInviteStatus("waiting");
+        setShowApprovalModal(false);
+        // Start polling for patient's decision (every 5s)
+        startPollingPatient(appointmentId);
+      } else {
+        setInviteStatus("idle");
+      }
+    } catch {
+      setInviteStatus("idle");
+    }
+  };
+
+  const handleDataMessage = (payload: string) => {
+    try {
+      const data = JSON.parse(payload);
+      if (data.type === "specialist_accepted") {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        setInviteStatus("accepted");
+        setShowSuccessModal(true);
+      }
+      if (data.type === "specialist_declined") {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        setInviteStatus("declined");
+      }
+    } catch {}
+  };
+
+  // Clean up poll on unmount
+  useEffect(() => {
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, []);
 
   // 1. Right-side Specialist Drawer Content
   const specialistModalContent = showSpecialistModal && mounted ? createPortal(
@@ -421,8 +497,8 @@ export default function VideoCallsPage() {
             <div className="relative w-12 h-12 shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={selectedDoctor.avatar}
-                alt={selectedDoctor.name}
+                src={selectedDoctor.avatarUrl ?? undefined}
+                alt={selectedDoctor.fullName}
                 className="w-12 h-12 rounded-full object-cover border border-slate-100"
               />
               {selectedDoctor.isOnline && (
@@ -431,7 +507,7 @@ export default function VideoCallsPage() {
             </div>
             <div className="flex flex-col items-center">
               <span className="text-[#383F45] text-xs font-semibold">
-                {selectedDoctor.name}
+                {selectedDoctor.fullName}
               </span>
               <span className="text-[#838B95] text-[10px] font-normal mt-0.5">
                 {selectedDoctor.email}
@@ -453,11 +529,11 @@ export default function VideoCallsPage() {
             </div>
           </div>
 
-          {/* Connect Now — opens invitation modal on specialist's end */}
+          {/* Connect Now — specialist already notified via dashboard polling */}
           <button
             onClick={() => {
               setShowSuccessModal(false);
-              setShowInvitationModal(true);
+              setSpecialistJoined(true);
             }}
             className="w-full h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:from-[#7990FF] hover:to-[#3B5BFC] hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] active:scale-[0.98] transition-all select-none flex items-center justify-center"
           >
@@ -469,113 +545,6 @@ export default function VideoCallsPage() {
     document.body
   ) : null;
 
-  // 4. New Consultation Invitation Modal (simulates what specialist sees on their dashboard)
-  const invitationModalContent = showInvitationModal && selectedDoctor && mounted ? createPortal(
-    <div className="fixed inset-0 w-screen h-screen z-[999999] flex items-end justify-end p-6 pointer-events-none font-outfit">
-      {/* Semi-transparent backdrop */}
-      <div
-        className="fixed inset-0 w-screen h-screen bg-slate-900/30 backdrop-blur-[2px] pointer-events-auto"
-        onClick={() => setShowInvitationModal(false)}
-      />
-
-      {/* Invitation Card — bottom-right corner like a notification */}
-      <div className="bg-white w-full max-w-[380px] rounded-2xl shadow-2xl border border-slate-100 flex flex-col pointer-events-auto animate-[slideInCard_0.3s_ease-out] select-none relative">
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes slideInCard {
-            from { opacity: 0; transform: translateY(20px) scale(0.97); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-          }
-        `}} />
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F1F3F7]">
-          <h3 className="text-[#24292E] font-semibold text-[15px] tracking-tight">
-            New Consultation Invitation!
-          </h3>
-          <button
-            onClick={() => setShowInvitationModal(false)}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 flex flex-col gap-4">
-          {/* Subtitle */}
-          <p className="text-[#676E76] text-[11.5px] font-normal leading-relaxed">
-            You have been invited to join a consultation call with{" "}
-            <span className="font-semibold text-[#383F45]">{selectedDoctor.name}</span>
-          </p>
-
-          {/* Provider Details */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide">Provider Details</span>
-            <div className="flex items-center gap-2.5">
-              <div className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={selectedDoctor.avatar} alt={selectedDoctor.name} className="w-9 h-9 rounded-full object-cover border border-slate-100" />
-                {selectedDoctor.isOnline && <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#383F45] text-xs font-semibold">{selectedDoctor.name}</span>
-                <span className="text-[#838B95] text-[10px] font-normal">{selectedDoctor.email}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Patient Details */}
-          <div className="flex flex-col gap-2">
-            <span className="text-[10px] font-semibold text-[#676E76] uppercase tracking-wide">Patient Details</span>
-            <div className="flex items-center gap-2.5">
-              <div className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&h=200&q=80"
-                  alt="Kathryn Murphy"
-                  className="w-9 h-9 rounded-full object-cover border border-slate-100"
-                />
-                <span className="w-2 h-2 rounded-full bg-[#10B981] border-2 border-white absolute bottom-0 right-0" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[#383F45] text-xs font-semibold">Kathryn Murphy</span>
-                <span className="text-[#838B95] text-[10px] font-normal">yelena@example.com</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="px-5 pb-5 pt-1 flex items-center gap-3">
-          {/* Decline */}
-          <button
-            onClick={() => setShowInvitationModal(false)}
-            className="flex-1 h-11 rounded-xl bg-[#FF3B30] hover:bg-[#E02D22] text-white text-xs font-bold shadow-sm transition-all active:scale-[0.98] select-none"
-          >
-            Decline
-          </button>
-          {/* Join Consultation */}
-          <button
-            onClick={() => {
-              setShowInvitationModal(false);
-              setSpecialistJoined(true);
-            }}
-            className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            Join Consultation
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  ) : null;
 
   return (
     <div className="w-full bg-slate-50 p-6 flex flex-col gap-6 select-none font-outfit">
@@ -618,7 +587,6 @@ export default function VideoCallsPage() {
       {specialistModalContent}
       {approvalModalContent}
       {successModalContent}
-      {invitationModalContent}
 
       {/* ── Two-Column Main Layout Grid ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">

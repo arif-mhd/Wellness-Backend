@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { vaccinesContainer, vaccinationBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
@@ -102,6 +103,18 @@ router.post("/bookings", requireRole("patient"), async (req: SessionRequest, res
     };
 
     await vaccinationBookingsContainer.items.upsert(booking);
+
+    const vaccineNames = validatedItems.map((i: any) => i.vaccineName).join(", ");
+    logActivity({
+      source: "patient",
+      action: "Vaccination Booked",
+      details: `Vaccination AED ${total_amount.toFixed(2)} — ${vaccineNames}`,
+      performedBy: "Patient",
+      performedById: patientId,
+      entityType: "vaccinationBooking",
+      entityId: bookingId,
+    });
+
     res.status(201).json({ status: "OK", booking });
   } catch (err) {
     console.error("Create vaccination booking error:", err);

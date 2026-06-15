@@ -41,6 +41,23 @@ const DoubleCaret = () => (
 export default function EarningsPage() {
   const [activeTab, setActiveTab] = useState<"All" | "Pharmacy" | "Lab" | "Radiology">("Pharmacy");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [search, setSearch]         = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const filteredTransactions = mockTransactions.filter(t => {
+    const matchTab = activeTab === "All" || t.source === activeTab;
+    if (!matchTab) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      t.transactionId.toLowerCase().includes(q) ||
+      t.doctor.name.toLowerCase().includes(q) ||
+      t.patient.name.toLowerCase().includes(q) ||
+      t.source.toLowerCase().includes(q) ||
+      t.paymentMethod.toLowerCase().includes(q) ||
+      t.status.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <ProtectedRoute>
@@ -74,9 +91,27 @@ export default function EarningsPage() {
                 {tab}
               </button>
             ))}
-            <button className="ml-2 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 shadow-sm border border-slate-100 transition">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </button>
+            <div className="flex items-center gap-2 ml-2">
+              {searchOpen && (
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search transactions…"
+                  className="w-48 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
+                />
+              )}
+              <button
+                onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearch(""); }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
+              >
+                {searchOpen
+                  ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                  : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                }
+              </button>
+            </div>
           </div>
           <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
             Today
@@ -120,7 +155,7 @@ export default function EarningsPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockTransactions.map((t) => (
+                {filteredTransactions.map((t) => (
                   <tr
                     key={t.id}
                     onMouseEnter={() => setHoveredId(t.id)}

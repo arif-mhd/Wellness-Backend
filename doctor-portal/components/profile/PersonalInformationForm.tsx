@@ -10,8 +10,16 @@ interface PersonalInformationFormProps {
   initialDob?: string;
   initialGender?: string;
   initialEmiratesId?: string;
+  initialLanguages?: string[];
   onSubmit: (data: any) => void;
 }
+
+const ALL_LANGUAGES = [
+  "Arabic", "English", "Hindi", "Urdu", "Malayalam", "Tamil", "Tagalog",
+  "Bengali", "Punjabi", "Sinhalese", "Nepali", "French", "German", "Spanish",
+  "Chinese", "Japanese", "Korean", "Russian", "Persian", "Turkish", "Amharic",
+];
+
 
 const YEARS = Array.from({ length: 87 }, (_, i) => 2026 - i); // 1940 to 2026
 const MONTHS = [
@@ -27,6 +35,7 @@ export default function PersonalInformationForm({
   initialDob = "",
   initialGender = "",
   initialEmiratesId = "",
+  initialLanguages = [],
   onSubmit,
 }: PersonalInformationFormProps) {
   // Form State
@@ -48,7 +57,10 @@ export default function PersonalInformationForm({
   const [maritalStatus, setMaritalStatus] = useState("");
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [languages, setLanguages] = useState("");
+  const [languages, setLanguages] = useState<string[]>(initialLanguages ?? []);
+  const [langInput, setLangInput] = useState("");
+  const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   const [formError, setFormError] = useState("");
 
@@ -223,13 +235,13 @@ export default function PersonalInformationForm({
       setFormError("Postal code is required.");
       return;
     }
-    if (!languages.trim()) {
-      setFormError("Languages known field is required.");
+    if (languages.length === 0) {
+      setFormError("Please add at least one language.");
       return;
     }
 
     setFormError("");
-    
+
     // Call parent handler
     onSubmit({
       profilePic,
@@ -247,7 +259,7 @@ export default function PersonalInformationForm({
       maritalStatus,
       address,
       postalCode,
-      languages,
+      languages,  // string[]
     });
   };
 
@@ -716,15 +728,79 @@ export default function PersonalInformationForm({
 
         </div>
 
-        {/* LANGUAGES KNOWN */}
-        <div>
+        {/* LANGUAGES KNOWN — typeahead multi-select */}
+        <div className="relative">
+          {/* Selected language chips */}
+          {languages.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {languages.map((lang) => (
+                <span
+                  key={lang}
+                  className="inline-flex items-center gap-1.5 bg-indigo-50 text-[#5476FC] text-xs font-semibold px-3 py-1.5 rounded-full"
+                >
+                  {lang}
+                  <button
+                    type="button"
+                    onClick={() => setLanguages(languages.filter((l) => l !== lang))}
+                    className="text-[#5476FC] hover:text-indigo-800 leading-none outline-none"
+                    aria-label={`Remove ${lang}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <input
             type="text"
-            placeholder="Languages Known*"
-            value={languages}
-            onChange={(e) => setLanguages(e.target.value)}
+            placeholder="Languages Known* (type to search)"
+            value={langInput}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLangInput(val);
+              if (val.trim().length > 0) {
+                setLangSuggestions(
+                  ALL_LANGUAGES.filter(
+                    (l) =>
+                      l.toLowerCase().startsWith(val.toLowerCase()) &&
+                      !languages.includes(l)
+                  )
+                );
+                setShowLangDropdown(true);
+              } else {
+                setLangSuggestions([]);
+                setShowLangDropdown(false);
+              }
+            }}
+            onFocus={() => {
+              if (langInput.trim().length > 0 && langSuggestions.length > 0)
+                setShowLangDropdown(true);
+            }}
+            onBlur={() => setTimeout(() => setShowLangDropdown(false), 150)}
             className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
           />
+
+          {showLangDropdown && langSuggestions.length > 0 && (
+            <div className="absolute left-0 top-full mt-1 w-full bg-white border border-indigo-100 rounded-2xl shadow-[0_15px_40px_rgba(79,70,229,0.12)] z-50 py-1.5 max-h-[180px] overflow-y-auto font-outfit animate-fadeIn">
+              {langSuggestions.map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setLanguages([...languages, lang]);
+                    setLangInput("");
+                    setLangSuggestions([]);
+                    setShowLangDropdown(false);
+                  }}
+                  className="w-full text-left px-5 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-[#5476FC] transition-colors"
+                >
+                  {lang}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* SUBMIT BUTTON ROW */}

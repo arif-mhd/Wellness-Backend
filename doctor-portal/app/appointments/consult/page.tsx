@@ -21,6 +21,16 @@ interface Medicine { id: string; name: string; notes: string; }
 interface Lab      { id: string; name: string; }
 type Panel = "chat" | "emr" | "specialist";
 
+interface AvailableDoctor {
+  id: string;
+  fullName: string;
+  specialty: string;
+  avatarUrl: string | null;
+  email: string;
+  fees: string | null;
+  rating: number;
+}
+
 function ConsultRoom() {
   const searchParams  = useSearchParams();
   const router        = useRouter();
@@ -46,6 +56,14 @@ function ConsultRoom() {
   const [labs,      setLabs]      = useState<Lab[]>([]);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved,  setEmrSaved]  = useState(false);
+
+  // Specialist invite state
+  const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
+  const [doctorsLoading,     setDoctorsLoading]     = useState(false);
+  const [specialistSearch,   setSpecialistSearch]   = useState("");
+  const [selectedSpecialist, setSelectedSpecialist] = useState<AvailableDoctor | null>(null);
+  const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [inviteError,        setInviteError]        = useState("");
 
   const roomRef       = useRef<Room | null>(null);
   const remoteVideoEl = useRef<HTMLVideoElement>(null);
@@ -192,6 +210,52 @@ function ConsultRoom() {
 
   const toggleMic = async () => { await roomRef.current?.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); };
   const toggleCam = async () => { await roomRef.current?.localParticipant.setCameraEnabled(!camOn);   setCamOn(v => !v); };
+
+  const fetchAvailableDoctors = useCallback(async () => {
+    if (!appointmentId) return;
+    setDoctorsLoading(true);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/available-doctors`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { doctors: list } = await res.json();
+        setAvailableDoctors(list ?? []);
+      }
+    } catch {}
+    finally { setDoctorsLoading(false); }
+  }, [appointmentId]);
+
+  // Load doctors when switching to specialist panel
+  useEffect(() => {
+    if (panel === "specialist" && availableDoctors.length === 0) fetchAvailableDoctors();
+  }, [panel, availableDoctors.length, fetchAvailableDoctors]);
+
+  const sendInvite = async (doctor: AvailableDoctor) => {
+    if (!appointmentId) return;
+    setSelectedSpecialist(doctor);
+    setInviteStatus("sending");
+    setInviteError("");
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/invite-specialist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ specialistDoctorId: doctor.id }),
+      });
+      if (res.ok) {
+        setInviteStatus("sent");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setInviteError(body.error ?? "Failed to send invite");
+        setInviteStatus("error");
+      }
+    } catch {
+      setInviteError("Network error. Please try again.");
+      setInviteStatus("error");
+    }
+  };
 
   const saveEmr = async () => {
     setSavingEmr(true);
@@ -409,14 +473,121 @@ function ConsultRoom() {
             </div>
           )}
 
-          {/* ── Specialist ── */}
+          {/* ── SPECIALIST ── */}
           {panel === "specialist" && (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-xl">👨‍⚕️</div>
-                <p className="text-gray-400 text-xs">Invite a specialist</p>
-                <p className="text-gray-300 text-[10px] mt-1">Feature coming soon</p>
+            <div className="flex-1 flex flex-col overflow-hidden">
+
+              {/* Invite sent banner */}
+              {inviteStatus === "sent" && selectedSpecialist && (
+                <div className="mx-3 mt-3 flex items-start gap-2.5 bg-green-50 border border-green-100 rounded-xl p-3">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-green-700 text-[11px] font-semibold">Invite sent!</p>
+                    <p className="text-green-600 text-[10px] mt-0.5 leading-relaxed">
+                      Waiting for <span className="font-semibold">{selectedSpecialist.fullName}</span> to accept.
+                      They will receive a notification on their dashboard.
+                    </p>
+                  </div>
+                  <button onClick={() => { setInviteStatus("idle"); setSelectedSpecialist(null); fetchAvailableDoctors(); }}
+                    className="text-green-400 hover:text-green-600 text-xs flex-shrink-0">✕</button>
+                </div>
+              )}
+
+              {inviteStatus === "error" && (
+                <div className="mx-3 mt-3 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-[10px]">
+                  {inviteError}
+                  <button onClick={() => setInviteStatus("idle")} className="ml-2 underline">Dismiss</button>
+                </div>
+              )}
+
+              {/* Search */}
+              <div className="p-3 border-b border-gray-100">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input
+                    value={specialistSearch}
+                    onChange={e => setSpecialistSearch(e.target.value)}
+                    placeholder="Search by name or specialty…"
+                    className="w-full bg-gray-50 rounded-lg pl-8 pr-3 py-2 text-[11px] text-gray-700 placeholder-gray-300 outline-none focus:ring-1 focus:ring-[#5476fc]/30"
+                  />
+                </div>
               </div>
+
+              {/* Doctor list */}
+              <div className="flex-1 overflow-y-auto">
+                {doctorsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : availableDoctors.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg mb-2">👨‍⚕️</div>
+                    <p className="text-gray-400 text-xs font-medium">No doctors available</p>
+                    <p className="text-gray-300 text-[10px] mt-1">All other doctors are currently in calls</p>
+                    <button onClick={fetchAvailableDoctors}
+                      className="mt-3 text-[#5476fc] text-[10px] font-semibold hover:underline">
+                      Refresh
+                    </button>
+                  </div>
+                ) : (
+                  availableDoctors
+                    .filter(d =>
+                      d.fullName.toLowerCase().includes(specialistSearch.toLowerCase()) ||
+                      d.specialty.toLowerCase().includes(specialistSearch.toLowerCase())
+                    )
+                    .map(doc => {
+                      const isSelected = selectedSpecialist?.id === doc.id && inviteStatus === "sent";
+                      return (
+                        <div key={doc.id} className={`flex items-center gap-3 px-3 py-3 border-b border-gray-50 transition-colors ${isSelected ? "bg-green-50" : "hover:bg-gray-50"}`}>
+                          {/* Avatar */}
+                          <div className="relative flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={doc.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.fullName)}&background=5476FC&color=fff&size=64`}
+                              alt={doc.fullName}
+                              className="w-9 h-9 rounded-full object-cover border border-slate-100"
+                            />
+                            <span className="w-2 h-2 rounded-full bg-green-400 border-2 border-white absolute bottom-0 right-0" />
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[#24292e] text-[11px] font-semibold truncate">{doc.fullName}</p>
+                            <p className="text-gray-400 text-[10px] truncate">{doc.specialty}</p>
+                            {doc.fees && (
+                              <p className="text-[#5476fc] text-[10px] font-medium">AED {doc.fees}</p>
+                            )}
+                          </div>
+
+                          {/* Action */}
+                          {isSelected ? (
+                            <span className="text-[10px] text-green-600 font-semibold flex-shrink-0">Invited ✓</span>
+                          ) : (
+                            <button
+                              onClick={() => sendInvite(doc)}
+                              disabled={inviteStatus === "sending" || inviteStatus === "sent"}
+                              className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] font-semibold border border-[#5476fc] text-[#5476fc] hover:bg-[#5476fc] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {inviteStatus === "sending" && selectedSpecialist?.id === doc.id ? "…" : "Invite"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+
+              {/* Refresh footer */}
+              {availableDoctors.length > 0 && inviteStatus !== "sent" && (
+                <div className="p-2 border-t border-gray-100 text-center">
+                  <button onClick={fetchAvailableDoctors}
+                    className="text-[10px] text-gray-400 hover:text-[#5476fc] transition-colors">
+                    ↻ Refresh list
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </aside>

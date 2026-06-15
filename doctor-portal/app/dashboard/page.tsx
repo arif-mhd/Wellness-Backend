@@ -1,7 +1,7 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import { createPortal } from "react-dom";
@@ -92,6 +92,8 @@ export default function DashboardPage() {
   }
   const [specialistInvite, setSpecialistInvite] = useState<SpecialistInvite | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  // Track which appointment invite has already been shown so the poll doesn't re-open the modal
+  const shownInviteIdRef = useRef<string | null>(null);
 
   // Poll backend every 10s for a pending invite
   const pollForInvite = useCallback(async () => {
@@ -103,7 +105,8 @@ export default function DashboardPage() {
       });
       if (res.ok) {
         const { invite } = await res.json();
-        if (invite) {
+        if (invite && invite.appointmentId !== shownInviteIdRef.current) {
+          shownInviteIdRef.current = invite.appointmentId;
           setSpecialistInvite(invite);
           setShowInviteModal(true);
         }
@@ -295,7 +298,7 @@ export default function DashboardPage() {
           <button
             onClick={() => {
               setShowInviteModal(false);
-              router.push(`/video-calls?appointmentId=${specialistInvite.appointmentId}`);
+              router.push(`/video-calls?appointmentId=${specialistInvite.appointmentId}&role=specialist`);
             }}
             className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
             style={{ fontFamily: 'Outfit, sans-serif' }}

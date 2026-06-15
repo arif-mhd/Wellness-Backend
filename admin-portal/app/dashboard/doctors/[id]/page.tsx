@@ -115,6 +115,11 @@ const ReviewCard = ({ name, rating, review }: { name: string; rating: number; re
   </div>
 );
 
+interface DiagnosisEntry { reason: string; count: number; }
+interface ReviewEntry { id: string; rating: number; comment: string; reviewer: { name: string; avatar: string }; date: string; }
+
+const PALETTE = ["#8b5cf6", "#10b981", "#f59e0b", "#06b6d4", "#ef4444", "#3b82f6", "#ec4899", "#84cc16", "#f97316", "#0ea5e9"];
+
 export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -122,6 +127,12 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [diagnosis, setDiagnosis] = useState<DiagnosisEntry[]>([]);
+  const [diagTotal, setDiagTotal] = useState(0);
+  const [reviews, setReviews] = useState<ReviewEntry[]>([]);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [tabLoading, setTabLoading] = useState(false);
 
   useEffect(() => {
     async function fetchDoctor() {
@@ -144,6 +155,28 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
     }
     fetchDoctor();
   }, [id]);
+
+  useEffect(() => {
+    if (activeTab === "diagnosis" && diagnosis.length === 0) {
+      setTabLoading(true);
+      adminFetch(`/api/admin/doctors/${id}/diagnosis`)
+        .then(r => r.json())
+        .then(d => { setDiagnosis(d.diagnosis ?? []); setDiagTotal(d.total ?? 0); })
+        .catch(() => {})
+        .finally(() => setTabLoading(false));
+    }
+  }, [activeTab, id]);
+
+  useEffect(() => {
+    if (activeTab === "reviews" && reviews.length === 0) {
+      setTabLoading(true);
+      adminFetch(`/api/admin/doctors/${id}/reviews`)
+        .then(r => r.json())
+        .then(d => { setReviews(d.reviews ?? []); setAvgRating(d.avgRating ?? null); setReviewsTotal(d.total ?? 0); })
+        .catch(() => {})
+        .finally(() => setTabLoading(false));
+    }
+  }, [activeTab, id]);
 
   if (loading) return (
     <ProtectedRoute>
@@ -327,60 +360,68 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
               {/* DIAGNOSIS */}
               {activeTab === "diagnosis" && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <p className="text-[12px] text-slate-700 font-bold max-w-2xl leading-relaxed">
-                    These are the top reasons patients book appointments, highlighting the doctor&apos;s main areas of focus.
-                  </p>
-                  <div className="grid grid-cols-4 gap-3 pt-4">
-                    {["#8b5cf6", "#10b981", "#f59e0b", "#06b6d4"].map(c => (
-                      <div key={c} className="w-full h-0 border-b-[4px] border-dotted" style={{ borderColor: c }} />
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-4 gap-5">
-                    <DiagnosisCard title="Fever" count={doctor.consultations ? Math.round(doctor.consultations * 0.22) : 123} colorHex="#8b5cf6" />
-                    <DiagnosisCard title="Cough" count={doctor.consultations ? Math.round(doctor.consultations * 0.21) : 118} colorHex="#10b981" />
-                    <DiagnosisCard title="Asthma" count={doctor.consultations ? Math.round(doctor.consultations * 0.26) : 143} colorHex="#f59e0b" />
-                    <DiagnosisCard title="Headache" count={doctor.consultations ? Math.round(doctor.consultations * 0.24) : 134} colorHex="#06b6d4" />
-                  </div>
+                  {tabLoading ? (
+                    <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A8BFF]" /></div>
+                  ) : diagnosis.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400 text-[13px] font-medium">
+                      No appointment data yet. Diagnosis breakdown will appear once patients start booking.
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[12px] text-slate-700 font-bold max-w-2xl leading-relaxed">
+                        Top {diagnosis.length} reason{diagnosis.length !== 1 ? "s" : ""} patients booked with this doctor
+                        {diagTotal > 0 && <span className="text-slate-400 font-medium"> · {diagTotal} total appointments</span>}
+                      </p>
+                      <div className="grid grid-cols-4 gap-3 pt-4">
+                        {diagnosis.slice(0, 4).map((_, i) => (
+                          <div key={i} className="w-full h-0 border-b-[4px] border-dotted" style={{ borderColor: PALETTE[i] }} />
+                        ))}
+                      </div>
+                      <div className={`grid gap-5 ${diagnosis.length >= 4 ? "grid-cols-4" : `grid-cols-${diagnosis.length}`}`}>
+                        {diagnosis.map((d, i) => (
+                          <DiagnosisCard key={d.reason} title={d.reason} count={d.count} colorHex={PALETTE[i % PALETTE.length]} />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* REVIEWS */}
               {activeTab === "reviews" && (
                 <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center justify-between mb-7">
-                    <h3 className="text-[14px] font-black text-slate-800">All Ratings</h3>
-                    <div className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
-                      <svg className="w-4 h-4 text-[#6A8BFF] fill-[#6A8BFF]" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                      </svg>
-                      {doctor.rating ?? 4}.2
-                      <span className="text-slate-400 font-medium ml-1 text-[13px]">({doctor.consultations ?? 345} Ratings)</span>
+                  {tabLoading ? (
+                    <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6A8BFF]" /></div>
+                  ) : reviews.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400 text-[13px] font-medium">
+                      No reviews yet. Patient feedback will appear here after consultations.
                     </div>
-                  </div>
-                  <div className="space-y-4">
-                    {[
-                      { name: "Kelemen Krisztina", rating: 4, review: "His attentive approach and thorough understanding of my condition made me feel confident in my treatment plan." },
-                      { name: "Szűcs Gabriella", rating: 4, review: "I had a fantastic experience with this doctor. Very knowledgeable and genuinely cares about patients." },
-                      { name: "Somogyi Adél", rating: 4, review: "An outstanding doctor. Professionalism and dedication to patient care are clearly evident." },
-                      { name: "Somogyi Adél", rating: 4, review: "An outstanding doctor. Professionalism and dedication to patient care are clearly evident." },
-                      { name: "Somogyi Adél", rating: 4, review: "An outstanding doctor. Professionalism and dedication to patient care are clearly evident." },
-                    ].map((r, i) => <ReviewCard key={i} {...r} />)}
-                  </div>
-
-                  {/* Pagination */}
-                  <div className="bg-[#f8fafd] rounded-full flex items-center justify-between px-3 py-2 mt-8">
-                    <button className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-600 transition shadow-sm">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                        <button key={n} className={`w-8 h-8 rounded-full text-[13px] font-bold flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-200" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}>{n}</button>
-                      ))}
-                    </div>
-                    <button className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-600 transition shadow-sm">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7-7" /></svg>
-                    </button>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-7">
+                        <h3 className="text-[14px] font-black text-slate-800">All Ratings</h3>
+                        {avgRating !== null && (
+                          <div className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
+                            <svg className="w-4 h-4 text-[#6A8BFF] fill-[#6A8BFF]" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            {avgRating}
+                            <span className="text-slate-400 font-medium ml-1 text-[13px]">({reviewsTotal} Rating{reviewsTotal !== 1 ? "s" : ""})</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        {reviews.map((r) => (
+                          <ReviewCard
+                            key={r.id}
+                            name={r.reviewer?.name || "Anonymous"}
+                            rating={r.rating ?? 0}
+                            review={r.comment || ""}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

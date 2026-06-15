@@ -4,8 +4,67 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { doctorsContainer, appointmentsContainer, queryDocuments } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
+import multer from "multer";
+import { uploadBlob, generateSasUrl } from "../config/blob";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// ─── POST /api/doctors/upload ────────────────────────────────────────────────
+// Multipart file upload for doctor profile assets (avatar, emirates ID, certificates).
+// Accessible by doctor_pending (onboarding) and doctor (profile updates).
+// Field names: avatar | emiratesId | degree | spec | other
+// Returns a SAS URL for each uploaded file.
+router.post(
+  "/upload",
+  requireRole("doctor_pending", "doctor"),
+  upload.fields([
+    { name: "avatar",     maxCount: 1 },
+    { name: "emiratesId", maxCount: 1 },
+    { name: "degree",     maxCount: 1 },
+    { name: "spec",       maxCount: 1 },
+    { name: "other",      maxCount: 1 },
+  ]),
+  async (req: SessionRequest, res: Response) => {
+    const doctorId = req.session!.getUserId();
+    const files = req.files as Record<string, Express.Multer.File[]>;
+    const urls: Record<string, string> = {};
+
+    const MIME_EXT: Record<string, string> = {
+      "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+      "application/pdf": "pdf",
+    };
+
+    try {
+      for (const [field, fileArr] of Object.entries(files ?? {})) {
+        const file = fileArr[0];
+        const ext  = MIME_EXT[file.mimetype] ?? "bin";
+        const blobPath = `doctors/${doctorId}/${field}.${ext}`;
+        await uploadBlob(blobPath, file.buffer, file.mimetype);
+        urls[field] = generateSasUrl(blobPath);
+      }
+      res.json({ status: "OK", urls });
+    } catch (err) {
+      console.error("Doctor file upload error:", err);
+      res.status(500).json({ error: "File upload failed." });
+    }
+  }
+);
+
+// ─── GET /api/doctors/me ─────────────────────────────────────────────────────
+// Returns the currently logged-in doctor's own profile (doctor or doctor_pending role).
+router.get("/me", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
+    res.json({ doctor });
+  } catch (err) {
+    console.error("Get doctor me error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 // ─── POST /api/doctors/register ─────────────────────────────────────────────
 // Public endpoint — called by the doctor portal signup flow (step 4).
@@ -89,7 +148,7 @@ router.post("/register", async (req: Request, res: Response) => {
 // ─── PUT /api/doctors/profile ───────────────────────────────────────────────
 // Doctor submits their full onboarding profile after signup.
 // Called by the complete-profile wizard. Saves all details to Cosmos.
-router.put("/profile", requireRole("doctor_pending"), async (req: SessionRequest, res: Response) => {
+router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const {
     // Personal
@@ -142,6 +201,17 @@ router.put("/profile", requireRole("doctor_pending"), async (req: SessionRequest
     };
 
     await doctorsContainer.items.upsert(updated);
+
+    logActivity({
+      source: "doctor",
+      action: "Doctor Profile Updated",
+      details: `Dr. ${updated.fullName ?? doctorId} submitted profile (${updated.specialty ?? "specialty TBD"})`,
+      performedBy: updated.fullName ?? "Doctor",
+      performedById: doctorId,
+      entityType: "doctor",
+      entityId: doctorId,
+    });
+
     res.json({ status: "OK", doctor: updated });
   } catch (err) {
     console.error("Update doctor profile error:", err);

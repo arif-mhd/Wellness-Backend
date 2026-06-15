@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
 import {
   appointmentsContainer,
   patientsContainer,
@@ -9,6 +9,7 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
+import { logActivity } from "../utils/activityLogger";
 
 function makeLivekitToken(userId: string, room: string): { token: Promise<string>; wsUrl: string } {
   const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
@@ -17,6 +18,20 @@ function makeLivekitToken(userId: string, room: string): { token: Promise<string
   const at = new AccessToken(apiKey, apiSecret, { identity: userId, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
+}
+
+async function sendLivekitData(room: string, payload: Record<string, unknown>): Promise<void> {
+  try {
+    const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
+    const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
+    const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const httpUrl   = wsUrl.replace(/^wss?:\/\//, "https://");
+    const svc = new RoomServiceClient(httpUrl, apiKey, apiSecret);
+    const data = Buffer.from(JSON.stringify(payload));
+    await svc.sendData(room, data, DataPacket_Kind.RELIABLE);
+  } catch (err) {
+    console.error("[sendLivekitData] Failed:", err);
+  }
 }
 
 const router = Router();
@@ -63,6 +78,18 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
     };
 
     await appointmentsContainer.items.create(appointment);
+
+    // Log activity (best-effort)
+    const patientDoc = await patientsContainer.item(patientId, patientId).read().then(r => r.resource).catch(() => null);
+    logActivity({
+      source: "patient",
+      action: "Appointment Scheduled",
+      details: `Patient ${patientDoc?.fullName ?? patientId} booked with Dr. ${doctor.fullName ?? doctorId} — ${reason}`,
+      performedBy: patientDoc?.fullName ?? "Patient",
+      performedById: patientId,
+      entityType: "appointment",
+      entityId: id,
+    });
 
     res.status(201).json({ status: "OK", appointment });
   } catch (err) {
@@ -270,6 +297,14 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
     };
     await appointmentsContainer.items.upsert(updated);
 
+    // Notify the patient inside the LiveKit room so the consent modal appears
+    await sendLivekitData(apt.livekitRoom, {
+      type: "specialist_invite",
+      specialistName: specialist.fullName,
+      specialistAvatarUrl: specialist.avatarUrl ?? null,
+      fee: specialist.fees ? `AED ${specialist.fees}` : "AED 200",
+    });
+
     res.json({
       status: "OK",
       specialistName: specialist.fullName,
@@ -304,6 +339,58 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
     res.json({ token: apt.specialistInvite.token, wsUrl: apt.specialistInvite.wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/:id/specialist-respond ───────────────────────────
+// Patient accepts or declines the specialist invite.
+router.post("/:id/specialist-respond", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id } = req.params;
+  const { decision } = req.body; // "accepted" | "declined"
+  if (decision !== "accepted" && decision !== "declined") {
+    res.status(400).json({ error: "decision must be 'accepted' or 'declined'." }); return;
+  }
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+    if (!apt.specialistInvite) { res.status(400).json({ error: "No specialist invite on this appointment." }); return; }
+
+    const updated = {
+      ...apt,
+      specialistInvite: {
+        ...apt.specialistInvite,
+        patientDecision: decision,
+        patientDecidedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await appointmentsContainer.items.upsert(updated);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("specialist-respond error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/specialist-status ─────────────────────────────
+// Primary doctor polls this to know if patient accepted/declined the invite.
+router.get("/:id/specialist-status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id } = req.params;
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+    const invite = apt.specialistInvite ?? null;
+    res.json({
+      patientDecision: invite?.patientDecision ?? null,
+      inviteStatus: invite?.status ?? null,
+    });
+  } catch (err) {
+    console.error("specialist-status error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -351,6 +438,18 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     const updated = { ...apt, status: "cancelled", updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
 
+    // Determine who cancelled (patient vs doctor) for the log
+    const isDoctor = apt.doctorId === userId;
+    logActivity({
+      source: isDoctor ? "doctor" : "patient",
+      action: "Appointment Cancelled",
+      details: `Appointment ${id} cancelled`,
+      performedBy: isDoctor ? "Doctor" : "Patient",
+      performedById: userId,
+      entityType: "appointment",
+      entityId: id,
+    });
+
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
     console.error("Cancel appointment error:", err);
@@ -384,6 +483,19 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 
     const updated = { ...apt, status, updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
+
+    if (status === "completed") {
+      const docDoc = await doctorsContainer.item(doctorId, doctorId).read().then(r => r.resource).catch(() => null);
+      logActivity({
+        source: "doctor",
+        action: "Appointment Completed",
+        details: `Dr. ${docDoc?.fullName ?? doctorId} completed appointment ${id}`,
+        performedBy: docDoc?.fullName ?? "Doctor",
+        performedById: doctorId,
+        entityType: "appointment",
+        entityId: id,
+      });
+    }
 
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
