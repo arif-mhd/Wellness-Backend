@@ -100,6 +100,7 @@ function VideoCallInner() {
   const tokenRef     = useRef("");
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
 
   // Timer
   useEffect(() => {
@@ -133,11 +134,17 @@ function VideoCallInner() {
       if (track.kind === Track.Kind.Audio) track.attach();
     }
 
-    room.on(RoomEvent.ParticipantConnected, () => { if (!cancelled) setConnected(true); });
+    room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+      if (!cancelled) {
+        setConnected(true);
+        setPinnedId(prev => prev ?? p.identity);
+      }
+    });
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
       if (!cancelled) {
         setRemoteTiles(prev => prev.filter(t => t.participantId !== p.identity));
         remoteVideoRefs.current.delete(p.identity);
+        setPinnedId(prev => prev === p.identity ? null : prev);
         if (room.remoteParticipants.size === 0) setConnected(false);
       }
     });
@@ -517,37 +524,45 @@ function VideoCallInner() {
                   </>
                 )}
               </div>
-            ) : (
-              <>
-                {/* Primary remote */}
-                <video ref={el => setRemoteVideoRef(remoteTiles[0].participantId, el)}
-                  autoPlay playsInline className="absolute inset-0 w-full h-full object-cover"/>
-                <div className="absolute bottom-[76px] left-3 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-md z-10">
-                  {remoteTiles[0].name}
-                </div>
-                {/* Additional PiP tiles */}
-                {remoteTiles.slice(1).map((tile, i) => (
-                  <div key={tile.participantId} className="absolute z-10" style={{ bottom: `${76 + i * 88}px`, right: "76px" }}>
-                    <div className="w-24 h-16 rounded-lg overflow-hidden border border-white/20 bg-[#1a2035] shadow-xl">
-                      <video ref={el => setRemoteVideoRef(tile.participantId, el)}
-                        autoPlay playsInline className="w-full h-full object-cover"/>
-                    </div>
-                    <p className="text-white/70 text-[9px] text-center mt-0.5">{tile.name}</p>
+            ) : (() => {
+              const mainTile = remoteTiles.find(t => t.participantId === pinnedId) ?? remoteTiles[0];
+              const pipTiles = remoteTiles.filter(t => t.participantId !== mainTile.participantId);
+              return (
+                <>
+                  <video ref={el => setRemoteVideoRef(mainTile.participantId, el)}
+                    autoPlay playsInline className="absolute inset-0 w-full h-full object-cover"/>
+                  <div className="absolute bottom-16 left-3 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-md z-10">
+                    {mainTile.name}
                   </div>
-                ))}
-              </>
-            )}
+                  {pipTiles.map((tile, i) => (
+                    <button key={tile.participantId}
+                      onClick={() => setPinnedId(tile.participantId)}
+                      className="absolute z-20 group"
+                      style={{ bottom: `${88 + (pipTiles.length - 1 - i) * 88}px`, right: "8px" }}
+                      title="Click to make main">
+                      <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/30 bg-[#1a2035] shadow-xl relative hover:border-[#5476fc] transition-colors">
+                        <video ref={el => setRemoteVideoRef(tile.participantId, el)} autoPlay playsInline className="w-full h-full object-cover"/>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <svg className="opacity-0 group-hover:opacity-100 transition-opacity" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                        </div>
+                      </div>
+                      <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">{tile.name}</p>
+                    </button>
+                  ))}
+                </>
+              );
+            })()}
 
-            {/* Local PiP */}
-            <div className="absolute bottom-4 right-4 z-20">
-              <div className="w-20 h-14 rounded-lg overflow-hidden border border-white/20 bg-[#1a2035] shadow-xl">
+            {/* Local PiP — bottom-right corner */}
+            <div className="absolute bottom-14 right-2 z-20">
+              <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-white/20 bg-[#1a2035] shadow-xl">
                 <video ref={localVideoEl} autoPlay playsInline muted className="w-full h-full object-cover"/>
               </div>
-              <p className="text-white/70 text-[9px] text-center mt-0.5">Display Name</p>
+              <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">You</p>
             </div>
 
             {/* Controls overlay */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
               <button onClick={toggleMic}
                 className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg ${micOn ? "bg-white/20 text-white" : "bg-red-500 text-white"}`}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
