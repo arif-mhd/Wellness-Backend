@@ -499,7 +499,7 @@ function VideoCallInner() {
         <div className="flex flex-col" style={{ width: "420px", flexShrink: 0 }}>
 
           {/* Video */}
-          <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "300px" }}>
+          <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "420px" }}>
             {remoteTiles.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 {!error ? (
