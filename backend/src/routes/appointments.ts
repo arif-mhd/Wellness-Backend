@@ -449,6 +449,47 @@ router.get("/:id/specialist-status", requireRole("doctor"), async (req: SessionR
   }
 });
 
+// ─── POST /api/appointments/:id/pre-visit ─────────────────────────────────────
+// Patient saves pre-visit questionnaire answers to their appointment document.
+// This data is then visible to the doctor in the consultation room.
+router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id }    = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const {
+      primaryReason, symptoms, severity, duration,
+      conditions, medications, allergies, additionalNotes, submittedAt,
+    } = req.body;
+
+    const updated = {
+      ...apt,
+      preVisitData: {
+        primaryReason:   primaryReason   ?? "",
+        symptoms:        symptoms        ?? [],
+        severity:        severity        ?? "",
+        duration:        duration        ?? "",
+        conditions:      conditions      ?? "",
+        medications:     medications     ?? "",
+        allergies:       allergies       ?? "",
+        additionalNotes: additionalNotes ?? "",
+        submittedAt:     submittedAt     ?? new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await appointmentsContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Pre-visit save error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/appointments/:id/patient-profile ───────────────────────────────
 // Doctor fetches the patient's registered profile for an appointment they own.
 // Returns the medically relevant subset of the patient Cosmos document.
