@@ -11,11 +11,21 @@ import {
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 
-function makeLivekitToken(userId: string, room: string): { token: Promise<string>; wsUrl: string } {
+// True if this doctor is either the primary doctor on the appointment, or the
+// specialist who was invited — both are allowed to view the
+// patient's EHR and contribute to the shared EMR for this encounter.
+function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
+  if (apt.doctorId === doctorId) return true;
+  // If they have an invite, allow them (even if status is pending, as they
+  // might be loading EMR concurrently with the join process).
+  return apt.specialistInvite?.doctorId === doctorId;
+}
+
+function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
   const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
   const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
   const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
-  const at = new AccessToken(apiKey, apiSecret, { identity: userId, ttl: 2 * 60 * 60 });
+  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
 }
@@ -387,7 +397,7 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
       res.status(404).json({ error: "Specialist not found or not approved." }); return;
     }
 
-    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom);
+    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom, specialist.fullName);
     const resolvedToken = await token;
 
     // Store the invite on the appointment document
@@ -444,7 +454,8 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
     };
     await appointmentsContainer.items.upsert(updated);
     // Generate a fresh token using the same wsUrl the primary doctor uses
-    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom);
+    const { resource: specialist } = await doctorsContainer.item(specialistId, specialistId).read();
+    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom, specialist?.fullName);
     res.json({ token: await token, wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
@@ -500,6 +511,88 @@ router.get("/:id/specialist-status", requireRole("doctor"), async (req: SessionR
     });
   } catch (err) {
     console.error("specialist-status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/:id/pre-visit ─────────────────────────────────────
+// Patient saves pre-visit questionnaire answers to their appointment document.
+// This data is then visible to the doctor in the consultation room.
+router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id }    = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const {
+      primaryReason, symptoms, severity, duration,
+      conditions, medications, allergies, additionalNotes, submittedAt,
+    } = req.body;
+
+    const updated = {
+      ...apt,
+      preVisitData: {
+        primaryReason:   primaryReason   ?? "",
+        symptoms:        symptoms        ?? [],
+        severity:        severity        ?? "",
+        duration:        duration        ?? "",
+        conditions:      conditions      ?? "",
+        medications:     medications     ?? "",
+        allergies:       allergies       ?? "",
+        additionalNotes: additionalNotes ?? "",
+        submittedAt:     submittedAt     ?? new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await appointmentsContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Pre-visit save error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/patient-profile ───────────────────────────────
+// Doctor fetches the patient's registered profile for an appointment they own.
+// Returns the medically relevant subset of the patient Cosmos document.
+router.get("/:id/patient-profile", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id }   = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+    if (!patient) { res.status(404).json({ error: "Patient profile not found." }); return; }
+
+    // Return medically relevant fields only
+    const profile = {
+      fullName:       patient.fullName      ?? "",
+      email:          patient.email         ?? "",
+      phone:          patient.phone         ?? "",
+      gender:         patient.gender        ?? "",
+      dateOfBirth:    patient.dob           ?? patient.dateOfBirth ?? "",
+      bloodGroup:     patient.bloodGroup    ?? "",
+      height:         patient.height        ?? "",
+      weight:         patient.weight        ?? "",
+      emiratesId:     patient.emiratesId    ?? "",
+      maritalStatus:  patient.maritalStatus ?? "",
+      location:       patient.location      ?? "",
+      allergies:      patient.allergies     ?? [],
+      medications:    patient.medications   ?? { current: [], past: [] },
+      chronicDiseases: patient.chronicDiseases ?? [],
+      insurance:      patient.insurance     ?? [],
+    };
+
+    res.json({ profile });
+  } catch (err) {
+    console.error("patient-profile fetch error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -614,26 +707,185 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 });
 
 // ─── POST /api/appointments/:id/emr ─────────────────────────────────────────
-// Doctor saves EMR notes, medicines, and lab recommendations for an appointment.
+// Doctor saves the structured EMR for this single encounter: per-section
+// clinical notes, prescribed medicines, and recommended labs. This is the
+// encounter-level medical record (EMR) — distinct from the patient's
+// longitudinal EHR, which is assembled on read from all past EMRs (see
+// GET /:id/ehr below).
+//
+// IMPORTANT — Shared EMR for multi-doctor consultations:
+// Medicines and labs are merged by contributorDoctorId so that the primary
+// doctor and any invited specialist can each manage their own entries without
+// overwriting each other's. The saving doctor's previous entries are replaced
+// while all other doctors' entries are preserved.
 router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { id }   = req.params;
-  const { notes, medicines, labs } = req.body;
+  const { sections, medicines, labs } = req.body;
 
   try {
     const { resource: apt } = await appointmentsContainer.item(id, id).read();
     if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    // Resolve doctor name for contributor labelling
+    let contributorName = "Doctor";
+    try {
+      const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
+      contributorName = doc?.fullName ?? contributorName;
+    } catch { /* use default */ }
+
+    // Safety net: drop any incoming entries that are explicitly tagged as belonging
+    // to a different doctor (the frontend should already filter these out, but we
+    // enforce it here too so a bad payload never corrupts another doctor's entries).
+    const ownIncomingMedicines = (medicines ?? []).filter(
+      (m: any) => !m.contributorDoctorId || m.contributorDoctorId === doctorId
+    );
+    const ownIncomingLabs = (labs ?? []).filter(
+      (l: any) => !l.contributorDoctorId || l.contributorDoctorId === doctorId
+    );
+
+    // Tag the incoming entries with this doctor's identity
+    const taggedMedicines = ownIncomingMedicines.map((m: any) => ({
+      ...m,
+      contributorDoctorId: doctorId,
+      contributorName,
+    }));
+    const taggedLabs = ownIncomingLabs.map((l: any) => ({
+      ...l,
+      contributorDoctorId: doctorId,
+      contributorName,
+    }));
+
+    // Merge: keep other doctors' existing entries, replace this doctor's entries
+    const existingMedicines: any[] = apt.emr?.medicines ?? [];
+    const existingLabs: any[]      = apt.emr?.labs      ?? [];
+
+    const otherMedicines = existingMedicines.filter(
+      // Keep if it belongs to someone else OR if it's a legacy entry with no tag
+      (m: any) => m.contributorDoctorId !== doctorId
+    );
+    const otherLabs = existingLabs.filter(
+      (l: any) => l.contributorDoctorId !== doctorId
+    );
+
+    const mergedMedicines = [...otherMedicines, ...taggedMedicines];
+    const mergedLabs      = [...otherLabs,      ...taggedLabs];
+
+    // Merge sections: layer this doctor's section notes on top of whatever was
+    // previously saved. This prevents a specialist from wiping the primary
+    // doctor's clinical notes when they save their own additions.
+    const existingSections = apt.emr?.sections ?? {};
+    const mergedSections   = { ...existingSections, ...(sections ?? {}) };
 
     const updated = {
       ...apt,
-      emr: { notes: notes ?? "", medicines: medicines ?? [], labs: labs ?? [], savedAt: new Date().toISOString() },
+      emr: {
+        sections:  mergedSections,
+        medicines: mergedMedicines,
+        labs:      mergedLabs,
+        savedAt:   new Date().toISOString(),
+      },
       updatedAt: new Date().toISOString(),
     };
     await appointmentsContainer.items.upsert(updated);
-    res.json({ status: "OK" });
+    res.json({ status: "OK", emr: updated.emr });
   } catch (err) {
     console.error("Save EMR error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/emr ──────────────────────────────────────────
+// Doctor reads back the saved EMR (and pre-visit data) for this appointment —
+// used to restore the consult screen if the doctor reloads or rejoins.
+router.get("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id }   = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    res.json({
+      emr:          apt.emr ?? null,
+      preVisitData: apt.preVisitData ?? null,
+    });
+  } catch (err) {
+    console.error("Fetch EMR error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/ehr ───────────────────────────────────────────
+// Doctor fetches the patient's full longitudinal Electronic Health Record:
+// demographics + standing medical profile (allergies, chronic conditions,
+// current medications) PLUS a timeline of every past appointment's EMR for
+// this patient, across all doctors. This is the patient's complete medical
+// history — as opposed to /:id/emr, which is just this one encounter.
+router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id }   = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+    if (!patient) { res.status(404).json({ error: "Patient profile not found." }); return; }
+
+    const profile = {
+      fullName:        patient.fullName       ?? "",
+      email:           patient.email          ?? "",
+      phone:           patient.phone          ?? "",
+      gender:          patient.gender         ?? "",
+      dateOfBirth:     patient.dob            ?? patient.dateOfBirth ?? "",
+      bloodGroup:      patient.bloodGroup     ?? "",
+      height:          patient.height         ?? "",
+      weight:          patient.weight         ?? "",
+      emiratesId:      patient.emiratesId     ?? "",
+      maritalStatus:   patient.maritalStatus  ?? "",
+      location:        patient.location       ?? "",
+      allergies:       patient.allergies      ?? [],
+      medications:     patient.medications    ?? { current: [], past: [] },
+      chronicDiseases: patient.chronicDiseases ?? [],
+      insurance:       patient.insurance      ?? [],
+    };
+
+    // All of this patient's appointments across every doctor, most recent first.
+    const allAppointments = await queryDocuments<any>(appointmentsContainer, {
+      query: "SELECT * FROM c WHERE c.patientId = @patientId ORDER BY c.scheduledAt DESC",
+      parameters: [{ name: "@patientId", value: apt.patientId }],
+    });
+
+    const doctorIds = Array.from(new Set(allAppointments.map((a) => a.doctorId).filter(Boolean)));
+    const doctorNames: Record<string, string> = {};
+    await Promise.all(doctorIds.map(async (did) => {
+      try {
+        const { resource: doc } = await doctorsContainer.item(did, did).read();
+        doctorNames[did] = doc?.fullName ?? "Unknown Doctor";
+      } catch {
+        doctorNames[did] = "Unknown Doctor";
+      }
+    }));
+
+    const visitHistory = allAppointments
+      .filter((a) => a.emr || a.status === "completed")
+      .map((a) => ({
+        appointmentId: a.id,
+        scheduledAt:   a.scheduledAt,
+        status:        a.status,
+        reason:        a.reason ?? "",
+        doctorId:      a.doctorId,
+        doctorName:    doctorNames[a.doctorId] ?? "Unknown Doctor",
+        emr:           a.emr ?? null,
+      }));
+
+    res.json({ profile, visitHistory, preVisitData: apt.preVisitData ?? null });
+  } catch (err) {
+    console.error("Fetch EHR error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -668,8 +920,13 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
     const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
     const wsUrl = isDoctor ? wsUrlDoctor : wsUrlPatient;
 
+    const participantName = isDoctor
+      ? (await doctorsContainer.item(userId, userId).read()).resource?.fullName
+      : (await patientsContainer.item(userId, userId).read()).resource?.fullName;
+
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
+      name:     participantName,
       ttl:      2 * 60 * 60, // 2 hours
     });
 

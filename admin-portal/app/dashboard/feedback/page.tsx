@@ -75,25 +75,20 @@ export default function FeedbackPage() {
     setLoading(true);
     setError("");
     try {
-      const url = filterFolder ? `/api/feedback/admin?folder=${filterFolder}` : "/api/feedback/admin";
-      const res = await adminFetch(url);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch reviews: status ${res.status}`);
-      }
+      // Always fetch all — filter client-side so range/type tabs don't need a refetch
+      const res = await adminFetch("/api/feedback/admin");
+      if (!res.ok) throw new Error(`Failed to fetch reviews: status ${res.status}`);
       const data = await res.json();
       setReviews(data);
-      if (data.length > 0) {
-        setSelectedId(data[0].id);
-      } else {
-        setSelectedId(null);
-      }
+      if (data.length > 0) setSelectedId(data[0].id);
+      else setSelectedId(null);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong while loading feedbacks.");
     } finally {
       setLoading(false);
     }
-  }, [filterFolder]);
+  }, []);
 
   useEffect(() => {
     fetchReviews();
@@ -101,10 +96,29 @@ export default function FeedbackPage() {
 
   const selected = reviews.find((r) => r.id === selectedId);
 
+  const filteredReviews = filterFolder === ""
+    ? reviews
+    : filterFolder === "consultation"
+    ? reviews.filter((r) => r.folder === "appointment")
+    : reviews.filter((r) => r.folder === filterFolder);
+
   // Filter other reviews from the same reviewer (to display on the sidebar)
   const reviewerPastReviews = selected
     ? reviews.filter((r) => r.reviewer.id === selected.reviewer.id && r.id !== selected.id)
     : [];
+
+  function getFolderLabel(folder: string) {
+    if (folder === "appointment") return "Consult";
+    if (folder === "pharmacy") return "Pharmacy";
+    if (folder === "lab") return "Lab";
+    return folder;
+  }
+
+  function getFolderColor(folder: string) {
+    if (folder === "appointment") return "bg-blue-50 text-blue-500";
+    if (folder === "pharmacy") return "bg-emerald-50 text-emerald-500";
+    return "bg-purple-50 text-purple-500";
+  }
 
   return (
     <ProtectedRoute>
@@ -127,7 +141,7 @@ export default function FeedbackPage() {
               <div className="flex items-center gap-2.5 flex-wrap">
                 {[
                   { value: "", label: "All Reviews" },
-                  { value: "appointment", label: "Consultations" },
+                  { value: "consultation", label: "Consultations" },
                   { value: "pharmacy", label: "Pharmacy" },
                   { value: "lab", label: "Diagnostics/Lab" },
                 ].map((tab) => {
@@ -167,7 +181,7 @@ export default function FeedbackPage() {
                   <div className="w-8 h-8 border-[3px] border-[#6A8BFF]/30 border-t-[#6A8BFF] rounded-full animate-spin" />
                   <p className="text-sm text-slate-400 font-semibold">Loading reviews…</p>
                 </div>
-              ) : reviews.length === 0 ? (
+              ) : filteredReviews.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-slate-400 my-auto">
                   <svg className="w-12 h-12 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499c.173-.439.81-.439.98 0l2.42 5.03 5.433.727c.48.064.672.643.298.98l-3.972 3.593 1.05 5.378c.09.46-.395.813-.81.588L12 18.068l-4.836 2.54c-.415.225-.9-.128-.81-.588l1.05-5.378-3.972-3.593c-.374-.337-.182-.916.298-.98l5.433-.727 2.42-5.03z" />
@@ -189,7 +203,7 @@ export default function FeedbackPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {reviews.map((rev) => {
+                      {filteredReviews.map((rev) => {
                         const isSelected = selectedId === rev.id;
                         return (
                           <tr
@@ -221,11 +235,8 @@ export default function FeedbackPage() {
                               <p className="line-clamp-1">{rev.comment || <span className="italic text-slate-300">No comment left</span>}</p>
                             </td>
                             <td className="py-4 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                rev.folder === "appointment" ? "bg-blue-50 text-blue-500" :
-                                rev.folder === "pharmacy" ? "bg-emerald-50 text-emerald-500" : "bg-purple-50 text-purple-500"
-                              }`}>
-                                {rev.folder === "appointment" ? "Consult" : rev.folder === "pharmacy" ? "Pharmacy" : "Lab"}
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getFolderColor(rev.folder)}`}>
+                                {getFolderLabel(rev.folder)}
                               </span>
                             </td>
                             <td className="py-4 pr-2 text-right">
@@ -242,7 +253,7 @@ export default function FeedbackPage() {
               )}
 
               {/* Pagination (visual placeholder matching design) */}
-              {!loading && reviews.length > 0 && (
+              {!loading && filteredReviews.length > 0 && (
                 <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
                   <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 transition" aria-label="Previous">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>

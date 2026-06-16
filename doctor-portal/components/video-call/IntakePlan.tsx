@@ -1,134 +1,151 @@
 "use client";
 
-import { useState } from "react";
-
-interface AccordionItem {
-  id: string;
-  title: string;
+export interface VisitInfoData {
+  visitType: string;
+  accompaniedBy: string[];
+  sourceOfHistory: string[];
+  referralSource: string[];
+  historyLimitation: string[];
 }
 
-export default function IntakePlan() {
-  // Visit type selection states
-  const [selectedVisitType, setSelectedVisitType] = useState("General concerns");
-  const visitTypes = [
-    "Annual exam",
-    "General concerns",
-    "New symptom",
-    "Increase in symptom",
-    "Scheduled follow-up",
-    "Increase in symptom",
-  ];
+export interface EmrSections {
+  visitInformation: VisitInfoData;
+  historyOfPresentIllness: string;
+  reviewSystem: string;
+  healthStatus: string;
+  histories: string;
+  physicalExamination: string;
+  medicalDecisionMaking: string;
+  procedure: string;
+  impressionAndPlan: string;
+  professionalServices: string;
+}
 
-  // Accompanied by selection
-  const [selectedAccompanied, setSelectedAccompanied] = useState<string[]>(["No one"]);
-  const accompaniedOptions = [
-    "No one",
-    "Family Member",
-    "Mother",
-    "Father",
-    "Spouse",
-    "Significant other",
-    "Medical personnel",
-  ];
+export const EMPTY_EMR_SECTIONS: EmrSections = {
+  visitInformation: {
+    visitType: "",
+    accompaniedBy: [],
+    sourceOfHistory: [],
+    referralSource: [],
+    historyLimitation: [],
+  },
+  historyOfPresentIllness: "",
+  reviewSystem: "",
+  healthStatus: "",
+  histories: "",
+  physicalExamination: "",
+  medicalDecisionMaking: "",
+  procedure: "",
+  impressionAndPlan: "",
+  professionalServices: "",
+};
 
-  // Source of history selection
-  const [selectedSource, setSelectedSource] = useState<string[]>(["Family Member"]);
-  const sourceOptions = [
-    "No one",
-    "Family Member",
-    "Mother",
-    "Father",
-    "Spouse",
-    "Significant other",
-    "Medical personnel",
-  ];
+const TEXT_SECTIONS: { key: keyof EmrSections; title: string }[] = [
+  { key: "historyOfPresentIllness", title: "History of Present Illness" },
+  { key: "reviewSystem", title: "Review System" },
+  { key: "healthStatus", title: "Health Status" },
+  { key: "histories", title: "Histories" },
+  { key: "physicalExamination", title: "Physical Examination" },
+  { key: "medicalDecisionMaking", title: "Medical Decision Making" },
+  { key: "procedure", title: "Procedure" },
+  { key: "impressionAndPlan", title: "Impression and Plan" },
+  { key: "professionalServices", title: "Professional Services" },
+];
 
-  // Referral source selection
-  const [selectedReferral, setSelectedReferral] = useState<string[]>(["ED"]);
-  const referralOptions = ["Self", "Provider", "ED", "Health plan", "Family member", "Friend"];
+const VISIT_TYPES = ["Annual exam", "General concerns", "New symptom", "Increase in symptom", "Scheduled follow-up"];
+const ACCOMPANIED_OPTIONS = ["No one", "Family Member", "Mother", "Father", "Spouse", "Significant other", "Medical personnel"];
+const SOURCE_OPTIONS = ACCOMPANIED_OPTIONS;
+const REFERRAL_OPTIONS = ["Self", "Provider", "ED", "Health plan", "Family member", "Friend"];
+const LIMITATION_OPTIONS = ["None", "Clinical condition", "Hearing Impaired", "Language barrier", "Family/Guardian not available"];
 
-  // History Limitation selection
-  const [selectedLimitation, setSelectedLimitation] = useState<string[]>(["None"]);
-  const limitationOptions = [
-    "None",
-    "Clinical condition",
-    "Hearing Impaired",
-    "Language barrier",
-    "Family/Guardian not available",
-  ];
+interface IntakePlanProps {
+  sections: EmrSections;
+  onChange: (sections: EmrSections) => void;
+  openSection: string | null;
+  onToggleSection: (key: string) => void;
+}
 
-  // Collapsible Accordions state
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    visit_info: true, // open by default
-  });
+function MultiSelectChips({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (opt: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onToggle(opt)}
+            className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
+              active ? "bg-[#5476FC] text-white shadow-sm" : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  const sections: AccordionItem[] = [
-    { id: "hpi", title: "History of Present Illness" },
-    { id: "ros", title: "Review System" },
-    { id: "health_status", title: "Health Status" },
-    { id: "histories", title: "Histories" },
-    { id: "pe", title: "Physical Examination" },
-    { id: "mdm", title: "Medical Decision Making" },
-    { id: "procedure", title: "Procedure" },
-    { id: "impression", title: "Impression and Plan" },
-    { id: "services", title: "Professional Services" },
-  ];
+export default function IntakePlan({ sections, onChange, openSection, onToggleSection }: IntakePlanProps) {
+  const visit = sections.visitInformation;
 
-  const toggleSection = (id: string) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+  const updateVisit = (patch: Partial<VisitInfoData>) => {
+    onChange({ ...sections, visitInformation: { ...visit, ...patch } });
   };
 
-  const handleToggleMultiSelect = (
-    item: string,
-    list: string[],
-    setList: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    if (list.includes(item)) {
-      setList(list.filter((x) => x !== item));
-    } else {
-      setList([...list, item]);
-    }
+  const toggleMulti = (field: keyof VisitInfoData, opt: string) => {
+    const current = visit[field] as string[];
+    const next = current.includes(opt) ? current.filter((x) => x !== opt) : [...current, opt];
+    updateVisit({ [field]: next } as Partial<VisitInfoData>);
+  };
+
+  const updateText = (key: keyof EmrSections, value: string) => {
+    onChange({ ...sections, [key]: value });
   };
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      {/* Static Intake Plan Header Box */}
       <div className="w-full bg-white rounded-xl border border-[#EBEEF5] px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-slate-800 text-[13px] font-bold">
         Intake plan
       </div>
 
-      {/* ── Visit Information Accordion (with blue border if open) ───────────────── */}
+      {/* Visit Information */}
       <div
         className={`bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-300 border ${
-          openSections["visit_info"] ? "border-[#5476FC] ring-1 ring-[#5476FC]/10" : "border-[#EBEEF5]"
+          openSection === "visitInformation" ? "border-[#5476FC] ring-1 ring-[#5476FC]/10" : "border-[#EBEEF5]"
         }`}
       >
         <button
-          onClick={() => toggleSection("visit_info")}
+          type="button"
+          onClick={() => onToggleSection("visitInformation")}
           className="w-full flex items-center justify-between p-5 text-left font-bold text-slate-800 text-[13px] bg-white border-b border-[#EBEEF5] hover:bg-[#F8FAFC] transition-colors"
         >
           <span>Visit Information</span>
         </button>
 
-        {openSections["visit_info"] && (
+        {openSection === "visitInformation" && (
           <div className="p-5 flex flex-col gap-5 bg-white">
-            {/* Visit Type */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Visit type</span>
               <div className="flex flex-wrap gap-2">
-                {visitTypes.map((type, idx) => {
-                  const active = selectedVisitType === type;
+                {VISIT_TYPES.map((type) => {
+                  const active = visit.visitType === type;
                   return (
                     <button
-                      key={idx}
-                      onClick={() => setSelectedVisitType(type)}
+                      key={type}
+                      type="button"
+                      onClick={() => updateVisit({ visitType: type })}
                       className={`h-7 px-4 rounded-full text-xs font-semibold tracking-wide transition-all border-none ${
-                        active
-                          ? "bg-[#5476FC] text-white shadow-sm"
-                          : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
+                        active ? "bg-[#5476FC] text-white shadow-sm" : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
                       }`}
                     >
                       {type}
@@ -136,164 +153,63 @@ export default function IntakePlan() {
                   );
                 })}
               </div>
+              <input
+                type="text"
+                value={!VISIT_TYPES.includes(visit.visitType) ? visit.visitType : ""}
+                onChange={(e) => updateVisit({ visitType: e.target.value })}
+                placeholder="Other visit type…"
+                className="flex-1 h-9 px-4 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all"
+              />
             </div>
 
-            {/* Add New Input */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Add New</span>
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="Increase in symptom"
-                  className="flex-1 h-9 px-4 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all"
-                />
-                <button
-                  onClick={() => alert("Search cancelled")}
-                  className="h-9 px-4 rounded-lg bg-[#E8F1FF] text-[#5476FC] text-xs font-bold hover:bg-[#D4E4FF] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => alert("Value saved")}
-                  className="h-9 px-5 rounded-lg bg-[#5476FC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.2)] hover:bg-[#3B5BFC] transition-all"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-
-            {/* Accompanied By */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Accompanied by</span>
-              <div className="flex flex-wrap gap-2">
-                {accompaniedOptions.map((opt) => {
-                  const active = selectedAccompanied.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleToggleMultiSelect(opt, selectedAccompanied, setSelectedAccompanied)}
-                      className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
-                        active
-                          ? "bg-[#5476FC] text-white shadow-sm"
-                          : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+              <MultiSelectChips options={ACCOMPANIED_OPTIONS} selected={visit.accompaniedBy} onToggle={(o) => toggleMulti("accompaniedBy", o)} />
             </div>
 
-            {/* Source of History */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Source of history</span>
-              <div className="flex flex-wrap gap-2">
-                {sourceOptions.map((opt) => {
-                  const active = selectedSource.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleToggleMultiSelect(opt, selectedSource, setSelectedSource)}
-                      className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
-                        active
-                          ? "bg-[#5476FC] text-white shadow-sm"
-                          : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+              <MultiSelectChips options={SOURCE_OPTIONS} selected={visit.sourceOfHistory} onToggle={(o) => toggleMulti("sourceOfHistory", o)} />
             </div>
 
-            {/* Referral Source */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Referral source</span>
-              <div className="flex flex-wrap gap-2">
-                {referralOptions.map((opt) => {
-                  const active = selectedReferral.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleToggleMultiSelect(opt, selectedReferral, setSelectedReferral)}
-                      className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
-                        active
-                          ? "bg-[#5476FC] text-white shadow-sm"
-                          : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+              <MultiSelectChips options={REFERRAL_OPTIONS} selected={visit.referralSource} onToggle={(o) => toggleMulti("referralSource", o)} />
             </div>
 
-            {/* History Limitation */}
             <div className="flex flex-col gap-2.5">
               <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">History Limitation</span>
-              <div className="flex flex-wrap gap-2">
-                {limitationOptions.map((opt) => {
-                  const active = selectedLimitation.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleToggleMultiSelect(opt, selectedLimitation, setSelectedLimitation)}
-                      className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
-                        active
-                          ? "bg-[#5476FC] text-white shadow-sm"
-                          : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
+              <MultiSelectChips options={LIMITATION_OPTIONS} selected={visit.historyLimitation} onToggle={(o) => toggleMulti("historyLimitation", o)} />
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Remaining Minimalist White Accordion Bars (No Chevrons) ──────────────── */}
+      {/* Remaining free-text sections */}
       <div className="flex flex-col gap-2.5 w-full">
-        {sections.map((sec) => {
-          const isOpen = openSections[sec.id] || false;
+        {TEXT_SECTIONS.map(({ key, title }) => {
+          const isOpen = openSection === key;
+          const value = sections[key] as string;
           return (
-            <div
-              key={sec.id}
-              className="bg-white rounded-xl border border-[#EBEEF5] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300"
-            >
+            <div key={key} className="bg-white rounded-xl border border-[#EBEEF5] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300">
               <button
-                onClick={() => toggleSection(sec.id)}
+                type="button"
+                onClick={() => onToggleSection(key)}
                 className="w-full flex items-center justify-between px-5 py-4 text-left font-bold text-slate-800 text-[13px] bg-white hover:bg-[#F8FAFC] transition-colors"
               >
-                <span>{sec.title}</span>
+                <span>{title}</span>
+                {value.trim() && <span className="w-1.5 h-1.5 rounded-full bg-[#5476FC]" />}
               </button>
 
               {isOpen && (
                 <div className="px-5 pb-5 pt-2 text-[#676E76] text-xs leading-relaxed border-t border-[#EBEEF5] bg-white">
                   <textarea
-                    placeholder={`Enter clinical notes for ${sec.title.toLowerCase()}...`}
+                    value={value}
+                    onChange={(e) => updateText(key, e.target.value)}
+                    placeholder={`Enter clinical notes for ${title.toLowerCase()}...`}
                     rows={3}
                     className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none"
                   />
-                  <div className="flex justify-end gap-2.5 mt-3">
-                    <button
-                      onClick={() => toggleSection(sec.id)}
-                      className="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[#383F45] text-[11px] font-semibold"
-                    >
-                      Clear
-                    </button>
-                    <button
-                      onClick={() => alert(`Saved notes for ${sec.title}`)}
-                      className="px-3.5 py-1.5 rounded-md bg-[#5476FC] hover:bg-[#3B5BFC] text-white text-[11px] font-semibold"
-                    >
-                      Apply Notes
-                    </button>
-                  </div>
                 </div>
               )}
             </div>

@@ -8,6 +8,10 @@ import {
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication,
 } from "livekit-client";
+import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS } from "@/components/video-call/IntakePlan";
+import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
+import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
+import EhrPanel from "@/components/video-call/EhrPanel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -46,19 +50,6 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-const EMR_SECTIONS = [
-  "Visit Information",
-  "History of Present Illness",
-  "Review System",
-  "Health Status",
-  "Histories",
-  "Physical Examination",
-  "Medical Decision Making",
-  "Procedure",
-  "Impression and Plan",
-  "Professional Services",
-];
-
 function VideoCallInner() {
   const searchParams  = useSearchParams();
   const router        = useRouter();
@@ -77,10 +68,21 @@ function VideoCallInner() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [unread,     setUnread]     = useState(0);
 
-  const [notes,      setNotes]      = useState("");
-  const [expandedSection, setExpandedSection] = useState<string | null>("Visit Information");
+  const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
+  const [expandedSection, setExpandedSection] = useState<string | null>("visitInformation");
   const [savingEmr,  setSavingEmr]  = useState(false);
   const [emrSaved,   setEmrSaved]   = useState(false);
+  const [loadingEmr, setLoadingEmr] = useState(true);
+
+  // Current doctor identity — used by AddMedicines/AddLabs to identify own entries
+  const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
+
+  // EHR panel
+  const [ehrOpen, setEhrOpen] = useState(false);
+  const [ehrLoading, setEhrLoading] = useState(false);
+  const [ehrData, setEhrData] = useState<any | null>(null);
 
   // Specialist invite (primary doctor only)
   const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
@@ -101,6 +103,10 @@ function VideoCallInner() {
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+
+  // A stable ref to the latest "refresh medicines + labs only" function so the
+  // once-registered LiveKit DataReceived handler can always call the current version.
+  const refreshMedicinesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Timer
   useEffect(() => {
@@ -176,6 +182,10 @@ function VideoCallInner() {
         } else if (data.type === "specialist_declined" && !isSpecialist) {
           if (patientPollRef.current) clearInterval(patientPollRef.current);
           setInviteStatus("declined");
+        } else if (data.type === "emr_updated") {
+          // Another doctor in the call saved the EMR — re-fetch medicines & labs
+          // so both doctors always see the merged, up-to-date prescription list.
+          refreshMedicinesRef.current?.();
         }
       } catch {}
     });
@@ -244,6 +254,123 @@ function VideoCallInner() {
     await roomRef.current?.disconnect();
     setEnded(true);
   }, []);
+
+  // Load the current doctor's user ID on mount so components can identify own entries
+  useEffect(() => {
+    Session.getUserId().then((id) => setCurrentDoctorId(id ?? null)).catch(() => {});
+  }, []);
+
+  // Restore any previously saved EMR for this appointment
+  useEffect(() => {
+    if (!appointmentId) return;
+    (async () => {
+      setLoadingEmr(true);
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { emr } = await res.json();
+          if (emr) {
+            if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
+            setMedicines(emr.medicines ?? []);
+            setLabs(emr.labs ?? []);
+          }
+        }
+      } catch {
+        // ignore — start with a blank EMR
+      } finally {
+        setLoadingEmr(false);
+      }
+    })();
+  }, [appointmentId]);
+
+  // Keep refreshMedicinesRef pointing at the latest fetch function.
+  // We do this separately from the EMR-load useEffect so it can be called
+  // by the once-registered LiveKit DataReceived handler at any time.
+  useEffect(() => {
+    refreshMedicinesRef.current = async () => {
+      if (!appointmentId) return;
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { emr } = await res.json();
+          if (emr) {
+            // Only refresh medicines + labs; leave the doctor's in-progress
+            // section notes untouched so they don't lose unsaved text.
+            setMedicines(emr.medicines ?? []);
+            setLabs(emr.labs ?? []);
+          }
+        }
+      } catch {
+        // ignore — keep existing state
+      }
+    };
+  }, [appointmentId]);
+
+  const saveEmr = async () => {
+    setSavingEmr(true);
+    try {
+      const token = await Session.getAccessToken();
+
+      // CRITICAL: Only send THIS doctor's own entries to the backend.
+      // The local medicines/labs state includes entries from other doctors
+      // (loaded via EMR fetch). If we sent those too, the backend would
+      // re-tag them with this doctor's contributorDoctorId, corrupting the
+      // merge. The backend preserves all other doctors' entries independently.
+      const ownMedicines = medicines.filter(
+        (m) => !currentDoctorId || !m.contributorDoctorId || m.contributorDoctorId === currentDoctorId
+      );
+      const ownLabs = labs.filter(
+        (l) => !currentDoctorId || !l.contributorDoctorId || l.contributorDoctorId === currentDoctorId
+      );
+
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sections: emrSections, medicines: ownMedicines, labs: ownLabs }),
+      });
+      if (res.ok) {
+        // Update local state with what the backend actually saved — the fully
+        // merged list (this doctor's entries + all other doctors' entries).
+        const { emr: savedEmr } = await res.json();
+        if (savedEmr) {
+          setMedicines(savedEmr.medicines ?? []);
+          setLabs(savedEmr.labs ?? []);
+        }
+        setEmrSaved(true);
+        setTimeout(() => setEmrSaved(false), 2500);
+
+        // Notify the other doctor(s) in the room so they re-fetch immediately.
+        try {
+          await roomRef.current?.localParticipant.publishData(
+            new TextEncoder().encode(JSON.stringify({ type: "emr_updated" })),
+            { reliable: true }
+          );
+        } catch { /* non-fatal */ }
+      }
+    } catch {} finally { setSavingEmr(false); }
+  };
+
+  const openEhrPanel = async () => {
+    setEhrOpen(true);
+    setEhrLoading(true);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setEhrData(await res.json());
+    } catch {
+      // ignore
+    } finally {
+      setEhrLoading(false);
+    }
+  };
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -471,7 +598,7 @@ function VideoCallInner() {
           {inviteStatus === "declined" && (
             <div className="px-3 py-1.5 bg-red-50 border border-red-100 rounded-full text-red-600 text-[10px] font-semibold">Patient declined</div>
           )}
-          <button className="h-8 px-4 rounded-lg border border-gray-200 text-gray-600 text-[11px] font-semibold hover:bg-gray-50 transition-colors">
+          <button onClick={openEhrPanel} className="h-8 px-4 rounded-lg border border-gray-200 text-gray-600 text-[11px] font-semibold hover:bg-gray-50 transition-colors">
             View Detailed EHR
           </button>
           {!isSpecialist && (
@@ -629,50 +756,37 @@ function VideoCallInner() {
         {/* Right: EMR */}
         <div className="flex-1 overflow-hidden flex flex-col border-l border-gray-100">
           <div className="flex-1 overflow-y-auto">
-            <div className="px-6 pt-4 pb-2 border-b border-gray-100">
-              <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wide">Intake plan</p>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {EMR_SECTIONS.map(section => (
-                <div key={section}>
-                  <button onClick={() => setExpandedSection(expandedSection === section ? null : section)}
-                    className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
-                    <span className={`text-xs font-semibold ${expandedSection === section ? "text-[#5476fc]" : "text-[#24292e]"}`}>{section}</span>
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
-                      className={`text-gray-300 transition-transform ${expandedSection === section ? "rotate-180" : ""}`}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                  </button>
-                  {expandedSection === section && (
-                    <div className="px-6 pb-4 bg-gray-50/50">
-                      <textarea
-                        value={section === "Impression and Plan" ? notes : ""}
-                        onChange={e => section === "Impression and Plan" && setNotes(e.target.value)}
-                        placeholder={`Add ${section} notes…`}
-                        rows={3}
-                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/40 resize-none mt-2"
-                      />
-                    </div>
-                  )}
+            {loadingEmr ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+              </div>
+            ) : (
+              <div className="px-6 py-4 flex flex-col gap-5">
+                <IntakePlan
+                  sections={emrSections}
+                  onChange={setEmrSections}
+                  openSection={expandedSection}
+                  onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
+                  <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
             <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50">Cancel</button>
-            <button onClick={async () => {
-              setSavingEmr(true);
-              await new Promise(r => setTimeout(r, 800));
-              setEmrSaved(true);
-              setSavingEmr(false);
-              setTimeout(() => setEmrSaved(false), 2500);
-            }} disabled={savingEmr}
+            <button onClick={saveEmr} disabled={savingEmr}
               className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec]"}`}>
               {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
             </button>
           </div>
         </div>
       </div>
+
+      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} />
     </div>
   );
 }

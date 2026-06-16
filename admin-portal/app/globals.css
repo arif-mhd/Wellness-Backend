@@ -40,4 +40,32 @@
     background-color: #e5e7eb;
     border-radius: 9999px;
   }
+
+  .chart-scroll-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .chart-scroll-x::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .chart-scroll-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .chart-scroll-x::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+  }
+
+  .chart-scroll-x:hover {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .chart-scroll-x:hover::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+  }
 }

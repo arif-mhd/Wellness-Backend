@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -81,8 +81,10 @@ const StarRating = ({ rating }: { rating: number }) => (
 
 type ActiveTab = "onboard" | "queue";
 
-export default function ManagePharmacyPage() {
+function ManagePharmacyPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get("id");
   const [activeTab, setActiveTab] = useState<ActiveTab>("onboard");
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
 
@@ -105,14 +107,26 @@ export default function ManagePharmacyPage() {
         adminFetch("/api/admin/pharmacy/products/pending"),
         adminFetch("/api/admin/pharmacy/products/approved"),
       ]);
-      if (pp.ok)  { const d = await pp.json();  setPendingPharmacies(d.pharmacies); }
-      if (ap.ok)  { const d = await ap.json();  setApprovedPharmacies(d.pharmacies); }
+      let pendingList: Pharmacy[] = [];
+      let approvedList: Pharmacy[] = [];
+      if (pp.ok)  { const d = await pp.json();  pendingList = d.pharmacies ?? []; setPendingPharmacies(pendingList); }
+      if (ap.ok)  { const d = await ap.json();  approvedList = d.pharmacies ?? []; setApprovedPharmacies(approvedList); }
       if (ppr.ok) { const d = await ppr.json(); setPendingProducts(d.products); }
       if (apr.ok) { const d = await apr.json(); setApprovedProducts(d.products); }
+
+      if (targetId) {
+        if (pendingList.some((p) => p.id === targetId)) {
+          setActiveTab("queue");
+          setSelectedPharmacyId(targetId);
+        } else if (approvedList.some((p) => p.id === targetId)) {
+          setActiveTab("onboard");
+          setSelectedPharmacyId(targetId);
+        }
+      }
     } catch {
       setFetchError("Failed to load data.");
     }
-  }, []);
+  }, [targetId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -561,5 +575,13 @@ export default function ManagePharmacyPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function ManagePharmacyPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManagePharmacyPageInner />
+    </Suspense>
   );
 }

@@ -9,6 +9,10 @@ import {
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication, Participant,
 } from "livekit-client";
+import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS } from "@/components/video-call/IntakePlan";
+import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
+import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
+import EhrPanel from "@/components/video-call/EhrPanel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -17,8 +21,6 @@ function fmt(d: Date) {
 }
 
 interface ChatMsg  { id: string; sender: "you" | "patient"; name: string; text: string; time: string; }
-interface Medicine { id: string; name: string; dose: string; freq: string; duration: string; notes: string; }
-interface Lab      { id: string; name: string; notes: string; }
 
 interface RemoteVideoTile {
   participantId: string;
@@ -36,19 +38,6 @@ interface AvailableDoctor {
   rating: number;
 }
 
-// EMR section definitions
-const EMR_SECTIONS = [
-  "Visit Information",
-  "History of Present Illness",
-  "Review System",
-  "Health Status",
-  "Histories",
-  "Physical Examination",
-  "Medical Decision Making",
-  "Procedure",
-  "Impression and Plan",
-  "Professional Services",
-];
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -84,16 +73,18 @@ function ConsultRoom() {
   const [chatOpen,  setChatOpen]  = useState(false);
 
   // EMR
-  const [notes,     setNotes]     = useState("");
+  const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [labs,      setLabs]      = useState<Lab[]>([]);
+  const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved,  setEmrSaved]  = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>("Visit Information");
-  const [addMedOpen, setAddMedOpen] = useState(false);
-  const [addLabOpen, setAddLabOpen] = useState(false);
-  const [newMed, setNewMed] = useState<Omit<Medicine, "id">>({ name: "", dose: "", freq: "Before food", duration: "Once Daily", notes: "" });
-  const [newLab, setNewLab] = useState({ name: "", notes: "" });
+  const [loadingEmr, setLoadingEmr] = useState(true);
+  const [expandedSection, setExpandedSection] = useState<string | null>("visitInformation");
+
+  // EHR panel
+  const [ehrOpen, setEhrOpen] = useState(false);
+  const [ehrLoading, setEhrLoading] = useState(false);
+  const [ehrData, setEhrData] = useState<any | null>(null);
 
   // Specialist invite
   const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
@@ -363,17 +354,59 @@ function ConsultRoom() {
 
   useEffect(() => { return () => { if (patientPollRef.current) clearInterval(patientPollRef.current); }; }, []);
 
+  // Restore any previously saved EMR for this appointment (e.g. doctor reloaded the page)
+  useEffect(() => {
+    if (!appointmentId) return;
+    (async () => {
+      setLoadingEmr(true);
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { emr } = await res.json();
+          if (emr) {
+            if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
+            setMedicines(emr.medicines ?? []);
+            setLabs(emr.labs ?? []);
+          }
+        }
+      } catch {
+        // ignore — start with a blank EMR
+      } finally {
+        setLoadingEmr(false);
+      }
+    })();
+  }, [appointmentId]);
+
   const saveEmr = async () => {
     setSavingEmr(true);
     try {
       await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
-        body: JSON.stringify({ notes, medicines, labs }),
+        body: JSON.stringify({ sections: emrSections, medicines, labs }),
       });
       setEmrSaved(true);
       setTimeout(() => setEmrSaved(false), 2500);
     } catch {} finally { setSavingEmr(false); }
+  };
+
+  const openEhrPanel = async () => {
+    setEhrOpen(true);
+    setEhrLoading(true);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setEhrData(await res.json());
+    } catch {
+      // ignore
+    } finally {
+      setEhrLoading(false);
+    }
   };
 
   if (ended) return (
@@ -536,57 +569,8 @@ function ConsultRoom() {
         </div>
       )}
 
-      {/* ── Add Medicine modal ── */}
-      {addMedOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setAddMedOpen(false)}/>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[360px] mx-4 p-6 flex flex-col gap-4">
-            <h3 className="text-[#24292e] font-semibold text-sm">Add Medicine</h3>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-[10px] text-gray-500 font-medium mb-1 block">Medicine</label>
-                <input value={newMed.name} onChange={e => setNewMed(p => ({...p, name: e.target.value}))}
-                  placeholder="Search for a medicine"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/50"/>
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 font-medium mb-1 block">Timing</label>
-                <select value={newMed.freq} onChange={e => setNewMed(p => ({...p, freq: e.target.value}))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none">
-                  <option>Before food</option><option>After food</option><option>With food</option><option>Empty stomach</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 font-medium mb-1 block">Frequency</label>
-                <select value={newMed.duration} onChange={e => setNewMed(p => ({...p, duration: e.target.value}))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none">
-                  <option>Once Daily</option><option>Twice Daily</option><option>Three Times Daily</option><option>As needed</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 font-medium mb-1 block">Dosage</label>
-                <input value={newMed.dose} onChange={e => setNewMed(p => ({...p, dose: e.target.value}))}
-                  placeholder="e.g. 500mg"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/50"/>
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 font-medium mb-1 block">Instructions</label>
-                <input value={newMed.notes} onChange={e => setNewMed(p => ({...p, notes: e.target.value}))}
-                  placeholder="Add Instructions"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/50"/>
-              </div>
-            </div>
-            <button onClick={() => {
-              if (!newMed.name.trim()) return;
-              setMedicines(p => [...p, { id: `${Date.now()}`, ...newMed }]);
-              setNewMed({ name: "", dose: "", freq: "Before food", duration: "Once Daily", notes: "" });
-              setAddMedOpen(false);
-            }} className="w-full py-2.5 rounded-xl bg-[#5476fc] text-white text-xs font-bold hover:bg-[#4466ec] transition-colors">
-              Add Medicine
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── EHR panel ── */}
+      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} />
 
       {/* ── Top call bar ── */}
       <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
@@ -612,7 +596,7 @@ function ConsultRoom() {
               Patient declined
             </div>
           )}
-          <button onClick={() => router.push(`/appointments/${appointmentId}/ehr`)}
+          <button onClick={openEhrPanel}
             className="h-8 px-4 rounded-lg border border-gray-200 text-gray-600 text-[11px] font-semibold hover:bg-gray-50 transition-colors">
             View Detailed EHR
           </button>
@@ -800,172 +784,26 @@ function ConsultRoom() {
 
         {/* ── Right: EMR / Intake Plan ── */}
         <div className="flex-1 overflow-hidden flex flex-col border-l border-gray-100">
-          <div className="flex-1 overflow-y-auto">
-            {/* Intake plan header */}
-            <div className="px-6 pt-4 pb-2 border-b border-gray-100 flex-shrink-0">
-              <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wide">Intake plan</p>
-            </div>
+          <div className="flex-1 overflow-y-auto px-0">
+            {loadingEmr ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+              </div>
+            ) : (
+              <div className="px-6 py-4 flex flex-col gap-5">
+                <IntakePlan
+                  sections={emrSections}
+                  onChange={setEmrSections}
+                  openSection={expandedSection}
+                  onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                />
 
-            {/* EMR Sections */}
-            <div className="divide-y divide-gray-50">
-              {EMR_SECTIONS.map(section => (
-                <div key={section}>
-                  <button
-                    onClick={() => setExpandedSection(expandedSection === section ? null : section)}
-                    className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
-                    <span className={`text-xs font-semibold ${expandedSection === section ? "text-[#5476fc]" : "text-[#24292e]"}`}>{section}</span>
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
-                      className={`text-gray-300 transition-transform ${expandedSection === section ? "rotate-180" : ""}`}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                  </button>
-
-                  {expandedSection === section && (
-                    <div className="px-6 pb-4 bg-gray-50/50">
-                      {section === "Visit Information" && (
-                        <div className="flex flex-col gap-3 pt-2">
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">Visit type</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["Annual exam", "General concerns", "New symptom", "Increase in symptom", "Scheduled follow-up"].map(vt => (
-                                <button key={vt} className="h-6 px-3 rounded-full text-[10px] border border-[#5476fc] bg-[#5476fc]/5 text-[#5476fc] font-medium hover:bg-[#5476fc]/10 transition-colors">{vt}</button>
-                              ))}
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                              <input placeholder="Increase in symptom" className="flex-1 text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/40"/>
-                              <button className="h-8 px-3 rounded-lg border border-gray-200 text-gray-500 text-xs hover:bg-gray-50 transition-colors">Cancel</button>
-                              <button className="h-8 px-3 rounded-lg bg-[#5476fc] text-white text-xs font-medium hover:bg-[#4466ec] transition-colors">Save</button>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">Accompanied by</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["No one", "Family Member", "Mother", "Father", "Spouse", "Significant other", "Medical personnel"].map(a => (
-                                <button key={a} className="h-6 px-3 rounded-full text-[10px] border border-gray-200 text-gray-500 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">{a}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">Source of history</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["No one", "Family Member", "Mother", "Father", "Spouse", "Significant other", "Medical personnel"].map(a => (
-                                <button key={a} className="h-6 px-3 rounded-full text-[10px] border border-gray-200 text-gray-500 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">{a}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">Referral source</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["Self", "Provider", "ED", "Health plan", "Family member", "Friend"].map(a => (
-                                <button key={a} className="h-6 px-3 rounded-full text-[10px] border border-gray-200 text-gray-500 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">{a}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">History Limitation</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {["None", "Clinical condition", "Hearing Impaired", "Language barrier", "Family/Guardian not available"].map(a => (
-                                <button key={a} className="h-6 px-3 rounded-full text-[10px] border border-gray-200 text-gray-500 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">{a}</button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {section !== "Visit Information" && (
-                        <textarea
-                          value={section === "Impression and Plan" ? notes : ""}
-                          onChange={e => section === "Impression and Plan" && setNotes(e.target.value)}
-                          placeholder={`Add ${section} notes…`}
-                          rows={3}
-                          className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-700 placeholder-gray-300 outline-none focus:border-[#5476fc]/40 resize-none mt-2"
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Add Medicines + Labs */}
-            <div className="px-6 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Medicines */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-[#24292e]">Add Medicines</p>
-                    <button onClick={() => setAddMedOpen(true)}
-                      className="w-6 h-6 rounded-full bg-[#5476fc]/10 text-[#5476fc] flex items-center justify-center hover:bg-[#5476fc]/20 transition-colors text-sm font-bold">+</button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {medicines.map(m => (
-                      <div key={m.id} className="bg-white border border-gray-100 rounded-xl p-3 relative group">
-                        <div className="flex items-start gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#5476fc] mt-1.5 flex-shrink-0"/>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-semibold text-[#24292e] truncate">{m.name} {m.dose}</p>
-                            <p className="text-[10px] text-[#5476fc]">{m.freq} ({m.duration})</p>
-                            {m.notes && <p className="text-[10px] text-gray-400 mt-0.5">Notes: {m.notes}</p>}
-                          </div>
-                          <button onClick={() => setMedicines(p => p.filter(x => x.id !== m.id))}
-                            className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 flex-shrink-0 transition-opacity">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {medicines.length === 0 && <p className="text-gray-300 text-[11px]">No medicines added</p>}
-                  </div>
-                </div>
-
-                {/* Labs */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-[#24292e]">Add/ Recommend Labs</p>
-                    <button onClick={() => setAddLabOpen(true)}
-                      className="w-6 h-6 rounded-full bg-[#5476fc]/10 text-[#5476fc] flex items-center justify-center hover:bg-[#5476fc]/20 transition-colors text-sm font-bold">+</button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {labs.map(l => (
-                      <div key={l.id} className="bg-white border border-gray-100 rounded-xl p-3 relative group">
-                        <div className="flex items-start gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#5476fc] mt-1.5 flex-shrink-0"/>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-semibold text-[#24292e]">{l.name}</p>
-                            {l.notes && <p className="text-[10px] text-gray-400">{l.notes}</p>}
-                          </div>
-                          <button onClick={() => setLabs(p => p.filter(x => x.id !== l.id))}
-                            className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 flex-shrink-0 transition-opacity">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {labs.length === 0 && <p className="text-gray-300 text-[11px]">No labs added</p>}
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <AddMedicines medicines={medicines} onChange={setMedicines} />
+                  <AddLabs labs={labs} onChange={setLabs} />
                 </div>
               </div>
-
-              {/* Add Lab inline form */}
-              {addLabOpen && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-xl flex flex-col gap-2">
-                  <input value={newLab.name} onChange={e => setNewLab(p => ({...p, name: e.target.value}))}
-                    placeholder="Lab test name"
-                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-[#5476fc]/40"/>
-                  <input value={newLab.notes} onChange={e => setNewLab(p => ({...p, notes: e.target.value}))}
-                    placeholder="Notes (optional)"
-                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-[#5476fc]/40"/>
-                  <div className="flex gap-2">
-                    <button onClick={() => setAddLabOpen(false)} className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-500 hover:bg-gray-100">Cancel</button>
-                    <button onClick={() => {
-                      if (!newLab.name.trim()) return;
-                      setLabs(p => [...p, { id: `${Date.now()}`, ...newLab }]);
-                      setNewLab({ name: "", notes: "" });
-                      setAddLabOpen(false);
-                    }} className="flex-1 py-1.5 rounded-lg bg-[#5476fc] text-white text-xs font-semibold hover:bg-[#4466ec]">Add Lab</button>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Bottom save bar */}
