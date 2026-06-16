@@ -154,7 +154,7 @@ export default function AllConsultations({ appointments = [] }: AllConsultations
         name: a.patientName ?? "Unknown Patient",
         age,
         email: a.patientEmail ?? "",
-        avatar: a.patientAvatarUrl || "/patient-avatar-1.png",
+        avatar: a.patientAvatarUrl || "/default-avatar.svg",
         disease: a.reason ?? "Consultation",
         date: formatRecentDate(a.scheduledAt),
       };
@@ -346,7 +346,7 @@ export default function AllConsultations({ appointments = [] }: AllConsultations
                         alt={item.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
+                          (e.target as HTMLImageElement).src = "/default-avatar.svg";
                         }}
                       />
                     </div>

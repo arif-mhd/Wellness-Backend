@@ -37,8 +37,14 @@ function fmt12(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2,"0")}${h >= 12 ? "PM" : "AM"}`;
 }
 
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function timeUntil(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
+  const diff = parseLocalTime(iso).getTime() - Date.now();
   if (diff <= 0) return "Now";
   const mins = Math.round(diff / 60000);
   if (mins < 60) return `Consultation in ${mins} min`;
@@ -143,11 +149,17 @@ export default function DashboardPage() {
         const { appointments } = await apptRes.json();
         const all: any[] = appointments ?? [];
 
-        const todayStr     = new Date().toISOString().slice(0, 10);
-        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const today = new Date();
+        const yesterday = new Date(Date.now() - 86400000);
 
-        const todays    = all.filter(a => a.scheduledAt?.startsWith(todayStr)     && a.status !== "cancelled");
-        const yesterdays = all.filter(a => a.scheduledAt?.startsWith(yesterdayStr) && a.status !== "cancelled");
+        const isSameDay = (d1: Date, d2: Date) => {
+          return d1.getFullYear() === d2.getFullYear() &&
+                 d1.getMonth() === d2.getMonth() &&
+                 d1.getDate() === d2.getDate();
+        };
+
+        const todays    = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), today) && a.status !== "cancelled");
+        const yesterdays = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), yesterday) && a.status !== "cancelled");
         const inProgress = all.filter(a => a.status === "in_progress");
 
         setTotalAppointments(all.length);
@@ -157,15 +169,15 @@ export default function DashboardPage() {
         // Waiting room: patients currently in_progress
         setWaitingCount(inProgress.length);
         setWaitingAvatars(
-          inProgress.slice(0, 3).map((_, i) =>
-            i % 2 === 0 ? "/patient-avatar-1.png" : "/patient-avatar-2.png"
+          inProgress.slice(0, 3).map((a: any) =>
+            a.patientAvatarUrl || "/default-avatar.svg"
           )
         );
 
-        const rows: PatientRow[] = todays.map((a: any, i: number) => ({
+        const rows: PatientRow[] = todays.map((a: any) => ({
           id:     a.id,
           name:   a.patientName ?? "Patient",
-          avatar: i % 2 === 0 ? "/patient-avatar-1.png" : "/patient-avatar-2.png",
+          avatar: a.patientAvatarUrl || "/default-avatar.svg",
           tags:   [a.reason ?? "Consultation"],
           time:   timeUntil(a.scheduledAt),
         }));

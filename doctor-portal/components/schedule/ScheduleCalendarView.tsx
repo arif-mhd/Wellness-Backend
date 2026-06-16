@@ -11,6 +11,7 @@ export interface CalendarAppointment {
   hour: string; // "7 AM", "8 AM" etc.
   patientBio: string;
   reasonForVisit: string;
+  dateStr?: string;
 }
 
 interface ScheduleCalendarViewProps {
@@ -28,16 +29,25 @@ export default function ScheduleCalendarView({
   appointments = [],
   onConsultClick,
 }: ScheduleCalendarViewProps) {
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedAppt, setSelectedAppt] = useState<CalendarAppointment | null>(null);
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
 
-  // Dynamically calculate the dates of the current week (Sunday to Saturday)
-  const currentWeekDays = useMemo(() => {
-    const current = new Date();
+  // Calculate the dates of the week relative to currentDate
+  const visibleDays = useMemo(() => {
+    if (activeRange === "Day") {
+      return [{
+        label: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][currentDate.getDay()],
+        num: String(currentDate.getDate()),
+        isToday: currentDate.toDateString() === new Date().toDateString(),
+        date: currentDate,
+      }];
+    }
+
     const week = [];
-    const distance = current.getDay(); // Sunday is index 0
-    const sunday = new Date(current);
-    sunday.setDate(current.getDate() - distance);
+    const distance = currentDate.getDay(); // Sunday is index 0
+    const sunday = new Date(currentDate);
+    sunday.setDate(currentDate.getDate() - distance);
 
     const dayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     for (let i = 0; i < 7; i++) {
@@ -46,25 +56,58 @@ export default function ScheduleCalendarView({
       week.push({
         label: dayLabels[i],
         num: String(d.getDate()),
-        isToday: d.toDateString() === current.toDateString(),
+        isToday: d.toDateString() === new Date().toDateString(),
+        date: d,
       });
     }
     return week;
-  }, []);
+  }, [currentDate, activeRange]);
 
   const currentMonthYear = useMemo(() => {
-    const d = new Date();
     const monthLabels = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
-    return `${monthLabels[d.getMonth()]} ${d.getFullYear()}`;
-  }, []);
+    return `${monthLabels[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+  }, [currentDate]);
 
-  const getCellAppointments = (day: string, hour: string) =>
-    appointments.filter(
-      (a) => a.day.toUpperCase() === day.toUpperCase() && a.hour.toUpperCase() === hour.toUpperCase()
+  const handlePrev = () => {
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      if (activeRange === "Day") {
+        next.setDate(prev.getDate() - 1);
+      } else {
+        next.setDate(prev.getDate() - 7);
+      }
+      return next;
+    });
+  };
+
+  const handleNext = () => {
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      if (activeRange === "Day") {
+        next.setDate(prev.getDate() + 1);
+      } else {
+        next.setDate(prev.getDate() + 7);
+      }
+      return next;
+    });
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const getCellAppointments = (date: Date, hour: string) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const cellDateStr = `${year}-${month}-${day}`;
+    return appointments.filter(
+      (a) => a.dateStr === cellDateStr && a.hour.toUpperCase() === hour.toUpperCase()
     );
+  };
 
   return (
     <div className="relative flex flex-col w-full min-h-[640px] select-none">
@@ -72,9 +115,32 @@ export default function ScheduleCalendarView({
       {/* ── Calendar Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-2">
         <div className="flex items-center gap-3">
+          <button
+            onClick={handlePrev}
+            className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#676E76] hover:bg-slate-50 hover:text-[#5879FC] transition-colors"
+          >
+            <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+              <path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={handleToday}
+            className="px-3.5 py-1.5 border border-[#EBEEF5] rounded-full text-xs font-semibold text-[#676E76] bg-white hover:bg-slate-50 transition-all"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          >
+            Today
+          </button>
+          <button
+            onClick={handleNext}
+            className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#676E76] hover:bg-slate-50 hover:text-[#5879FC] transition-colors"
+          >
+            <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+              <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
           {/* Month label */}
           <span
-            className="text-[#24292E] font-medium text-[16px] tracking-[-0.3px]"
+            className="text-[#24292E] font-medium text-[16px] tracking-[-0.3px] ml-2"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
             {currentMonthYear}
@@ -107,8 +173,8 @@ export default function ScheduleCalendarView({
       <div className="overflow-x-auto relative">
         <div className="min-w-[840px] border border-[#EBEEF5] rounded-[16px] overflow-hidden bg-white max-h-[600px] overflow-y-auto">
 
-          {/* Header row: Left GMT + 7 day columns + Right GMT */}
-          <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "72px repeat(7, 1fr) 72px" }}>
+          {/* Header row: Left GMT + day columns + Right GMT */}
+          <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: `72px repeat(${visibleDays.length}, 1fr) 72px` }}>
             {/* GMT corner Left */}
             <div
               className="bg-[#F9FAFC] border-b border-r border-[#EBEEF5] py-3 px-2 flex items-center justify-center text-[10px] font-bold text-[#9EA5AD]"
@@ -116,7 +182,7 @@ export default function ScheduleCalendarView({
             >
               GMT
             </div>
-            {currentWeekDays.map((day) => {
+            {visibleDays.map((day) => {
               return (
                 <div
                   key={day.label}
@@ -142,7 +208,7 @@ export default function ScheduleCalendarView({
             <div
               key={hour}
               className="grid border-b border-[#EBEEF5] last:border-b-0"
-              style={{ gridTemplateColumns: "72px repeat(7, 1fr) 72px" }}
+              style={{ gridTemplateColumns: `72px repeat(${visibleDays.length}, 1fr) 72px` }}
             >
               {/* Time label Left */}
               <div
@@ -153,8 +219,8 @@ export default function ScheduleCalendarView({
               </div>
 
               {/* Day cells */}
-              {currentWeekDays.map((day) => {
-                const cellAppts = getCellAppointments(day.label, hour);
+              {visibleDays.map((day) => {
+                const cellAppts = getCellAppointments(day.date, hour);
                 return (
                   <div
                     key={`${day.label}-${hour}`}
@@ -171,7 +237,7 @@ export default function ScheduleCalendarView({
                           alt={appt.patientName}
                           className="w-6 h-6 rounded-full object-cover shrink-0 border border-white shadow-sm"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
+                            (e.target as HTMLImageElement).src = "/default-avatar.svg";
                           }}
                         />
                         <span
@@ -228,7 +294,7 @@ export default function ScheduleCalendarView({
                 alt={selectedAppt.patientName}
                 className="w-12 h-12 rounded-full object-cover border-2 border-[#EBEEF5] shadow-sm"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
+                  (e.target as HTMLImageElement).src = "/default-avatar.svg";
                 }}
               />
               <div>
