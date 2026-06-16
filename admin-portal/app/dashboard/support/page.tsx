@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -15,11 +16,14 @@ function apiFetch(path: string, init?: RequestInit) {
 
 type Priority = "High" | "Medium" | "Low";
 type Status = "Open" | "In Progress" | "Closed";
+type SubmitterRole = "all" | "patient" | "doctor";
 
 interface Ticket {
   id: string;
   patientId: string;
   patientName?: string;
+  submitterName?: string;
+  submitterRole?: string;
   subject: string;
   description: string;
   category: string;
@@ -48,7 +52,9 @@ const DoubleCaret = () => (
   </div>
 );
 
-export default function SupportPage() {
+function SupportPageInner() {
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get("id");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -56,23 +62,34 @@ export default function SupportPage() {
   const [savingReply, setSavingReply] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const [roleFilter, setRoleFilter] = useState<SubmitterRole>("all");
 
   const fetchTickets = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/support/admin/all");
+      const params = new URLSearchParams();
+      if (roleFilter !== "all") params.set("submitterRole", roleFilter);
+      const res = await apiFetch(`/api/support/admin/all?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTickets(data);
-        if (data.length > 0 && !selectedId) setSelectedId(data[0].id);
+        if (targetId && data.some((t: Ticket) => t.id === targetId)) {
+          setSelectedId(targetId);
+        } else if (data.length > 0 && !selectedId) {
+          setSelectedId(data[0].id);
+        }
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [roleFilter, targetId]);
 
-  useEffect(() => { fetchTickets(); }, [fetchTickets]);
+  useEffect(() => {
+    setLoading(true);
+    if (!targetId) setSelectedId(null);
+    fetchTickets();
+  }, [fetchTickets]);
 
   const selected = tickets.find((t) => t.id === selectedId);
 
@@ -116,6 +133,10 @@ export default function SupportPage() {
 
   const filtered = statusFilter === "all" ? tickets : tickets.filter(t => t.status === statusFilter);
 
+  // Compute open counts per role (from all currently loaded tickets regardless of status filter)
+  const patientOpenCount = tickets.filter(t => (t.submitterRole === "patient" || !t.submitterRole) && t.status === "Open").length;
+  const doctorOpenCount = tickets.filter(t => t.submitterRole === "doctor" && t.status === "Open").length;
+
   function formatDate(iso: string) {
     try {
       return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -128,6 +149,8 @@ export default function SupportPage() {
     "Closed": "bg-[#24b26b] text-white",
   };
 
+  const displayName = (t: Ticket) => t.submitterName || t.patientName || (t.submitterRole === "doctor" ? "Unknown Doctor" : "Unknown Patient");
+
   return (
     <ProtectedRoute>
       <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
@@ -138,6 +161,31 @@ export default function SupportPage() {
 
             <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Support and Tickets</h1>
 
+            {/* Role tabs */}
+            <div className="flex items-center gap-2">
+              {([
+                { key: "all", label: "All Requests" },
+                { key: "patient", label: "Patient Requests", count: patientOpenCount },
+                { key: "doctor", label: "Doctor Requests", count: doctorOpenCount },
+              ] as { key: SubmitterRole; label: string; count?: number }[]).map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => setRoleFilter(key)}
+                  className={`px-5 py-2 rounded-full text-[13px] font-bold transition-all flex items-center gap-2 ${
+                    roleFilter === key ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
+                  }`}
+                >
+                  {label}
+                  {count !== undefined && count > 0 && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleFilter === key ? "bg-white/20 text-white" : "bg-rose-50 text-rose-500"}`}>
+                      {count} open
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Status filters */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {(["all", "Open", "In Progress", "Closed"] as const).map((s) => (
@@ -177,27 +225,29 @@ export default function SupportPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                      <th className="pb-4 pt-1 font-bold pl-2 w-[25%]">
+                      <th className="pb-4 pt-1 font-bold pl-2 w-[24%]">
                         <div className="flex items-center gap-2">Subject <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[12%]">
+                      <th className="pb-4 pt-1 font-bold w-[10%]">
                         <div className="flex items-center gap-2">Priority <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[16%]">Category</th>
-                      <th className="pb-4 pt-1 font-bold w-[20%]">Patient</th>
-                      <th className="pb-4 pt-1 font-bold w-[18%]">Date</th>
+                      <th className="pb-4 pt-1 font-bold w-[14%]">Category</th>
+                      <th className="pb-4 pt-1 font-bold w-[8%]">Type</th>
+                      <th className="pb-4 pt-1 font-bold w-[18%]">Submitter</th>
+                      <th className="pb-4 pt-1 font-bold w-[14%]">Date</th>
                       <th className="pb-4 pt-1 font-bold w-[12%] text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center text-slate-400 text-sm">No tickets found</td>
+                        <td colSpan={7} className="py-16 text-center text-slate-400 text-sm">No tickets found</td>
                       </tr>
                     ) : (
                       filtered.map((t) => {
                         const isSelected = selectedId === t.id;
                         const priority = getPriority(t.category);
+                        const isDoctor = t.submitterRole === "doctor";
                         return (
                           <tr
                             key={t.id}
@@ -210,13 +260,18 @@ export default function SupportPage() {
                             </td>
                             <td className={`py-4 text-[12px] font-bold ${priorityColor[priority]}`}>{priority}</td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
+                            <td className="py-4">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${isDoctor ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
+                                {isDoctor ? "Doctor" : "Patient"}
+                              </span>
+                            </td>
                             <td className="py-4 pr-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[12px] flex-shrink-0">
-                                  {(t.patientName || "?").slice(0, 2).toUpperCase()}
+                                  {displayName(t).slice(0, 2).toUpperCase()}
                                 </div>
                                 <div>
-                                  <p className="text-[12px] font-bold text-slate-800 leading-tight">{t.patientName || "Patient"}</p>
+                                  <p className="text-[12px] font-bold text-slate-800 leading-tight">{displayName(t)}</p>
                                 </div>
                               </div>
                             </td>
@@ -251,6 +306,13 @@ export default function SupportPage() {
                 </button>
               </div>
 
+              {/* Type badge */}
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-bold ${selected.submitterRole === "doctor" ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
+                  {selected.submitterRole === "doctor" ? "Doctor Request" : "Patient Request"}
+                </span>
+              </div>
+
               {/* Status toggle */}
               <div className="flex items-center gap-2 flex-wrap">
                 {(["Open", "In Progress", "Closed"] as Status[]).map((s) => (
@@ -271,13 +333,15 @@ export default function SupportPage() {
 
               {/* Created by */}
               <div>
-                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Patient</p>
+                <p className="text-[12.5px] font-bold text-slate-800 mb-2">
+                  {selected.submitterRole === "doctor" ? "Doctor" : "Patient"}
+                </p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[13px] flex-shrink-0">
-                    {(selected.patientName || "?").slice(0, 2).toUpperCase()}
+                    {displayName(selected).slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-[13px] font-black text-slate-800">{selected.patientName || "Patient"}</p>
+                    <p className="text-[13px] font-black text-slate-800">{displayName(selected)}</p>
                     <p className="text-[11px] text-slate-400 font-medium">ID: {selected.id.slice(0, 8).toUpperCase()}</p>
                   </div>
                 </div>
@@ -301,7 +365,7 @@ export default function SupportPage() {
 
               {/* Description */}
               <div>
-                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Patient Message</p>
+                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Message</p>
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
@@ -318,7 +382,7 @@ export default function SupportPage() {
                 )}
                 <textarea
                   className="w-full border border-slate-100 rounded-xl p-4 text-[12px] font-medium text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-[#6A8BFF] bg-[#f8fafd] transition min-h-[100px]"
-                  placeholder="Type your reply to the patient..."
+                  placeholder={`Type your reply to the ${selected.submitterRole === "doctor" ? "doctor" : "patient"}...`}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                 />
@@ -335,5 +399,13 @@ export default function SupportPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense fallback={null}>
+      <SupportPageInner />
+    </Suspense>
   );
 }

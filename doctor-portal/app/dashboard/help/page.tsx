@@ -1,170 +1,131 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-interface SupportTicket {
-  id: number;
-  name: string;
-  email: string;
-  category: "Technical Problems" | "Billing Inquiries";
-  summary: string;
-  dateTime: string;
-  status: "Open" | "Closed";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+async function apiFetch(path: string, init?: RequestInit) {
+  const accessToken = await Session.getAccessToken();
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      ...(init?.headers ?? {}),
+    },
+  });
 }
 
-const INITIAL_TICKETS: SupportTicket[] = [
-  {
-    id: 1,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Technical Problems",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "1 Feb, 2020, 11:40 PM",
-    status: "Open",
-  },
-  {
-    id: 2,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Billing Inquiries",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 3,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Technical Problems",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "8 Sep, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 4,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Technical Problems",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 5,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Billing Inquiries",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 6,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Technical Problems",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 7,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Billing Inquiries",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 8,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Billing Inquiries",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 9,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Technical Problems",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-  {
-    id: 10,
-    name: "Ticket_Feb2020",
-    email: "yelena@example.com",
-    category: "Billing Inquiries",
-    summary: "I've had a fever for three days with chills...",
-    dateTime: "22 Oct, 2020, 11:40 PM",
-    status: "Closed",
-  },
-];
+interface SupportTicket {
+  id: string;
+  patientId: string;
+  subject: string;
+  description: string;
+  category: string;
+  status: "Open" | "In Progress" | "Closed";
+  adminReply?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  submitterRole?: string;
+}
 
 export default function HelpSupportPage() {
   const router = useRouter();
-  const [tickets, setTickets] = useState<SupportTicket[]>(INITIAL_TICKETS);
-  const [filter, setFilter] = useState<"All" | "Open" | "Closed">("All");
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"All" | "Open" | "In Progress" | "Closed">("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Modal form states
   const [showRaiseIssue, setShowRaiseIssue] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Technical Problems");
+  const [subject, setSubject] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [comments, setComments] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Filter logic
+  const fetchTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/support");
+      if (res.ok) {
+        const data = await res.json();
+        setTickets(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchesFilter =
-      filter === "All" ||
-      (filter === "Open" && ticket.status === "Open") ||
-      (filter === "Closed" && ticket.status === "Closed");
+      filter === "All" || ticket.status === filter;
     const matchesSearch =
-      ticket.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.category.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  const handleCreateTicket = () => {
-    const now = new Date();
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthName = months[now.getMonth()];
-    
-    const newTicket: SupportTicket = {
-      id: Date.now(),
-      name: `Ticket_${monthName}${now.getFullYear()}`,
-      email: "yelena@example.com",
-      category: selectedCategory as any,
-      summary: comments || "Message from Pharmacy, prescription details pending",
-      dateTime: `${now.getDate()} ${monthName}, ${now.getFullYear()}, ${now.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      })}`,
-      status: "Open",
-    };
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / ITEMS_PER_PAGE));
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
-    setTickets([newTicket, ...tickets]);
-    
-    // reset form
-    setContactNumber("");
-    setComments("");
-    setSelectedCategory("Technical Problems");
-    setShowRaiseIssue(false);
+  const handleCreateTicket = async () => {
+    const ticketSubject = subject.trim() || `${selectedCategory} issue`;
+    const ticketDescription = comments.trim();
+    if (!ticketDescription) return;
+
+    setSubmitting(true);
+    try {
+      const res = await apiFetch("/api/support", {
+        method: "POST",
+        body: JSON.stringify({
+          subject: ticketSubject,
+          description: ticketDescription,
+          category: selectedCategory.toLowerCase().replace(/ /g, "_"),
+          role: "doctor",
+        }),
+      });
+      if (res.ok) {
+        const newTicket = await res.json();
+        setTickets((prev) => [newTicket, ...prev]);
+      }
+    } finally {
+      setSubmitting(false);
+      setSubject("");
+      setContactNumber("");
+      setComments("");
+      setSelectedCategory("Technical Problems");
+      setShowRaiseIssue(false);
+    }
   };
+
+  function formatDate(iso: string) {
+    try {
+      const d = new Date(iso);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${d.getDate()} ${months[d.getMonth()]}, ${d.getFullYear()}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    } catch { return iso; }
+  }
 
   return (
     <ProtectedRoute>
       <div className="px-10 pb-12 select-none flex flex-col gap-8 relative">
-        
+
         {/* Page title */}
         <div className="flex flex-col justify-center items-start mt-2">
           <h1
@@ -212,9 +173,9 @@ export default function HelpSupportPage() {
             </div>
             <input
               type="text"
-              placeholder="Need some help?"
+              placeholder="Search tickets..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               className="w-full bg-[#F4F6FA] text-[#24292E] placeholder-[#9EA5AD] text-xs rounded-full pl-12 pr-6 py-3.5 border border-transparent focus:border-[#EBEEF5] focus:bg-white outline-none transition-all text-center"
               style={{ fontFamily: "Outfit, sans-serif" }}
             />
@@ -238,7 +199,7 @@ export default function HelpSupportPage() {
             >
               Raise an Issue
             </button>
-            
+
             <Link
               href="/dashboard/help/faq"
               className="px-5 py-2.5 bg-white border border-[#EBEEF5] text-[#24292E] hover:bg-slate-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
@@ -254,17 +215,18 @@ export default function HelpSupportPage() {
 
         {/* History Table Wrapper */}
         <div className="flex flex-col gap-5 w-full">
-          
+
           {/* Filters Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {(["All", "Open", "Closed"] as const).map((opt) => {
+              {(["All", "Open", "In Progress", "Closed"] as const).map((opt) => {
                 const isActive = filter === opt;
+                const openCount = opt === "Open" ? tickets.filter(t => t.status === "Open").length : null;
                 return (
                   <button
                     key={opt}
-                    onClick={() => setFilter(opt)}
-                    className={`px-5 py-2 rounded-full text-xs font-semibold tracking-[-0.24px] border transition-all duration-200 ${
+                    onClick={() => { setFilter(opt); setCurrentPage(1); }}
+                    className={`px-5 py-2 rounded-full text-xs font-semibold tracking-[-0.24px] border transition-all duration-200 flex items-center gap-1.5 ${
                       isActive
                         ? "bg-[#24292E] text-white border-transparent shadow-sm"
                         : "bg-white text-[#676E76] border-[#EBEEF5] hover:bg-gray-50"
@@ -272,134 +234,155 @@ export default function HelpSupportPage() {
                     style={{ fontFamily: "Outfit, sans-serif" }}
                   >
                     {opt}
+                    {openCount !== null && openCount > 0 && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-[#FFF0F0] text-[#E05252]"}`}>
+                        {openCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
 
             <button
+              onClick={fetchTickets}
               className="text-[#9EA5AD] hover:text-[#24292E] text-xs font-semibold flex items-center gap-1 transition-colors"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
-              Today
-              <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-                <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              Refresh
+              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
           </div>
 
           {/* List Table Card */}
           <div className="bg-white border border-[#EBEEF5] rounded-[24px] px-6 py-4 shadow-sm flex flex-col">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="text-[10px] font-bold text-[#9EA5AD] uppercase tracking-wider">
-                  <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Name</th>
-                  <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Summary</th>
-                  <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Date and Time</th>
-                  <th className="py-4 font-bold text-right" style={{ fontFamily: "Outfit, sans-serif" }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    onClick={() => router.push("/dashboard/help/ticket")}
-                    className="hover:bg-[#F9FAFC]/50 transition-colors cursor-pointer"
-                  >
-                    {/* Name Column */}
-                    <td className="py-[22px] flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full border border-[#EEF2FF] bg-[#EEF2FF]/40 flex items-center justify-center text-[#5476FC] shrink-0">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                          <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="2" />
-                          <path d="M10 6.5h.01M10 9.5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[12px] font-bold text-[#24292E]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {ticket.name}
-                        </span>
-                        <span className="text-[10px] text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {ticket.email}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Summary Column */}
-                    <td className="py-[22px]">
-                      <div className="flex items-center gap-2 max-w-[320px]">
-                        <span className="px-2.5 py-1 bg-[#EEF2FF] text-[#5476FC] text-[9.5px] font-bold rounded-[6px] shrink-0" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {ticket.category}
-                        </span>
-                        <span className="text-xs text-[#9EA5AD] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {ticket.summary}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Date Column */}
-                    <td className="py-[22px] text-xs text-[#676E76] font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>
-                      {ticket.dateTime}
-                    </td>
-
-                    {/* Status Column */}
-                    <td className="py-[22px] text-right">
-                      <span className={`inline-block px-3 py-1.5 rounded-full text-[10px] font-bold tracking-[-0.2px] ${
-                        ticket.status === "Open"
-                          ? "bg-[#FFF0F0] text-[#E05252]"
-                          : "bg-[#E2FBE9] text-[#0E9F6E]"
-                      }`} style={{ fontFamily: "Outfit, sans-serif" }}>
-                        {ticket.status}
-                      </span>
-                    </td>
+            {loading ? (
+              <div className="py-12 text-center text-[#9EA5AD] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Loading tickets...
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-[10px] font-bold text-[#9EA5AD] uppercase tracking-wider">
+                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
+                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Summary</th>
+                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Date and Time</th>
+                    <th className="py-4 font-bold text-right" style={{ fontFamily: "Outfit, sans-serif" }}>Status</th>
                   </tr>
-                ))}
+                </thead>
+                <tbody>
+                  {paginatedTickets.map((ticket) => (
+                    <tr
+                      key={ticket.id}
+                      onClick={() => router.push(`/dashboard/help/ticket?id=${ticket.id}`)}
+                      className="hover:bg-[#F9FAFC]/50 transition-colors cursor-pointer"
+                    >
+                      {/* Subject Column */}
+                      <td className="py-[22px] flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full border border-[#EEF2FF] bg-[#EEF2FF]/40 flex items-center justify-center text-[#5476FC] shrink-0">
+                          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                            <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="2" />
+                            <path d="M10 6.5h.01M10 9.5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[12px] font-bold text-[#24292E]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {ticket.subject}
+                          </span>
+                          <span className="text-[10px] text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            #{ticket.id.slice(0, 8).toUpperCase()}
+                          </span>
+                        </div>
+                      </td>
 
-                {filteredTickets.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-[#9EA5AD] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
-                      No support tickets found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      {/* Summary Column */}
+                      <td className="py-[22px]">
+                        <div className="flex items-center gap-2 max-w-[320px]">
+                          <span className="px-2.5 py-1 bg-[#EEF2FF] text-[#5476FC] text-[9.5px] font-bold rounded-[6px] shrink-0 capitalize" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {ticket.category.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-xs text-[#9EA5AD] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {ticket.description}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Date Column */}
+                      <td className="py-[22px] text-xs text-[#676E76] font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        {formatDate(ticket.createdAt)}
+                      </td>
+
+                      {/* Status Column */}
+                      <td className="py-[22px] text-right">
+                        <span className={`inline-block px-3 py-1.5 rounded-full text-[10px] font-bold tracking-[-0.2px] ${
+                          ticket.status === "Open"
+                            ? "bg-[#FFF0F0] text-[#E05252]"
+                            : ticket.status === "In Progress"
+                            ? "bg-[#FFF8E7] text-[#D97706]"
+                            : "bg-[#E2FBE9] text-[#0E9F6E]"
+                        }`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                          {ticket.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {paginatedTickets.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-[#9EA5AD] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        No support tickets found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Table Pagination */}
-          <div className="flex items-center justify-center gap-2 mt-2">
-            {/* Left Chevron */}
-            <button className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all">
-              <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
-                <path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all disabled:opacity-40"
+              >
+                <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                  <path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
 
-            {/* Page buttons */}
-            {([1, 2, 3, 4, 5, 6, 7] as const).map((pg) => {
-              const isSelected = currentPage === pg;
-              return (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    isSelected
-                      ? "bg-[#5879FC] text-white shadow-sm"
-                      : "text-[#9EA5AD] hover:text-[#5879FC]"
-                  }`}
-                  style={{ fontFamily: "Outfit, sans-serif" }}
-                >
-                  {pg}
-                </button>
-              );
-            })}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => {
+                const isSelected = currentPage === pg;
+                return (
+                  <button
+                    key={pg}
+                    onClick={() => setCurrentPage(pg)}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      isSelected
+                        ? "bg-[#5879FC] text-white shadow-sm"
+                        : "text-[#9EA5AD] hover:text-[#5879FC]"
+                    }`}
+                    style={{ fontFamily: "Outfit, sans-serif" }}
+                  >
+                    {pg}
+                  </button>
+                );
+              })}
 
-            {/* Right Chevron */}
-            <button className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all">
-              <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
-                <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all disabled:opacity-40"
+              >
+                <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                  <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
 
         </div>
 
@@ -409,7 +392,7 @@ export default function HelpSupportPage() {
       {showRaiseIssue && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_50px_rgba(0,0,0,0.15)] w-full max-w-[500px] mx-4 flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal header (Centered Marcellus Title) */}
+            {/* Modal header */}
             <div className="relative flex items-center justify-center min-h-[36px] border-b border-[#EBEEF5]/40 pb-2">
               <h3
                 className="text-[#24292E] font-normal text-[22px] tracking-[-0.44px] text-center"
@@ -425,6 +408,24 @@ export default function HelpSupportPage() {
                   <path d="M1.5 10.5l9-9M1.5 1.5l9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </button>
+            </div>
+
+            {/* Subject */}
+            <div className="flex flex-col gap-2">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Subject
+              </span>
+              <input
+                type="text"
+                placeholder="Brief subject of your issue"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] px-4 py-3.5 text-[13px] text-[#24292E] placeholder-[#9EA5AD] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
             </div>
 
             {/* Choose category list */}
@@ -480,7 +481,7 @@ export default function HelpSupportPage() {
               </span>
               <input
                 type="text"
-                placeholder="Contact Number*"
+                placeholder="Contact Number"
                 value={contactNumber}
                 onChange={(e) => setContactNumber(e.target.value)}
                 className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] px-4 py-3.5 text-[13px] text-[#24292E] placeholder-[#9EA5AD] outline-none focus:border-[#5476FC] transition-colors"
@@ -494,44 +495,15 @@ export default function HelpSupportPage() {
                 className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                Add Comments
+                Add Comments *
               </span>
               <textarea
-                placeholder="Comments here.."
+                placeholder="Describe your issue in detail..."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] p-4 text-[13px] text-[#24292E] placeholder-[#9EA5AD] min-h-[100px] outline-none focus:border-[#5476FC] transition-colors"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               />
-            </div>
-
-            {/* Attach file */}
-            <div className="flex flex-col gap-2">
-              <span
-                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
-                style={{ fontFamily: "Outfit, sans-serif" }}
-              >
-                Attach screenshot/ file
-              </span>
-              <div className="flex items-center justify-between p-3.5 bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] cursor-pointer hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-2">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#9EA5AD]">
-                    <path
-                      d="M8.5 4.5l-3.5 3.5c-.8.8-2 .8-2.8 0s-.8-2 0-2.8l4.5-4.5c1.2-1.2 3.2-1.2 4.4 0s1.2 3.2 0 4.4l-4.5 4.5c-1.6 1.6-4.2 1.6-5.8 0s-1.6-4.2 0-5.8l3.5-3.5"
-                      stroke="currentColor"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span
-                    className="text-[#9EA5AD] text-xs font-semibold"
-                    style={{ fontFamily: "Outfit, sans-serif" }}
-                  >
-                    Attach file
-                  </span>
-                </div>
-              </div>
             </div>
 
             {/* Action buttons */}
@@ -545,10 +517,11 @@ export default function HelpSupportPage() {
               </button>
               <button
                 onClick={handleCreateTicket}
-                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200"
+                disabled={submitting || !comments.trim()}
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] disabled:opacity-50 text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                Create Ticket
+                {submitting ? "Creating..." : "Create Ticket"}
               </button>
             </div>
 

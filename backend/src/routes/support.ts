@@ -3,7 +3,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
-import { supportContainer, patientsContainer } from "../config/cosmos";
+import { supportContainer, patientsContainer, doctorsContainer } from "../config/cosmos";
 
 const router = Router();
 
@@ -21,30 +21,44 @@ async function requireRole(req: SessionRequest, res: Response, role: string): Pr
 
 async function getPatientName(patientId: string): Promise<string> {
   try {
-    const { resources } = await patientsContainer.items
-      .query({ query: "SELECT c.fullName FROM c WHERE c.id = @id", parameters: [{ name: "@id", value: patientId }] as any[] })
-      .fetchAll();
-    return resources[0]?.fullName || "Unknown Patient";
-  } catch {
+    const { resource } = await patientsContainer.item(patientId, patientId).read();
+    console.log(`[support] getPatientName(${patientId}) →`, resource?.fullName, resource?.id);
+    return resource?.fullName || "Unknown Patient";
+  } catch (err) {
+    console.error(`[support] getPatientName(${patientId}) error:`, err);
     return "Unknown Patient";
+  }
+}
+
+async function getDoctorName(doctorId: string): Promise<string> {
+  try {
+    const { resource } = await doctorsContainer.item(doctorId, doctorId).read();
+    console.log(`[support] getDoctorName(${doctorId}) →`, resource?.fullName, resource?.id);
+    return resource?.fullName || "Unknown Doctor";
+  } catch (err) {
+    console.error(`[support] getDoctorName(${doctorId}) error:`, err);
+    return "Unknown Doctor";
   }
 }
 
 // ── Patient routes ────────────────────────────────────────────────────────────
 
-// POST /api/support — patient creates a ticket
+// POST /api/support — patient or doctor creates a ticket
 router.post("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
-  const patientId = session.getUserId();
-  const { subject, description, category } = req.body;
+  const userId = session.getUserId();
+  const { subject, description, category, role } = req.body;
 
   if (!subject || !description) {
     return res.status(400).json({ error: "subject and description are required" });
   }
 
+  const submitterRole = role === "doctor" ? "doctor" : "patient";
+
   const ticket = {
     id: uuidv4(),
-    patientId,
+    patientId: userId,
+    submitterRole,
     subject,
     description,
     category: category || "other",
@@ -99,7 +113,7 @@ router.get("/:ticketId", verifySession(), async (req: SessionRequest, res: Respo
 router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
-  const { status, category } = req.query;
+  const { status, category, submitterRole } = req.query;
   let query = "SELECT * FROM c";
   const params: any[] = [];
   const conditions: string[] = [];
@@ -112,6 +126,10 @@ router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Respo
     conditions.push("c.category = @category");
     params.push({ name: "@category", value: category });
   }
+  if (submitterRole) {
+    conditions.push("c.submitterRole = @submitterRole");
+    params.push({ name: "@submitterRole", value: submitterRole });
+  }
   if (conditions.length) query += " WHERE " + conditions.join(" AND ");
   query += " ORDER BY c.createdAt DESC";
 
@@ -119,12 +137,15 @@ router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Respo
     .query({ query, parameters: params })
     .fetchAll();
 
-  // Enrich with patient name
+  // Enrich with submitter name
   const enriched = await Promise.all(
-    resources.map(async (t: any) => ({
-      ...t,
-      patientName: await getPatientName(t.patientId),
-    }))
+    resources.map(async (t: any) => {
+      const isDoctor = t.submitterRole === "doctor";
+      const submitterName = isDoctor
+        ? await getDoctorName(t.patientId)
+        : await getPatientName(t.patientId);
+      return { ...t, patientName: submitterName, submitterName };
+    })
   );
 
   return res.json(enriched);
@@ -145,7 +166,10 @@ router.get("/admin/:ticketId", verifySession(), async (req: SessionRequest, res:
   if (!resources[0]) return res.status(404).json({ error: "Ticket not found" });
 
   const ticket = resources[0] as any;
-  ticket.patientName = await getPatientName(ticket.patientId);
+  const isDoctor = ticket.submitterRole === "doctor";
+  const submitterName = isDoctor ? await getDoctorName(ticket.patientId) : await getPatientName(ticket.patientId);
+  ticket.patientName = submitterName;
+  ticket.submitterName = submitterName;
   return res.json(ticket);
 });
 

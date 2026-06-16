@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -75,8 +75,10 @@ function DoctorAvatar({ doctor, size = "md" }: { doctor: Doctor; size?: "sm" | "
   );
 }
 
-export default function ManageDoctorsPage() {
+function ManageDoctorsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetId = searchParams.get("id");
   const [activeTab, setActiveTab] = useState<"onboard" | "queue">("onboard");
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queue, setQueue] = useState<Doctor[]>([]);
@@ -108,6 +110,20 @@ export default function ManageDoctorsPage() {
       const { doctors: approved } = await approvedRes.json();
       setQueue(pending ?? []);
       setDoctors(approved ?? []);
+
+      if (targetId) {
+        if (pending?.some((d: Doctor) => d.id === targetId)) {
+          setActiveTab("queue");
+          setSelectedDoctorId(targetId);
+          return;
+        }
+        if (approved?.some((d: Doctor) => d.id === targetId)) {
+          setActiveTab("onboard");
+          setSelectedDoctorId(targetId);
+          return;
+        }
+      }
+
       if (!selectedDoctorId) {
         if (approved?.length > 0) setSelectedDoctorId(approved[0].id);
         else if (pending?.length > 0) { setActiveTab("queue"); setSelectedDoctorId(pending[0].id); }
@@ -115,7 +131,7 @@ export default function ManageDoctorsPage() {
     } catch {
       setFetchError("Could not reach the backend.");
     }
-  }, []);
+  }, [targetId]);
 
   useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
 
@@ -488,5 +504,13 @@ export default function ManageDoctorsPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function ManageDoctorsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManageDoctorsPageInner />
+    </Suspense>
   );
 }

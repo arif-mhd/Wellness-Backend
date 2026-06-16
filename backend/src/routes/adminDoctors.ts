@@ -187,13 +187,14 @@ router.get("/:id/diagnosis", requireRole("admin"), async (req: Request, res: Res
 });
 
 // ─── GET /api/admin/doctors/:id/reviews ─────────────────────────────────────
-// Returns all feedback submitted for a doctor (folder = "doctor:{id}").
+// Returns all consultation feedback submitted for a doctor
+// (folder = "appointment", provider.id = doctorId).
 router.get("/:id/reviews", requireRole("admin"), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const reviews = await queryDocuments<any>(feedbackContainer, {
-      query: "SELECT * FROM c WHERE c.folder = @folder ORDER BY c.createdAt DESC",
-      parameters: [{ name: "@folder", value: `doctor:${id}` }],
+      query: "SELECT * FROM c WHERE c.folder = 'appointment' AND c.provider.id = @doctorId ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@doctorId", value: id }],
     });
 
     const total = reviews.length;

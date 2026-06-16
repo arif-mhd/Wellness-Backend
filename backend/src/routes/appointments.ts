@@ -11,11 +11,11 @@ import {
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 
-function makeLivekitToken(userId: string, room: string): { token: Promise<string>; wsUrl: string } {
+function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
   const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
   const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
   const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
-  const at = new AccessToken(apiKey, apiSecret, { identity: userId, ttl: 2 * 60 * 60 });
+  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
 }
@@ -331,7 +331,7 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
       res.status(404).json({ error: "Specialist not found or not approved." }); return;
     }
 
-    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom);
+    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom, specialist.fullName);
     const resolvedToken = await token;
 
     // Store the invite on the appointment document
@@ -388,7 +388,8 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
     };
     await appointmentsContainer.items.upsert(updated);
     // Generate a fresh token using the same wsUrl the primary doctor uses
-    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom);
+    const { resource: specialist } = await doctorsContainer.item(specialistId, specialistId).read();
+    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom, specialist?.fullName);
     res.json({ token: await token, wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
@@ -653,8 +654,13 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
     const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
     const wsUrl = isDoctor ? wsUrlDoctor : wsUrlPatient;
 
+    const participantName = isDoctor
+      ? (await doctorsContainer.item(userId, userId).read()).resource?.fullName
+      : (await patientsContainer.item(userId, userId).read()).resource?.fullName;
+
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
+      name:     participantName,
       ttl:      2 * 60 * 60, // 2 hours
     });
 
