@@ -397,6 +397,47 @@ router.get("/:id/specialist-status", requireRole("doctor"), async (req: SessionR
   }
 });
 
+// ─── GET /api/appointments/:id/patient-profile ───────────────────────────────
+// Doctor fetches the patient's registered profile for an appointment they own.
+// Returns the medically relevant subset of the patient Cosmos document.
+router.get("/:id/patient-profile", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id }   = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+    if (!patient) { res.status(404).json({ error: "Patient profile not found." }); return; }
+
+    // Return medically relevant fields only
+    const profile = {
+      fullName:       patient.fullName      ?? "",
+      email:          patient.email         ?? "",
+      phone:          patient.phone         ?? "",
+      gender:         patient.gender        ?? "",
+      dateOfBirth:    patient.dob           ?? patient.dateOfBirth ?? "",
+      bloodGroup:     patient.bloodGroup    ?? "",
+      height:         patient.height        ?? "",
+      weight:         patient.weight        ?? "",
+      emiratesId:     patient.emiratesId    ?? "",
+      maritalStatus:  patient.maritalStatus ?? "",
+      location:       patient.location      ?? "",
+      allergies:      patient.allergies     ?? [],
+      medications:    patient.medications   ?? { current: [], past: [] },
+      chronicDiseases: patient.chronicDiseases ?? [],
+      insurance:      patient.insurance     ?? [],
+    };
+
+    res.json({ profile });
+  } catch (err) {
+    console.error("patient-profile fetch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/appointments/:id ───────────────────────────────────────────────
 // Single appointment — accessible by both patient and doctor of that appointment.
 router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) => {
