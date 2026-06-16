@@ -654,6 +654,12 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 // encounter-level medical record (EMR) — distinct from the patient's
 // longitudinal EHR, which is assembled on read from all past EMRs (see
 // GET /:id/ehr below).
+//
+// IMPORTANT — Shared EMR for multi-doctor consultations:
+// Medicines and labs are merged by contributorDoctorId so that the primary
+// doctor and any invited specialist can each manage their own entries without
+// overwriting each other's. The saving doctor's previous entries are replaced
+// while all other doctors' entries are preserved.
 router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { id }   = req.params;
@@ -664,12 +670,45 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
     if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
     if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
 
+    // Resolve doctor name for contributor labelling
+    let contributorName = "Doctor";
+    try {
+      const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
+      contributorName = doc?.fullName ?? contributorName;
+    } catch { /* use default */ }
+
+    // Tag the incoming entries with this doctor's identity
+    const taggedMedicines = (medicines ?? []).map((m: any) => ({
+      ...m,
+      contributorDoctorId: doctorId,
+      contributorName,
+    }));
+    const taggedLabs = (labs ?? []).map((l: any) => ({
+      ...l,
+      contributorDoctorId: doctorId,
+      contributorName,
+    }));
+
+    // Merge: keep other doctors' existing entries, replace this doctor's entries
+    const existingMedicines: any[] = apt.emr?.medicines ?? [];
+    const existingLabs: any[]      = apt.emr?.labs      ?? [];
+
+    const otherMedicines = existingMedicines.filter(
+      (m: any) => m.contributorDoctorId && m.contributorDoctorId !== doctorId
+    );
+    const otherLabs = existingLabs.filter(
+      (l: any) => l.contributorDoctorId && l.contributorDoctorId !== doctorId
+    );
+
+    const mergedMedicines = [...otherMedicines, ...taggedMedicines];
+    const mergedLabs      = [...otherLabs,      ...taggedLabs];
+
     const updated = {
       ...apt,
       emr: {
-        sections:  sections  ?? {},
-        medicines: medicines ?? [],
-        labs:      labs      ?? [],
+        sections:  sections ?? apt.emr?.sections ?? {},
+        medicines: mergedMedicines,
+        labs:      mergedLabs,
         savedAt:   new Date().toISOString(),
       },
       updatedAt: new Date().toISOString(),

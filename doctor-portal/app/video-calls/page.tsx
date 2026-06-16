@@ -76,6 +76,9 @@ function VideoCallInner() {
   const [emrSaved,   setEmrSaved]   = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
 
+  // Current doctor identity — used by AddMedicines/AddLabs to identify own entries
+  const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
+
   // EHR panel
   const [ehrOpen, setEhrOpen] = useState(false);
   const [ehrLoading, setEhrLoading] = useState(false);
@@ -100,6 +103,10 @@ function VideoCallInner() {
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+
+  // A stable ref to the latest "refresh medicines + labs only" function so the
+  // once-registered LiveKit DataReceived handler can always call the current version.
+  const refreshMedicinesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Timer
   useEffect(() => {
@@ -175,6 +182,10 @@ function VideoCallInner() {
         } else if (data.type === "specialist_declined" && !isSpecialist) {
           if (patientPollRef.current) clearInterval(patientPollRef.current);
           setInviteStatus("declined");
+        } else if (data.type === "emr_updated") {
+          // Another doctor in the call saved the EMR — re-fetch medicines & labs
+          // so both doctors always see the merged, up-to-date prescription list.
+          refreshMedicinesRef.current?.();
         }
       } catch {}
     });
@@ -244,6 +255,11 @@ function VideoCallInner() {
     setEnded(true);
   }, []);
 
+  // Load the current doctor's user ID on mount so components can identify own entries
+  useEffect(() => {
+    Session.getUserId().then((id) => setCurrentDoctorId(id ?? null)).catch(() => {});
+  }, []);
+
   // Restore any previously saved EMR for this appointment
   useEffect(() => {
     if (!appointmentId) return;
@@ -270,17 +286,60 @@ function VideoCallInner() {
     })();
   }, [appointmentId]);
 
+  // Keep refreshMedicinesRef pointing at the latest fetch function.
+  // We do this separately from the EMR-load useEffect so it can be called
+  // by the once-registered LiveKit DataReceived handler at any time.
+  useEffect(() => {
+    refreshMedicinesRef.current = async () => {
+      if (!appointmentId) return;
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { emr } = await res.json();
+          if (emr) {
+            // Only refresh medicines + labs; leave the doctor's in-progress
+            // section notes untouched so they don't lose unsaved text.
+            setMedicines(emr.medicines ?? []);
+            setLabs(emr.labs ?? []);
+          }
+        }
+      } catch {
+        // ignore — keep existing state
+      }
+    };
+  }, [appointmentId]);
+
   const saveEmr = async () => {
     setSavingEmr(true);
     try {
       const token = await Session.getAccessToken();
-      await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ sections: emrSections, medicines, labs }),
       });
-      setEmrSaved(true);
-      setTimeout(() => setEmrSaved(false), 2500);
+      if (res.ok) {
+        // Update local state with what the backend actually saved (includes merged
+        // entries from the other doctor — contributor tags, de-duplication, etc.)
+        const { emr: savedEmr } = await res.json();
+        if (savedEmr) {
+          setMedicines(savedEmr.medicines ?? []);
+          setLabs(savedEmr.labs ?? []);
+        }
+        setEmrSaved(true);
+        setTimeout(() => setEmrSaved(false), 2500);
+
+        // Notify the other doctor(s) in the room so they re-fetch immediately.
+        try {
+          await roomRef.current?.localParticipant.publishData(
+            new TextEncoder().encode(JSON.stringify({ type: "emr_updated" })),
+            { reliable: true }
+          );
+        } catch { /* non-fatal — other doctor will see it on their next manual save */ }
+      }
     } catch {} finally { setSavingEmr(false); }
   };
 
@@ -698,8 +757,8 @@ function VideoCallInner() {
                 />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <AddMedicines medicines={medicines} onChange={setMedicines} />
-                  <AddLabs labs={labs} onChange={setLabs} />
+                  <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
+                  <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
                 </div>
               </div>
             )}

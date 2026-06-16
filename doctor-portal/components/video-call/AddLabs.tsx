@@ -12,6 +12,9 @@ export interface LabRecommendation {
   notes: string;
   testId?: string;
   labName?: string;
+  /** Set by the backend when the EMR is saved/loaded — used to track per-doctor contributions */
+  contributorDoctorId?: string;
+  contributorName?: string;
 }
 
 interface CatalogueTest {
@@ -24,11 +27,13 @@ interface CatalogueTest {
 interface AddLabsProps {
   labs: LabRecommendation[];
   onChange: (labs: LabRecommendation[]) => void;
+  /** The identity of the currently authenticated doctor — used to restrict delete to own entries */
+  currentDoctorId?: string;
 }
 
 let cachedTests: CatalogueTest[] | null = null;
 
-export default function AddLabs({ labs, onChange }: AddLabsProps) {
+export default function AddLabs({ labs, onChange, currentDoctorId }: AddLabsProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [labName, setLabName] = useState("");
   const [selectedTest, setSelectedTest] = useState<CatalogueTest | null>(null);
@@ -196,27 +201,45 @@ export default function AddLabs({ labs, onChange }: AddLabsProps) {
             No recommended labs yet.
           </div>
         ) : (
-          labs.map((lab) => (
-            <div
-              key={lab.id}
-              className="flex items-start justify-between px-4 py-3.5 rounded-2xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#EBEEF5] hover:border-[#8AA0FF]/40 transition-all duration-300 gap-3 w-full min-w-0"
-            >
-              <Image src={labReportIcon} alt="Lab Report Icon" className="w-8 h-8 object-contain shrink-0" />
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                <span className="text-[#383F45] text-[13px] font-bold truncate">{lab.name}</span>
-                <p className="text-[#838B95] text-[11px] leading-relaxed font-semibold">{lab.notes}</p>
-              </div>
-              <button
-                onClick={() => handleDelete(lab.id)}
-                title="Remove lab recommendation"
-                className="p-1 rounded-lg text-[#E84949] opacity-80 hover:opacity-100 hover:bg-red-50 transition-all shrink-0"
+          labs.map((lab) => {
+            const isOwn =
+              !currentDoctorId ||
+              !lab.contributorDoctorId ||
+              lab.contributorDoctorId === currentDoctorId;
+
+            return (
+              <div
+                key={lab.id}
+                className={`flex items-start justify-between px-4 py-3.5 rounded-2xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.03)] border transition-all duration-300 gap-3 w-full min-w-0 ${
+                  isOwn
+                    ? "border-[#EBEEF5] hover:border-[#8AA0FF]/40"
+                    : "border-[#E8F1FF] bg-blue-50/30"
+                }`}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-                </svg>
-              </button>
-            </div>
-          ))
+                <Image src={labReportIcon} alt="Lab Report Icon" className="w-8 h-8 object-contain shrink-0" />
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                  <span className="text-[#383F45] text-[13px] font-bold truncate">{lab.name}</span>
+                  <p className="text-[#838B95] text-[11px] leading-relaxed font-semibold">{lab.notes}</p>
+                  {lab.contributorName && !isOwn && (
+                    <span className="text-[10px] text-[#5476FC] font-semibold italic">
+                      Added by Dr. {lab.contributorName}
+                    </span>
+                  )}
+                </div>
+                {isOwn && (
+                  <button
+                    onClick={() => handleDelete(lab.id)}
+                    title="Remove lab recommendation"
+                    className="p-1 rounded-lg text-[#E84949] opacity-80 hover:opacity-100 hover:bg-red-50 transition-all shrink-0"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

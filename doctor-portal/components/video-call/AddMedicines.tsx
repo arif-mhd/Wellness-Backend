@@ -16,6 +16,9 @@ export interface Medicine {
   instructions: string;
   productId?: string;
   manufacturer?: string;
+  /** Set by the backend when the EMR is saved/loaded — used to track per-doctor contributions */
+  contributorDoctorId?: string;
+  contributorName?: string;
 }
 
 interface CatalogueProduct {
@@ -29,9 +32,11 @@ interface CatalogueProduct {
 interface AddMedicinesProps {
   medicines: Medicine[];
   onChange: (medicines: Medicine[]) => void;
+  /** The identity of the currently authenticated doctor — used to restrict delete to own entries */
+  currentDoctorId?: string;
 }
 
-export default function AddMedicines({ medicines, onChange }: AddMedicinesProps) {
+export default function AddMedicines({ medicines, onChange, currentDoctorId }: AddMedicinesProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [medName, setMedName] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogueProduct | null>(null);
@@ -301,32 +306,54 @@ export default function AddMedicines({ medicines, onChange }: AddMedicinesProps)
             No medicines added yet.
           </div>
         ) : (
-          medicines.map((med) => (
-            <div
-              key={med.id}
-              className="flex items-start justify-between px-4 py-3.5 rounded-2xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#EBEEF5] hover:border-[#8AA0FF]/40 transition-all duration-300 gap-3 w-full min-w-0"
-            >
-              <Image src={medicineIcon} alt="Medicine Icon" className="w-8 h-8 object-contain shrink-0" />
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                <span className="text-[#383F45] text-[13px] font-bold truncate">
-                  {med.name} {med.dosage}
-                </span>
-                <span className="text-[#5476FC] text-[11px] font-bold">
-                  {med.timing} <span className="text-[#5476FC] font-medium ml-0.5">({med.frequency})</span>
-                </span>
-                <p className="text-[#838B95] text-[11px] leading-relaxed font-semibold">Notes: {med.instructions}</p>
-              </div>
-              <button
-                onClick={() => handleDelete(med.id)}
-                title="Remove prescription"
-                className="p-1 rounded-lg text-[#E84949] opacity-80 hover:opacity-100 hover:bg-red-50 transition-all shrink-0"
+          medicines.map((med) => {
+            // A medicine is "owned" by this doctor if contributorDoctorId matches,
+            // or if it has no contributor tag (legacy / pre-merge data).
+            const isOwn =
+              !currentDoctorId ||
+              !med.contributorDoctorId ||
+              med.contributorDoctorId === currentDoctorId;
+
+            return (
+              <div
+                key={med.id}
+                className={`flex items-start justify-between px-4 py-3.5 rounded-2xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.03)] border transition-all duration-300 gap-3 w-full min-w-0 ${
+                  isOwn
+                    ? "border-[#EBEEF5] hover:border-[#8AA0FF]/40"
+                    : "border-[#E8F1FF] bg-blue-50/30"
+                }`}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-                </svg>
-              </button>
-            </div>
-          ))
+                <Image src={medicineIcon} alt="Medicine Icon" className="w-8 h-8 object-contain shrink-0" />
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                  <span className="text-[#383F45] text-[13px] font-bold truncate">
+                    {med.name} {med.dosage}
+                  </span>
+                  <span className="text-[#5476FC] text-[11px] font-bold">
+                    {med.timing} <span className="text-[#5476FC] font-medium ml-0.5">({med.frequency})</span>
+                  </span>
+                  <p className="text-[#838B95] text-[11px] leading-relaxed font-semibold">Notes: {med.instructions}</p>
+                  {/* Show contributor label for medicines added by another doctor */}
+                  {med.contributorName && !isOwn && (
+                    <span className="text-[10px] text-[#5476FC] font-semibold italic">
+                      Added by Dr. {med.contributorName}
+                    </span>
+                  )}
+                </div>
+                {/* Only allow the owning doctor to delete their own medicines */}
+                {isOwn && (
+                  <button
+                    onClick={() => handleDelete(med.id)}
+                    title="Remove prescription"
+                    className="p-1 rounded-lg text-[#E84949] opacity-80 hover:opacity-100 hover:bg-red-50 transition-all shrink-0"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
