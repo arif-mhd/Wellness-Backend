@@ -12,11 +12,13 @@ import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 
 // True if this doctor is either the primary doctor on the appointment, or the
-// specialist who was invited and has accepted — both are allowed to view the
+// specialist who was invited — both are allowed to view the
 // patient's EHR and contribute to the shared EMR for this encounter.
 function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
   if (apt.doctorId === doctorId) return true;
-  return apt.specialistInvite?.doctorId === doctorId && apt.specialistInvite?.status === "accepted";
+  // If they have an invite, allow them (even if status is pending, as they
+  // might be loading EMR concurrently with the join process).
+  return apt.specialistInvite?.doctorId === doctorId;
 }
 
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
@@ -704,10 +706,11 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
     const existingLabs: any[]      = apt.emr?.labs      ?? [];
 
     const otherMedicines = existingMedicines.filter(
-      (m: any) => m.contributorDoctorId && m.contributorDoctorId !== doctorId
+      // Keep if it belongs to someone else OR if it's a legacy entry with no tag
+      (m: any) => m.contributorDoctorId !== doctorId
     );
     const otherLabs = existingLabs.filter(
-      (l: any) => l.contributorDoctorId && l.contributorDoctorId !== doctorId
+      (l: any) => l.contributorDoctorId !== doctorId
     );
 
     const mergedMedicines = [...otherMedicines, ...taggedMedicines];
