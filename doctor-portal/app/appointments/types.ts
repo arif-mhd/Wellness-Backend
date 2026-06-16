@@ -21,4 +21,10 @@ export interface Patient {
   preVisitFormDate?: string;
   preVisitForm?: PreVisitForm;
   earnings?: string;
+  gender?: string;
+  phone?: string;
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  dob?: string;
 }

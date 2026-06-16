@@ -1,35 +1,13 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MOCK_NEW_APPOINTMENTS, MOCK_ALL_CONSULTATIONS } from "../mockData";
-import { MOCK_WAITING_PATIENTS } from "@/components/waiting-room/mockData";
+import Session from "supertokens-web-js/recipe/session";
 import { Patient } from "../types";
-import { WaitingPatient } from "@/components/waiting-room/types";
 import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
 import AppointmentsPage from "../page";
 
-const mapToPatient = (wp: WaitingPatient): Patient => ({
-  id: wp.id,
-  name: wp.name,
-  age: wp.age,
-  email: wp.email,
-  diagnosis: wp.reasonForVisit,
-  description: wp.description,
-  status: wp.status === "Connected" ? "Waiting" : "Waiting",
-  dateTime: "Today",
-  avatar: wp.avatar,
-  bio: wp.description,
-  preVisitFormDate: wp.dob,
-  preVisitForm: {
-    chronicIllnesses: "None reported",
-    currentMedications: "None",
-    allergies: "None",
-    primaryConcern: wp.reasonDescription,
-    smokes: "No",
-    drinks: "No"
-  }
-});
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function PreVisitFormContent() {
   const router = useRouter();
@@ -37,13 +15,72 @@ function PreVisitFormContent() {
   const id = searchParams.get("id");
   const from = searchParams.get("from");
 
-  const allPatients: Patient[] = [
-    ...MOCK_NEW_APPOINTMENTS,
-    ...MOCK_ALL_CONSULTATIONS,
-    ...MOCK_WAITING_PATIENTS.map(mapToPatient)
-  ];
+  const [dbPatient, setDbPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const patient = allPatients.find((p) => p.id === id) || allPatients[0];
+  useEffect(() => {
+    async function loadPatient() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const accessToken = await Session.getAccessToken();
+        if (!accessToken) {
+          setLoading(false);
+          return;
+        }
+        const headers = { Authorization: `Bearer ${accessToken}` };
+        const res = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+        if (res.ok) {
+          const { appointments } = await res.json();
+          const match = appointments?.find((a: any) => a.patientId === id);
+          if (match) {
+            const dob = match.patientDob || "";
+            let age = 0;
+            if (dob) {
+              const birthYear = new Date(dob).getFullYear();
+              if (!isNaN(birthYear)) {
+                age = new Date().getFullYear() - birthYear;
+              }
+            }
+            setDbPatient({
+              id: match.patientId,
+              name: match.patientName ?? "Patient",
+              age: age,
+              email: match.patientEmail ?? "",
+              diagnosis: match.reason ?? "Consultation",
+              description: match.reason ?? "",
+              status: "Completed",
+              dateTime: match.scheduledAt ?? "",
+              avatar: match.patientAvatarUrl || "/patient-avatar-1.png",
+              bio: match.reason ?? "",
+              gender: match.patientGender || "N/A",
+              phone: match.patientPhone || "N/A",
+              bloodGroup: match.patientBloodGroup || "N/A",
+              height: match.patientHeight || "N/A",
+              weight: match.patientWeight || "N/A",
+              dob: dob,
+              preVisitFormDate: dob,
+              preVisitForm: {
+                chronicIllnesses: match.patientChronicIllnesses || "None reported",
+                currentMedications: match.patientCurrentMedications || "None",
+                allergies: match.patientAllergies || "None",
+                primaryConcern: match.reason ?? "",
+                smokes: "No",
+                drinks: "No"
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching patient details for previsit form:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPatient();
+  }, [id]);
 
   const handleClose = () => {
     if (from === "waitingroom") {
@@ -55,10 +92,26 @@ function PreVisitFormContent() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#F7F9FC] text-gray-500 font-outfit">
+        Loading pre-visit form...
+      </div>
+    );
+  }
+
+  if (!dbPatient) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#F7F9FC] text-gray-500 font-outfit">
+        Patient details not found in database.
+      </div>
+    );
+  }
+
   return (
     <>
       <AppointmentsPage />
-      <PreVisitFormModal patient={patient} onClose={handleClose} />
+      <PreVisitFormModal patient={dbPatient} onClose={handleClose} />
     </>
   );
 }
@@ -74,4 +127,3 @@ export default function PreVisitFormPage() {
     </Suspense>
   );
 }
-

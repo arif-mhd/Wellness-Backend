@@ -1,22 +1,102 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 interface ScreeningItem {
   name: string;
   count: number;
 }
 
-export default function ScreeningRecommendations() {
+interface ScreeningRecommendationsProps {
+  appointments: any[];
+}
+
+export default function ScreeningRecommendations({ appointments = [] }: ScreeningRecommendationsProps) {
   const [activeTab, setActiveTab] = useState<"guideline" | "age" | "disease">("guideline");
 
-  const recommendations: ScreeningItem[] = [
-    { name: "Hypertension", count: 150 },
-    { name: "Diabetes", count: 80 },
-    { name: "Asthma", count: 43 },
-    { name: "Osteoarthritis", count: 32 },
-    { name: "Migraine", count: 27 },
-  ];
+  // Get completed appointments
+  const completedAppointments = useMemo(() => {
+    return appointments.filter(
+      (a) => a.status === "completed" || a.status === "Completed"
+    );
+  }, [appointments]);
+
+  // Extract unique patient records
+  const uniquePatients = useMemo(() => {
+    const map = new Map<string, { age: number; gender: string; chronic: string }>();
+
+    completedAppointments.forEach((apt) => {
+      const pId = apt.patientId;
+      if (!pId) return;
+
+      const dob = apt.patientDob || "";
+      let age = 0;
+      if (dob) {
+        const birthYear = new Date(dob).getFullYear();
+        if (!isNaN(birthYear)) {
+          age = new Date().getFullYear() - birthYear;
+        }
+      }
+
+      const gender = (apt.patientGender || "other").toLowerCase();
+      const chronic = (apt.patientChronicIllnesses || "None").toLowerCase();
+
+      map.set(pId, { age, gender, chronic });
+    });
+
+    return Array.from(map.values());
+  }, [completedAppointments]);
+
+  // Compute screening recommendations dynamically
+  const recommendationsData = useMemo(() => {
+    // 1. Guideline Based
+    const annualExamCount = uniquePatients.length;
+    const fluVaccineCount = uniquePatients.length;
+    const lipidPanelCount = uniquePatients.filter((p) => p.age >= 20).length;
+
+    const guidelineList: ScreeningItem[] = [
+      { name: "Annual Physical Exam", count: annualExamCount },
+      { name: "Influenza Vaccine Recommendation", count: fluVaccineCount },
+      { name: "Lipid Panel Lipid Screening", count: lipidPanelCount },
+    ].filter(r => r.count > 0);
+
+    // 2. Age related
+    const mammogramCount = uniquePatients.filter((p) => p.gender === "female" && p.age >= 40).length;
+    const colorectalCount = uniquePatients.filter((p) => p.age >= 50).length;
+    const boneDensityCount = uniquePatients.filter((p) => p.gender === "female" && p.age >= 65).length;
+
+    const ageList: ScreeningItem[] = [
+      { name: "Mammogram (Females >= 40)", count: mammogramCount },
+      { name: "Colorectal Cancer Screening (Age >= 50)", count: colorectalCount },
+      { name: "Bone Density Scan (Females >= 65)", count: boneDensityCount },
+    ].filter(r => r.count > 0);
+
+    // 3. Disease screening
+    const diabeticRetinopathyCount = uniquePatients.filter((p) => p.chronic.includes("diabetes")).length;
+    const renalFunctionCount = uniquePatients.filter((p) => p.chronic.includes("hypertension") || p.chronic.includes("kidney")).length;
+    const spirometryCount = uniquePatients.filter((p) => p.chronic.includes("asthma") || p.chronic.includes("copd")).length;
+
+    const diseaseList: ScreeningItem[] = [
+      { name: "Diabetic Retinopathy Screening (Diabetic Patients)", count: diabeticRetinopathyCount },
+      { name: "Renal Function Assessment (Hypertensive Patients)", count: renalFunctionCount },
+      { name: "Spirometry / Lung Function Test (Asthma/COPD Patients)", count: spirometryCount },
+    ].filter(r => r.count > 0);
+
+    // Sort descending by count
+    guidelineList.sort((a, b) => b.count - a.count);
+    ageList.sort((a, b) => b.count - a.count);
+    diseaseList.sort((a, b) => b.count - a.count);
+
+    return {
+      guideline: guidelineList,
+      age: ageList,
+      disease: diseaseList,
+    };
+  }, [uniquePatients]);
+
+  const currentList = useMemo(() => {
+    return recommendationsData[activeTab];
+  }, [recommendationsData, activeTab]);
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -66,41 +146,39 @@ export default function ScreeningRecommendations() {
       </div>
 
       {/* ── Table Card ──────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl p-6 border border-white shadow-sm flex flex-col gap-4 relative w-full">
+      <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-4 relative w-full">
         {/* Table Header */}
         <div className="flex justify-between items-center w-full pb-2 border-b border-[#EBEEF5]">
-          <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider">Screening</span>
-          <div className="flex items-center gap-5">
-            <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider mr-6">Number of Patients Recommended</span>
-            <div className="flex items-center gap-1 cursor-pointer select-none">
-              <span className="text-[#707070] text-xs font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>This Week</span>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M4 6L8 10L12 6" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </div>
+          <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider">Screening Recommendation</span>
+          <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider mr-10">Patients Recommended</span>
         </div>
 
         {/* Screening List */}
-        <div className="flex flex-col gap-1.5 mt-2">
-          {recommendations.map((item, idx) => {
-            const isFirst = idx === 0;
-            return (
-              <div
-                key={item.name}
-                className={`flex justify-between items-center px-4 py-3.5 rounded-xl transition-all ${
-                  isFirst ? "bg-[#F5F6FA]" : "hover:bg-slate-50"
-                }`}
-              >
-                <span className="text-[#24292E] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {item.name}
-                </span>
-                <span className="text-[#24292E] text-xs font-semibold mr-32" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {item.count}
-                </span>
-              </div>
-            );
-          })}
+        <div className="flex flex-col gap-1.5 mt-2 max-h-[200px] overflow-y-auto pr-1">
+          {currentList.length === 0 ? (
+            <div className="text-center text-xs text-[#838B95] py-12">
+              No recommendations generated. Check that you have completed consultations with patient demographics.
+            </div>
+          ) : (
+            currentList.map((item, idx) => {
+              const isFirst = idx === 0;
+              return (
+                <div
+                  key={item.name}
+                  className={`flex justify-between items-center px-4 py-3 rounded-xl transition-all ${
+                    isFirst ? "bg-[#F5F6FA]" : "hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="text-[#24292E] text-xs font-semibold truncate max-w-[400px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {item.name}
+                  </span>
+                  <span className="text-[#24292E] text-xs font-bold mr-24" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {item.count}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

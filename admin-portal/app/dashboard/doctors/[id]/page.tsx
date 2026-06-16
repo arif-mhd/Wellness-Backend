@@ -56,6 +56,8 @@ interface Doctor {
   degreeFileUrl?: string | null;
   specFileUrl?: string | null;
   otherFileUrl?: string | null;
+  slotsPending?: boolean;
+  tempSlots?: AvailabilitySlot[];
 }
 
 type Tab = "about" | "diagnosis" | "reviews";
@@ -133,6 +135,34 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [reviewsTotal, setReviewsTotal] = useState(0);
   const [tabLoading, setTabLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleVerifySlots = async () => {
+    setVerifying(true);
+    try {
+      const res = await adminFetch(`/api/admin/doctors/${id}/verify-slots`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setDoctor(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            slots: prev.tempSlots ?? prev.slots,
+            slotsPending: false,
+          };
+        });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error ?? "Failed to verify slots.");
+      }
+    } catch (err) {
+      console.error("Error verifying slots:", err);
+      alert("An error occurred while verifying slots.");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchDoctor() {
@@ -439,21 +469,27 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Notice */}
-              <div className="bg-[#FFF8EA] rounded-[1.5rem] p-5 mb-7">
-                <div className="flex items-start gap-2.5">
-                  <svg className="w-[18px] h-[18px] text-[#F59E0B] shrink-0 mt-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-[11px] font-bold text-slate-700 leading-relaxed pr-2">
-                    This doctor has updated their availability slots. Please review and verify the changes.
-                  </p>
+              {doctor.slotsPending && (
+                <div className="bg-[#FFF8EA] rounded-[1.5rem] p-5 mb-7">
+                  <div className="flex items-start gap-2.5">
+                    <svg className="w-[18px] h-[18px] text-[#F59E0B] shrink-0 mt-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-[11px] font-bold text-slate-700 leading-relaxed pr-2">
+                      This doctor has updated their availability slots. Please review and verify the changes.
+                    </p>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={handleVerifySlots}
+                      disabled={verifying}
+                      className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white px-6 py-2.5 rounded-full text-[11px] font-bold shadow-md shadow-blue-200/50 transition active:scale-95 disabled:opacity-50"
+                    >
+                      {verifying ? "Verifying..." : "Verify Now"}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-end mt-4">
-                  <button className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white px-6 py-2.5 rounded-full text-[11px] font-bold shadow-md shadow-blue-200/50 transition active:scale-95">
-                    Verify Now
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* Schedule */}
               <div className="space-y-5 px-1">
@@ -466,17 +502,25 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   { label: "Saturday",  dow: 6 },
                   { label: "Sunday",    dow: 0 },
                 ].map(({ label, dow }) => {
-                  const slot = doctor.slots?.find(s => s.dayOfWeek === dow && s.isActive);
+                  const slotsToUse = doctor.slotsPending ? (doctor.tempSlots ?? []) : (doctor.slots ?? []);
+                  const activeSlots = slotsToUse.filter(s => s.dayOfWeek === dow && s.isActive);
+                  const sortedSlots = [...activeSlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
                   const formatT = (t: string) => {
                     const [h, m] = t.split(":").map(Number);
                     const ampm = h >= 12 ? "PM" : "AM";
                     return `${h % 12 || 12}${m ? `:${m.toString().padStart(2,"0")}` : ""}${ampm}`;
                   };
+                  const slotsText = sortedSlots.length > 0
+                    ? sortedSlots.map(s => `${formatT(s.startTime)} – ${formatT(s.endTime)}`).join(", ")
+                    : "Off";
                   return (
                     <div key={label} className="flex justify-between items-center text-[12px] pb-5 border-b border-slate-50 last:border-0 last:pb-0">
                       <span className="text-slate-500 font-medium">{label}</span>
-                      <span className={`font-bold ${slot ? "text-slate-800" : "text-slate-300"}`}>
-                        {slot ? `${formatT(slot.startTime)} – ${formatT(slot.endTime)}` : "Off"}
+                      <span
+                        className={`font-bold ${sortedSlots.length > 0 ? "text-slate-800" : "text-slate-300"} text-right max-w-[70%] truncate`}
+                        title={slotsText}
+                      >
+                        {slotsText}
                       </span>
                     </div>
                   );

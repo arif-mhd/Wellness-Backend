@@ -23,7 +23,7 @@ interface Lab      { id: string; name: string; notes: string; }
 interface RemoteVideoTile {
   participantId: string;
   name: string;
-  trackSid: string;
+  trackSid: string | undefined;
 }
 
 interface AvailableDoctor {

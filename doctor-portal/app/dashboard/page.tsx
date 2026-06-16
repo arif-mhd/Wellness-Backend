@@ -600,12 +600,29 @@ export default function DashboardPage() {
                 {slots.filter(s => s.isActive).length === 0 ? (
                   <p className="text-sm text-[#A0A8B0]" style={{ fontFamily: "Outfit, sans-serif" }}>No availability set</p>
                 ) : (
-                  slots.filter(s => s.isActive).map(s => (
-                    <div key={s.dayOfWeek} className="flex justify-between items-center text-xs">
-                      <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{DAY_NAMES[s.dayOfWeek]}</span>
-                      <span className="text-[#24292E] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{fmt12(s.startTime)} - {fmt12(s.endTime)}</span>
-                    </div>
-                  ))
+                  Object.entries(
+                    slots
+                      .filter(s => s.isActive)
+                      .reduce<Record<number, SlotDef[]>>((acc, s) => {
+                        if (!acc[s.dayOfWeek]) acc[s.dayOfWeek] = [];
+                        acc[s.dayOfWeek].push(s);
+                        return acc;
+                      }, {})
+                  )
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([dayOfWeekStr, daySlots]) => {
+                    const dayOfWeek = Number(dayOfWeekStr);
+                    const sortedDaySlots = [...daySlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const slotsText = sortedDaySlots.map(s => `${fmt12(s.startTime)} - ${fmt12(s.endTime)}`).join(", ");
+                    return (
+                      <div key={dayOfWeek} className="flex justify-between items-center text-xs">
+                        <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{DAY_NAMES[dayOfWeek]}</span>
+                        <span className="text-[#24292E] font-normal tracking-[-0.24px] text-right max-w-[70%] truncate" style={{ fontFamily: "Outfit, sans-serif" }} title={slotsText}>
+                          {slotsText}
+                        </span>
+                      </div>
+                    );
+                  })
                 )}
               </div>
 

@@ -20,7 +20,7 @@ interface ChatMsg { id: string; sender: "you" | "other"; name: string; text: str
 interface RemoteVideoTile {
   participantId: string;
   name: string;
-  trackSid: string;
+  trackSid: string | undefined;
 }
 
 interface AvailableDoctor {

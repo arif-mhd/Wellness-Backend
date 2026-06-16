@@ -91,7 +91,7 @@ router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, re
     // ── 3. Update Cosmos document ─────────────────────────────────────────
     const updatedDoctor = {
       ...doctor,
-      status:     "approved",
+      status: "approved",
       approvedAt: new Date().toISOString(),
       approvedBy: adminId,
     };
@@ -132,7 +132,7 @@ router.post("/:id/reject", requireRole("admin"), async (req: SessionRequest, res
     // Update Cosmos record
     const updatedDoctor = {
       ...doctor,
-      status:     "rejected",
+      status: "rejected",
       rejectedAt: new Date().toISOString(),
       rejectedBy: adminId,
     };
@@ -204,6 +204,47 @@ router.get("/:id/reviews", requireRole("admin"), async (req: Request, res: Respo
     res.json({ reviews, total, avgRating });
   } catch (err) {
     console.error("Reviews fetch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/doctors/:id/verify-slots ────────────────────────────────
+// Verifies/approves updated slots for a doctor.
+router.post("/:id/verify-slots", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.session!.getUserId();
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(id, id).read();
+
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+
+    const updatedDoctor = {
+      ...doctor,
+      slots: doctor.tempSlots ?? doctor.slots,
+      slotsPending: false,
+      slotsVerifiedAt: new Date().toISOString(),
+      slotsVerifiedBy: adminId,
+    };
+
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    logActivity({
+      source: "admin",
+      action: "Doctor Slots Verified",
+      details: `Dr. ${doctor.fullName ?? id} availability slots verified`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "doctor",
+      entityId: id,
+    });
+
+    res.json({ status: "OK", message: "Doctor slots verified successfully." });
+  } catch (err) {
+    console.error("Verify doctor slots error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

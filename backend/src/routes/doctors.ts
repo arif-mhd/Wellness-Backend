@@ -238,12 +238,33 @@ router.put("/slots", requireRole("doctor"), async (req: SessionRequest, res: Res
       return;
     }
 
-    const updated = { ...doctor, slots, updatedAt: new Date().toISOString() };
+    const updated = { ...doctor, tempSlots: slots, slotsPending: true, updatedAt: new Date().toISOString() };
     await doctorsContainer.items.upsert(updated);
 
-    res.json({ status: "OK", slots });
+    res.json({ status: "OK", slots: doctor.slots ?? [], tempSlots: slots });
   } catch (err) {
     console.error("Set slots error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/doctors/slots ──────────────────────────────────────────────────
+// Returns the currently logged-in doctor's own slots
+router.get("/slots", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    res.json({
+      slots: doctor.slots ?? [],
+      tempSlots: doctor.tempSlots ?? [],
+      slotsPending: doctor.slotsPending ?? false,
+    });
+  } catch (err) {
+    console.error("Get doctor slots error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
