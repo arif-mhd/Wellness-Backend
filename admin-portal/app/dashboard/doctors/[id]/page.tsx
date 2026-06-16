@@ -503,17 +503,24 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   { label: "Sunday",    dow: 0 },
                 ].map(({ label, dow }) => {
                   const slotsToUse = doctor.slotsPending ? (doctor.tempSlots ?? []) : (doctor.slots ?? []);
-                  const slot = slotsToUse.find(s => s.dayOfWeek === dow && s.isActive);
+                  const activeSlots = slotsToUse.filter(s => s.dayOfWeek === dow && s.isActive);
+                  const sortedSlots = [...activeSlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
                   const formatT = (t: string) => {
                     const [h, m] = t.split(":").map(Number);
                     const ampm = h >= 12 ? "PM" : "AM";
                     return `${h % 12 || 12}${m ? `:${m.toString().padStart(2,"0")}` : ""}${ampm}`;
                   };
+                  const slotsText = sortedSlots.length > 0
+                    ? sortedSlots.map(s => `${formatT(s.startTime)} – ${formatT(s.endTime)}`).join(", ")
+                    : "Off";
                   return (
                     <div key={label} className="flex justify-between items-center text-[12px] pb-5 border-b border-slate-50 last:border-0 last:pb-0">
                       <span className="text-slate-500 font-medium">{label}</span>
-                      <span className={`font-bold ${slot ? "text-slate-800" : "text-slate-300"}`}>
-                        {slot ? `${formatT(slot.startTime)} – ${formatT(slot.endTime)}` : "Off"}
+                      <span
+                        className={`font-bold ${sortedSlots.length > 0 ? "text-slate-800" : "text-slate-300"} text-right max-w-[70%] truncate`}
+                        title={slotsText}
+                      >
+                        {slotsText}
                       </span>
                     </div>
                   );

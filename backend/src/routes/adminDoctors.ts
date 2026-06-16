@@ -91,7 +91,7 @@ router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, re
     // ── 3. Update Cosmos document ─────────────────────────────────────────
     const updatedDoctor = {
       ...doctor,
-      status:     "approved",
+      status: "approved",
       approvedAt: new Date().toISOString(),
       approvedBy: adminId,
     };
@@ -132,7 +132,7 @@ router.post("/:id/reject", requireRole("admin"), async (req: SessionRequest, res
     // Update Cosmos record
     const updatedDoctor = {
       ...doctor,
-      status:     "rejected",
+      status: "rejected",
       rejectedAt: new Date().toISOString(),
       rejectedBy: adminId,
     };
