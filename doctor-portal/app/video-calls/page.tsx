@@ -316,14 +316,27 @@ function VideoCallInner() {
     setSavingEmr(true);
     try {
       const token = await Session.getAccessToken();
+
+      // CRITICAL: Only send THIS doctor's own entries to the backend.
+      // The local medicines/labs state includes entries from other doctors
+      // (loaded via EMR fetch). If we sent those too, the backend would
+      // re-tag them with this doctor's contributorDoctorId, corrupting the
+      // merge. The backend preserves all other doctors' entries independently.
+      const ownMedicines = medicines.filter(
+        (m) => !currentDoctorId || !m.contributorDoctorId || m.contributorDoctorId === currentDoctorId
+      );
+      const ownLabs = labs.filter(
+        (l) => !currentDoctorId || !l.contributorDoctorId || l.contributorDoctorId === currentDoctorId
+      );
+
       const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sections: emrSections, medicines, labs }),
+        body: JSON.stringify({ sections: emrSections, medicines: ownMedicines, labs: ownLabs }),
       });
       if (res.ok) {
-        // Update local state with what the backend actually saved (includes merged
-        // entries from the other doctor — contributor tags, de-duplication, etc.)
+        // Update local state with what the backend actually saved — the fully
+        // merged list (this doctor's entries + all other doctors' entries).
         const { emr: savedEmr } = await res.json();
         if (savedEmr) {
           setMedicines(savedEmr.medicines ?? []);
@@ -338,7 +351,7 @@ function VideoCallInner() {
             new TextEncoder().encode(JSON.stringify({ type: "emr_updated" })),
             { reliable: true }
           );
-        } catch { /* non-fatal — other doctor will see it on their next manual save */ }
+        } catch { /* non-fatal */ }
       }
     } catch {} finally { setSavingEmr(false); }
   };

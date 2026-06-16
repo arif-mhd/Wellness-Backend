@@ -677,13 +677,23 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
       contributorName = doc?.fullName ?? contributorName;
     } catch { /* use default */ }
 
+    // Safety net: drop any incoming entries that are explicitly tagged as belonging
+    // to a different doctor (the frontend should already filter these out, but we
+    // enforce it here too so a bad payload never corrupts another doctor's entries).
+    const ownIncomingMedicines = (medicines ?? []).filter(
+      (m: any) => !m.contributorDoctorId || m.contributorDoctorId === doctorId
+    );
+    const ownIncomingLabs = (labs ?? []).filter(
+      (l: any) => !l.contributorDoctorId || l.contributorDoctorId === doctorId
+    );
+
     // Tag the incoming entries with this doctor's identity
-    const taggedMedicines = (medicines ?? []).map((m: any) => ({
+    const taggedMedicines = ownIncomingMedicines.map((m: any) => ({
       ...m,
       contributorDoctorId: doctorId,
       contributorName,
     }));
-    const taggedLabs = (labs ?? []).map((l: any) => ({
+    const taggedLabs = ownIncomingLabs.map((l: any) => ({
       ...l,
       contributorDoctorId: doctorId,
       contributorName,
@@ -703,10 +713,16 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
     const mergedMedicines = [...otherMedicines, ...taggedMedicines];
     const mergedLabs      = [...otherLabs,      ...taggedLabs];
 
+    // Merge sections: layer this doctor's section notes on top of whatever was
+    // previously saved. This prevents a specialist from wiping the primary
+    // doctor's clinical notes when they save their own additions.
+    const existingSections = apt.emr?.sections ?? {};
+    const mergedSections   = { ...existingSections, ...(sections ?? {}) };
+
     const updated = {
       ...apt,
       emr: {
-        sections:  sections ?? apt.emr?.sections ?? {},
+        sections:  mergedSections,
         medicines: mergedMedicines,
         labs:      mergedLabs,
         savedAt:   new Date().toISOString(),
