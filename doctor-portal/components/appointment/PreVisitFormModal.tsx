@@ -21,14 +21,22 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
     onClose();
   };
 
-  const fields = [
-    { label: "Do you have any chronic illnesses?", value: form?.chronicIllnesses ?? "Not provided" },
-    { label: "Current Medications", value: form?.currentMedications ?? "None" },
-    { label: "Allergies", value: form?.allergies ?? "None known" },
-    { label: "Primary Concern", value: form?.primaryConcern ?? patient.description },
-    { label: "Do you smoke?", value: form?.smokes ?? "No" },
-    { label: "Do you drink?", value: form?.drinks ?? "No" },
-  ];
+  const fields = form?.isQuestionnaire
+    ? [
+        { label: "What is the primary reason for your visit today", value: form?.primaryConcern ?? "Not provided" },
+        { label: "Are you experiencing any new symptoms?", value: form?.smokes ?? "None" },
+        { label: "Do you have any existing medical conditions or chronic illnesses?", value: form?.chronicIllnesses ?? "None reported" },
+        { label: "What medications are you currently taking?", value: form?.currentMedications ?? "None" },
+        { label: "What is the primary reason for your visit today", value: form?.drinks ?? "None" },
+      ]
+    : [
+        { label: "Do you have any chronic illnesses?", value: form?.chronicIllnesses ?? "Not provided" },
+        { label: "Current Medications", value: form?.currentMedications ?? "None" },
+        { label: "Allergies", value: form?.allergies ?? "None known" },
+        { label: "Primary Concern", value: form?.primaryConcern ?? patient.description },
+        { label: "Do you smoke?", value: form?.smokes ?? "No" },
+        { label: "Do you drink?", value: form?.drinks ?? "No" },
+      ];
 
   return (
     /* Backdrop */
@@ -87,7 +95,7 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
         {/* Form Q&A fields */}
         <div className="flex flex-col gap-0 w-full">
           {fields.map((field, i) => (
-            <React.Fragment key={field.label}>
+            <React.Fragment key={`${field.label}-${i}`}>
               <div className="flex flex-col gap-1 py-0">
                 <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
                   {field.label}
