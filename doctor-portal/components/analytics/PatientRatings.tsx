@@ -16,7 +16,7 @@ interface PatientRatingsProps {
 
 export default function PatientRatings({ feedback = [] }: PatientRatingsProps) {
   const reviews: Review[] = feedback.map((item) => {
-    let avatarVal = "/patient-avatar-2.png";
+    let avatarVal = "/default-avatar.svg";
     if (item.reviewer?.avatar) {
       if (item.reviewer.avatar.length <= 2) {
         // It's a text initials avatar, e.g. "KW", use patient-avatar or generate initials UI
@@ -85,7 +85,7 @@ export default function PatientRatings({ feedback = [] }: PatientRatingsProps) {
                       alt={rev.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/patient-avatar-2.png";
+                        (e.target as HTMLImageElement).src = "/default-avatar.svg";
                       }}
                     />
                   </div>

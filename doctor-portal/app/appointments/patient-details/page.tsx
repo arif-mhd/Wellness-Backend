@@ -35,7 +35,7 @@ function PatientDetailsContent() {
         const res = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
         if (res.ok) {
           const { appointments } = await res.json();
-          const match = appointments?.find((a: any) => a.patientId === id);
+          const match = appointments?.find((a: any) => a.id === id || a.patientId === id || a.familyMemberId === id);
           if (match) {
             const dob = match.patientDob || "";
             let age = 0;
@@ -46,7 +46,7 @@ function PatientDetailsContent() {
               }
             }
             setDbPatient({
-              id: match.patientId,
+              id: match.familyMemberId || match.patientId,
               name: match.patientName ?? "Patient",
               age: age,
               email: match.patientEmail ?? "",
@@ -54,7 +54,7 @@ function PatientDetailsContent() {
               description: match.reason ?? "",
               status: "Completed",
               dateTime: match.scheduledAt ?? "",
-              avatar: match.patientAvatarUrl || "/patient-avatar-1.png",
+              avatar: match.patientAvatarUrl || "/default-avatar.svg",
               bio: match.reason ?? "",
               gender: match.patientGender || "N/A",
               phone: match.patientPhone || "N/A",

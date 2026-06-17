@@ -78,8 +78,8 @@ export default function PatientsPage() {
     );
 
     completedApps.forEach((apt: any) => {
-      const patientId = apt.patientId;
-      if (!patientId) return;
+      const keyId = apt.familyMemberId || apt.patientId;
+      if (!keyId) return;
 
       const dob = apt.patientDob || "";
       let age = 0;
@@ -91,22 +91,22 @@ export default function PatientsPage() {
       }
 
       const patientData: DBPatient = {
-        id: patientId,
+        id: keyId,
         name: apt.patientName ?? "Unknown Patient",
         email: apt.patientEmail ?? "",
         phone: apt.patientPhone ?? "",
         gender: apt.patientGender || "N/A",
         dob: dob,
         age: age,
-        avatar: apt.patientAvatarUrl || "/patient-avatar-1.png",
+        avatar: apt.patientAvatarUrl || "/default-avatar.svg",
         diagnosis: apt.reason ?? "Consultation",
         lastVisit: apt.scheduledAt ?? "",
         status: "Completed",
       };
 
       // Keep the most recent appointment details (appointments are returned DESC by scheduledAt)
-      if (!map.has(patientId)) {
-        map.set(patientId, patientData);
+      if (!map.has(keyId)) {
+        map.set(keyId, patientData);
       }
     });
 
@@ -363,7 +363,7 @@ export default function PatientsPage() {
                             alt={patient.name}
                             className="w-10 h-10 rounded-full object-cover border border-[#EBEEF5] shadow-sm group-hover:scale-105 transition-transform"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = "/patient-avatar-1.png";
+                              (e.target as HTMLImageElement).src = "/default-avatar.svg";
                             }}
                           />
                           <div className="flex flex-col">
