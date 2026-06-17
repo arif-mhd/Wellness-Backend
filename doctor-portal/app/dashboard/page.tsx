@@ -16,10 +16,12 @@ interface SlotDef {
 }
 
 interface Task {
-  id: number;
+  id: string;
+  type: "upcoming_consultation" | "pending_emr";
   title: string;
   desc: string;
-  completed: boolean;
+  appointmentId: string;
+  patientName: string;
 }
 
 interface PatientRow {
@@ -73,8 +75,9 @@ export default function DashboardPage() {
   const [waitingCount, setWaitingCount]       = useState(0);
   const [waitingAvatars, setWaitingAvatars]   = useState<string[]>([]);
 
-  // Tasks — local only (no backend endpoint for tasks)
+  // Tasks — derived live from appointments via /api/appointments/doctor/tasks
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [pendingEmrCount, setPendingEmrCount] = useState(0);
   const [tasksLoaded, setTasksLoaded] = useState(false);
 
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -172,6 +175,23 @@ export default function DashboardPage() {
         setPatients(rows);
         if (rows.length > 0) setSelectedPatientId(rows[0].id);
       }
+
+      // Tasks — derived from appointments (upcoming consultations + pending EMR)
+      const tasksRes = await fetch(`${API_URL}/api/appointments/doctor/tasks`, { headers });
+      if (tasksRes.ok) {
+        const { tasks: rawTasks, counts } = await tasksRes.json();
+        const mapped: Task[] = (rawTasks ?? []).map((t: any) => ({
+          id: t.id,
+          type: t.type,
+          title: t.title,
+          desc: `${t.patientName} — ${t.summary}`,
+          appointmentId: t.appointmentId,
+          patientName: t.patientName,
+        }));
+        setTasks(mapped);
+        setPendingEmrCount(counts?.pendingEmr ?? 0);
+      }
+      setTasksLoaded(true);
 
       // Slots
       const slotsRes = await fetch(`${API_URL}/api/doctors/slots`, { headers });
@@ -314,30 +334,13 @@ export default function DashboardPage() {
     document.body
   ) : null;
 
-  // Load tasks from localStorage on mount; start empty if none saved
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("doctor_tasks");
-      if (saved) setTasks(JSON.parse(saved));
-    } catch {
-      // ignore parse errors
-    }
-    setTasksLoaded(true);
-  }, []);
-
-  // Persist tasks to localStorage whenever they change
-  useEffect(() => {
-    if (tasksLoaded) {
-      localStorage.setItem("doctor_tasks", JSON.stringify(tasks));
-    }
-  }, [tasks, tasksLoaded]);
-
-  const toggleTask = (id: number) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const goToTask = (task: Task) => {
+    const tabSuffix = task.type === "pending_emr" ? "&tab=emr" : "";
+    router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}${tabSuffix}`);
   };
 
-  const completedCount      = tasks.filter(t => t.completed).length;
-  const completedPercentage = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const upcomingCount       = tasks.length - pendingEmrCount;
+  const completedPercentage = tasks.length > 0 ? Math.round((upcomingCount / tasks.length) * 100) : 0;
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -461,8 +464,8 @@ export default function DashboardPage() {
                 <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                   {tasks.length} Task{tasks.length !== 1 ? "s" : ""}
                 </div>
-                <div className="text-[#179353] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {completedCount} Task{completedCount !== 1 ? "s" : ""} Completed
+                <div className={`text-xs font-normal tracking-[-0.24px] ${pendingEmrCount > 0 ? "text-[#F25252]" : "text-[#179353]"}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {pendingEmrCount > 0 ? `${pendingEmrCount} EMR${pendingEmrCount !== 1 ? "s" : ""} pending` : "All EMRs up to date"}
                 </div>
               </>
             )}
@@ -646,7 +649,11 @@ export default function DashboardPage() {
                 <span className="text-[#2B2B2B] text-[16px] font-medium leading-[1.5] font-bricolage">
                   Todays Tasks
                 </span>
-                <div className="w-[40px] h-[40px] rounded-full bg-white flex items-center justify-center cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
+                <div
+                  onClick={() => router.push("/dashboard/prescriptions")}
+                  className="w-[40px] h-[40px] rounded-full bg-white flex items-center justify-center cursor-pointer shadow-sm hover:bg-gray-50 transition-colors"
+                  title="View all tasks"
+                >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M4.66699 11.3333L11.3337 4.66663" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M4.66699 4.66663H11.3337V11.3333" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -654,21 +661,23 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Progress Box */}
+              {/* Summary Box */}
               <div className="p-5 flex flex-col gap-3 rounded-[12px] bg-[#CDE48C] w-full">
                 <div className="flex flex-col gap-2">
                   <div className="text-[#2B2B2B] text-[24px] font-medium leading-[1.5] font-bricolage">
                     {!tasksLoaded ? "—" : tasks.length === 0 ? "No Tasks" : `${tasks.length} Task${tasks.length !== 1 ? "s" : ""}`}
                   </div>
-                  <div className="w-full bg-[rgba(0,0,0,0.1)] rounded-full h-[7px] relative overflow-hidden">
-                    <div
-                      className="bg-[#00656B] h-full rounded-full transition-all duration-300"
-                      style={{ width: `${completedPercentage}%` }}
-                    />
-                  </div>
+                  {tasks.length > 0 && (
+                    <div className="w-full bg-[rgba(0,0,0,0.1)] rounded-full h-[7px] relative overflow-hidden">
+                      <div
+                        className="bg-[#00656B] h-full rounded-full transition-all duration-300"
+                        style={{ width: `${completedPercentage}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="text-[#504E61] text-xs font-normal leading-[1.5]" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {tasks.length === 0 ? "No tasks added yet" : `${completedPercentage}% of tasks are completed`}
+                  {tasks.length === 0 ? "No tasks right now" : `${pendingEmrCount} EMR pending, ${upcomingCount} upcoming consultation${upcomingCount !== 1 ? "s" : ""}`}
                 </div>
               </div>
 
@@ -682,26 +691,20 @@ export default function DashboardPage() {
                   tasks.map((task) => (
                     <div
                       key={task.id}
-                      onClick={() => toggleTask(task.id)}
+                      onClick={() => goToTask(task)}
                       className="p-4 bg-white hover:bg-gray-50 rounded-[12px] flex items-center justify-between cursor-pointer transition-colors"
                     >
                       <div className="flex-1 pr-3 flex flex-col gap-1 select-none">
-                        <span className={`text-[#2B2B2B] font-medium text-[12px] leading-[1.5] ${task.completed ? "line-through opacity-50" : ""}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                        <span className="text-[#2B2B2B] font-medium text-[12px] leading-[1.5]" style={{ fontFamily: "Inter, sans-serif" }}>
                           {task.title}
                         </span>
-                        <span className={`text-[#707070] font-normal text-[12px] leading-[1.3] line-clamp-1 ${task.completed ? "opacity-50" : ""}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                        <span className="text-[#707070] font-normal text-[12px] leading-[1.3] line-clamp-1" style={{ fontFamily: "Inter, sans-serif" }}>
                           {task.desc}
                         </span>
                       </div>
-                      {task.completed ? (
-                        <div className="w-6 h-6 rounded-full bg-[#00656B] flex items-center justify-center text-white shrink-0 shadow-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-full border-[3px] border-[#D1D5EB] bg-white shrink-0 hover:border-gray-400 transition-colors" />
-                      )}
+                      <div className={`w-6 h-6 rounded-full border-[3px] shrink-0 transition-colors ${
+                        task.type === "pending_emr" ? "border-[#F25252]" : "border-[#D1D5EB]"
+                      }`} />
                     </div>
                   ))
                 )}

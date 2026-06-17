@@ -223,6 +223,85 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
   }
 });
 
+// ─── GET /api/appointments/doctor/tasks ─────────────────────────────────────
+// Doctor's task list. Like the admin dashboard's task feed, this is derived
+// live from appointments — there is no separate "task" record. Two task
+// types for now:
+//   - upcoming_consultation: scheduled appointment still ahead of now
+//   - pending_emr: appointment marked completed but c.emr was never saved
+// A task disappears once the underlying appointment moves past it (consult
+// happens, or EMR gets saved).
+router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+
+  try {
+    const appointments = await queryDocuments<any>(appointmentsContainer, {
+      query: "SELECT * FROM c WHERE c.doctorId = @doctorId ORDER BY c.scheduledAt DESC",
+      parameters: [{ name: "@doctorId", value: doctorId }],
+    });
+
+    const now = Date.now();
+    const relevant = appointments.filter(
+      (apt) =>
+        (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() >= now) ||
+        (apt.status === "completed" && !apt.emr)
+    );
+
+    const enriched = await Promise.all(
+      relevant.map(async (apt) => {
+        let patientName = "Unknown Patient";
+        let patientEmail = "";
+        let patientAvatarUrl: string | null = null;
+        let patientAge: number | null = null;
+        try {
+          const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+          patientName = patient?.fullName ?? patientName;
+          patientEmail = patient?.email ?? "";
+          patientAvatarUrl = patient?.avatarUrl ?? null;
+          const dob = patient?.dateOfBirth ?? patient?.dob;
+          if (dob) {
+            const diff = Date.now() - new Date(dob).getTime();
+            patientAge = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+          }
+        } catch { /* keep defaults */ }
+
+        const isUpcoming = apt.status === "scheduled";
+
+        return {
+          id: `appointment:${apt.id}`,
+          type: isUpcoming ? "upcoming_consultation" : "pending_emr",
+          title: isUpcoming ? "Upcoming Consultation" : "Complete EMR for Consultation",
+          summary: isUpcoming
+            ? (apt.reason ?? "Consultation")
+            : `Consultation completed — EMR notes and prescription still pending`,
+          priority: isUpcoming ? "Normal" : "High",
+          status: "Pending",
+          time: apt.scheduledAt,
+          patientName,
+          patientEmail,
+          patientAvatarUrl,
+          patientAge,
+          appointmentId: apt.id,
+        };
+      })
+    );
+
+    enriched.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+    res.json({
+      tasks: enriched,
+      counts: {
+        upcomingConsultations: enriched.filter((t) => t.type === "upcoming_consultation").length,
+        pendingEmr: enriched.filter((t) => t.type === "pending_emr").length,
+        total: enriched.length,
+      },
+    });
+  } catch (err) {
+    console.error("Fetch doctor tasks error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/appointments/my-invite ────────────────────────────────────────
 // Specialist (doctor) polls this to check if they have a pending invitation.
 router.get("/my-invite", requireRole("doctor"), async (req: SessionRequest, res: Response) => {

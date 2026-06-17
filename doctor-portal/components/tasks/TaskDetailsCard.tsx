@@ -3,7 +3,7 @@
 import React from "react";
 
 export interface TaskItem {
-  id: number;
+  id: string;
   type: string;
   email: string;
   summary: string;
@@ -12,17 +12,19 @@ export interface TaskItem {
   status: "Pending" | "Completed" | "Missed";
   details: string;
   patientName: string;
-  patientAge: number;
+  patientAge: number | null;
   patientAvatar: string;
   patientBio: string;
+  appointmentId?: string;
 }
 
 interface TaskDetailsCardProps {
   task: TaskItem | null;
-  onToggleComplete?: (taskId: number) => void;
+  onToggleComplete?: (taskId: string) => void;
+  onAction?: (task: TaskItem) => void;
 }
 
-export default function TaskDetailsCard({ task, onToggleComplete }: TaskDetailsCardProps) {
+export default function TaskDetailsCard({ task, onToggleComplete, onAction }: TaskDetailsCardProps) {
   if (!task) {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-[#F5F6FA] border border-[#EBEEF5] rounded-[24px] text-center min-h-[580px] shadow-sm select-none">
@@ -75,7 +77,7 @@ export default function TaskDetailsCard({ task, onToggleComplete }: TaskDetailsC
             Task
           </span>
           <span className="text-[#383F45] font-normal text-base tracking-[-0.32px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-            {task.type} for Patient
+            {task.type}
           </span>
         </div>
 
@@ -108,40 +110,24 @@ export default function TaskDetailsCard({ task, onToggleComplete }: TaskDetailsC
               <span className="text-[#24292E] font-medium text-[15px] tracking-[-0.3px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                 {task.patientName}
               </span>
-              <span className="text-[#676E76] font-normal text-xs mt-0.5" style={{ fontFamily: "Outfit, sans-serif" }}>
-                {task.patientAge} Year Old
-              </span>
+              {task.patientAge != null && (
+                <span className="text-[#676E76] font-normal text-xs mt-0.5" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {task.patientAge} Year Old
+                </span>
+              )}
             </div>
           </div>
-
-          <p className="text-[#676E76] text-xs leading-[1.6]" style={{ fontFamily: "Outfit, sans-serif" }}>
-            {task.patientBio}
-          </p>
         </div>
       </div>
 
-      {/* Action Buttons: View/Download & Complete Task */}
+      {/* Action Button: jump to the relevant consultation/EMR screen */}
       <div className="flex flex-col gap-2 mt-6">
         <button
-          className="w-full py-3 rounded-[12px] bg-[#E8EEFF] text-[#5476FC] hover:bg-[#5476FC] hover:text-white font-bold text-[14px] tracking-[-0.28px] transition-all duration-200 flex items-center justify-center gap-2 border border-transparent shadow-sm"
+          onClick={() => onAction?.(task)}
+          className="w-full py-3 rounded-[12px] font-bold text-[14px] tracking-[-0.28px] transition-all duration-200 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB] text-white"
           style={{ fontFamily: "Outfit, sans-serif" }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-          </svg>
-          View/ Download Report
-        </button>
-
-        <button
-          onClick={() => onToggleComplete?.(task.id)}
-          className={`w-full py-3 rounded-[12px] font-bold text-[14px] tracking-[-0.28px] transition-all duration-200 ${
-            task.status === "Completed"
-              ? "bg-[#E2F8EB] text-[#179353] border border-transparent"
-              : "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB] text-white"
-          }`}
-          style={{ fontFamily: "Outfit, sans-serif" }}
-        >
-          {task.status === "Completed" ? "Completed" : "Complete Task"}
+          {task.type === "upcoming_consultation" ? "Go to Consultation" : "Complete EMR"}
         </button>
       </div>
     </div>

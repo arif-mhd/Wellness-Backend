@@ -7,9 +7,9 @@ import { TaskItem } from "./TaskDetailsCard";
 
 interface TaskListTableProps {
   tasks: TaskItem[];
-  selectedTaskId: number | null;
+  selectedTaskId: string | null;
   onSelectTask: (task: TaskItem) => void;
-  onToggleComplete: (taskId: number) => void;
+  onAction: (task: TaskItem) => void;
   activeFilter: string;
   setActiveFilter: (filter: string) => void;
   searchQuery: string;
@@ -21,7 +21,7 @@ export default function TaskListTable({
   tasks,
   selectedTaskId,
   onSelectTask,
-  onToggleComplete,
+  onAction,
   activeFilter,
   setActiveFilter,
   searchQuery,
@@ -34,10 +34,9 @@ export default function TaskListTable({
 
   // Filter & Search Logic
   const filteredTasks = tasks.filter((task) => {
-    // 1. Filter by tab status
-    if (activeFilter === "Pending" && task.status !== "Pending") return false;
-    if (activeFilter === "Completed" && task.status !== "Completed") return false;
-    if (activeFilter === "Missed" && task.status !== "Missed") return false;
+    // 1. Filter by tab (task type)
+    if (activeFilter === "Consultations" && task.type !== "upcoming_consultation") return false;
+    if (activeFilter === "EMR" && task.type !== "pending_emr") return false;
 
     // 2. Filter by search query
     if (searchQuery.trim() !== "") {
@@ -45,8 +44,7 @@ export default function TaskListTable({
       return (
         task.type.toLowerCase().includes(query) ||
         task.summary.toLowerCase().includes(query) ||
-        task.patientName.toLowerCase().includes(query) ||
-        task.email.toLowerCase().includes(query)
+        task.patientName.toLowerCase().includes(query)
       );
     }
 
@@ -67,7 +65,7 @@ export default function TaskListTable({
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
-  const filters = ["ALL", "Pending", "Completed", "Missed"];
+  const filters = ["ALL", "Consultations", "EMR"];
 
   return (
     <div className="flex flex-col bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm min-h-[580px] justify-between select-none">
@@ -176,34 +174,25 @@ export default function TaskListTable({
                   onClick={() => onSelectTask(task)}
                   onMouseEnter={() => onHoverTask?.(task)}
                   onMouseLeave={() => onHoverTask?.(null)}
-                  className="group grid grid-cols-1 md:grid-cols-[1.5fr_2fr_0.8fr_1.5fr] gap-4 items-center p-3 rounded-2xl cursor-pointer border border-transparent bg-white hover:bg-[#ECEFFE]/80 transition-all duration-300"
+                  className={`group grid grid-cols-1 md:grid-cols-[1.5fr_2fr_0.8fr_1.5fr] gap-4 items-center p-3 rounded-2xl cursor-pointer border transition-all duration-300 ${
+                    isSelected ? "bg-[#ECEFFE] border-[#D7DEFF]" : "bg-white border-transparent hover:bg-[#ECEFFE]/80"
+                  }`}
                 >
-                  {/* Task Info with Checkbox Icon */}
+                  {/* Task Info with Icon */}
                   <div className="flex items-center gap-3">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleComplete(task.id);
-                      }}
-                      className="shrink-0 transition-all duration-150 hover:scale-105"
-                      title={task.status === "Completed" ? "Mark Pending" : "Mark Completed"}
-                    >
-                      <div className={`w-9 h-9 rounded-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(88,121,252,0.2)] transition-all duration-200 ${
-                        task.status === "Completed" ? "opacity-100" : "opacity-75 group-hover:opacity-100"
-                      }`}>
-                        <Image
-                          src={checkIcon}
-                          alt="Check Icon"
-                          className="w-5 h-5 object-contain"
-                        />
-                      </div>
-                    </button>
+                    <div className="shrink-0 w-9 h-9 rounded-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] flex items-center justify-center shadow-[0_2px_8px_rgba(88,121,252,0.2)]">
+                      <Image
+                        src={checkIcon}
+                        alt="Task Icon"
+                        className="w-5 h-5 object-contain"
+                      />
+                    </div>
                     <div className="flex flex-col min-w-0">
-                      <span className={`text-[#24292E] font-medium text-[13px] tracking-[-0.26px] truncate ${task.status === "Completed" ? "line-through opacity-50" : ""}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                      <span className="text-[#24292E] font-medium text-[13px] tracking-[-0.26px] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
                         {task.type}
                       </span>
                       <span className="text-[#9EA5AD] text-xs truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
-                        {task.email}
+                        {task.patientName}
                       </span>
                     </div>
                   </div>
@@ -218,38 +207,27 @@ export default function TaskListTable({
                         High Priority
                       </span>
                     )}
-                    <span className={`text-[#676E76] text-xs truncate ${task.status === "Completed" ? "opacity-50" : ""}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <span className="text-[#676E76] text-xs truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
                       {task.summary}
                     </span>
                   </div>
 
                   {/* Time info */}
-                  <div className={`text-[#676E76] text-xs ${task.status === "Completed" ? "opacity-50" : ""}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                  <div className="text-[#676E76] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>
                     {task.time}
                   </div>
 
                   {/* Actions Column */}
                   <div className="flex items-center justify-end gap-3 mt-2 md:mt-0">
-                    {/* Messaging Chat Trigger */}
-                    <button className="w-8 h-8 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#3D4B5A] hover:bg-[#F5F6FA] hover:text-[#5879FC] transition-colors shadow-sm">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12.25 6.417a4.667 4.667 0 01-4.958 4.666 4.9 4.9 0 01-2.217-.408L1.75 12.25l1.108-3.325a4.667 4.667 0 119.392-2.508z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onToggleComplete(task.id);
+                        onAction(task);
                       }}
-                      className={`whitespace-nowrap shrink-0 h-[32px] px-3.5 rounded-xl text-xs font-semibold tracking-[-0.24px] transition-all duration-300 ${
-                        task.status === "Completed"
-                          ? "bg-[#E2F8EB] text-[#179353] border border-transparent"
-                          : "bg-white text-[#24292E] border border-gray-200 group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:text-white group-hover:border-transparent group-hover:shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
-                      }`}
+                      className="whitespace-nowrap shrink-0 h-[32px] px-3.5 rounded-xl text-xs font-semibold tracking-[-0.24px] transition-all duration-300 bg-white text-[#24292E] border border-gray-200 group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:text-white group-hover:border-transparent group-hover:shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
                       style={{ fontFamily: "Outfit, sans-serif" }}
                     >
-                      {task.status === "Completed" ? "Completed" : "Complete Task"}
+                      {task.type === "upcoming_consultation" ? "Consult Now" : "Complete EMR"}
                     </button>
                   </div>
                 </div>
