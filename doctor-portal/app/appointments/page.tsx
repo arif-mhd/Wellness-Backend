@@ -22,6 +22,29 @@ function mapToPatient(apt: any, index: number): Patient {
   let status: Patient["status"] = "Scheduled";
   if (apt.status === "in_progress") status = "Waiting";
   else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
+
+  const preVisitForm = apt.preVisitData ? {
+    isQuestionnaire: true,
+    chronicIllnesses: apt.preVisitData.conditions || "None reported",
+    currentMedications: apt.preVisitData.medications || "None",
+    allergies: apt.preVisitData.allergies || "None",
+    primaryConcern: apt.preVisitData.primaryReason || apt.reason || "Consultation",
+    smokes: Array.isArray(apt.preVisitData.symptoms) ? apt.preVisitData.symptoms.join(", ") : (apt.preVisitData.symptoms || "None"),
+    drinks: apt.preVisitData.additionalNotes || "None",
+  } : {
+    isQuestionnaire: false,
+    chronicIllnesses: apt.patientChronicIllnesses || "None reported",
+    currentMedications: apt.patientCurrentMedications || "None",
+    allergies: apt.patientAllergies || "None",
+    primaryConcern: apt.reason || "Consultation",
+    smokes: "No",
+    drinks: "No"
+  };
+
+  const preVisitFormDate = apt.preVisitData?.submittedAt
+    ? new Date(apt.preVisitData.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + ", " + new Date(apt.preVisitData.submittedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    : undefined;
+
   return {
     id: apt.id,
     name: apt.patientName ?? "Patient",
@@ -36,6 +59,8 @@ function mapToPatient(apt: any, index: number): Patient {
     avatar: apt.patientAvatarUrl || "/default-avatar.svg",
     bio: apt.reason ?? "",
     earnings: `${apt.paymentAmount ?? 250} AED`,
+    preVisitForm,
+    preVisitFormDate,
   };
 }
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";

@@ -61,8 +61,19 @@ function PreVisitFormContent() {
               height: match.patientHeight || "N/A",
               weight: match.patientWeight || "N/A",
               dob: dob,
-              preVisitFormDate: dob,
-              preVisitForm: {
+              preVisitFormDate: match.preVisitData?.submittedAt
+                ? new Date(match.preVisitData.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + ", " + new Date(match.preVisitData.submittedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+                : dob,
+              preVisitForm: match.preVisitData ? {
+                isQuestionnaire: true,
+                chronicIllnesses: match.preVisitData.conditions || "None reported",
+                currentMedications: match.preVisitData.medications || "None",
+                allergies: match.preVisitData.allergies || "None",
+                primaryConcern: match.preVisitData.primaryReason || match.reason || "Consultation",
+                smokes: Array.isArray(match.preVisitData.symptoms) ? match.preVisitData.symptoms.join(", ") : (match.preVisitData.symptoms || "None"),
+                drinks: match.preVisitData.additionalNotes || "None",
+              } : {
+                isQuestionnaire: false,
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
                 currentMedications: match.patientCurrentMedications || "None",
                 allergies: match.patientAllergies || "None",
