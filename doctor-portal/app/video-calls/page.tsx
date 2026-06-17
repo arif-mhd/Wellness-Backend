@@ -71,10 +71,13 @@ function VideoCallInner() {
   const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
-  const [expandedSection, setExpandedSection] = useState<string | null>("visitInformation");
+  const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
   const [savingEmr,  setSavingEmr]  = useState(false);
   const [emrSaved,   setEmrSaved]   = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
+
+  // Patient profile for the snapshot strip + HPI pre-fill
+  const [patientProfile, setPatientProfile] = useState<any | null>(null);
 
   // Current doctor identity — used by AddMedicines/AddLabs to identify own entries
   const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
@@ -260,26 +263,61 @@ function VideoCallInner() {
     Session.getUserId().then((id) => setCurrentDoctorId(id ?? null)).catch(() => {});
   }, []);
 
-  // Restore any previously saved EMR for this appointment
+  // Restore any previously saved EMR for this appointment + load patient profile
   useEffect(() => {
     if (!appointmentId) return;
     (async () => {
       setLoadingEmr(true);
       try {
         const token = await Session.getAccessToken();
-        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+
+        // 1. Load patient profile (for the snapshot strip)
+        try {
+          const profRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/patient-profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (profRes.ok) {
+            const { profile } = await profRes.json();
+            setPatientProfile(profile ?? null);
+          }
+        } catch { /* non-fatal */ }
+
+        // 2. Load saved EMR for this encounter
+        const emrRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.ok) {
-          const { emr } = await res.json();
+        if (emrRes.ok) {
+          const { emr } = await emrRes.json();
           if (emr) {
             if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
             setMedicines(emr.medicines ?? []);
             setLabs(emr.labs ?? []);
+          } else {
+            // 3. No saved EMR yet — pre-fill HPI from the patient's most recent
+            //    past appointment that has an EMR (fetched via the EHR endpoint).
+            try {
+              const ehrRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (ehrRes.ok) {
+                const ehrData = await ehrRes.json();
+                const history: any[] = ehrData?.visitHistory ?? [];
+                // Find the most-recent completed visit that has HPI recorded
+                const hpiSource = history.find(
+                  (v: any) => v.emr?.sections?.historyOfPresentIllness?.trim()
+                );
+                if (hpiSource) {
+                  setEmrSections((prev) => ({
+                    ...prev,
+                    historyOfPresentIllness: hpiSource.emr.sections.historyOfPresentIllness,
+                  }));
+                }
+              }
+            } catch { /* non-fatal — leave HPI blank */ }
           }
         }
       } catch {
-        // ignore — start with a blank EMR
+        // ignore — start with a blank form
       } finally {
         setLoadingEmr(false);
       }
@@ -767,6 +805,7 @@ function VideoCallInner() {
                   onChange={setEmrSections}
                   openSection={expandedSection}
                   onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                  patientProfile={patientProfile}
                 />
 
                 <div className="grid grid-cols-2 gap-4">
@@ -780,7 +819,7 @@ function VideoCallInner() {
             <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50">Cancel</button>
             <button onClick={saveEmr} disabled={savingEmr}
               className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec]"}`}>
-              {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
+              {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save Consultation Notes"}
             </button>
           </div>
         </div>

@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
 import { Patient } from "@/app/appointments/types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface PatientProfileModalProps {
   patient: Patient;
@@ -13,66 +16,32 @@ interface PatientProfileModalProps {
 
 type ProfileTab = "Consultations" | "Medications" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
 
-const MOCK_CONSULTATIONS = [
-  {
-    id: "c1",
-    title: "Consultation_01022020",
-    ref: "DHA-2025-00123456",
-    doctor: "Dr. Selima Khan",
-    doctorAvatar: "https://api.builder.io/api/v1/image/assets/TEMP/2355e046a3fdc8727311560c0e1cb05484370c15?width=42",
-    date: "1 Feb, 2020, 11:40 PM",
-  },
-  {
-    id: "c2",
-    title: "Consultation_15052020",
-    ref: "DHA-2025-00123457",
-    doctor: "Dr. Selima Khan",
-    doctorAvatar: "https://api.builder.io/api/v1/image/assets/TEMP/2355e046a3fdc8727311560c0e1cb05484370c15?width=42",
-    date: "15 May, 2020, 09:20 AM",
-  },
-  {
-    id: "c3",
-    title: "Consultation_22092020",
-    ref: "DHA-2025-00123458",
-    doctor: "Dr. Selima Khan",
-    doctorAvatar: "https://api.builder.io/api/v1/image/assets/TEMP/2355e046a3fdc8727311560c0e1cb05484370c15?width=42",
-    date: "22 Sep, 2020, 03:30 PM",
-  },
-  {
-    id: "c4",
-    title: "Consultation_10122020",
-    ref: "DHA-2025-00123459",
-    doctor: "Dr. Selima Khan",
-    doctorAvatar: "https://api.builder.io/api/v1/image/assets/TEMP/2355e046a3fdc8727311560c0e1cb05484370c15?width=42",
-    date: "10 Dec, 2020, 11:00 AM",
-  },
-  {
-    id: "c5",
-    title: "Consultation_03032021",
-    ref: "DHA-2025-00123460",
-    doctor: "Dr. Selima Khan",
-    doctorAvatar: "https://api.builder.io/api/v1/image/assets/TEMP/2355e046a3fdc8727311560c0e1cb05484370c15?width=42",
-    date: "3 Mar, 2021, 02:15 PM",
-  },
-];
+// ── Real consultation type (from backend appointments) ──────────────────────
+interface RealConsultation {
+  id: string;
+  title: string;
+  ref: string;
+  doctor: string;
+  doctorAvatar: string | null;
+  date: string;
+  reason: string;
+  emr: {
+    sections?: {
+      reasonForVisit?: string;
+      historyOfPresentIllness?: string;
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+      // Legacy keys
+      impressionAndPlan?: string;
+      medicalDecisionMaking?: string;
+    };
+    medicines?: any[];
+    labs?: any[];
+  } | null;
+}
 
-const EMR_DETAIL = {
-  reasonForVisit: "Fever",
-  reasonDescription: "I've had a fever for three days with chills, body aches, and fatigue.",
-  emrSummary: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
-  subjective: "Patient reports persistent headaches and fatigue over the past two weeks. States the headaches are moderate in intensity and occur daily. Patient also mentions feeling more fatigued than usual, especially in the afternoons. Denies any recent changes in medication or significant stressors.",
-  objective: `Vital Signs:\n-Blood Pressure: 150/90 mmHg\n-Heart Rate: 80 bpm\n-Temperature: 98.6°F (37°C)\n\nPhysical Exam\n-General: Alert and in no acute distress.\n-Neurological: No focal deficits; cranial nerves II–XII intact.\n-Cardiovascular: Regular rate and rhythm, no murmurs.\n-Respiratory: Clear to auscultation bilaterally.\n-Abdominal: Soft, non-tender, no masses.`,
-  assessment: `Hypertension (uncontrolled): Likely contributing to headaches.\nFatigue: Could be related to hypertension and sleep quality; further evaluation needed.`,
-  plan: `Increase Amlodipine to 10mg daily to better control blood pressure.\nSchedule a follow-up appointment in 4 weeks to monitor blood pressure and assess headache frequency.\nOrder blood tests: Complete Blood Count (CBC) and Basic Metabolic Panel (BMP) to evaluate for underlying causes of fatigue. Recommend lifestyle modifications: Reduce caffeine intake, increase hydration, and maintain a regular sleep schedule.`,
-  medicines: [
-    { name: "Paracetamol 500 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-    { name: "Ibuprofen 200 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-  ],
-  labTests: [
-    { name: "CBC", notes: "Take before food in the morning" },
-    { name: "BMP", notes: "Take before food in the morning" },
-  ],
-};
 
 const MOCK_LAB_REPORTS = [
   {
@@ -157,7 +126,56 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
   const [activeTab, setActiveTab] = useState<ProfileTab>(
     initialTab || (mode === "lab-reports" ? "Labs" : "Consultations")
   );
-  const [selectedConsultation, setSelectedConsultation] = useState(MOCK_CONSULTATIONS[0]);
+
+  // Real consultation data fetched from the backend
+  const [consultations, setConsultations] = useState<RealConsultation[]>([]);
+  const [selectedConsultation, setSelectedConsultation] = useState<RealConsultation | null>(null);
+  const [loadingConsultations, setLoadingConsultations] = useState(true);
+
+  // Fetch all appointments for this patient (from the doctor's perspective)
+  useEffect(() => {
+    (async () => {
+      setLoadingConsultations(true);
+      try {
+        const token = await Session.getAccessToken();
+        if (!token) return;
+        const res = await fetch(`${API_URL}/api/appointments/doctor`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { appointments } = await res.json();
+          // Filter to this patient's appointments, most-recent first
+          const patientApts: any[] = (appointments ?? [])
+            .filter((a: any) => a.patientId === patient.id)
+            .sort((a: any, b: any) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+
+          const mapped: RealConsultation[] = patientApts.map((a: any) => {
+            const d = new Date(a.scheduledAt);
+            const dateStr = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
+              ", " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+            const dateKey = d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "");
+            return {
+              id: a.id,
+              title: `Consultation_${dateKey}`,
+              ref: `APT-${a.id.slice(-8).toUpperCase()}`,
+              doctor: a.doctorName ? `Dr. ${a.doctorName}` : "Doctor",
+              doctorAvatar: a.doctorAvatarUrl ?? null,
+              date: dateStr,
+              reason: a.reason ?? "",
+              emr: a.emr ?? null,
+            };
+          });
+          setConsultations(mapped);
+          if (mapped.length > 0) setSelectedConsultation(mapped[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load consultations:", err);
+      } finally {
+        setLoadingConsultations(false);
+      }
+    })();
+  }, [patient.id]);
+
   const [prescribedMedicines, setPrescribedMedicines] = useState([
     { name: "Paracetamol 500 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
     { name: "Ibuprofen 200 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
@@ -318,8 +336,14 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
               {/* Consultation rows */}
               <div className="flex flex-col gap-2">
-                {MOCK_CONSULTATIONS.map((c) => {
-                  const isSelected = selectedConsultation.id === c.id;
+                {loadingConsultations ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : consultations.length === 0 ? (
+                  <p className="text-[#9EA5AD] text-[13px] text-center py-6">No consultations recorded yet.</p>
+                ) : consultations.map((c) => {
+                  const isSelected = selectedConsultation?.id === c.id;
                   return (
                     <button
                       key={c.id}
@@ -332,18 +356,35 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                         <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
                           {c.title}
                         </span>
-                        <span className="text-[#777F86] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
+                        <span className="text-[#777F86] text-[12px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
                           {c.ref}
                         </span>
                         <div className="flex items-center gap-2 mt-1">
-                          <img src={c.doctorAvatar} alt={c.doctor} className="w-[21px] h-[21px] rounded-full object-cover flex-shrink-0" />
-                          <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
+                          {c.doctorAvatar ? (
+                            <img src={c.doctorAvatar} alt={c.doctor} className="w-[21px] h-[21px] rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-[21px] h-[21px] rounded-full bg-[#5476FC] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
+                              {c.doctor.replace("Dr. ", "").slice(0,1)}
+                            </div>
+                          )}
+                          <span className="text-[#24292E] text-[13px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
                             {c.doctor}
                           </span>
                         </div>
                         <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-0.5">
                           {c.date}
                         </span>
+                        {/* EMR badge */}
+                        {c.emr ? (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold w-fit">
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+                            Notes recorded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 text-[10px] font-semibold w-fit">
+                            No notes yet
+                          </span>
+                        )}
                       </div>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 rotate-[-90deg]">
                         <path d="M5.25 10.5L8.75 7L5.25 3.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -371,135 +412,177 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
               </div>
 
               {/* Scrollable content */}
-              <div className="flex flex-col lg:flex-row gap-6 p-6 overflow-y-auto min-h-0 flex-1">
-
-                {/* Sub-column 1: Summary, Medicines, Labs */}
-                <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
-                  {/* Reason for visit */}
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                      Reason for visit
-                    </div>
-                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex items-center gap-2">
-                      <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] flex-shrink-0">
-                        {EMR_DETAIL.reasonForVisit}
-                      </span>
-                      <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] line-clamp-2">
-                        {EMR_DETAIL.reasonDescription}
-                      </span>
-                    </div>
+              {!selectedConsultation ? (
+                <div className="flex items-center justify-center py-16 text-[#9EA5AD] text-sm">Select a consultation</div>
+              ) : !selectedConsultation.emr ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9EA5AD" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
                   </div>
-
-                  {/* EMR Summary */}
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                      EMR
-                    </div>
-                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4">
-                      <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px]">
-                        {EMR_DETAIL.emrSummary}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Medicines */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
-                      <button className="flex items-center gap-2 px-[13px] py-[6px] bg-[#E0E7FF] rounded-[12px] text-[#182A6F] text-[13px] font-medium leading-5">
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                          <path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/>
-                        </svg>
-                        Download Prescription
-                      </button>
-                    </div>
-                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
-                      {EMR_DETAIL.medicines.map((med, i) => (
-                        <React.Fragment key={med.name}>
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <GradientPillIcon />
-                              <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                                {med.name}
-                              </span>
-                            </div>
-                            <p className="text-[12px] leading-[16px]">
-                              <span className="text-[#5476FC]">{med.dose.split(" ")[0]}</span>
-                              <span className="text-[#676E76]"> {med.dose.split(" ").slice(1).join(" ")}</span>
-                              <span className="text-[#5476FC]"> ({med.duration})</span>
-                            </p>
-                            <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {med.notes}</p>
-                          </div>
-                          {i < EMR_DETAIL.medicines.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Lab Tests */}
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                      Lab Tests
-                    </div>
-                    <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
-                      {EMR_DETAIL.labTests.map((lab, i) => (
-                        <React.Fragment key={lab.name}>
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}>
-                                  <span className="text-white text-[10px] font-bold">{lab.name[0]}</span>
-                                </div>
-                                <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                                  {lab.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
-                                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M12.0028 7.06066L5.54784 13.5156L4.48718 12.4549L10.9421 6H5.2528V4.5H13.5028V12.75H12.0028V7.06066Z" fill="#182A6E"/></svg>
-                                  View
-                                </button>
-                                <button className="flex items-center gap-1 text-[#182A6F] text-[12px] font-medium leading-5">
-                                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V13.2692H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/></svg>
-                                  Download Report
-                                </button>
-                              </div>
-                            </div>
-                            <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {lab.notes}</p>
-                          </div>
-                          {i < EMR_DETAIL.labTests.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
+                  <p className="text-[#9EA5AD] text-[13px] text-center">
+                    No consultation notes recorded for this visit.
+                  </p>
+                  <p className="text-[#9EA5AD] text-[11px] text-center max-w-[260px]">
+                    Notes filled during the video call will appear here after the doctor saves them.
+                  </p>
                 </div>
+              ) : (
+                <div className="flex flex-col lg:flex-row gap-6 p-6 overflow-y-auto min-h-0 flex-1">
 
-                {/* Sub-column 2: SOAP details */}
-                <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
-                  {[
-                    { label: "Subjective", color: "#8AA0FF", text: EMR_DETAIL.subjective },
-                    { label: "Objective", color: "#3CB3DA", text: EMR_DETAIL.objective },
-                    { label: "Assessment", color: "#8AA0FF", text: EMR_DETAIL.assessment },
-                    { label: "Plan", color: "#3CB3DA", text: EMR_DETAIL.plan },
-                  ].map((section, i) => (
-                    <React.Fragment key={section.label}>
+                  {/* Sub-column 1: Reason for Visit + HPI + Medicines + Labs */}
+                  <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
+
+                    {/* Reason for Visit */}
+                    {(selectedConsultation.emr.sections?.reasonForVisit || selectedConsultation.reason) && (
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <DiamondIcon color={section.color} />
-                          <span className="flex-1 text-[#24292E] text-[14px] font-medium leading-[1.2] tracking-[-0.28px]">
-                            {section.label}
+                        <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                          Reason for visit
+                        </div>
+                        <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex items-start gap-2">
+                          <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] flex-shrink-0">
+                            Visit
+                          </span>
+                          <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px]">
+                            {selectedConsultation.emr.sections?.reasonForVisit || selectedConsultation.reason}
                           </span>
                         </div>
-                        <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">
-                          {section.text}
-                        </p>
                       </div>
-                      {i < 3 && <div className="w-full h-px bg-[#EBEEF5]" />}
-                    </React.Fragment>
-                  ))}
-                </div>
+                    )}
 
-              </div>
+                    {/* History of Present Illness */}
+                    {selectedConsultation.emr.sections?.historyOfPresentIllness && (
+                      <div className="flex flex-col gap-2">
+                        <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                          History of Present Illness
+                        </div>
+                        <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4">
+                          <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">
+                            {selectedConsultation.emr.sections.historyOfPresentIllness}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Medicines */}
+                    {selectedConsultation.emr.medicines && selectedConsultation.emr.medicines.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
+                          <button className="flex items-center gap-2 px-[13px] py-[6px] bg-[#E0E7FF] rounded-[12px] text-[#182A6F] text-[13px] font-medium leading-5">
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                              <path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/>
+                            </svg>
+                            Download Prescription
+                          </button>
+                        </div>
+                        <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
+                          {selectedConsultation.emr.medicines.map((med: any, i: number) => (
+                            <React.Fragment key={med.id ?? i}>
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <GradientPillIcon />
+                                  <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                                    {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
+                                  </span>
+                                </div>
+                                <p className="text-[12px] leading-[16px]">
+                                  <span className="text-[#5476FC]">{med.timing}</span>
+                                  {med.frequency && <span className="text-[#676E76]"> · {med.frequency}</span>}
+                                </p>
+                                {med.instructions && (
+                                  <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {med.instructions}</p>
+                                )}
+                                {med.contributorName && (
+                                  <p className="text-[#5476FC] text-[11px] italic">By Dr. {med.contributorName}</p>
+                                )}
+                              </div>
+                              {i < (selectedConsultation.emr!.medicines!.length - 1) && <div className="w-full h-px bg-[#EBEEF5]" />}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lab Tests */}
+                    {selectedConsultation.emr.labs && selectedConsultation.emr.labs.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                          Lab Tests
+                        </div>
+                        <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
+                          {selectedConsultation.emr.labs.map((lab: any, i: number) => (
+                            <React.Fragment key={lab.id ?? i}>
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}>
+                                    <span className="text-white text-[10px] font-bold">{lab.name?.[0] ?? "L"}</span>
+                                  </div>
+                                  <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                                    {lab.name}
+                                  </span>
+                                </div>
+                                {lab.notes && <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {lab.notes}</p>}
+                                {lab.contributorName && (
+                                  <p className="text-[#5476FC] text-[11px] italic">By Dr. {lab.contributorName}</p>
+                                )}
+                              </div>
+                              {i < (selectedConsultation.emr!.labs!.length - 1) && <div className="w-full h-px bg-[#EBEEF5]" />}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {(!selectedConsultation.emr.medicines || selectedConsultation.emr.medicines.length === 0) &&
+                      (!selectedConsultation.emr.labs || selectedConsultation.emr.labs.length === 0) &&
+                      !selectedConsultation.emr.sections?.reasonForVisit &&
+                      !selectedConsultation.emr.sections?.historyOfPresentIllness && (
+                      <p className="text-[#9EA5AD] text-[12px] text-center py-4">No details recorded for this consultation.</p>
+                    )}
+                  </div>
+
+                  {/* Sub-column 2: SOAP notes */}
+                  <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
+                    {(([
+                      { label: "Subjective",  color: "#8AA0FF", text: selectedConsultation.emr.sections?.subjective },
+                      { label: "Objective",   color: "#3CB3DA", text: selectedConsultation.emr.sections?.objective },
+                      { label: "Assessment",  color: "#8AA0FF", text: selectedConsultation.emr.sections?.assessment },
+                      { label: "Plan",        color: "#3CB3DA", text: selectedConsultation.emr.sections?.plan ?? selectedConsultation.emr.sections?.impressionAndPlan },
+                    ] as { label: string; color: string; text?: string }[])
+                      .filter((s) => s.text && s.text.trim())
+                      .map((section, i, arr) => (
+                        <React.Fragment key={section.label}>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <DiamondIcon color={section.color} />
+                              <span className="flex-1 text-[#24292E] text-[14px] font-medium leading-[1.2] tracking-[-0.28px]">
+                                {section.label}
+                              </span>
+                            </div>
+                            <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">
+                              {section.text}
+                            </p>
+                          </div>
+                          {i < arr.length - 1 && <div className="w-full h-px bg-[#EBEEF5]" />}
+                        </React.Fragment>
+                      ))
+                    )}
+                    {!selectedConsultation.emr.sections?.subjective &&
+                      !selectedConsultation.emr.sections?.objective &&
+                      !selectedConsultation.emr.sections?.assessment &&
+                      !selectedConsultation.emr.sections?.plan &&
+                      !selectedConsultation.emr.sections?.impressionAndPlan && (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <p className="text-[#9EA5AD] text-[12px] text-center">No SOAP notes recorded for this consultation.</p>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -520,7 +603,6 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   Add Medicine
                 </button>
               </div>
-
               {prescribedMedicines.length === 0 ? (
                 <p className="text-gray-400 text-center py-6 text-sm">No medicines prescribed.</p>
               ) : (
@@ -560,7 +642,6 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                 </div>
               )}
             </div>
-
             {/* Right: Consultation Details */}
             <div className="flex-1 bg-white rounded-[12px] p-8 flex flex-col gap-6 border border-white shadow-sm">
               <div className="border-b border-gray-100 pb-4">
@@ -568,25 +649,17 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   Consultation Details
                 </span>
               </div>
-
               <div className="flex flex-col gap-4">
-                {/* Reason for visit */}
                 <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
-                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
-                    Reason for visit
-                  </span>
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">Reason for visit</span>
                   <p className="text-[#676E76] text-[12px] leading-[1.4]">
-                    {patient.description || "I’ve had a fever for three days with chills, body aches, and fatigue."}
+                    {patient.description || "No reason recorded."}
                   </p>
                 </div>
-
-                {/* Pre-visit Form */}
                 <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
-                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
-                    Pre-vist Form
-                  </span>
+                  <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">Pre-visit Form</span>
                   <p className="text-[#676E76] text-[12px] leading-[1.4] mb-2">
-                    Review the patient's pre-visit form to understand their medical history and reason for the appointment.
+                    Review the patient&apos;s pre-visit form to understand their medical history and reason for the appointment.
                   </p>
                   <button
                     onClick={() => router.push(`/appointments/previsit-form?id=${patient.id}&from=patientdetails`)}
