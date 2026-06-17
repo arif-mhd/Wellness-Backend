@@ -75,15 +75,22 @@ function VisitDetail({ emr }: { emr: any }) {
   }
 
   const sections: { label: string; value: string }[] = [
-    { label: "History of Present Illness", value: emr.sections?.historyOfPresentIllness },
-    { label: "Review System", value: emr.sections?.reviewSystem },
-    { label: "Health Status", value: emr.sections?.healthStatus },
-    { label: "Histories", value: emr.sections?.histories },
-    { label: "Physical Examination", value: emr.sections?.physicalExamination },
-    { label: "Medical Decision Making", value: emr.sections?.medicalDecisionMaking },
-    { label: "Procedure", value: emr.sections?.procedure },
-    { label: "Impression and Plan", value: emr.sections?.impressionAndPlan },
-    { label: "Professional Services", value: emr.sections?.professionalServices },
+    // ── New SOAP + HPI format (used for new appointments) ──
+    { label: "Reason for Visit",            value: emr.sections?.reasonForVisit },
+    { label: "History of Present Illness",  value: emr.sections?.historyOfPresentIllness },
+    { label: "Subjective",                  value: emr.sections?.subjective },
+    { label: "Objective",                   value: emr.sections?.objective },
+    { label: "Assessment",                  value: emr.sections?.assessment },
+    { label: "Plan",                        value: emr.sections?.plan },
+    // ── Legacy intake-plan fields (kept for old appointments) ──
+    { label: "Review System",              value: emr.sections?.reviewSystem },
+    { label: "Health Status",              value: emr.sections?.healthStatus },
+    { label: "Histories",                  value: emr.sections?.histories },
+    { label: "Physical Examination",       value: emr.sections?.physicalExamination },
+    { label: "Medical Decision Making",    value: emr.sections?.medicalDecisionMaking },
+    { label: "Procedure",                  value: emr.sections?.procedure },
+    { label: "Impression and Plan",        value: emr.sections?.impressionAndPlan },
+    { label: "Professional Services",      value: emr.sections?.professionalServices },
   ].filter((s) => s.value && s.value.trim() !== "");
 
   const medicines: any[] = Array.isArray(emr.medicines) ? emr.medicines : [];

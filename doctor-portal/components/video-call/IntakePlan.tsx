@@ -1,214 +1,298 @@
 "use client";
 
-export interface VisitInfoData {
-  visitType: string;
-  accompaniedBy: string[];
-  sourceOfHistory: string[];
-  referralSource: string[];
-  historyLimitation: string[];
-}
+// ── ConsultationNotes (replaces the old IntakePlan / EMR intake form) ──────────
+// Sections mirror the patient-details Consultation view so that what the doctor
+// fills during a call is exactly what appears on the patient record later.
+//
+// Sections:
+//   • Reason for Visit          – why the patient booked the appointment
+//   • History of Present Illness – pre-fillable from past appointments' HPI or
+//                                  entered fresh by the doctor
+//   • Subjective                 – patient-reported symptoms / history (SOAP-S)
+//   • Objective                  – examination findings / vitals (SOAP-O)
+//   • Assessment                 – diagnosis / differential (SOAP-A)
+//   • Plan                       – treatment plan / follow-up (SOAP-P)
+
+import { useState } from "react";
 
 export interface EmrSections {
-  visitInformation: VisitInfoData;
+  reasonForVisit: string;
   historyOfPresentIllness: string;
-  reviewSystem: string;
-  healthStatus: string;
-  histories: string;
-  physicalExamination: string;
-  medicalDecisionMaking: string;
-  procedure: string;
-  impressionAndPlan: string;
-  professionalServices: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
 }
 
 export const EMPTY_EMR_SECTIONS: EmrSections = {
-  visitInformation: {
-    visitType: "",
-    accompaniedBy: [],
-    sourceOfHistory: [],
-    referralSource: [],
-    historyLimitation: [],
-  },
+  reasonForVisit: "",
   historyOfPresentIllness: "",
-  reviewSystem: "",
-  healthStatus: "",
-  histories: "",
-  physicalExamination: "",
-  medicalDecisionMaking: "",
-  procedure: "",
-  impressionAndPlan: "",
-  professionalServices: "",
+  subjective: "",
+  objective: "",
+  assessment: "",
+  plan: "",
 };
 
-const TEXT_SECTIONS: { key: keyof EmrSections; title: string }[] = [
-  { key: "historyOfPresentIllness", title: "History of Present Illness" },
-  { key: "reviewSystem", title: "Review System" },
-  { key: "healthStatus", title: "Health Status" },
-  { key: "histories", title: "Histories" },
-  { key: "physicalExamination", title: "Physical Examination" },
-  { key: "medicalDecisionMaking", title: "Medical Decision Making" },
-  { key: "procedure", title: "Procedure" },
-  { key: "impressionAndPlan", title: "Impression and Plan" },
-  { key: "professionalServices", title: "Professional Services" },
-];
+// ── Section definitions ────────────────────────────────────────────────────────
 
-const VISIT_TYPES = ["Annual exam", "General concerns", "New symptom", "Increase in symptom", "Scheduled follow-up"];
-const ACCOMPANIED_OPTIONS = ["No one", "Family Member", "Mother", "Father", "Spouse", "Significant other", "Medical personnel"];
-const SOURCE_OPTIONS = ACCOMPANIED_OPTIONS;
-const REFERRAL_OPTIONS = ["Self", "Provider", "ED", "Health plan", "Family member", "Friend"];
-const LIMITATION_OPTIONS = ["None", "Clinical condition", "Hearing Impaired", "Language barrier", "Family/Guardian not available"];
-
-interface IntakePlanProps {
-  sections: EmrSections;
-  onChange: (sections: EmrSections) => void;
-  openSection: string | null;
-  onToggleSection: (key: string) => void;
+interface SectionDef {
+  key: keyof EmrSections;
+  title: string;
+  color: string;          // diamond / accent colour
+  placeholder: string;
+  rows: number;
 }
 
-function MultiSelectChips({
-  options,
-  selected,
-  onToggle,
-}: {
-  options: string[];
-  selected: string[];
-  onToggle: (opt: string) => void;
-}) {
+const SECTIONS: SectionDef[] = [
+  {
+    key: "reasonForVisit",
+    title: "Reason for Visit",
+    color: "#5476FC",
+    placeholder: "Why is the patient consulting today? (e.g. Persistent headache for 3 days…)",
+    rows: 2,
+  },
+  {
+    key: "historyOfPresentIllness",
+    title: "History of Present Illness",
+    color: "#8AA0FF",
+    placeholder: "Describe onset, duration, character, aggravating / relieving factors…",
+    rows: 4,
+  },
+  {
+    key: "subjective",
+    title: "Subjective",
+    color: "#8AA0FF",
+    placeholder: "Patient-reported symptoms, complaints, and history…",
+    rows: 3,
+  },
+  {
+    key: "objective",
+    title: "Objective",
+    color: "#3CB3DA",
+    placeholder: "Vital signs, physical examination findings, test results…",
+    rows: 4,
+  },
+  {
+    key: "assessment",
+    title: "Assessment",
+    color: "#8AA0FF",
+    placeholder: "Diagnosis or differential diagnoses…",
+    rows: 3,
+  },
+  {
+    key: "plan",
+    title: "Plan",
+    color: "#3CB3DA",
+    placeholder: "Treatment plan, prescriptions, referrals, follow-up…",
+    rows: 3,
+  },
+];
+
+// ── Small icons ────────────────────────────────────────────────────────────────
+
+function DiamondIcon({ color }: { color: string }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => {
-        const active = selected.includes(opt);
-        return (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onToggle(opt)}
-            className={`h-7 px-4 rounded-full text-xs font-semibold transition-all border-none ${
-              active ? "bg-[#5476FC] text-white shadow-sm" : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-            }`}
-          >
-            {opt}
-          </button>
-        );
-      })}
-    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+      <path d="M12 18.2885L5.71149 12L12 5.71155L18.2885 12L12 18.2885Z" fill={color} />
+    </svg>
   );
 }
 
-export default function IntakePlan({ sections, onChange, openSection, onToggleSection }: IntakePlanProps) {
-  const visit = sections.visitInformation;
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      className={`text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
 
-  const updateVisit = (patch: Partial<VisitInfoData>) => {
-    onChange({ ...sections, visitInformation: { ...visit, ...patch } });
-  };
+// ── Props ──────────────────────────────────────────────────────────────────────
 
-  const toggleMulti = (field: keyof VisitInfoData, opt: string) => {
-    const current = visit[field] as string[];
-    const next = current.includes(opt) ? current.filter((x) => x !== opt) : [...current, opt];
-    updateVisit({ [field]: next } as Partial<VisitInfoData>);
-  };
+interface ConsultationNotesProps {
+  sections: EmrSections;
+  onChange: (sections: EmrSections) => void;
+  /** Key of the currently expanded section (or null) */
+  openSection: string | null;
+  onToggleSection: (key: string) => void;
+  /** Optional patient profile to show at the top of the panel */
+  patientProfile?: {
+    fullName?: string;
+    gender?: string;
+    dateOfBirth?: string;
+    bloodGroup?: string;
+    height?: string;
+    weight?: string;
+    chronicDiseases?: string[];
+    allergies?: any[];
+  } | null;
+}
 
-  const updateText = (key: keyof EmrSections, value: string) => {
+// ── Helper ─────────────────────────────────────────────────────────────────────
+
+function calcAge(dob?: string): number | null {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return null;
+  return new Date().getFullYear() - birth.getFullYear();
+}
+
+function fmtAllergies(allergies?: any[]): string {
+  if (!allergies || allergies.length === 0) return "None";
+  return allergies
+    .map((a) =>
+      typeof a === "string"
+        ? a
+        : `${a.category ?? ""}: ${Array.isArray(a.selected) ? a.selected.join(", ") : a.selected ?? ""}`.trim()
+    )
+    .join("; ");
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function IntakePlan({
+  sections,
+  onChange,
+  openSection,
+  onToggleSection,
+  patientProfile,
+}: ConsultationNotesProps) {
+  const updateSection = (key: keyof EmrSections, value: string) => {
     onChange({ ...sections, [key]: value });
   };
 
+  const age = calcAge(patientProfile?.dateOfBirth);
+
   return (
     <div className="flex flex-col gap-3 w-full">
+
+      {/* ── Section header ─────────────────────────────────────────────────── */}
       <div className="w-full bg-white rounded-xl border border-[#EBEEF5] px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-slate-800 text-[13px] font-bold">
-        Intake plan
+        Consultation Notes
       </div>
 
-      {/* Visit Information */}
-      <div
-        className={`bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-300 border ${
-          openSection === "visitInformation" ? "border-[#5476FC] ring-1 ring-[#5476FC]/10" : "border-[#EBEEF5]"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => onToggleSection("visitInformation")}
-          className="w-full flex items-center justify-between p-5 text-left font-bold text-slate-800 text-[13px] bg-white border-b border-[#EBEEF5] hover:bg-[#F8FAFC] transition-colors"
-        >
-          <span>Visit Information</span>
-        </button>
-
-        {openSection === "visitInformation" && (
-          <div className="p-5 flex flex-col gap-5 bg-white">
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Visit type</span>
-              <div className="flex flex-wrap gap-2">
-                {VISIT_TYPES.map((type) => {
-                  const active = visit.visitType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => updateVisit({ visitType: type })}
-                      className={`h-7 px-4 rounded-full text-xs font-semibold tracking-wide transition-all border-none ${
-                        active ? "bg-[#5476FC] text-white shadow-sm" : "bg-[#E8F1FF] text-[#5476FC] hover:bg-[#D4E4FF]"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  );
-                })}
-              </div>
-              <input
-                type="text"
-                value={!VISIT_TYPES.includes(visit.visitType) ? visit.visitType : ""}
-                onChange={(e) => updateVisit({ visitType: e.target.value })}
-                placeholder="Other visit type…"
-                className="flex-1 h-9 px-4 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all"
-              />
+      {/* ── Patient snapshot strip ─────────────────────────────────────────── */}
+      {patientProfile && (
+        <div className="w-full bg-gradient-to-r from-[#EEF2FF] to-[#F5F8FF] rounded-xl border border-[#DDEAFE] px-5 py-3.5 flex flex-col gap-2.5">
+          {/* Name + age */}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-[#5476FC] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+              {(patientProfile.fullName ?? "P").slice(0, 1).toUpperCase()}
             </div>
-
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Accompanied by</span>
-              <MultiSelectChips options={ACCOMPANIED_OPTIONS} selected={visit.accompaniedBy} onToggle={(o) => toggleMulti("accompaniedBy", o)} />
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Source of history</span>
-              <MultiSelectChips options={SOURCE_OPTIONS} selected={visit.sourceOfHistory} onToggle={(o) => toggleMulti("sourceOfHistory", o)} />
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">Referral source</span>
-              <MultiSelectChips options={REFERRAL_OPTIONS} selected={visit.referralSource} onToggle={(o) => toggleMulti("referralSource", o)} />
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              <span className="text-[#676E76] text-[11px] font-bold uppercase tracking-wider">History Limitation</span>
-              <MultiSelectChips options={LIMITATION_OPTIONS} selected={visit.historyLimitation} onToggle={(o) => toggleMulti("historyLimitation", o)} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#24292e] text-[13px] font-bold truncate">
+                {patientProfile.fullName ?? "Patient"}
+                {age !== null && (
+                  <span className="text-[#5476FC] font-semibold ml-1.5">· {age} y/o</span>
+                )}
+              </span>
+              {patientProfile.gender && (
+                <span className="text-[#676E76] text-[10px] font-medium capitalize">
+                  {patientProfile.gender}
+                </span>
+              )}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Remaining free-text sections */}
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "Blood Group", value: patientProfile.bloodGroup || "—" },
+              { label: "Height", value: patientProfile.height ? `${patientProfile.height} cm` : "—" },
+              { label: "Weight", value: patientProfile.weight ? `${patientProfile.weight} kg` : "—" },
+            ].map((s) => (
+              <div key={s.label} className="flex flex-col gap-0.5">
+                <span className="text-[9px] text-[#676E76] uppercase font-bold tracking-wide">{s.label}</span>
+                <span className="text-[11px] text-[#24292e] font-semibold">{s.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Chronic conditions + allergies */}
+          {(patientProfile.chronicDiseases?.length || patientProfile.allergies?.length) ? (
+            <div className="flex flex-col gap-1 pt-1 border-t border-[#DDEAFE]">
+              {patientProfile.chronicDiseases && patientProfile.chronicDiseases.length > 0 && (
+                <div className="flex gap-1.5 items-start">
+                  <span className="text-[9px] text-[#676E76] uppercase font-bold tracking-wide flex-shrink-0 mt-0.5">
+                    Conditions:
+                  </span>
+                  <span className="text-[10px] text-[#24292e] font-medium leading-relaxed">
+                    {patientProfile.chronicDiseases.join(", ")}
+                  </span>
+                </div>
+              )}
+              {patientProfile.allergies && patientProfile.allergies.length > 0 && (
+                <div className="flex gap-1.5 items-start">
+                  <span className="text-[9px] text-[#676E76] uppercase font-bold tracking-wide flex-shrink-0 mt-0.5">
+                    Allergies:
+                  </span>
+                  <span className="text-[10px] text-[#E84949] font-semibold leading-relaxed">
+                    {fmtAllergies(patientProfile.allergies)}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ── SOAP + HPI accordion sections ──────────────────────────────────── */}
       <div className="flex flex-col gap-2.5 w-full">
-        {TEXT_SECTIONS.map(({ key, title }) => {
-          const isOpen = openSection === key;
-          const value = sections[key] as string;
+        {SECTIONS.map((sec) => {
+          const isOpen = openSection === sec.key;
+          const value = sections[sec.key];
+          const hasContent = value.trim().length > 0;
+
           return (
-            <div key={key} className="bg-white rounded-xl border border-[#EBEEF5] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300">
+            <div
+              key={sec.key}
+              className={`bg-white rounded-xl border overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300 ${
+                isOpen
+                  ? "border-[#5476FC] ring-1 ring-[#5476FC]/10"
+                  : "border-[#EBEEF5]"
+              }`}
+            >
+              {/* Header row */}
               <button
                 type="button"
-                onClick={() => onToggleSection(key)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left font-bold text-slate-800 text-[13px] bg-white hover:bg-[#F8FAFC] transition-colors"
+                onClick={() => onToggleSection(sec.key)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left bg-white hover:bg-[#F8FAFC] transition-colors"
               >
-                <span>{title}</span>
-                {value.trim() && <span className="w-1.5 h-1.5 rounded-full bg-[#5476FC]" />}
+                <div className="flex items-center gap-2.5">
+                  <DiamondIcon color={isOpen ? sec.color : "#CBD5E1"} />
+                  <span className="font-bold text-slate-800 text-[13px]">{sec.title}</span>
+                  {hasContent && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5476FC] flex-shrink-0" />
+                  )}
+                </div>
+                <ChevronIcon open={isOpen} />
               </button>
 
+              {/* Textarea body */}
               {isOpen && (
-                <div className="px-5 pb-5 pt-2 text-[#676E76] text-xs leading-relaxed border-t border-[#EBEEF5] bg-white">
+                <div className="px-5 pb-5 pt-2 border-t border-[#EBEEF5] bg-white">
+                  {/* HPI: show a hint if it was pre-filled */}
+                  {sec.key === "historyOfPresentIllness" && hasContent && (
+                    <p className="text-[10px] text-[#5476FC] font-semibold mb-2 flex items-center gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                      </svg>
+                      Pre-filled from past visit — edit as needed
+                    </p>
+                  )}
                   <textarea
                     value={value}
-                    onChange={(e) => updateText(key, e.target.value)}
-                    placeholder={`Enter clinical notes for ${title.toLowerCase()}...`}
-                    rows={3}
-                    className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none"
+                    onChange={(e) => updateSection(sec.key, e.target.value)}
+                    placeholder={sec.placeholder}
+                    rows={sec.rows}
+                    className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] placeholder-[#9EA5AD] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none leading-relaxed"
                   />
                 </div>
               )}
