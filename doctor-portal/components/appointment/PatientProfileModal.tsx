@@ -43,18 +43,6 @@ interface RealConsultation {
 }
 
 
-const MOCK_LAB_REPORTS = [
-  {
-    name: "Complete Blood Count (CBC) Report",
-    status: "Pending",
-    description: "A common blood test that evaluates several components of blood, providing important information about a person's overall health and helping to diagnose various conditions."
-  },
-  {
-    name: "Basic Metabolic Panel (BMP)",
-    status: "Available",
-    description: "A blood test that measures various substances in the blood to assess a person's metabolic state and overall health."
-  }
-];
 
 interface LabReportRow {
   item: string;
@@ -167,6 +155,33 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
           });
           setConsultations(mapped);
           if (mapped.length > 0) setSelectedConsultation(mapped[0]);
+
+          const allMeds: any[] = [];
+          const allLabs: any[] = [];
+          mapped.forEach((c) => {
+            if (c.emr?.medicines) {
+              c.emr.medicines.forEach((m: any) => {
+                allMeds.push({
+                  name: m.name,
+                  dose: `${m.timing} ${m.frequency ? `· ${m.frequency}` : ""}`,
+                  duration: m.dosage || "As advised",
+                  notes: m.instructions || ""
+                });
+              });
+            }
+            if (c.emr?.labs) {
+              c.emr.labs.forEach((l: any) => {
+                allLabs.push({
+                  name: l.name,
+                  date: c.date.split(",")[0],
+                  status: "Pending",
+                  description: l.notes || "Lab recommendation from consultation."
+                });
+              });
+            }
+          });
+          setPrescribedMedicines(allMeds);
+          setLabReports(allLabs);
         }
       } catch (err) {
         console.error("Failed to load consultations:", err);
@@ -176,12 +191,8 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
     })();
   }, [patient.id]);
 
-  const [prescribedMedicines, setPrescribedMedicines] = useState([
-    { name: "Paracetamol 500 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-    { name: "Ibuprofen 200 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-    { name: "Diclofenac 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-    { name: "Tramadol 50 mg", dose: "1x After Breakfast", duration: "3 days", notes: "Take with food every morning" },
-  ]);
+  const [prescribedMedicines, setPrescribedMedicines] = useState<any[]>([]);
+  const [labReports, setLabReports] = useState<any[]>([]);
   const [labsViewMode, setLabsViewMode] = useState<"cards" | "table">(
     mode === "lab-reports" ? "table" : "cards"
   );
@@ -718,56 +729,60 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   </div>
 
                   <div className="flex flex-col gap-6">
-                    {MOCK_LAB_REPORTS.map((report, i) => (
-                      <React.Fragment key={report.name}>
-                        <div className="flex flex-col gap-3">
-                          {/* Title row */}
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                              <GradientPillIcon />
-                              <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
-                                {report.name}
-                              </span>
+                    {labReports.length === 0 ? (
+                      <p className="text-gray-400 text-center py-6 text-sm">No labs recommended.</p>
+                    ) : (
+                      labReports.map((report, i) => (
+                        <React.Fragment key={report.name + i}>
+                          <div className="flex flex-col gap-3">
+                            {/* Title row */}
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <GradientPillIcon />
+                                <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px]">
+                                  {report.name}
+                                </span>
+                              </div>
+                              {report.status === "Pending" ? (
+                                <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                                  Report Pending
+                                </span>
+                              ) : (
+                                <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                                  Report Available
+                                </span>
+                              )}
                             </div>
-                            {report.status === "Pending" ? (
-                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                                Report Pending
-                              </span>
-                            ) : (
-                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                                Report Available
-                              </span>
+
+                            {/* Description */}
+                            <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
+                              {report.description}
+                            </p>
+
+                            {/* Actions for Available reports */}
+                            {report.status === "Available" && (
+                              <div className="flex items-center gap-4 pl-[48px] mt-1">
+                                <button
+                                  onClick={() => router.push(`/appointments/patient-details/lab-reports?id=${patient.id}`)}
+                                  className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
+                                  type="button"
+                                >
+                                  View Report
+                                </button>
+                                <button
+                                  onClick={() => alert(`Downloading ${report.name}...`)}
+                                  className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
+                                  type="button"
+                                >
+                                  Download Report
+                                </button>
+                              </div>
                             )}
                           </div>
-
-                          {/* Description */}
-                          <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
-                            {report.description}
-                          </p>
-
-                          {/* Actions for Available reports */}
-                          {report.status === "Available" && (
-                            <div className="flex items-center gap-4 pl-[48px] mt-1">
-                              <button
-                                onClick={() => router.push(`/appointments/patient-details/lab-reports?id=${patient.id}`)}
-                                className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
-                                type="button"
-                              >
-                                View Report
-                              </button>
-                              <button
-                                onClick={() => alert(`Downloading ${report.name}...`)}
-                                className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
-                                type="button"
-                              >
-                                Download Report
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        {i < MOCK_LAB_REPORTS.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
-                      </React.Fragment>
-                    ))}
+                          {i < labReports.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
+                        </React.Fragment>
+                      ))
+                    )}
                   </div>
                 </div>
 
