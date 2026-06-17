@@ -7,9 +7,18 @@ import Session from "supertokens-web-js/recipe/session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function mapToPatient(apt: any, index: number): Patient {
-  const d = new Date(apt.scheduledAt);
-  const isToday = d.toDateString() === new Date().toDateString();
+  const d = parseLocalTime(apt.scheduledAt);
+  const today = new Date();
+  const isToday = d.getFullYear() === today.getFullYear() &&
+                  d.getMonth() === today.getMonth() &&
+                  d.getDate() === today.getDate();
   let status: Patient["status"] = "Scheduled";
   if (apt.status === "in_progress") status = "Waiting";
   else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
@@ -24,7 +33,7 @@ function mapToPatient(apt: any, index: number): Patient {
     dateTime: isToday
       ? (status === "Waiting" ? "Waiting" : d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }))
       : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
-    avatar: index % 2 === 0 ? "/patient-avatar-1.png" : "/patient-avatar-2.png",
+    avatar: apt.patientAvatarUrl || "/default-avatar.svg",
     bio: apt.reason ?? "",
     earnings: `${apt.paymentAmount ?? 250} AED`,
   };

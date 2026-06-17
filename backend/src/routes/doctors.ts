@@ -306,23 +306,33 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     const slots: any[] = doctor.slots ?? [];
     const dayOfWeek = new Date(date + "T12:00:00Z").getUTCDay();
-    const daySlot   = slots.find((s: any) => s.dayOfWeek === dayOfWeek && s.isActive)
-                   ?? { startTime: "09:00", endTime: "19:00", slotDurationMins: 30 };
+    const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
 
-    // Generate all time slots for this day
-    const duration = daySlot.slotDurationMins ?? 30;
-    const [startH, startM] = daySlot.startTime.split(":").map(Number);
-    const [endH,   endM]   = daySlot.endTime.split(":").map(Number);
-    let cursor = startH * 60 + startM;
-    const endMinutes = endH * 60 + endM;
-    const intervals: string[] = [];
-
-    while (cursor + duration <= endMinutes) {
-      const h = Math.floor(cursor / 60).toString().padStart(2, "0");
-      const m = (cursor % 60).toString().padStart(2, "0");
-      intervals.push(`${h}:${m}`);
-      cursor += duration;
+    if (activeDaySlots.length === 0) {
+      res.json({ available: [], slotDurationMins: 30 });
+      return;
     }
+
+    const intervals: string[] = [];
+    let duration = 30;
+
+    for (const daySlot of activeDaySlots) {
+      duration = daySlot.slotDurationMins ?? 30;
+      if (!daySlot.startTime || !daySlot.endTime) continue;
+      const [startH, startM] = daySlot.startTime.split(":").map(Number);
+      const [endH,   endM]   = daySlot.endTime.split(":").map(Number);
+      let cursor = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+
+      while (cursor + duration <= endMinutes) {
+        const h = Math.floor(cursor / 60).toString().padStart(2, "0");
+        const m = (cursor % 60).toString().padStart(2, "0");
+        intervals.push(`${h}:${m}`);
+        cursor += duration;
+      }
+    }
+
+    const uniqueIntervals = Array.from(new Set(intervals)).sort();
 
     // Find booked slots for this date
     const dayStart = `${date}T00:00:00.000Z`;
@@ -348,7 +358,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       })
     );
 
-    const available = intervals.filter((t) => !bookedSet.has(t));
+    const available = uniqueIntervals.filter((t) => !bookedSet.has(t));
     res.json({ available, slotDurationMins: duration });
   } catch (err) {
     console.error("Available slots error:", err);

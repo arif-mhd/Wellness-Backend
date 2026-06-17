@@ -54,7 +54,7 @@ function generateId(): string {
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
-  const { doctorId, scheduledAt, reason, shareMedicalHistory, paymentAmount } = req.body;
+  const { doctorId, scheduledAt, reason, shareMedicalHistory, paymentAmount, familyMemberId } = req.body;
 
   if (!doctorId || !scheduledAt || !reason) {
     res.status(400).json({ error: "doctorId, scheduledAt, and reason are required." });
@@ -85,17 +85,24 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       livekitRoom: id,
       createdAt: now,
       updatedAt: now,
+      familyMemberId: familyMemberId ?? null,
     };
 
     await appointmentsContainer.items.create(appointment);
 
     // Log activity (best-effort)
     const patientDoc = await patientsContainer.item(patientId, patientId).read().then(r => r.resource).catch(() => null);
+    let displayName = patientDoc?.fullName ?? patientId;
+    if (familyMemberId && patientDoc?.familyMembers) {
+      const member = patientDoc.familyMembers.find((m: any) => m.id === familyMemberId);
+      if (member) displayName = `${member.fullName} (Family Member of ${patientDoc.fullName})`;
+    }
+
     logActivity({
       source: "patient",
       action: "Appointment Scheduled",
-      details: `Patient ${patientDoc?.fullName ?? patientId} booked with Dr. ${doctor.fullName ?? doctorId} — ${reason}`,
-      performedBy: patientDoc?.fullName ?? "Patient",
+      details: `Patient ${displayName} booked with Dr. ${doctor.fullName ?? doctorId} — ${reason}`,
+      performedBy: displayName,
       performedById: patientId,
       entityType: "appointment",
       entityId: id,
@@ -155,8 +162,18 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
         try {
           const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
           
+          let patientName = patient?.fullName ?? "Unknown Patient";
+          let patientEmail = patient?.email ?? "";
+          let patientPhone = patient?.phone ?? "";
+          let patientGender = patient?.gender ?? "";
+          let patientDob = patient?.dateOfBirth ?? patient?.dob ?? "";
+          let patientAvatarUrl = patient?.avatarUrl ?? null;
+          let patientBloodGroup = patient?.bloodGroup ?? "";
+          let patientHeight = patient?.height ?? "";
+          let patientWeight = patient?.weight ?? "";
+
           // Format chronic illnesses/diseases
-          const chronicIllnesses = Array.isArray(patient?.chronicDiseases) 
+          let chronicIllnesses = Array.isArray(patient?.chronicDiseases) 
             ? patient.chronicDiseases.join(", ") 
             : (patient?.chronicDiseases || "None reported");
 
@@ -181,17 +198,56 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
               : String(patient.allergies);
           }
 
+          // Check if appointment is for a family member
+          if (apt.familyMemberId && patient?.familyMembers) {
+            const member = patient.familyMembers.find((m: any) => m.id === apt.familyMemberId);
+            if (member) {
+              patientName = member.fullName ?? patientName;
+              patientGender = member.gender ?? patientGender;
+              patientDob = member.dob ?? member.dateOfBirth ?? patientDob;
+              patientAvatarUrl = member.avatarUrl ?? patientAvatarUrl;
+              if (member.email) patientEmail = member.email;
+              if (member.phone) patientPhone = member.phone;
+              if (member.bloodGroup) patientBloodGroup = member.bloodGroup;
+              if (member.height) patientHeight = member.height;
+              if (member.weight) patientWeight = member.weight;
+
+              chronicIllnesses = Array.isArray(member.chronicDiseases) 
+                ? member.chronicDiseases.join(", ") 
+                : (member.chronicDiseases || "None reported");
+
+              currentMedications = "None";
+              if (member.medications?.current) {
+                currentMedications = Array.isArray(member.medications.current)
+                  ? member.medications.current.map((m: any) => typeof m === "string" ? m : `${m.name || ""} ${m.dosage || ""}`.trim()).join("\n")
+                  : String(member.medications.current);
+              }
+
+              allergies = "None";
+              if (member.allergies) {
+                allergies = Array.isArray(member.allergies)
+                  ? member.allergies.map((a: any) => {
+                      if (typeof a === "string") return a;
+                      const category = a.category ?? "";
+                      const selected = Array.isArray(a.selected) ? a.selected.join(", ") : (a.selected ?? "");
+                      return `${category}: ${selected}`.trim();
+                    }).join("\n")
+                  : String(member.allergies);
+              }
+            }
+          }
+
           return {
             ...apt,
-            patientName: patient?.fullName ?? "Unknown Patient",
-            patientEmail: patient?.email ?? "",
-            patientPhone: patient?.phone ?? "",
-            patientGender: patient?.gender ?? "",
-            patientDob: patient?.dateOfBirth ?? patient?.dob ?? "",
-            patientAvatarUrl: patient?.avatarUrl ?? null,
-            patientBloodGroup: patient?.bloodGroup ?? "",
-            patientHeight: patient?.height ?? "",
-            patientWeight: patient?.weight ?? "",
+            patientName,
+            patientEmail,
+            patientPhone,
+            patientGender,
+            patientDob,
+            patientAvatarUrl,
+            patientBloodGroup,
+            patientHeight,
+            patientWeight,
             patientChronicIllnesses: chronicIllnesses,
             patientCurrentMedications: currentMedications,
             patientAllergies: allergies,

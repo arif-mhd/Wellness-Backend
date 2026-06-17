@@ -12,9 +12,15 @@ import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function formatScheduleDateTime(isoString: string): string {
   try {
-    const d = new Date(isoString);
+    const d = parseLocalTime(isoString);
     if (isNaN(d.getTime())) return "N/A";
     const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -72,9 +78,11 @@ export default function SchedulesDashboardPage() {
       }
 
       // Check if the appointment is today (regardless of time)
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const apptDateStr = apt.scheduledAt ? apt.scheduledAt.slice(0, 10) : "";
-      const isToday = apptDateStr === todayStr;
+      const apptDate = parseLocalTime(apt.scheduledAt);
+      const today = new Date();
+      const isToday = apptDate.getFullYear() === today.getFullYear() &&
+                      apptDate.getMonth() === today.getMonth() &&
+                      apptDate.getDate() === today.getDate();
       
       const isCompleted = apt.status?.toLowerCase() === "completed";
       const actionType = (isToday && !isCompleted) ? "Consult Now" : "Reschedule";
@@ -86,7 +94,7 @@ export default function SchedulesDashboardPage() {
         id: apt.id,
         patientName: apt.patientName ?? "Unknown Patient",
         patientAge: age,
-        patientAvatar: apt.patientAvatarUrl || "/patient-avatar-1.png",
+        patientAvatar: apt.patientAvatarUrl || "/default-avatar.svg",
         email: apt.patientEmail ?? "",
         symptomType: symptomType,
         symptomDetails: apt.reason ?? "General Consultation",
@@ -102,13 +110,18 @@ export default function SchedulesDashboardPage() {
     const activeApts = appointments.filter(a => a.status !== "cancelled" && a.status !== "Cancelled");
 
     return activeApts.map((apt) => {
-      const d = new Date(apt.scheduledAt);
+      const d = parseLocalTime(apt.scheduledAt);
       const dayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
       const dayLabel = dayLabels[d.getDay()];
 
       const h = d.getHours() % 12 || 12;
       const ampm = d.getHours() >= 12 ? "PM" : "AM";
       const hourStr = `${h} ${ampm}`;
+
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
 
       const dob = apt.patientDob || "";
       let age = 0;
@@ -122,12 +135,13 @@ export default function SchedulesDashboardPage() {
       return {
         id: apt.id,
         patientName: apt.patientName ?? "Unknown Patient",
-        patientAvatar: apt.patientAvatarUrl || "/patient-avatar-1.png",
+        patientAvatar: apt.patientAvatarUrl || "/default-avatar.svg",
         patientAge: age,
         day: dayLabel,
         hour: hourStr,
         patientBio: apt.patientChronicIllnesses || "No conditions reported.",
         reasonForVisit: apt.reason ?? "General Consultation",
+        dateStr,
       };
     });
   }, [appointments]);
