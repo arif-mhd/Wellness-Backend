@@ -5,6 +5,7 @@ export interface PreVisitForm {
   primaryConcern: string;
   smokes: string;
   drinks: string;
+  isQuestionnaire?: boolean;
 }
 
 export interface Patient {
