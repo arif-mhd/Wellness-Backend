@@ -46,6 +46,33 @@ const monthLabels = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const formatSlotRange = (timeStr: string) => {
+  try {
+    const [hStr, mStr] = timeStr.split(":");
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    
+    let endH = h;
+    let endM = m + 30;
+    if (endM >= 60) {
+      endH += 1;
+      endM -= 60;
+    }
+    
+    const formatTime = (hour: number, min: number) => {
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const displayHour = hour % 12 || 12;
+      const hourPart = hour >= 12 ? String(displayHour).padStart(2, "0") : String(displayHour);
+      const minPart = min === 0 ? "" : `:${String(min).padStart(2, "0")}`;
+      return `${hourPart}${minPart} ${ampm}`;
+    };
+    
+    return `${formatTime(h, m)} - ${formatTime(endH, endM)}`;
+  } catch {
+    return timeStr;
+  }
+};
+
 export default function TimeSlotView() {
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
@@ -308,6 +335,21 @@ export default function TimeSlotView() {
         </span>
       </div>
 
+      {/* ── Information Banner ──────────────────────────────────────────────── */}
+      <div className="bg-[#EEF2FF] border border-[#BAC7FF] rounded-[18px] p-4 flex items-start gap-3">
+        <svg className="w-5 h-5 text-[#5476FC] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[#243D7F] text-xs font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Weekly Template Notice
+          </span>
+          <span className="text-[#4E5D8F] text-[11px] font-medium leading-relaxed" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Changes made in this grid update your **weekly recurring slot template**. To mark dynamic unavailability (such as specific vacations, sick leaves, or holidays), please use the <strong>Schedule Absences</strong> tab instead.
+          </span>
+        </div>
+      </div>
+
       {/* ── Two-column layout: calendar + task panel ─────────────────────── */}
       <div className="flex gap-6 items-start w-full">
         {/* Left: calendar grid */}
@@ -459,9 +501,21 @@ export default function TimeSlotView() {
                             <button
                               key={`${day.label}-${timeStr}`}
                               onClick={() => handleCellClick(day.dayOfWeek, timeStr)}
-                              className={`w-full transition-colors outline-none shrink-0 ${cellBg} ${cellBorder}`}
+                              className={`w-full transition-colors outline-none shrink-0 ${cellBg} ${cellBorder} relative group`}
                               style={{ height: "32px" }}
-                            />
+                            >
+                              {(isSelected || isOriginal) && (
+                                <div
+                                  className="hidden group-hover:block absolute left-[calc(100%-12px)] z-20 bg-white border border-[#EBEEF5] rounded-[10px] px-3.5 py-2 shadow-[0_4px_16px_rgba(0,0,0,0.06)] text-[9px] font-bold text-[#24292E] whitespace-nowrap pointer-events-none"
+                                  style={{
+                                    top: "0px",
+                                    fontFamily: "Outfit, sans-serif",
+                                  }}
+                                >
+                                  {formatSlotRange(timeStr)}
+                                </div>
+                              )}
+                            </button>
                           );
                         });
                       })}

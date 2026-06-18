@@ -30,6 +30,7 @@ import vaccinesRouter from "./routes/vaccines";
 import supportRouter from "./routes/support";
 import remindersRouter from "./routes/reminders";
 import feedbackRouter from "./routes/feedback";
+import notificationsRouter from "./routes/notifications";
 import adminActivityLogRouter from "./routes/adminActivityLog";
 import adminDashboardRouter from "./routes/adminDashboard";
 
@@ -102,6 +103,7 @@ app.use("/api/vaccines",       vaccinesRouter);
 app.use("/api/support",        supportRouter);
 app.use("/api/reminders",      remindersRouter);
 app.use("/api/feedback",       feedbackRouter);
+app.use("/api/notifications",  notificationsRouter);
 app.use("/api/admin/activity-logs", adminActivityLogRouter);
 app.use("/api/admin/dashboard", adminDashboardRouter);
 

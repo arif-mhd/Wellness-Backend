@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { doctorsContainer, appointmentsContainer, queryDocuments } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, notificationsContainer, patientsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -40,7 +40,10 @@ router.post(
       for (const [field, fileArr] of Object.entries(files ?? {})) {
         const file = fileArr[0];
         const ext  = MIME_EXT[file.mimetype] ?? "bin";
-        const blobPath = `doctors/${doctorId}/${field}.${ext}`;
+        const filename = (field === "avatar" || field === "emiratesId" || field === "degree" || field === "spec")
+          ? field
+          : `${field}_${Date.now()}`;
+        const blobPath = `doctors/${doctorId}/${filename}.${ext}`;
         await uploadBlob(blobPath, file.buffer, file.mimetype);
         urls[field] = generateSasUrl(blobPath);
       }
@@ -269,6 +272,245 @@ router.get("/slots", requireRole("doctor"), async (req: SessionRequest, res: Res
   }
 });
 
+// ─── GET /api/doctors/absences ───────────────────────────────────────────────
+router.get("/absences", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    res.json({ absences: doctor.absences ?? [] });
+  } catch (err) {
+    console.error("Get doctor absences error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/absences/check-conflicts ──────────────────────────────
+router.post("/absences/check-conflicts", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: "startDate and endDate are required." });
+    return;
+  }
+
+  try {
+    // Query appointments within the time frame
+    const rangeStart = new Date(new Date(startDate).getTime() - 30 * 60 * 1000).toISOString();
+    const appts = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT c.id, c.patientId, c.scheduledAt, c.reason, c.durationMins, c.familyMemberId FROM c
+              WHERE c.doctorId = @doctorId
+                AND c.status != 'cancelled'
+                AND c.scheduledAt >= @rangeStart
+                AND c.scheduledAt <= @rangeEnd`,
+      parameters: [
+        { name: "@doctorId", value: doctorId },
+        { name: "@rangeStart", value: rangeStart },
+        { name: "@rangeEnd", value: endDate },
+      ],
+    });
+
+    const conflicts = [];
+    for (const a of appts) {
+      const apptStart = new Date(a.scheduledAt);
+      const apptEnd = new Date(apptStart.getTime() + (a.durationMins || 30) * 60 * 1000);
+      if (apptStart < new Date(endDate) && apptEnd > new Date(startDate)) {
+        // Fetch patient details
+        let patientName = "Unknown Patient";
+        let patientAvatarUrl = null;
+        let patientDob = null;
+        try {
+          const { resource: patient } = await patientsContainer.item(a.patientId, a.patientId).read();
+          if (patient) {
+            patientName = patient.fullName ?? patientName;
+            patientAvatarUrl = patient.avatarUrl ?? null;
+            patientDob = patient.dateOfBirth ?? patient.dob ?? null;
+            if (a.familyMemberId && patient.familyMembers) {
+              const member = patient.familyMembers.find((m: any) => m.id === a.familyMemberId);
+              if (member) {
+                patientName = member.fullName ?? patientName;
+                patientAvatarUrl = member.avatarUrl ?? patientAvatarUrl;
+                patientDob = member.dateOfBirth ?? member.dob ?? patientDob;
+              }
+            }
+          }
+        } catch {}
+
+        conflicts.push({
+          id: a.id,
+          patientName,
+          patientAvatarUrl,
+          patientDob,
+          scheduledAt: a.scheduledAt,
+          reason: a.reason ?? "General Consultation",
+        });
+      }
+    }
+
+    res.json({ conflicts });
+  } catch (err) {
+    console.error("Check conflicts error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/absences ──────────────────────────────────────────────
+router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { startDate, endDate, reason, fileUrl, fileName } = req.body;
+
+  if (!startDate || !endDate || !reason) {
+    res.status(400).json({ error: "startDate, endDate, and reason are required." });
+    return;
+  }
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+
+    // 1. Calculate conflicts
+    const rangeStart = new Date(new Date(startDate).getTime() - 30 * 60 * 1000).toISOString();
+    const appts = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT c.id, c.patientId, c.scheduledAt, c.reason, c.durationMins, c.familyMemberId FROM c
+              WHERE c.doctorId = @doctorId
+                AND c.status != 'cancelled'
+                AND c.scheduledAt >= @rangeStart
+                AND c.scheduledAt <= @rangeEnd`,
+      parameters: [
+        { name: "@doctorId", value: doctorId },
+        { name: "@rangeStart", value: rangeStart },
+        { name: "@rangeEnd", value: endDate },
+      ],
+    });
+
+    const conflicts = [];
+    for (const a of appts) {
+      const apptStart = new Date(a.scheduledAt);
+      const apptEnd = new Date(apptStart.getTime() + (a.durationMins || 30) * 60 * 1000);
+      if (apptStart < new Date(endDate) && apptEnd > new Date(startDate)) {
+        conflicts.push(a);
+      }
+    }
+
+    const now = new Date().toISOString();
+
+    // 2. Cancel conflicting appointments and notify patients in-app
+    for (const appt of conflicts) {
+      const updatedAppt = {
+        ...appt,
+        status: "cancelled",
+        cancellationReason: `Doctor scheduled absence: ${reason}`,
+        updatedAt: now,
+      };
+      await appointmentsContainer.items.upsert(updatedAppt);
+
+      // Create wellness app notification for patient
+      const dateText = new Date(appt.scheduledAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      const timeText = new Date(appt.scheduledAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+
+      const patientNotification = {
+        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        patientId: appt.patientId,
+        title: "Appointment Cancelled",
+        body: `Your appointment with Dr. ${doctor.fullName ?? "Doctor"} on ${dateText} at ${timeText} has been cancelled due to doctor unavailability. Reason: ${reason}.`,
+        type: "appointment_cancelled",
+        referenceId: appt.id,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(patientNotification);
+
+      logActivity({
+        source: "doctor",
+        action: "Appointment Cancelled",
+        details: `Appointment ${appt.id} automatically cancelled due to doctor absence`,
+        performedBy: doctor.fullName ?? "Doctor",
+        performedById: doctorId,
+        entityType: "appointment",
+        entityId: appt.id,
+      });
+    }
+
+    // 3. Create the absence entry
+    const startObj = new Date(startDate);
+    const endObj = new Date(endDate);
+    const diffMs = endObj.getTime() - startObj.getTime();
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+    let duration = `${diffHours} hour(s)`;
+    if (diffHours >= 24) {
+      const diffDays = Math.round(diffHours / 24);
+      duration = `${diffDays} day(s)`;
+    }
+
+    const newAbsence = {
+      id: "abs_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      startDate,
+      endDate,
+      reason,
+      duration,
+      fileName: fileName || null,
+      fileUrl: fileUrl || null,
+      createdAt: now,
+    };
+
+    const currentAbsences = doctor.absences ?? [];
+    const updatedDoctor = {
+      ...doctor,
+      absences: [...currentAbsences, newAbsence],
+      updatedAt: now,
+    };
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    res.status(201).json({ status: "OK", absences: updatedDoctor.absences });
+  } catch (err) {
+    console.error("Create absence error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── DELETE /api/doctors/absences/:id ────────────────────────────────────────
+router.delete("/absences/:id", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+
+    const currentAbsences = doctor.absences ?? [];
+    const updatedAbsences = currentAbsences.filter((abs: any) => abs.id !== id);
+
+    const updatedDoctor = {
+      ...doctor,
+      absences: updatedAbsences,
+      updatedAt: new Date().toISOString(),
+    };
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    res.json({ status: "OK", absences: updatedAbsences });
+  } catch (err) {
+    console.error("Delete absence error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/doctors/:id/slots ──────────────────────────────────────────────
 router.get("/:id/slots", async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -327,7 +569,20 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       while (cursor + duration <= endMinutes) {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
-        intervals.push(`${h}:${m}`);
+        
+        // Check if slot falls in any scheduled absences
+        const slotStart = new Date(`${date}T${h}:${m}:00.000Z`);
+        const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
+        const absences = doctor.absences ?? [];
+        const isAbsent = absences.some((abs: any) => {
+          const absStart = new Date(abs.startDate);
+          const absEnd = new Date(abs.endDate);
+          return slotStart < absEnd && slotEnd > absStart;
+        });
+
+        if (!isAbsent) {
+          intervals.push(`${h}:${m}`);
+        }
         cursor += duration;
       }
     }
