@@ -90,6 +90,9 @@ export const remindersContainer: Container = db.container("reminders");
 /** Feedback collection — partition key: /id */
 export const feedbackContainer: Container = db.container("feedback");
 
+/** Notifications collection — partition key: /patientId */
+export const notificationsContainer: Container = db.container("notifications");
+
 /** Activity logs — partition key: /source (admin | doctor | patient | pharmacy | lab) */
 export const activityLogsContainer: Container = db.container("activityLogs");
 
@@ -127,6 +130,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
     { id: "feedback",               partitionKey: { paths: ["/id"] } },
+    { id: "notifications",          partitionKey: { paths: ["/patientId"] } },
     { id: "activityLogs",           partitionKey: { paths: ["/source"] } },
   ];
 
