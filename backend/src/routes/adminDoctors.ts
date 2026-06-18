@@ -26,6 +26,37 @@ router.get("/pending", requireRole("admin"), async (_req: Request, res: Response
   }
 });
 
+async function populateDoctorStats(doctors: any[]) {
+  if (doctors.length === 0) return doctors;
+
+  const appointments = await queryDocuments<any>(appointmentsContainer, {
+    query: "SELECT c.doctorId, c.status, c.emr FROM c WHERE c.status IN ('completed', 'in_progress')"
+  });
+
+  const feedbacks = await queryDocuments<any>(feedbackContainer, {
+    query: "SELECT c.provider.id AS doctorId, c.rating FROM c WHERE c.folder = 'appointment'"
+  });
+
+  for (const doc of doctors) {
+    const docAppts = appointments.filter(a => a.doctorId === doc.id);
+    const docFeedbacks = feedbacks.filter(f => f.doctorId === doc.id);
+
+    doc.consultations = docAppts.length;
+    doc.prescriptions = docAppts.filter(a => Array.isArray(a.emr?.medicines) && a.emr.medicines.length > 0).length;
+    
+    if (docFeedbacks.length > 0) {
+      const sum = docFeedbacks.reduce((s, f) => s + (f.rating ?? 0), 0);
+      doc.rating = Math.round((sum / docFeedbacks.length) * 10) / 10;
+    } else {
+      doc.rating = 0;
+    }
+
+    doc.avgConsultation = 0; 
+  }
+
+  return doctors;
+}
+
 // ─── GET /api/admin/doctors/approved ────────────────────────────────────────
 // Returns all doctors whose status is "approved" (the onboarded list).
 router.get("/approved", requireRole("admin"), async (_req: Request, res: Response) => {
@@ -37,7 +68,9 @@ router.get("/approved", requireRole("admin"), async (_req: Request, res: Respons
       })
       .fetchAll();
 
-    res.json({ doctors: resources });
+    const populated = await populateDoctorStats(resources);
+
+    res.json({ doctors: populated });
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -55,7 +88,8 @@ router.get("/:id", requireRole("admin"), async (req: Request, res: Response) => 
       parameters: [{ name: "@id", value: id }],
     }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Doctor not found." }); return; }
-    res.json({ doctor: resources[0] });
+    const populated = await populateDoctorStats([resources[0]]);
+    res.json({ doctor: populated[0] });
   } catch (err) {
     console.error("Fetch doctor error:", err);
     res.status(500).json({ error: "Internal server error." });
