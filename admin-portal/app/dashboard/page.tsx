@@ -109,46 +109,35 @@ function MiniBarChart({ data, labels, color = "#FFC107" }: { data: number[]; lab
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const max = Math.max(...data, 1);
   const isDense = data.length > 14;
+  const H = 130;
+  const W = isDense ? data.length * 40 : 250;
 
-  return (
-    <div className={isDense ? "chart-scroll-x pb-1 -mb-1" : ""}>
-      <div
-        className="relative flex items-end gap-1.5 h-16 pt-4"
-        style={isDense ? { minWidth: `${data.length * 22}px` } : undefined}
-      >
-        {hoveredIdx !== null && (
-          <div
-            className="absolute -top-6 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md pointer-events-none transition-all duration-200 z-10"
-            style={
-              isDense
-                ? { left: `${hoveredIdx * 22 + 11}px`, transform: "translateX(-50%)" }
-                : { left: `${(hoveredIdx / (data.length - 1)) * 75 + 10}%`, transform: "translateX(-50%)" }
-            }
-          >
-            <div className="whitespace-nowrap text-[8px] opacity-75 text-center">{labels[hoveredIdx]}</div>
-            <div className="font-bold text-center">{data[hoveredIdx]}</div>
-          </div>
-        )}
-
+  const chart = (
+    <div className="relative pt-4 flex-1 flex flex-col justify-end mt-4" style={isDense ? { width: `${W}px` } : undefined}>
+      <div className="w-full flex items-end justify-between relative" style={{ height: `${H}px` }}>
         {data.map((v, i) => {
           const isHovered = hoveredIdx === i;
+          const height = Math.max((v / max) * (H - 20), 45); // Leave 20px space for labels below
           return (
-            <div
-              key={i}
-              className={`flex flex-col items-center gap-1 cursor-pointer group ${isDense ? "shrink-0 w-[18px]" : "flex-1"}`}
-              onMouseEnter={() => setHoveredIdx(i)}
-              onMouseLeave={() => setHoveredIdx(null)}
-            >
+            <div key={i} className="flex flex-col items-center justify-end h-full" style={{ width: isDense ? "28px" : "36px" }}>
               <div
-                className="w-full rounded-sm transition-all duration-300 relative overflow-hidden"
+                className="relative flex flex-col items-center justify-start overflow-hidden cursor-pointer group rounded-[4px] transition-all duration-300 shadow-sm w-full"
                 style={{
-                  height: `${Math.max((v / max) * 44, 2)}px`,
-                  background: isHovered ? `linear-gradient(to top, ${color}cc, ${color})` : `linear-gradient(to top, ${color}99, ${color}cc)`,
+                  height: `${height}px`,
+                  background: `linear-gradient(to bottom, #fef3c7, #fde68a, #fcd34d)`,
+                  opacity: isHovered ? 0.9 : 1,
+                  transform: isHovered ? "scaleY(1.02)" : "scaleY(1)",
+                  transformOrigin: "bottom"
                 }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
               >
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="text-[11px] font-bold text-slate-800 mt-2 z-10" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {v >= 1000 ? `${(v/1000).toFixed(0)}K` : v}
+                </span>
               </div>
-              <span className="text-[9px] font-semibold text-slate-400 group-hover:text-slate-700 transition-colors whitespace-nowrap">
+              <span className="text-[9px] font-medium text-[#9ca3af] mt-2 whitespace-nowrap" style={{ fontFamily: "Outfit, sans-serif" }}>
                 {labels[i]}
               </span>
             </div>
@@ -157,70 +146,107 @@ function MiniBarChart({ data, labels, color = "#FFC107" }: { data: number[]; lab
       </div>
     </div>
   );
+
+  return isDense ? <div className="chart-scroll-x pb-1 -mb-1 mt-auto">{chart}</div> : <div className="mt-auto flex-1 flex flex-col">{chart}</div>;
 }
 
 // ─── Interactive Mini Line Chart with Hover Tooltip ───────────────────────────
 function MiniLineChart({ data, labels, color = "#3b82f6" }: { data: number[]; labels: string[]; color?: string }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
+  const max = Math.max(...data, 100);
+  const min = 0;
   const range = max - min || 1;
   const isDense = data.length > 14;
-  const W = isDense ? data.length * 22 : 200;
-  const H = 48;
+  const W = isDense ? data.length * 40 : 250;
+  const H = 140;
+
+  const paddingLeft = 30;
+  const paddingBottom = 20;
+  const chartW = W - paddingLeft;
+  const chartH = H - paddingBottom;
 
   const points = data.map((v, i) => {
-    const x = (i / Math.max(data.length - 1, 1)) * W;
-    const y = H - ((v - min) / range) * (H - 12) - 6;
+    const x = paddingLeft + (i / Math.max(data.length - 1, 1)) * chartW;
+    const y = chartH - ((v - min) / range) * chartH;
     return { x, y, val: v };
   });
 
   const pathD = `M ${points.map((p) => `${p.x},${p.y}`).join(" L ")}`;
-  const areaD = `M 0,${H} L ${points.map((p) => `${p.x},${p.y}`).join(" L ")} L ${W},${H} Z`;
+  const areaD = `M ${paddingLeft},${chartH} L ${points.map((p) => `${p.x},${p.y}`).join(" L ")} L ${paddingLeft + chartW},${chartH} Z`;
   const gradId = `grad-${color.replace("#", "")}`;
 
+  const ticks = [0, max * 0.25, max * 0.5, max * 0.75, max];
+
   const chart = (
-    <div className="relative pt-3" style={isDense ? { width: `${W}px` } : undefined}>
+    <div className="relative flex-1 flex flex-col justify-end mt-4" style={isDense ? { width: `${W}px` } : undefined}>
       {hoveredIdx !== null && (
         <div
-          className="absolute -top-6 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md pointer-events-none transition-all duration-200 z-10"
-          style={
-            isDense
-              ? { left: `${points[hoveredIdx].x}px`, transform: "translateX(-50%)" }
-              : { left: `${(hoveredIdx / Math.max(data.length - 1, 1)) * 75 + 10}%`, transform: "translateX(-50%)" }
-          }
+          className="absolute bg-white px-3 py-2 rounded-xl flex flex-col gap-1 items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] pointer-events-none z-10 transition-all duration-200 whitespace-nowrap border border-slate-100"
+          style={{
+            top: `${Math.max(0, points[hoveredIdx].y - 65)}px`,
+            left: `${points[hoveredIdx].x}px`,
+            transform: "translateX(-50%)"
+          }}
         >
-          <div className="whitespace-nowrap text-[8px] opacity-75 text-center">{labels[hoveredIdx]}</div>
-          <div className="font-bold text-center">{data[hoveredIdx]}</div>
+          <span className="text-[10px] text-slate-400 font-medium tracking-wide" style={{ fontFamily: "Outfit, sans-serif" }}>{labels[hoveredIdx]} 00:00</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[15px] font-bold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>{data[hoveredIdx] >= 1000 ? `${(data[hoveredIdx]/1000).toFixed(0)}K` : data[hoveredIdx]}</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-emerald-600 bg-emerald-50">+3.4%</span>
+          </div>
         </div>
       )}
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className={isDense ? "h-12 overflow-visible" : "w-full h-12 overflow-visible"}
-        style={isDense ? { width: `${W}px` } : undefined}
+        className="w-full overflow-visible"
+        style={{ height: `${H}px`, ...(isDense ? { width: `${W}px` } : {}) }}
         preserveAspectRatio="none"
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
             <stop offset="100%" stopColor={color} stopOpacity="0.0" />
           </linearGradient>
         </defs>
 
+        {ticks.map((t, i) => {
+          const y = chartH - (t / max) * chartH;
+          return (
+            <g key={i}>
+              <text x={paddingLeft - 10} y={y + 3} fontSize="9" fill="#9ca3af" textAnchor="end" style={{ fontFamily: "Outfit, sans-serif" }}>
+                {t >= 1000 ? `${(t/1000).toFixed(0)}K` : Math.round(t)}
+              </text>
+              <line x1={paddingLeft} y1={y} x2={W} y2={y} stroke="#f1f5f9" strokeWidth="1" />
+            </g>
+          );
+        })}
+
+        {points.map((p, i) => (
+           <line key={`v-${i}`} x1={p.x} y1={0} x2={p.x} y2={chartH} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="2 2" />
+        ))}
+
         <path d={areaD} fill={`url(#${gradId})`} />
-        <path d={pathD} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
         {hoveredIdx !== null && (
-          <circle cx={points[hoveredIdx].x} cy={points[hoveredIdx].y} r="3.5" fill={color} stroke="white" strokeWidth="1.2" />
+          <>
+            <circle cx={points[hoveredIdx].x} cy={points[hoveredIdx].y} r="12" fill={color} fillOpacity="0.15" className="transition-all duration-200" />
+            <circle cx={points[hoveredIdx].x} cy={points[hoveredIdx].y} r="4" fill="white" stroke={color} strokeWidth="2" className="transition-all duration-200" />
+          </>
         )}
 
         {points.map((p, i) => (
+          <text key={`l-${i}`} x={p.x} y={H - 5} fontSize="8" fill="#9ca3af" textAnchor="middle" style={{ fontFamily: "Outfit, sans-serif" }}>
+            {labels[i]}
+          </text>
+        ))}
+
+        {points.map((p, i) => (
           <rect
-            key={i}
-            x={i === 0 ? 0 : p.x - W / Math.max(data.length - 1, 1) / 2}
+            key={`r-${i}`}
+            x={i === 0 ? paddingLeft : p.x - chartW / Math.max(data.length - 1, 1) / 2}
             y={0}
-            width={W / Math.max(data.length - 1, 1)}
+            width={chartW / Math.max(data.length - 1, 1)}
             height={H}
             fill="transparent"
             className="cursor-pointer"
@@ -229,22 +255,10 @@ function MiniLineChart({ data, labels, color = "#3b82f6" }: { data: number[]; la
           />
         ))}
       </svg>
-
-      <div className={isDense ? "flex mt-1" : "flex mt-1 w-full"} style={isDense ? { width: `${W}px` } : undefined}>
-        {labels.map((l, i) => (
-          <span
-            key={i}
-            className={`text-[9px] font-semibold text-slate-400 text-center ${isDense ? "shrink-0" : "flex-1"}`}
-            style={isDense ? { width: `${W / labels.length}px` } : undefined}
-          >
-            {l}
-          </span>
-        ))}
-      </div>
     </div>
   );
 
-  return isDense ? <div className="chart-scroll-x pb-1 -mb-1">{chart}</div> : chart;
+  return isDense ? <div className="chart-scroll-x pb-1 -mb-1 mt-auto">{chart}</div> : <div className="mt-auto flex-1 flex flex-col">{chart}</div>;
 }
 
 // ─── Segmented Progress Bar Component ──────────────────────────────────────────
@@ -353,7 +367,7 @@ function BarStatCard({
   onCloseDropdown: () => void;
 }) {
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col justify-between h-[190px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
       <CardHeader
         title={title}
         range={range}
@@ -364,20 +378,14 @@ function BarStatCard({
       />
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-400 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-slate-200 border-t-emerald-400 rounded-full animate-spin" />
         </div>
       ) : !hasData ? (
         <NoDataState range={range} />
       ) : (
-        <>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-slate-800">{totalLabel}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${change.positive ? "text-green-600 bg-green-50" : "text-red-500 bg-red-50"}`}>
-              {change.positive ? "+" : "-"}{change.value}%
-            </span>
-          </div>
+        <div className="flex-1 flex flex-col">
           <MiniBarChart data={data} labels={labels} color={color} />
-        </>
+        </div>
       )}
     </div>
   );
@@ -414,7 +422,7 @@ function LineStatCard({
   onCloseDropdown: () => void;
 }) {
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col justify-between h-[190px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
       <CardHeader
         title={title}
         range={range}
@@ -425,20 +433,14 @@ function LineStatCard({
       />
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-400 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-slate-200 border-t-emerald-400 rounded-full animate-spin" />
         </div>
       ) : !hasData ? (
         <NoDataState range={range} />
       ) : (
-        <>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-slate-800">{value}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${change.positive ? "text-green-600 bg-green-50" : "text-red-500 bg-red-50"}`}>
-              {change.positive ? "+" : "-"}{change.value}%
-            </span>
-          </div>
+        <div className="flex-1 flex flex-col">
           <MiniLineChart data={data} labels={labels} color={color} />
-        </>
+        </div>
       )}
     </div>
   );
@@ -466,7 +468,7 @@ function ConsultCard({
 }) {
   const title = "Appointment Cancellation and Rescheduling";
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col justify-between h-[190px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
       <CardHeader
         title={title}
         range={range}
@@ -478,58 +480,68 @@ function ConsultCard({
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-400 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-slate-200 border-t-emerald-400 rounded-full animate-spin" />
         </div>
       ) : !hasData || !cancellation ? (
         <NoDataState range={range} />
       ) : (
-        <>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-slate-800">{cancellation.totalLabel}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cancellation.bookingChange.positive ? "text-green-600 bg-green-50" : "text-red-500 bg-red-50"}`}>
+        <div className="flex-1 flex flex-col mt-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {cancellation.totalLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalLabel}
+            </span>
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
               {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
             </span>
           </div>
 
-          <div className="space-y-2 mt-1.5">
-            <SegmentedProgressBar percentage={cancellation.bookingPct} color="#818cf8" />
-            <SegmentedProgressBar percentage={cancellation.cancelPct} color="#34d399" />
+          <div className="flex gap-1.5 mt-5">
+            <div className="flex-1">
+              <SegmentedProgressBar percentage={cancellation.bookingPct} color="#a855f7" />
+            </div>
+            <div className="flex-1">
+              <SegmentedProgressBar percentage={cancellation.cancelPct} color="#4ade80" />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-50">
-            <div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#818cf8]" />
+          <div className="grid grid-cols-2 gap-3 mt-auto pt-4">
+            <div className="border border-[#eef2f7] rounded-xl p-3 bg-white shadow-sm flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#a855f7]" />
                 Total Booking
               </div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-xs font-bold text-slate-800">{cancellation.totalBookingLabel}</span>
-                <span className={`text-[8px] font-bold px-1 py-0.2 rounded ${cancellation.bookingChange.positive ? "text-green-500 bg-green-50" : "text-red-500 bg-red-50"}`}>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {cancellation.totalBookingLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.totalBookingLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalBookingLabel}
+                </span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
                 </span>
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#34d399]" />
+            <div className="border border-[#eef2f7] rounded-xl p-3 bg-white shadow-sm flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
                 Cancellations
               </div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-xs font-bold text-slate-800">{cancellation.cancellationsLabel}</span>
-                <span className={`text-[8px] font-bold px-1 py-0.2 rounded ${cancellation.change.positive ? "text-green-500 bg-green-50" : "text-red-500 bg-red-50"}`}>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {cancellation.cancellationsLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.cancellationsLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.cancellationsLabel}
+                </span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.change.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.change.positive ? "+" : "-"}{cancellation.change.value}%
                 </span>
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
 }
 
 // ─── Primary Appointment Reasons Card ─────────────────────────────────────────
-const REASON_COLORS = ["#3b82f6", "#14b8a6", "#f59e0b", "#a855f7"];
+const REASON_COLORS = ["#a855f7", "#4ade80", "#fcd34d", "#4ade80"];
 
 function PrimaryReasonsCard({
   primaryReasons,
@@ -552,7 +564,7 @@ function PrimaryReasonsCard({
 }) {
   const title = "Primary Appointment Reasons";
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col justify-between h-[190px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
       <CardHeader
         title={title}
         range={range}
@@ -564,30 +576,30 @@ function PrimaryReasonsCard({
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-400 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-slate-200 border-t-emerald-400 rounded-full animate-spin" />
         </div>
       ) : !hasData || !primaryReasons ? (
         <NoDataState range={range} />
       ) : (
-        <>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-slate-800">{primaryReasons.totalLabel}</span>
+        <div className="flex-1 flex flex-col mt-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {primaryReasons.totalLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(primaryReasons.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : primaryReasons.totalLabel}
+            </span>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md text-emerald-600 bg-emerald-50">+3.4%</span>
           </div>
 
-          <div className="flex gap-[3px] w-full mt-1.5 select-none">
+          <div className="flex gap-[4px] w-full mt-5 select-none">
             {(() => {
               const blocksCount = 20;
               const shownTotal = primaryReasons.reasons.reduce((s, r) => s + r.count, 0);
 
               if (shownTotal === 0) {
                 return Array.from({ length: blocksCount }).map((_, i) => (
-                  <div key={i} className="h-[6px] rounded-[1.5px] flex-1" style={{ backgroundColor: "#ecf0f6" }} />
+                  <div key={i} className="h-[8px] rounded-full flex-1" style={{ backgroundColor: "#ecf0f6" }} />
                 ));
               }
 
-              // Largest-remainder allocation: gives each reason floor(share*N) blocks,
-              // then distributes leftover blocks to the reasons with the biggest fractional remainder
-              // (instead of dumping all rounding slack onto whichever reason happens to be last).
               const raw = primaryReasons.reasons.map((r) => (r.count / shownTotal) * blocksCount);
               const base = raw.map((v) => Math.floor(v));
               let used = base.reduce((s, v) => s + v, 0);
@@ -603,23 +615,25 @@ function PrimaryReasonsCard({
               });
 
               return blocks.slice(0, blocksCount).map((color, i) => (
-                <div key={i} className="h-[6px] rounded-[1.5px] flex-1 transition-all duration-300" style={{ backgroundColor: color }} />
+                <div key={i} className="h-[8px] rounded-full flex-1 transition-all duration-300" style={{ backgroundColor: color }} />
               ));
             })()}
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-slate-50">
+          <div className="grid grid-cols-4 gap-2 mt-auto pt-4">
             {primaryReasons.reasons.map((r, i) => (
-              <div key={r.reason}>
-                <div className="flex items-center gap-1 text-[8px] font-bold text-slate-400">
+              <div key={r.reason} className="border border-[#eef2f7] rounded-xl p-2.5 bg-white shadow-sm flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 mb-2">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }} />
-                  <span className="truncate">{r.reason.length > 6 ? `${r.reason.slice(0, 5)}..` : r.reason}</span>
+                  <span className="truncate">{r.reason.length > 8 ? `${r.reason.slice(0, 7)}.` : r.reason}</span>
                 </div>
-                <p className="text-[10px] font-black text-slate-700 mt-0.5">{r.count}</p>
+                <p className="text-[13px] font-medium text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {r.count >= 1000 ? `${(r.count/1000).toFixed(1)}K` : r.count}
+                </p>
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -779,7 +793,7 @@ export default function AdminDashboardPage() {
               title="Appointments Booked"
               data={bookingStats?.appointmentsBooked.data ?? []}
               labels={bookingStats?.labels ?? []}
-              color="#fbbf24"
+              color="#8b5cf6"
               totalLabel={bookingStats?.appointmentsBooked.totalLabel ?? "0"}
               change={bookingStats?.appointmentsBooked.change ?? { value: 0, positive: true }}
               hasData={bookingStats?.appointmentsBooked.hasData ?? false}
@@ -826,7 +840,7 @@ export default function AdminDashboardPage() {
               title="Number of Consultations"
               data={doctorStats?.consultations.data ?? []}
               labels={doctorStats?.labels ?? []}
-              color="#fbbf24"
+              color="#10B981"
               totalLabel={doctorStats?.consultations.totalLabel ?? "0"}
               change={doctorStats?.consultations.change ?? { value: 0, positive: true }}
               hasData={doctorStats?.consultations.hasData ?? false}
@@ -843,7 +857,7 @@ export default function AdminDashboardPage() {
               change={doctorStats?.doctorSatisfaction.change ?? { value: 0, positive: true }}
               data={doctorStats?.doctorSatisfaction.data ?? []}
               labels={doctorStats?.labels ?? []}
-              color="#3b82f6"
+              color="#f59e0b"
               hasData={doctorStats?.doctorSatisfaction.hasData ?? false}
               loading={loadingDoctor}
               range={doctorRange}
@@ -856,7 +870,7 @@ export default function AdminDashboardPage() {
               title="Number of Prescriptions Issued"
               data={doctorStats?.prescriptions.data ?? []}
               labels={doctorStats?.labels ?? []}
-              color="#fbbf24"
+              color="#ec4899"
               totalLabel={doctorStats?.prescriptions.totalLabel ?? "0"}
               change={doctorStats?.prescriptions.change ?? { value: 0, positive: true }}
               hasData={doctorStats?.prescriptions.hasData ?? false}
@@ -880,7 +894,7 @@ export default function AdminDashboardPage() {
               change={patientStats?.patientAppointments.change ?? { value: 0, positive: true }}
               data={patientStats?.patientAppointments.data ?? []}
               labels={patientStats?.labels ?? []}
-              color="#3b82f6"
+              color="#10B981"
               hasData={patientStats?.patientAppointments.hasData ?? false}
               loading={loadingPatient}
               range={patientRange}
@@ -905,7 +919,7 @@ export default function AdminDashboardPage() {
               change={patientStats?.patientSatisfaction.change ?? { value: 0, positive: true }}
               data={patientStats?.patientSatisfaction.data ?? []}
               labels={patientStats?.labels ?? []}
-              color="#3b82f6"
+              color="#f59e0b"
               hasData={patientStats?.patientSatisfaction.hasData ?? false}
               loading={loadingPatient}
               range={patientRange}

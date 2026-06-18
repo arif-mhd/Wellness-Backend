@@ -42,12 +42,53 @@ interface Patient {
   chronicDiseases?: string[];
 }
 
+interface EmrMedicine {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  timing?: string;
+  instructions?: string;
+}
+
+interface EmrLab {
+  name: string;
+  notes?: string;
+}
+
+interface EmrSections {
+  reasonForVisit?: string;
+  historyOfPresentIllness?: string;
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  impressionAndPlan?: string;
+  medicalDecisionMaking?: string;
+}
+
+interface VisitHistoryEntry {
+  appointmentId: string;
+  scheduledAt: string;
+  status: string;
+  reason: string;
+  doctorId: string;
+  doctorName: string;
+  emr: { sections?: EmrSections; medicines?: EmrMedicine[]; labs?: EmrLab[] } | null;
+}
+
 type Tab = "about" | "consultations" | "diagnostics" | "surgeries" | "medications" | "vaccinations" | "allergies";
 
 function formatDate(iso?: string) {
   if (!iso) return "—";
   const d = new Date(iso);
   return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatDateTime(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 function age(dob?: string) {
@@ -82,6 +123,10 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [visitHistory, setVisitHistory] = useState<VisitHistoryEntry[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(true);
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
+
   useEffect(() => {
     async function fetchPatient() {
       setLoading(true);
@@ -102,6 +147,28 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
     }
     fetchPatient();
   }, [id]);
+
+  useEffect(() => {
+    async function fetchEhr() {
+      setVisitsLoading(true);
+      try {
+        const res = await adminFetch(`/api/admin/patients/${id}/ehr`);
+        if (res.ok) {
+          const d = await res.json();
+          const visits: VisitHistoryEntry[] = d.visitHistory ?? [];
+          setVisitHistory(visits);
+          setSelectedVisitId(visits[0]?.appointmentId ?? null);
+        }
+      } catch {
+        // leave visitHistory empty — UI shows "no consultations" state
+      } finally {
+        setVisitsLoading(false);
+      }
+    }
+    fetchEhr();
+  }, [id]);
+
+  const selectedVisit = visitHistory.find((v) => v.appointmentId === selectedVisitId) ?? null;
 
   if (loading) return (
     <ProtectedRoute>
@@ -266,138 +333,156 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   </svg>
                   <span className="text-[12px] font-bold text-slate-800">Recent</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="bg-[#E5EDFF] rounded-[1rem] p-4 flex items-center justify-between cursor-pointer">
-                    <div>
-                      <h4 className="text-[13px] font-bold text-slate-800">Consultation_01022020</h4>
-                      <p className="text-[11px] font-medium text-slate-500 mt-1">1 Feb, 2020, 11:40 PM</p>
-                    </div>
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
+                {visitsLoading ? (
+                  <p className="text-[12px] font-medium text-slate-400 px-2 py-4">Loading consultations…</p>
+                ) : visitHistory.length === 0 ? (
+                  <p className="text-[12px] font-medium text-slate-400 px-2 py-4">No consultations recorded yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {visitHistory.map((visit) => {
+                      const isSelected = visit.appointmentId === selectedVisitId;
+                      return (
+                        <div
+                          key={visit.appointmentId}
+                          onClick={() => setSelectedVisitId(visit.appointmentId)}
+                          className={`rounded-[1rem] p-4 flex items-center justify-between cursor-pointer transition ${
+                            isSelected ? "bg-[#E5EDFF]" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <div>
+                            <h4 className="text-[13px] font-bold text-slate-800">Dr. {visit.doctorName}</h4>
+                            <p className="text-[11px] font-medium text-slate-500 mt-1">{formatDateTime(visit.scheduledAt)}</p>
+                          </div>
+                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {["03022019", "26062019", "26062019", "26062019"].map((d, i) => (
-                    <div key={i} className="rounded-[1rem] p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition">
-                      <div>
-                        <h4 className="text-[13px] font-bold text-slate-800">Consultation_{d}</h4>
-                        <p className="text-[11px] font-medium text-slate-500 mt-1">1 Feb, 2020, 11:40 PM</p>
-                      </div>
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  ))}
-                </div>
+                )}
               </div>
 
               {/* Details */}
               <div className="xl:col-span-8 bg-transparent">
                 <h3 className="text-[16px] font-black text-slate-800 mb-6 px-1">Consultation Details</h3>
 
-                {/* Reason for visit */}
-                <div className="mb-6">
-                  <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">Reason for visit</h4>
-                  <div className="bg-white border border-slate-100 rounded-[1rem] p-5 shadow-sm flex items-center gap-4">
-                    <span className="bg-[#e4edff] text-[#6A8BFF] text-[11px] font-bold px-4 py-1.5 rounded-full shrink-0">Fever</span>
-                    <p className="text-[12px] font-medium text-slate-600">I&apos;ve had a fever for three days with chills, body aches, and fatigue.</p>
+                {!selectedVisit ? (
+                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm">
+                    <p className="text-[12px] font-medium text-slate-400">Select a consultation to view details.</p>
                   </div>
-                </div>
-
-                {/* EMR */}
-                <div className="mb-8">
-                  <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">EMR</h4>
-                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm space-y-6">
-                    <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
-                      Patient presents with persistent headaches and fatigue over the past two weeks.
-                    </p>
-                    {[
-                      { title: "Subjective", text: "Patient reports persistent headaches and fatigue over the past two weeks. States the headaches are moderate in intensity and occur daily. Denies any recent changes in medication or significant stressors." },
-                      { title: "Objective", text: "Blood Pressure: 150/90 mmHg · Heart Rate: 80 bpm · Temperature: 98.6°F. General: Alert and in no acute distress. Neurological: No focal deficits." },
-                      { title: "Assessment", text: "Hypertension (uncontrolled): Likely contributing to headaches. Fatigue: Could be related to hypertension and sleep quality; further evaluation needed." },
-                      { title: "Plan", text: "Increase Amlodipine to 10mg daily. Schedule follow-up in 4 weeks. Order CBC and BMP. Recommend lifestyle modifications." },
-                    ].map(({ title, text }) => (
-                      <div key={title} className="pt-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-2 h-2 bg-[#6A8BFF] rotate-45 shrink-0" />
-                          <span className="text-[12px] font-bold text-slate-800">{title}</span>
-                        </div>
-                        <p className="text-[12px] font-medium text-slate-500 leading-relaxed pl-4 border-l-2 border-slate-50 ml-1">{text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Medicines */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-4 px-1">
-                    <h4 className="text-[12px] font-bold text-slate-800">Medicines</h4>
-                    <button className="bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] text-[11px] font-bold px-5 py-2.5 rounded-[0.8rem] flex items-center gap-2 transition active:scale-95">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download Prescription
-                    </button>
-                  </div>
-                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
-                    {[
-                      { name: "Paracetamol 500 mg", note: "Take with food every morning" },
-                      { name: "Ibuprofen 200 mg", note: "Take with food every morning" },
-                    ].map(med => (
-                      <div key={med.name} className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-50 last:border-0 last:pb-0">
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0 mt-0.5">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h5 className="text-[13px] font-bold text-slate-800">{med.name}</h5>
-                            <p className="text-[12px] font-medium text-slate-500 mt-1">Notes: {med.note}</p>
-                          </div>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-500 text-right shrink-0">
-                          <span className="text-[#6A8BFF] mr-1">1x</span> After Breakfast <span className="text-[#6A8BFF] ml-1">(3 days)</span>
+                ) : (
+                  <>
+                    {/* Reason for visit */}
+                    {(selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason) && (
+                      <div className="mb-6">
+                        <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">Reason for visit</h4>
+                        <div className="bg-white border border-slate-100 rounded-[1rem] p-5 shadow-sm">
+                          <p className="text-[12px] font-medium text-slate-600">
+                            {selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason}
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    )}
 
-                {/* Lab Tests */}
-                <div>
-                  <h4 className="text-[12px] font-bold text-slate-800 mb-4 px-1">Lab Tests</h4>
-                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
-                    {["CBC", "BMP"].map((test, i) => (
-                      <div key={test} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${i < 1 ? "pb-6 border-b border-slate-50" : ""}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                            </svg>
+                    {/* EMR */}
+                    <div className="mb-8">
+                      <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">EMR</h4>
+                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm space-y-6">
+                        {selectedVisit.emr?.sections?.historyOfPresentIllness && (
+                          <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
+                            {selectedVisit.emr.sections.historyOfPresentIllness}
+                          </p>
+                        )}
+                        {[
+                          { title: "Subjective", text: selectedVisit.emr?.sections?.subjective },
+                          { title: "Objective", text: selectedVisit.emr?.sections?.objective },
+                          { title: "Assessment", text: selectedVisit.emr?.sections?.assessment },
+                          { title: "Plan", text: selectedVisit.emr?.sections?.plan ?? selectedVisit.emr?.sections?.impressionAndPlan },
+                        ].filter(({ text }) => !!text).map(({ title, text }) => (
+                          <div key={title} className="pt-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-2 h-2 bg-[#6A8BFF] rotate-45 shrink-0" />
+                              <span className="text-[12px] font-bold text-slate-800">{title}</span>
+                            </div>
+                            <p className="text-[12px] font-medium text-slate-500 leading-relaxed pl-4 border-l-2 border-slate-50 ml-1">{text}</p>
                           </div>
-                          <div>
-                            <h5 className="text-[13px] font-bold text-slate-800">{test}</h5>
-                            <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: Take before food in the morning</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-5 text-[11px] font-bold">
-                          <button className="flex items-center gap-1.5 text-slate-800 hover:text-[#6A8BFF] transition">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            View
-                          </button>
-                          <button className="flex items-center gap-1.5 text-slate-800 hover:text-[#6A8BFF] transition">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download Report
-                          </button>
-                        </div>
+                        ))}
+                        {!selectedVisit.emr?.sections?.historyOfPresentIllness &&
+                          !selectedVisit.emr?.sections?.subjective &&
+                          !selectedVisit.emr?.sections?.objective &&
+                          !selectedVisit.emr?.sections?.assessment &&
+                          !selectedVisit.emr?.sections?.plan &&
+                          !selectedVisit.emr?.sections?.impressionAndPlan && (
+                            <p className="text-[12px] font-medium text-slate-400">No SOAP notes recorded for this consultation.</p>
+                          )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+
+                    {/* Medicines */}
+                    <div className="mb-8">
+                      <div className="flex items-center justify-between mb-4 px-1">
+                        <h4 className="text-[12px] font-bold text-slate-800">Medicines</h4>
+                      </div>
+                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
+                        {!selectedVisit.emr?.medicines || selectedVisit.emr.medicines.length === 0 ? (
+                          <p className="text-[12px] font-medium text-slate-400">No medicines prescribed for this consultation.</p>
+                        ) : (
+                          selectedVisit.emr.medicines.map((med, i) => (
+                            <div key={`${med.name}-${i}`} className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-50 last:border-0 last:pb-0">
+                              <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0 mt-0.5">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h5 className="text-[13px] font-bold text-slate-800">
+                                    {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
+                                  </h5>
+                                  <p className="text-[12px] font-medium text-slate-500 mt-1">
+                                    {med.instructions ? `Notes: ${med.instructions}` : "Notes: —"}
+                                  </p>
+                                </div>
+                              </div>
+                              {(med.timing || med.frequency) && (
+                                <div className="text-[11px] font-bold text-slate-500 text-right shrink-0">
+                                  {med.timing}{med.timing && med.frequency ? " · " : ""}{med.frequency}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lab Tests */}
+                    <div>
+                      <h4 className="text-[12px] font-bold text-slate-800 mb-4 px-1">Lab Tests</h4>
+                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
+                        {!selectedVisit.emr?.labs || selectedVisit.emr.labs.length === 0 ? (
+                          <p className="text-[12px] font-medium text-slate-400">No lab tests recommended for this consultation.</p>
+                        ) : (
+                          selectedVisit.emr.labs.map((lab, i) => (
+                            <div key={`${lab.name}-${i}`} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${i < selectedVisit.emr!.labs!.length - 1 ? "pb-6 border-b border-slate-50" : ""}`}>
+                              <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h5 className="text-[13px] font-bold text-slate-800">{lab.name}</h5>
+                                  {lab.notes && <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: {lab.notes}</p>}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -515,11 +515,14 @@ router.delete("/routines/:routineId", async (req: SessionRequest, res: Response)
 
 // ── POST /api/wellness/workout-log/bulk ──────────────────────────────────────
 // Logs multiple exercises in one shot (used when finishing an active session).
-// Body: { date?, exercises: [{ exerciseId, sets?, durationMinutes? }] }
+// Body: { date?, sessionTitle?, exercises: [{ exerciseId, sets?, durationMinutes? }] }
+// All entries from one call share a generated sessionId (and the optional
+// sessionTitle, e.g. a routine name) so the client can group them back into
+// a single workout-history card.
 router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { date, exercises } = req.body;
+    const { date, exercises, sessionTitle } = req.body;
     if (!Array.isArray(exercises) || exercises.length === 0) {
       res.status(400).json({ error: "exercises array is required" });
       return;
@@ -533,6 +536,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
     } catch { /* use default */ }
 
     const logDate = date ?? new Date().toISOString().slice(0, 10);
+    const sessionId = crypto.randomUUID();
     const saved: any[] = [];
 
     for (const ex of exercises) {
@@ -551,6 +555,8 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
         id:              crypto.randomUUID(),
         patientId,
         date:            logDate,
+        sessionId,
+        sessionTitle:    sessionTitle ?? null,
         exerciseId:      ex.exerciseId,
         exerciseName:    exercise.name,
         category:        exercise.category,
@@ -566,7 +572,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
       saved.push(entry);
     }
 
-    res.json({ saved, count: saved.length });
+    res.json({ saved, count: saved.length, sessionId });
   } catch (err) {
     console.error("Bulk workout log error:", err);
     res.status(500).json({ error: "Internal server error" });
