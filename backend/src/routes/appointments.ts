@@ -7,25 +7,22 @@ import {
   patientsContainer,
   doctorsContainer,
   queryDocuments,
+  notificationsContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 
-// True if this doctor is either the primary doctor on the appointment, or the
-// specialist who was invited — both are allowed to view the
-// patient's EHR and contribute to the shared EMR for this encounter.
-function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
-  if (apt.doctorId === doctorId) return true;
-  // If they have an invite, allow them (even if status is pending, as they
-  // might be loading EMR concurrently with the join process).
-  return apt.specialistInvite?.doctorId === doctorId;
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
 }
 
-function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
+function makeLivekitToken(userId: string, room: string): { token: Promise<string>; wsUrl: string } {
   const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
   const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
   const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
-  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
+  const at = new AccessToken(apiKey, apiSecret, { identity: userId, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
 }
@@ -397,7 +394,7 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
       res.status(404).json({ error: "Specialist not found or not approved." }); return;
     }
 
-    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom, specialist.fullName);
+    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom);
     const resolvedToken = await token;
 
     // Store the invite on the appointment document
@@ -454,8 +451,7 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
     };
     await appointmentsContainer.items.upsert(updated);
     // Generate a fresh token using the same wsUrl the primary doctor uses
-    const { resource: specialist } = await doctorsContainer.item(specialistId, specialistId).read();
-    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom, specialist?.fullName);
+    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom);
     res.json({ token: await token, wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
@@ -515,88 +511,6 @@ router.get("/:id/specialist-status", requireRole("doctor"), async (req: SessionR
   }
 });
 
-// ─── POST /api/appointments/:id/pre-visit ─────────────────────────────────────
-// Patient saves pre-visit questionnaire answers to their appointment document.
-// This data is then visible to the doctor in the consultation room.
-router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest, res: Response) => {
-  const patientId = req.session!.getUserId();
-  const { id }    = req.params;
-
-  try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    const {
-      primaryReason, symptoms, severity, duration,
-      conditions, medications, allergies, additionalNotes, submittedAt,
-    } = req.body;
-
-    const updated = {
-      ...apt,
-      preVisitData: {
-        primaryReason:   primaryReason   ?? "",
-        symptoms:        symptoms        ?? [],
-        severity:        severity        ?? "",
-        duration:        duration        ?? "",
-        conditions:      conditions      ?? "",
-        medications:     medications     ?? "",
-        allergies:       allergies       ?? "",
-        additionalNotes: additionalNotes ?? "",
-        submittedAt:     submittedAt     ?? new Date().toISOString(),
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
-    await appointmentsContainer.items.upsert(updated);
-    res.json({ status: "OK" });
-  } catch (err) {
-    console.error("Pre-visit save error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /api/appointments/:id/patient-profile ───────────────────────────────
-// Doctor fetches the patient's registered profile for an appointment they own.
-// Returns the medically relevant subset of the patient Cosmos document.
-router.get("/:id/patient-profile", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  const { id }   = req.params;
-
-  try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
-    if (!patient) { res.status(404).json({ error: "Patient profile not found." }); return; }
-
-    // Return medically relevant fields only
-    const profile = {
-      fullName:       patient.fullName      ?? "",
-      email:          patient.email         ?? "",
-      phone:          patient.phone         ?? "",
-      gender:         patient.gender        ?? "",
-      dateOfBirth:    patient.dob           ?? patient.dateOfBirth ?? "",
-      bloodGroup:     patient.bloodGroup    ?? "",
-      height:         patient.height        ?? "",
-      weight:         patient.weight        ?? "",
-      emiratesId:     patient.emiratesId    ?? "",
-      maritalStatus:  patient.maritalStatus ?? "",
-      location:       patient.location      ?? "",
-      allergies:      patient.allergies     ?? [],
-      medications:    patient.medications   ?? { current: [], past: [] },
-      chronicDiseases: patient.chronicDiseases ?? [],
-      insurance:      patient.insurance     ?? [],
-    };
-
-    res.json({ profile });
-  } catch (err) {
-    console.error("patient-profile fetch error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
 // ─── GET /api/appointments/:id ───────────────────────────────────────────────
 // Single appointment — accessible by both patient and doctor of that appointment.
 router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) => {
@@ -640,8 +554,51 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     const updated = { ...apt, status: "cancelled", updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
 
-    // Determine who cancelled (patient vs doctor) for the log
     const isDoctor = apt.doctorId === userId;
+    const now = new Date().toISOString();
+
+    const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeText = parseLocalTime(apt.scheduledAt).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    if (isDoctor) {
+      // Notify patient
+      const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
+      const doctorName = docDoc?.fullName ?? "Doctor";
+      const patientNotification = {
+        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        patientId: apt.patientId,
+        title: "Appointment Cancelled",
+        body: `Your appointment with Dr. ${doctorName} on ${dateText} at ${timeText} has been cancelled by the doctor.`,
+        type: "appointment_cancelled",
+        referenceId: id,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(patientNotification);
+    } else {
+      // Notify doctor
+      const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
+      const patientName = patientDoc?.fullName ?? "Patient";
+      const doctorNotification = {
+        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        patientId: apt.doctorId,
+        title: "Appointment Cancelled",
+        body: `Your appointment with ${patientName} on ${dateText} at ${timeText} has been cancelled by the patient.`,
+        type: "appointment_cancelled",
+        referenceId: id,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(doctorNotification);
+    }
+
     logActivity({
       source: isDoctor ? "doctor" : "patient",
       action: "Appointment Cancelled",
@@ -655,6 +612,189 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
     console.error("Cancel appointment error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/appointments/:id/reschedule ─────────────────────────────────
+router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { id } = req.params;
+  const { scheduledAt, reason } = req.body;
+
+  if (!scheduledAt) {
+    res.status(400).json({ error: "scheduledAt is required." });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+    if (apt.patientId !== userId && apt.doctorId !== userId) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const newDate = new Date(scheduledAt);
+    if (isNaN(newDate.getTime())) {
+      res.status(400).json({ error: "Invalid scheduledAt format." });
+      return;
+    }
+
+    const dateStr = newDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const utcHours = newDate.getUTCHours().toString().padStart(2, "0");
+    const utcMinutes = newDate.getUTCMinutes().toString().padStart(2, "0");
+    const timeStr = `${utcHours}:${utcMinutes}`;
+
+    const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+    if (!doctor || doctor.status !== "approved") {
+      res.status(404).json({ error: "Doctor not found or not active." });
+      return;
+    }
+
+    const slots: any[] = doctor.slots ?? [];
+    const dayOfWeek = new Date(dateStr + "T12:00:00Z").getUTCDay();
+    const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
+
+    if (activeDaySlots.length === 0) {
+      res.status(400).json({ error: "Doctor does not have active slots on this day." });
+      return;
+    }
+
+    const intervals: string[] = [];
+    let duration = 30;
+
+    for (const daySlot of activeDaySlots) {
+      duration = daySlot.slotDurationMins ?? 30;
+      if (!daySlot.startTime || !daySlot.endTime) continue;
+      const [startH, startM] = daySlot.startTime.split(":").map(Number);
+      const [endH,   endM]   = daySlot.endTime.split(":").map(Number);
+      let cursor = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+
+      while (cursor + duration <= endMinutes) {
+        const h = Math.floor(cursor / 60).toString().padStart(2, "0");
+        const m = (cursor % 60).toString().padStart(2, "0");
+        
+        const slotStart = new Date(`${dateStr}T${h}:${m}:00.000Z`);
+        const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
+        const absences = doctor.absences ?? [];
+        const isAbsent = absences.some((abs: any) => {
+          const absStart = new Date(abs.startDate);
+          const absEnd = new Date(abs.endDate);
+          return slotStart < absEnd && slotEnd > absStart;
+        });
+
+        if (!isAbsent) {
+          intervals.push(`${h}:${m}`);
+        }
+        cursor += duration;
+      }
+    }
+
+    const uniqueIntervals = Array.from(new Set(intervals)).sort();
+
+    const dayStart = `${dateStr}T00:00:00.000Z`;
+    const dayEnd   = `${dateStr}T23:59:59.999Z`;
+
+    const booked = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT c.scheduledAt FROM c
+              WHERE c.doctorId = @doctorId
+                AND c.id != @apptId
+                AND c.scheduledAt >= @dayStart
+                AND c.scheduledAt <= @dayEnd
+                AND c.status != 'cancelled'`,
+      parameters: [
+        { name: "@doctorId", value: apt.doctorId },
+        { name: "@apptId", value: id },
+        { name: "@dayStart", value: dayStart },
+        { name: "@dayEnd",   value: dayEnd },
+      ],
+    });
+
+    const bookedSet = new Set(
+      booked.map((b: any) => {
+        const d = new Date(b.scheduledAt);
+        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+      })
+    );
+
+    const available = uniqueIntervals.filter((t) => !bookedSet.has(t));
+
+    if (!available.includes(timeStr)) {
+      res.status(400).json({ error: "The selected time slot is not available." });
+      return;
+    }
+
+    const oldScheduledAt = apt.scheduledAt;
+    const updated = {
+      ...apt,
+      scheduledAt,
+      reason: reason ?? apt.reason,
+      status: "scheduled",
+      updatedAt: new Date().toISOString()
+    };
+    await appointmentsContainer.items.upsert(updated);
+
+    const isDoctor = apt.doctorId === userId;
+    const now = new Date().toISOString();
+
+    const dateText = parseLocalTime(scheduledAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeText = parseLocalTime(scheduledAt).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    if (isDoctor) {
+      const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
+      const doctorName = docDoc?.fullName ?? "Doctor";
+      const patientNotification = {
+        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        patientId: apt.patientId,
+        title: "Appointment Rescheduled",
+        body: `Your appointment with Dr. ${doctorName} has been rescheduled to ${dateText} at ${timeText}.`,
+        type: "appointment_rescheduled",
+        referenceId: id,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(patientNotification);
+    } else {
+      const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
+      const patientName = patientDoc?.fullName ?? "Patient";
+      const doctorNotification = {
+        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        patientId: apt.doctorId,
+        title: "Appointment Rescheduled",
+        body: `Your appointment with ${patientName} has been rescheduled to ${dateText} at ${timeText}.`,
+        type: "appointment_rescheduled",
+        referenceId: id,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(doctorNotification);
+    }
+
+    logActivity({
+      source: isDoctor ? "doctor" : "patient",
+      action: "Appointment Rescheduled",
+      details: `Appointment ${id} rescheduled from ${oldScheduledAt} to ${scheduledAt}`,
+      performedBy: isDoctor ? "Doctor" : "Patient",
+      performedById: userId,
+      entityType: "appointment",
+      entityId: id,
+    });
+
+    res.json({ status: "OK", appointment: updated });
+  } catch (err) {
+    console.error("Reschedule appointment error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -707,185 +847,26 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 });
 
 // ─── POST /api/appointments/:id/emr ─────────────────────────────────────────
-// Doctor saves the structured EMR for this single encounter: per-section
-// clinical notes, prescribed medicines, and recommended labs. This is the
-// encounter-level medical record (EMR) — distinct from the patient's
-// longitudinal EHR, which is assembled on read from all past EMRs (see
-// GET /:id/ehr below).
-//
-// IMPORTANT — Shared EMR for multi-doctor consultations:
-// Medicines and labs are merged by contributorDoctorId so that the primary
-// doctor and any invited specialist can each manage their own entries without
-// overwriting each other's. The saving doctor's previous entries are replaced
-// while all other doctors' entries are preserved.
+// Doctor saves EMR notes, medicines, and lab recommendations for an appointment.
 router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { id }   = req.params;
-  const { sections, medicines, labs } = req.body;
+  const { notes, medicines, labs } = req.body;
 
   try {
     const { resource: apt } = await appointmentsContainer.item(id, id).read();
     if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    // Resolve doctor name for contributor labelling
-    let contributorName = "Doctor";
-    try {
-      const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
-      contributorName = doc?.fullName ?? contributorName;
-    } catch { /* use default */ }
-
-    // Safety net: drop any incoming entries that are explicitly tagged as belonging
-    // to a different doctor (the frontend should already filter these out, but we
-    // enforce it here too so a bad payload never corrupts another doctor's entries).
-    const ownIncomingMedicines = (medicines ?? []).filter(
-      (m: any) => !m.contributorDoctorId || m.contributorDoctorId === doctorId
-    );
-    const ownIncomingLabs = (labs ?? []).filter(
-      (l: any) => !l.contributorDoctorId || l.contributorDoctorId === doctorId
-    );
-
-    // Tag the incoming entries with this doctor's identity
-    const taggedMedicines = ownIncomingMedicines.map((m: any) => ({
-      ...m,
-      contributorDoctorId: doctorId,
-      contributorName,
-    }));
-    const taggedLabs = ownIncomingLabs.map((l: any) => ({
-      ...l,
-      contributorDoctorId: doctorId,
-      contributorName,
-    }));
-
-    // Merge: keep other doctors' existing entries, replace this doctor's entries
-    const existingMedicines: any[] = apt.emr?.medicines ?? [];
-    const existingLabs: any[]      = apt.emr?.labs      ?? [];
-
-    const otherMedicines = existingMedicines.filter(
-      // Keep if it belongs to someone else OR if it's a legacy entry with no tag
-      (m: any) => m.contributorDoctorId !== doctorId
-    );
-    const otherLabs = existingLabs.filter(
-      (l: any) => l.contributorDoctorId !== doctorId
-    );
-
-    const mergedMedicines = [...otherMedicines, ...taggedMedicines];
-    const mergedLabs      = [...otherLabs,      ...taggedLabs];
-
-    // Merge sections: layer this doctor's section notes on top of whatever was
-    // previously saved. This prevents a specialist from wiping the primary
-    // doctor's clinical notes when they save their own additions.
-    const existingSections = apt.emr?.sections ?? {};
-    const mergedSections   = { ...existingSections, ...(sections ?? {}) };
+    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
 
     const updated = {
       ...apt,
-      emr: {
-        sections:  mergedSections,
-        medicines: mergedMedicines,
-        labs:      mergedLabs,
-        savedAt:   new Date().toISOString(),
-      },
+      emr: { notes: notes ?? "", medicines: medicines ?? [], labs: labs ?? [], savedAt: new Date().toISOString() },
       updatedAt: new Date().toISOString(),
     };
     await appointmentsContainer.items.upsert(updated);
-    res.json({ status: "OK", emr: updated.emr });
+    res.json({ status: "OK" });
   } catch (err) {
     console.error("Save EMR error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /api/appointments/:id/emr ──────────────────────────────────────────
-// Doctor reads back the saved EMR (and pre-visit data) for this appointment —
-// used to restore the consult screen if the doctor reloads or rejoins.
-router.get("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  const { id }   = req.params;
-
-  try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    res.json({
-      emr:          apt.emr ?? null,
-      preVisitData: apt.preVisitData ?? null,
-    });
-  } catch (err) {
-    console.error("Fetch EMR error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /api/appointments/:id/ehr ───────────────────────────────────────────
-// Doctor fetches the patient's full longitudinal Electronic Health Record:
-// demographics + standing medical profile (allergies, chronic conditions,
-// current medications) PLUS a timeline of every past appointment's EMR for
-// this patient, across all doctors. This is the patient's complete medical
-// history — as opposed to /:id/emr, which is just this one encounter.
-router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  const { id }   = req.params;
-
-  try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
-    if (!patient) { res.status(404).json({ error: "Patient profile not found." }); return; }
-
-    const profile = {
-      fullName:        patient.fullName       ?? "",
-      email:           patient.email          ?? "",
-      phone:           patient.phone          ?? "",
-      gender:          patient.gender         ?? "",
-      dateOfBirth:     patient.dob            ?? patient.dateOfBirth ?? "",
-      bloodGroup:      patient.bloodGroup     ?? "",
-      height:          patient.height         ?? "",
-      weight:          patient.weight         ?? "",
-      emiratesId:      patient.emiratesId     ?? "",
-      maritalStatus:   patient.maritalStatus  ?? "",
-      location:        patient.location       ?? "",
-      allergies:       patient.allergies      ?? [],
-      medications:     patient.medications    ?? { current: [], past: [] },
-      chronicDiseases: patient.chronicDiseases ?? [],
-      insurance:       patient.insurance      ?? [],
-    };
-
-    // All of this patient's appointments across every doctor, most recent first.
-    const allAppointments = await queryDocuments<any>(appointmentsContainer, {
-      query: "SELECT * FROM c WHERE c.patientId = @patientId ORDER BY c.scheduledAt DESC",
-      parameters: [{ name: "@patientId", value: apt.patientId }],
-    });
-
-    const doctorIds = Array.from(new Set(allAppointments.map((a) => a.doctorId).filter(Boolean)));
-    const doctorNames: Record<string, string> = {};
-    await Promise.all(doctorIds.map(async (did) => {
-      try {
-        const { resource: doc } = await doctorsContainer.item(did, did).read();
-        doctorNames[did] = doc?.fullName ?? "Unknown Doctor";
-      } catch {
-        doctorNames[did] = "Unknown Doctor";
-      }
-    }));
-
-    const visitHistory = allAppointments
-      .filter((a) => a.emr || a.status === "completed")
-      .map((a) => ({
-        appointmentId: a.id,
-        scheduledAt:   a.scheduledAt,
-        status:        a.status,
-        reason:        a.reason ?? "",
-        doctorId:      a.doctorId,
-        doctorName:    doctorNames[a.doctorId] ?? "Unknown Doctor",
-        emr:           a.emr ?? null,
-      }));
-
-    res.json({ profile, visitHistory, preVisitData: apt.preVisitData ?? null });
-  } catch (err) {
-    console.error("Fetch EHR error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -920,13 +901,8 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
     const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
     const wsUrl = isDoctor ? wsUrlDoctor : wsUrlPatient;
 
-    const participantName = isDoctor
-      ? (await doctorsContainer.item(userId, userId).read()).resource?.fullName
-      : (await patientsContainer.item(userId, userId).read()).resource?.fullName;
-
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
-      name:     participantName,
       ttl:      2 * 60 * 60, // 2 hours
     });
 

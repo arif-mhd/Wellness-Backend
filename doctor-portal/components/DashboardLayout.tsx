@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
 import { usePathname } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
 
 export default function SharedDashboardLayout({
   children,
@@ -24,6 +25,55 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isOpen: sidebarOpen } = useSidebar();
   const pathname = usePathname();
   const isVideoCall = pathname === "/video-calls";
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = await Session.getAccessToken();
+      if (!token) return;
+      
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data ?? []);
+        setUnreadCount(data.filter((n: any) => !n.is_read).length);
+      }
+    } catch (err) {
+      console.error("Fetch notifications error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    const id = setInterval(fetchNotifications, 10_000);
+    return () => clearInterval(id);
+  }, [fetchNotifications]);
+
+  const handleMarkAsRead = async (notifId: string) => {
+    try {
+      const token = await Session.getAccessToken();
+      if (!token) return;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications/${notifId}/read`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      if (res.ok) {
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error("Mark read error:", err);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
@@ -114,11 +164,57 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* Notification Bell */}
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all relative">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16.1497 11.9833C16.3137 12.1475 16.4437 12.3425 16.5324 12.5569C16.621 12.7714 16.6665 13.0013 16.6663 13.2333C16.6663 13.7019 16.4802 14.1512 16.1489 14.4826C15.8176 14.8139 15.3682 15 14.8997 15H5.09967C4.63113 15 4.18177 14.8139 3.85045 14.4826C3.51914 14.1512 3.33301 13.7019 3.33301 13.2333C3.3328 13.0013 3.37833 12.7714 3.46698 12.5569C3.55563 12.3425 3.68567 12.1475 3.84968 11.9833L4.99968 10.8333V7.5C4.99968 6.17392 5.52646 4.90215 6.46414 3.96447C7.40182 3.02678 8.67359 2.5 9.99968 2.5C11.3258 2.5 12.5975 3.02678 13.5352 3.96447C14.4729 4.90215 14.9997 6.17392 14.9997 7.5V10.8333L16.1497 11.9833ZM12.4997 15H7.49968C7.49968 15.663 7.76307 16.2989 8.23191 16.7678C8.70075 17.2366 9.33663 17.5 9.99968 17.5C10.6627 17.5 11.2986 17.2366 11.7674 16.7678C12.2363 16.2989 12.4997 15.663 12.4997 15Z" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all relative"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M16.1497 11.9833C16.3137 12.1475 16.4437 12.3425 16.5324 12.5569C16.621 12.7714 16.6665 13.0013 16.6663 13.2333C16.6663 13.7019 16.4802 14.1512 16.1489 14.4826C15.8176 14.8139 15.3682 15 14.8997 15H5.09967C4.63113 15 4.18177 14.8139 3.85045 14.4826C3.51914 14.1512 3.33301 13.7019 3.33301 13.2333C3.3328 13.0013 3.37833 12.7714 3.46698 12.5569C3.55563 12.3425 3.68567 12.1475 3.84968 11.9833L4.99968 10.8333V7.5C4.99968 6.17392 5.52646 4.90215 6.46414 3.96447C7.40182 3.02678 8.67359 2.5 9.99968 2.5C11.3258 2.5 12.5975 3.02678 13.5352 3.96447C14.4729 4.90215 14.9997 6.17392 14.9997 7.5V10.8333L16.1497 11.9833ZM12.4997 15H7.49968C7.49968 15.663 7.76307 16.2989 8.23191 16.7678C8.70075 17.2366 9.33663 17.5 9.99968 17.5C10.6627 17.5 11.2986 17.2366 11.7674 16.7678C12.2363 16.2989 12.4997 15.663 12.4997 15Z" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 w-4 h-4 bg-[#E84949] text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showDropdown && (
+                <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-2xl shadow-xl w-80 py-4 z-50 text-left">
+                  <div className="flex items-center justify-between px-4 pb-3 border-b border-[#EBEEF5]">
+                    <span className="font-semibold text-sm text-[#24292E]">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="text-xs text-[#5476FC] font-medium">{unreadCount} unread</span>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto mt-2">
+                    {notifications.filter((n: any) => !n.is_read).length === 0 ? (
+                      <div className="py-8 text-center text-xs text-[#9EA5AD]">
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.filter((n: any) => !n.is_read).slice(0, 5).map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => handleMarkAsRead(notif.id)}
+                          className="flex flex-col gap-1 px-4 py-3 border-b border-[#F7F9FC] last:border-0 hover:bg-[#F7F9FC] transition-colors cursor-pointer text-left bg-[#8AA0FF]/5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#5476FC]">
+                              {notif.title}
+                            </span>
+                            <span className="text-[9px] text-[#9EA5AD]">
+                              {notif.sent_at ? new Date(notif.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-[#676E76] leading-normal">{notif.body}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Chat Icon */}
             <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
