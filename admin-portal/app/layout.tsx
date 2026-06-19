@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Lora } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
 
-const inter = Inter({
+const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-sans",
-});
-
-const lora = Lora({
-  subsets: ["latin"],
-  variable: "--font-serif",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${lora.variable}`}>
+    <html lang="en" className={`${outfit.variable}`}>
       <body>
         <SuperTokensProvider>{children}</SuperTokensProvider>
       </body>

@@ -69,7 +69,7 @@ function DoctorAvatar({ doctor, size = "md" }: { doctor: Doctor; size?: "sm" | "
     return <img src={doctor.avatarUrl} alt={doctor.fullName} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
   }
   return (
-    <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-black shrink-0`}>
+    <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-medium shrink-0`}>
       {doctor.fullName?.split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
     </div>
   );
@@ -169,7 +169,7 @@ function ManageDoctorsPageInner() {
 
   return (
     <ProtectedRoute>
-      <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
+      <div className="w-full pb-12 font-sans animate-in fade-in duration-300" style={{ fontFamily: 'Outfit, sans-serif' }}>
 
         {(fetchError || approveError) && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
@@ -184,10 +184,10 @@ function ManageDoctorsPageInner() {
 
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Doctors</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Doctors</h1>
               <button
                 onClick={() => router.push("/dashboard/doctors/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-medium px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -201,7 +201,7 @@ function ManageDoctorsPageInner() {
               <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => { setActiveTab("onboard"); setSelectedDoctorId(doctors[0]?.id ?? null); }}
-                  className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${
+                  className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                     activeTab === "onboard" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
                 >
@@ -209,13 +209,13 @@ function ManageDoctorsPageInner() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("queue"); setSelectedDoctorId(queue[0]?.id ?? null); }}
-                  className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-2 ${
+                  className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === "queue" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
                 >
                   Onboarding Queue
                   {queue.length > 0 && (
-                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === "queue" ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-600"}`}>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${activeTab === "queue" ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-600"}`}>
                       {queue.length}
                     </span>
                   )}
@@ -244,11 +244,11 @@ function ManageDoctorsPageInner() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button className="text-[13px] font-bold text-slate-500 flex items-center gap-1.5 hover:text-slate-800 transition">
+                <button className="text-[13px] font-medium text-slate-500 flex items-center gap-1.5 hover:text-slate-800 transition">
                   Today
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
                 </button>
-                <button onClick={fetchDoctors} className="text-[12px] font-bold text-slate-400 hover:text-slate-700 flex items-center gap-1.5 transition">
+                <button onClick={fetchDoctors} className="text-[12px] font-medium text-slate-400 hover:text-slate-700 flex items-center gap-1.5 transition">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
@@ -258,7 +258,7 @@ function ManageDoctorsPageInner() {
             </div>
 
             {/* Sort labels */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] px-3 select-none">
+            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] px-3 select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
@@ -294,20 +294,20 @@ function ManageDoctorsPageInner() {
                 ) : activeTab === "onboard" ? (
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-bold pl-2">
+                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="pb-4 pt-1 font-medium pl-2">
                           <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold text-center">
+                        <th className="pb-4 pt-1 font-medium text-center">
                           <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Consultation <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold text-center">
+                        <th className="pb-4 pt-1 font-medium text-center">
                           <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Avg. Consultation <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold text-center">
+                        <th className="pb-4 pt-1 font-medium text-center">
                           <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Prescription <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold text-center">
+                        <th className="pb-4 pt-1 font-medium text-center">
                           <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Ratings <DoubleCaret /></div>
                         </th>
                       </tr>
@@ -327,13 +327,13 @@ function ManageDoctorsPageInner() {
                                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
-                                <p className="text-[11px] font-semibold text-slate-400 truncate">{doc.email}</p>
+                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
+                                <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
                               </div>
                             </td>
-                            <td className="py-3 text-[13px] text-slate-700 font-bold text-center">{doc.consultations ?? 0}</td>
-                            <td className="py-3 text-[13px] text-slate-700 font-bold text-center">{doc.avgConsultation ?? 0}</td>
-                            <td className="py-3 text-[13px] text-slate-700 font-bold text-center">{doc.prescriptions ?? 0}</td>
+                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.consultations ?? 0}</td>
+                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.avgConsultation ?? 0}</td>
+                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.prescriptions ?? 0}</td>
                             <td className="py-3 text-center"><StarRow rating={doc.rating ?? 0} /></td>
                           </tr>
                         );
@@ -343,8 +343,8 @@ function ManageDoctorsPageInner() {
                 ) : (
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-bold pl-2">
+                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="pb-4 pt-1 font-medium pl-2">
                           <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
                         </th>
                         <th className="pb-4 pt-1"></th>
@@ -365,17 +365,17 @@ function ManageDoctorsPageInner() {
                                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-amber-400 border-2 border-white rounded-full" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
-                                <p className="text-[11px] font-semibold text-slate-400 truncate">{doc.email}</p>
+                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
+                                <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
                               </div>
                             </td>
                             <td className="py-3 pr-4 text-right">
                               {isSelected ? (
-                                <button className="bg-[#6A8BFF] text-white text-[11px] font-bold px-6 py-2 rounded-full shadow-md shadow-blue-200/50">
+                                <button className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-md shadow-blue-200/50">
                                   Verify Manually
                                 </button>
                               ) : (
-                                <span className="text-[12px] font-bold text-slate-800 mr-6">Verify Manually</span>
+                                <span className="text-[12px] font-medium text-slate-800 mr-6">Verify Manually</span>
                               )}
                             </td>
                           </tr>
@@ -392,7 +392,7 @@ function ManageDoctorsPageInner() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                  <button key={n} className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{n}</button>
+                  <button key={n} className={`w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{n}</button>
                 ))}
                 <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7-7" /></svg>
@@ -407,7 +407,7 @@ function ManageDoctorsPageInner() {
 
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Doctor Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Doctor Details</h2>
                 <button
                   onClick={() => setSelectedDoctorId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -424,9 +424,9 @@ function ManageDoctorsPageInner() {
                     <span className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 border-2 border-white rounded-full ${selectedDoctor.status === "approved" ? "bg-[#10b981]" : "bg-amber-400"}`} />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-black text-slate-800">{selectedDoctor.fullName}</h3>
+                    <h3 className="text-[15px] font-medium text-slate-800">{selectedDoctor.fullName}</h3>
                     {selectedDoctor.license && (
-                      <p className="text-[10px] font-bold text-[#6A8BFF] uppercase tracking-wide mt-1 bg-blue-50/50 inline-block px-1.5 py-0.5 rounded">
+                      <p className="text-[10px] font-medium text-[#6A8BFF] uppercase tracking-wide mt-1 bg-blue-50/50 inline-block px-1.5 py-0.5 rounded">
                         LICENSE NUMBER {selectedDoctor.license}
                       </p>
                     )}
@@ -438,7 +438,7 @@ function ManageDoctorsPageInner() {
               {/* Specialty + bio */}
               <div className="mb-6 px-1">
                 {selectedDoctor.specialty && (
-                  <span className="inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-black tracking-wide uppercase mb-4">
+                  <span className="inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-medium tracking-wide uppercase mb-4">
                     {selectedDoctor.specialty}
                   </span>
                 )}
@@ -467,8 +467,8 @@ function ManageDoctorsPageInner() {
                   },
                 ].filter(r => r.value).map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">{label}</span>
-                    <span className="text-[11px] text-slate-800 font-bold truncate max-w-[170px]">{value}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">{label}</span>
+                    <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{value}</span>
                   </div>
                 ))}
               </div>
@@ -477,7 +477,7 @@ function ManageDoctorsPageInner() {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => router.push(`/dashboard/doctors/${selectedDoctor.id}`)}
-                  className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                  className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
                 >
                   View Detailed Profile
                 </button>
@@ -485,7 +485,7 @@ function ManageDoctorsPageInner() {
                   <button
                     onClick={() => handleApprove(selectedDoctor.id)}
                     disabled={loadingApprove}
-                    className="w-full py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[13px] font-bold transition duration-200 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[13px] font-medium transition duration-200 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {loadingApprove ? (
                       <>

@@ -117,23 +117,29 @@ function MiniBarChart({ data, labels, color = "#FFC107" }: { data: number[]; lab
       <div className="w-full flex items-end justify-between relative" style={{ height: `${H}px` }}>
         {data.map((v, i) => {
           const isHovered = hoveredIdx === i;
-          const height = Math.max((v / max) * (H - 20), 45); // Leave 20px space for labels below
+          const barHeight = Math.max((v / max) * (H - 20), 4);
           return (
             <div key={i} className="flex flex-col items-center justify-end h-full" style={{ width: isDense ? "28px" : "36px" }}>
-              <div
-                className="relative flex flex-col items-center justify-start overflow-hidden cursor-pointer group rounded-[4px] transition-all duration-300 shadow-sm w-full"
-                style={{
-                  height: `${height}px`,
-                  background: `linear-gradient(to bottom, #fef3c7, #fde68a, #fcd34d)`,
-                  opacity: isHovered ? 0.9 : 1,
-                  transform: isHovered ? "scaleY(1.02)" : "scaleY(1)",
-                  transformOrigin: "bottom"
-                }}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              >
-                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <span className="text-[11px] font-bold text-slate-800 mt-2 z-10" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <div className="relative w-full flex flex-col items-center justify-end" style={{ height: `${H - 20}px` }}>
+                <div
+                  className="w-full relative cursor-pointer group rounded-[4px] transition-all duration-300 shadow-sm overflow-hidden"
+                  style={{
+                    height: `${barHeight}px`,
+                    background: `linear-gradient(to bottom, #fef3c7, #fde68a, #fcd34d)`,
+                    opacity: isHovered ? 0.9 : 1,
+                  }}
+                  onMouseEnter={() => setHoveredIdx(i)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                >
+                  <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <span 
+                  className="absolute text-[11px] font-bold text-slate-800 transition-all duration-300 pointer-events-none" 
+                  style={{ 
+                    fontFamily: "Outfit, sans-serif",
+                    bottom: barHeight > 24 ? `${barHeight - 20}px` : `${barHeight + 4}px`
+                  }}
+                >
                   {v >= 1000 ? `${(v/1000).toFixed(0)}K` : v}
                 </span>
               </div>
@@ -262,20 +268,16 @@ function MiniLineChart({ data, labels, color = "#3b82f6" }: { data: number[]; la
 }
 
 // ─── Segmented Progress Bar Component ──────────────────────────────────────────
-function SegmentedProgressBar({ percentage, color = "#3b82f6", blocksCount = 20 }: { percentage: number; color?: string; blocksCount?: number }) {
-  const activeBlocks = Math.round((percentage / 100) * blocksCount);
+function SegmentedProgressBar({ percentage, color = "#3b82f6", blocksCount = 40 }: { percentage: number; color?: string; blocksCount?: number }) {
   return (
-    <div className="flex gap-[3px] w-full mt-1.5 select-none">
-      {Array.from({ length: blocksCount }).map((_, i) => {
-        const isActive = i < activeBlocks;
-        return (
-          <div
-            key={i}
-            className="h-[6px] rounded-[1.5px] flex-1 transition-all duration-300"
-            style={{ backgroundColor: isActive ? color : "#ecf0f6" }}
-          />
-        );
-      })}
+    <div className="flex gap-[1.5px] w-full mt-1.5 select-none h-[8px]">
+      {Array.from({ length: blocksCount }).map((_, i) => (
+        <div
+          key={i}
+          className="h-full rounded-[1px] flex-1"
+          style={{ backgroundColor: color, opacity: 0.4 }}
+        />
+      ))}
     </div>
   );
 }
@@ -296,41 +298,68 @@ function CardHeader({
   onToggleDropdown: () => void;
   onCloseDropdown: () => void;
 }) {
-  return (
-    <div className="flex items-center justify-between relative">
-      <p className="text-sm font-bold text-slate-800">{title}</p>
-      <div className="flex items-center gap-1.5">
-        <button
-          onClick={onToggleDropdown}
-          className="flex items-center gap-1 text-[10px] font-bold text-slate-400 border border-slate-100 bg-slate-50 hover:bg-slate-100 rounded-lg px-2.5 py-1.5 transition-colors active:scale-95"
-        >
-          {RANGE_LABEL[range]}
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+  const [showSettings, setShowSettings] = useState(false);
 
-        {showDropdown && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={onCloseDropdown} />
-            <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 w-32 z-20 animate-in fade-in slide-in-from-top-1 duration-150">
-              {(["day", "week", "month"] as Range[]).map((r) => (
+  return (
+    <div className="flex items-start justify-between relative z-10 gap-3">
+      <p className="text-xs font-medium text-[#6c7278] leading-snug pr-2">{title}</p>
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Range Dropdown */}
+        <div className="relative">
+          <button
+            onClick={onToggleDropdown}
+            className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap"
+          >
+            {RANGE_LABEL[range]}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showDropdown && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={onCloseDropdown} />
+              <div className="absolute right-0 top-6 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 w-32 z-20 animate-in fade-in slide-in-from-top-1 duration-150">
+                {(["day", "week", "month"] as Range[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      onChangeRange(r);
+                      onCloseDropdown();
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      range === r ? "bg-blue-50 text-blue-600" : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {RANGE_LABEL[r]}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Settings 3-dots Dropdown */}
+        <div className="relative">
+          <button onClick={() => setShowSettings(!showSettings)} className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </button>
+          {showSettings && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowSettings(false)} />
+              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-slate-100 py-2 w-44 z-30">
                 <button
-                  key={r}
-                  onClick={() => {
-                    onChangeRange(r);
-                    onCloseDropdown();
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                    range === r ? "bg-blue-50 text-blue-600" : "text-slate-700 hover:bg-slate-50"
-                  }`}
+                  onClick={() => setShowSettings(false)}
+                  className="w-full text-left px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  {RANGE_LABEL[r]}
+                  Download Report
                 </button>
-              ))}
-            </div>
-          </>
-        )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -367,7 +396,7 @@ function BarStatCard({
   onCloseDropdown: () => void;
 }) {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-full min-h-[230px] overflow-visible">
       <CardHeader
         title={title}
         range={range}
@@ -422,7 +451,7 @@ function LineStatCard({
   onCloseDropdown: () => void;
 }) {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-full min-h-[230px] overflow-visible">
       <CardHeader
         title={title}
         range={range}
@@ -468,7 +497,7 @@ function ConsultCard({
 }) {
   const title = "Appointment Cancellation and Rescheduling";
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-full min-h-[230px] overflow-visible">
       <CardHeader
         title={title}
         range={range}
@@ -488,14 +517,14 @@ function ConsultCard({
         <div className="flex-1 flex flex-col mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {cancellation.totalLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalLabel}
+              {parseFloat(cancellation.totalLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalLabel}
             </span>
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
               {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
             </span>
           </div>
 
-          <div className="flex gap-1.5 mt-5">
+          <div className="flex gap-2 mt-5">
             <div className="flex-1">
               <SegmentedProgressBar percentage={cancellation.bookingPct} color="#a855f7" />
             </div>
@@ -512,7 +541,7 @@ function ConsultCard({
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {cancellation.totalBookingLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.totalBookingLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalBookingLabel}
+                  {parseFloat(cancellation.totalBookingLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.totalBookingLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalBookingLabel}
                 </span>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
@@ -526,7 +555,7 @@ function ConsultCard({
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {cancellation.cancellationsLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(cancellation.cancellationsLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.cancellationsLabel}
+                  {parseFloat(cancellation.cancellationsLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.cancellationsLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.cancellationsLabel}
                 </span>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.change.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.change.positive ? "+" : "-"}{cancellation.change.value}%
@@ -564,7 +593,7 @@ function PrimaryReasonsCard({
 }) {
   const title = "Primary Appointment Reasons";
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-[230px] overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#eef2f7] hover:shadow-md transition-shadow flex flex-col h-full min-h-[230px] overflow-visible">
       <CardHeader
         title={title}
         range={range}
@@ -584,7 +613,7 @@ function PrimaryReasonsCard({
         <div className="flex-1 flex flex-col mt-4">
           <div className="flex items-baseline gap-2">
             <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {primaryReasons.totalLabel.replace(/,/g, '') >= 1000 ? `${(parseFloat(primaryReasons.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : primaryReasons.totalLabel}
+              {parseFloat(primaryReasons.totalLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(primaryReasons.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : primaryReasons.totalLabel}
             </span>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md text-emerald-600 bg-emerald-50">+3.4%</span>
           </div>
@@ -643,7 +672,7 @@ function PrimaryReasonsCard({
 function SectionHeader({ title, count }: { title: string; count?: number }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+      <h2 className="text-[15px] font-bold text-[#212b36] flex items-center gap-2">
         {title}
         {count !== undefined && count > 0 && (
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-500 normal-case tracking-normal">
@@ -772,8 +801,8 @@ export default function AdminDashboardPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Good Morning!</p>
-            <h1 className="text-3xl font-black text-slate-800">
+            <p className="text-[13px] font-medium text-[#6c7278] mb-1">Good Morning!</p>
+            <h1 className="text-[28px] font-medium text-[#212b36]">
               {adminName ? `${adminName}!` : "Wellness Admin!"}
             </h1>
           </div>
