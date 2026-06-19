@@ -7,6 +7,7 @@ import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
 import { usePathname } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
+import ChatBox from "@/components/ChatBox";
 
 export default function SharedDashboardLayout({
   children,
@@ -29,7 +30,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-
+  const [showChat, setShowChat] = useState(false);
   const fetchNotifications = useCallback(async () => {
     try {
       const token = await Session.getAccessToken();
@@ -217,14 +218,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Chat Icon */}
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15.675 13.525L16.6667 17.5L12.5417 15.4333C11.7208 15.6996 10.863 15.8346 10 15.8333C5.83333 15.8333 2.5 12.85 2.5 9.16667C2.5 5.48333 5.83333 2.5 10 2.5C14.1667 2.5 17.5 5.48333 17.5 9.16667C17.4863 10.8025 16.831 12.3675 15.675 13.525Z" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9.95801 9.16675H10.0413" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M6.58301 9.16675H6.66634" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M13.333 9.16675H13.4163" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowChat(!showChat)}
+                className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15.675 13.525L16.6667 17.5L12.5417 15.4333C11.7208 15.6996 10.863 15.8346 10 15.8333C5.83333 15.8333 2.5 12.85 2.5 9.16667C2.5 5.48333 5.83333 2.5 10 2.5C14.1667 2.5 17.5 5.48333 17.5 9.16667C17.4863 10.8025 16.831 12.3675 15.675 13.525Z" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M9.95801 9.16675H10.0413" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6.58301 9.16675H6.66634" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13.333 9.16675H13.4163" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {showChat && <ChatBox onClose={() => setShowChat(false)} />}
+            </div>
           </div>
         </header>
 
