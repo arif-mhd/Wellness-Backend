@@ -13,6 +13,18 @@ function parseLocalTime(isoString: string): Date {
   return new Date(clean);
 }
 
+function ageFromDob(dob?: string): number {
+  if (!dob) return 0;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return 0;
+  let age = new Date().getFullYear() - birth.getFullYear();
+  const notYetBirthdayThisYear =
+    new Date().getMonth() < birth.getMonth() ||
+    (new Date().getMonth() === birth.getMonth() && new Date().getDate() < birth.getDate());
+  if (notYetBirthdayThisYear) age--;
+  return Math.max(0, age);
+}
+
 function mapToPatient(apt: any, index: number): Patient {
   const d = parseLocalTime(apt.scheduledAt);
   const today = new Date();
@@ -48,7 +60,7 @@ function mapToPatient(apt: any, index: number): Patient {
   return {
     id: apt.id,
     name: apt.patientName ?? "Patient",
-    age: 0,
+    age: ageFromDob(apt.patientDob),
     email: apt.patientEmail ?? "",
     diagnosis: apt.reason ?? "Consultation",
     description: apt.reason ?? "",
@@ -61,6 +73,10 @@ function mapToPatient(apt: any, index: number): Patient {
     earnings: `${apt.paymentAmount ?? 250} AED`,
     preVisitForm,
     preVisitFormDate,
+    scheduledAt: apt.scheduledAt,
+    medicines: Array.isArray(apt.emr?.medicines)
+      ? apt.emr.medicines.map((m: any) => ({ name: m.name, dosage: m.dosage }))
+      : undefined,
   };
 }
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";
@@ -124,6 +140,24 @@ export default function AppointmentsPage() {
     }, 4000);
   };
 
+  const sendReminder = async (patient: Patient) => {
+    try {
+      const accessToken = await Session.getAccessToken();
+      if (!accessToken) return;
+      const res = await fetch(`${API_URL}/api/appointments/${patient.id}/remind`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        triggerToast(`Reminder sent to ${patient.name}`);
+      } else {
+        triggerToast("Failed to send reminder");
+      }
+    } catch {
+      triggerToast("Failed to send reminder");
+    }
+  };
+
   // Toggle sorting
   const handleSort = (field: "name" | "age" | "diagnosis" | "dateTime") => {
     if (sortField === field) {
@@ -159,6 +193,11 @@ export default function AppointmentsPage() {
       result = []; // New appointments are generally not past/completed
     }
 
+    // Filter by date
+    if (dateFilter === "Today") {
+      result = result.filter(appt => !appt.scheduledAt || new Date(appt.scheduledAt).toDateString() === todayStr);
+    }
+
     // Filter by inline search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -171,7 +210,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery, allAppointments]);
+  }, [activeTab, dateFilter, searchQuery, allAppointments]);
 
   // Filter & Sort All Consultations list
   const filteredAllConsultations = useMemo(() => {
@@ -182,6 +221,12 @@ export default function AppointmentsPage() {
       result = result.filter(c => c.status === "Scheduled" || c.status === "Waiting");
     } else if (activeTab === "Past") {
       result = result.filter(c => c.status === "Completed");
+    }
+
+    // Filter by date
+    if (dateFilter === "Today") {
+      const todayStr = new Date().toDateString();
+      result = result.filter(c => !c.scheduledAt || new Date(c.scheduledAt).toDateString() === todayStr);
     }
 
     // Filter by inline search
@@ -214,7 +259,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery, sortField, sortOrder, allAppointments]);
+  }, [activeTab, dateFilter, searchQuery, sortField, sortOrder, allAppointments]);
 
   return (
     <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${sidebarOpen
@@ -475,6 +520,7 @@ export default function AppointmentsPage() {
           onConsult={startConsult}
           onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
           onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+          onSendReminder={sendReminder}
           activeTab={activeTab}
         />
       </div>

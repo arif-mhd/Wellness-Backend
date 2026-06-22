@@ -8,7 +8,7 @@ import {
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication,
 } from "livekit-client";
-import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS } from "@/components/video-call/IntakePlan";
+import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import EhrPanel from "@/components/video-call/EhrPanel";
@@ -69,6 +69,7 @@ function VideoCallInner() {
   const [unread,     setUnread]     = useState(0);
 
   const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
+  const [visitInfo, setVisitInfo] = useState<VisitInfo>(EMPTY_VISIT_INFO);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
@@ -290,6 +291,7 @@ function VideoCallInner() {
           const { emr } = await emrRes.json();
           if (emr) {
             if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
+            if (emr.visitInfo) setVisitInfo({ ...EMPTY_VISIT_INFO, ...emr.visitInfo });
             setMedicines(emr.medicines ?? []);
             setLabs(emr.labs ?? []);
           } else {
@@ -370,7 +372,7 @@ function VideoCallInner() {
       const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sections: emrSections, medicines: ownMedicines, labs: ownLabs }),
+        body: JSON.stringify({ sections: emrSections, visitInfo, medicines: ownMedicines, labs: ownLabs }),
       });
       if (res.ok) {
         // Update local state with what the backend actually saved — the fully
@@ -804,8 +806,10 @@ function VideoCallInner() {
                   sections={emrSections}
                   onChange={setEmrSections}
                   openSection={expandedSection}
-                  onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                  onToggleSection={setExpandedSection}
                   patientProfile={patientProfile}
+                  visitInfo={visitInfo}
+                  onVisitInfoChange={setVisitInfo}
                 />
 
                 <div className="grid grid-cols-2 gap-4">

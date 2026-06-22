@@ -9,7 +9,7 @@ import {
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication, Participant,
 } from "livekit-client";
-import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS } from "@/components/video-call/IntakePlan";
+import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import EhrPanel from "@/components/video-call/EhrPanel";
@@ -74,12 +74,13 @@ function ConsultRoom() {
 
   // EMR
   const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
+  const [visitInfo, setVisitInfo] = useState<VisitInfo>(EMPTY_VISIT_INFO);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved,  setEmrSaved]  = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
-  const [expandedSection, setExpandedSection] = useState<string | null>("visitInformation");
+  const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
 
   // EHR panel
   const [ehrOpen, setEhrOpen] = useState(false);
@@ -368,6 +369,7 @@ function ConsultRoom() {
           const { emr } = await res.json();
           if (emr) {
             if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
+            if (emr.visitInfo) setVisitInfo({ ...EMPTY_VISIT_INFO, ...emr.visitInfo });
             setMedicines(emr.medicines ?? []);
             setLabs(emr.labs ?? []);
           }
@@ -386,7 +388,7 @@ function ConsultRoom() {
       await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
-        body: JSON.stringify({ sections: emrSections, medicines, labs }),
+        body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
       });
       setEmrSaved(true);
       setTimeout(() => setEmrSaved(false), 2500);
@@ -795,7 +797,9 @@ function ConsultRoom() {
                   sections={emrSections}
                   onChange={setEmrSections}
                   openSection={expandedSection}
-                  onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                  onToggleSection={setExpandedSection}
+                  visitInfo={visitInfo}
+                  onVisitInfoChange={setVisitInfo}
                 />
 
                 <div className="grid grid-cols-2 gap-4">

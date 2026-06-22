@@ -29,16 +29,31 @@ interface RealConsultation {
     sections?: {
       reasonForVisit?: string;
       historyOfPresentIllness?: string;
+      reviewSystem?: string;
+      healthStatus?: string;
+      histories?: string;
+      physicalExamination?: string;
+      medicalDecisionMaking?: string;
+      procedure?: string;
+      impressionAndPlan?: string;
+      professionalServices?: string;
+      // Legacy SOAP fields — kept for read-only display of older appointments
+      // saved before this format change; never written by the current UI.
       subjective?: string;
       objective?: string;
       assessment?: string;
       plan?: string;
-      // Legacy keys
-      impressionAndPlan?: string;
-      medicalDecisionMaking?: string;
     };
+    visitInfo?: {
+      visitType?: string;
+      accompaniedBy?: string;
+      sourceOfHistory?: string;
+      referralSource?: string;
+      historyLimitation?: string;
+    } | null;
     medicines?: any[];
     labs?: any[];
+    addenda?: { text: string; doctorId: string; doctorName: string; createdAt: string }[];
   } | null;
 }
 
@@ -91,6 +106,15 @@ const CheckboxIcon = ({ checked, onChange }: { checked: boolean; onChange: () =>
 
 const TABS: ProfileTab[] = ["Consultations", "Medications", "Labs", "Radiology", "Diagnostics", "Vaccinations", "Allergies", "Surgeries"];
 
+function ModalField({ label, value }: { label: string; value?: string | number | null }) {
+  if (value === undefined || value === null || value === "" || value === "N/A") return null;
+  return (
+    <div>
+      <strong className="text-[#383F45] font-medium">{label}:</strong> {value}
+    </div>
+  );
+}
+
 const DiamondIcon = ({ color }: { color: string }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
     <path d="M12 18.2885L5.71149 12L12 5.71155L18.2885 12L12 18.2885Z" fill={color} />
@@ -119,6 +143,13 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
   const [consultations, setConsultations] = useState<RealConsultation[]>([]);
   const [selectedConsultation, setSelectedConsultation] = useState<RealConsultation | null>(null);
   const [loadingConsultations, setLoadingConsultations] = useState(true);
+
+  // Freestanding clinical notes (not tied to a specific appointment)
+  const [clinicalNotes, setClinicalNotes] = useState<{ id: string; text: string; doctorId: string; doctorName: string; createdAt: string }[]>([]);
+  const [showNewNoteBox, setShowNewNoteBox] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [savingNewNote, setSavingNewNote] = useState(false);
+  const [newNoteError, setNewNoteError] = useState<string | null>(null);
 
   // Fetch all appointments for this patient (from the doctor's perspective)
   useEffect(() => {
@@ -154,7 +185,20 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             };
           });
           setConsultations(mapped);
-          if (mapped.length > 0) setSelectedConsultation(mapped[0]);
+          if (mapped.length > 0) {
+            setSelectedConsultation(mapped[0]);
+            try {
+              const ehrRes = await fetch(`${API_URL}/api/appointments/${mapped[0].id}/ehr`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (ehrRes.ok) {
+                const { clinicalNotes: notes } = await ehrRes.json();
+                setClinicalNotes(notes ?? []);
+              }
+            } catch (err) {
+              console.error("Failed to load clinical notes:", err);
+            }
+          }
 
           const allMeds: any[] = [];
           const allLabs: any[] = [];
@@ -224,6 +268,61 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
   const handleDeleteMedicine = (name: string) => {
     setPrescribedMedicines(prescribedMedicines.filter((m) => m.name !== name));
+  };
+
+  const [showAddendumBox, setShowAddendumBox] = useState(false);
+  const [addendumText, setAddendumText] = useState("");
+  const [savingAddendum, setSavingAddendum] = useState(false);
+  const [addendumError, setAddendumError] = useState<string | null>(null);
+
+  const saveAddendum = async () => {
+    if (!addendumText.trim() || !selectedConsultation) return;
+    setSavingAddendum(true);
+    setAddendumError(null);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/${selectedConsultation.id}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ addendum: addendumText.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to save addendum");
+      const { emr } = await res.json();
+      const updated = { ...selectedConsultation, emr };
+      setSelectedConsultation(updated);
+      setConsultations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      setAddendumText("");
+      setShowAddendumBox(false);
+    } catch (err) {
+      console.error("Save addendum error:", err);
+      setAddendumError("Could not save addendum. Please try again.");
+    } finally {
+      setSavingAddendum(false);
+    }
+  };
+
+  const saveNewNote = async () => {
+    if (!newNoteText.trim()) return;
+    setSavingNewNote(true);
+    setNewNoteError(null);
+    try {
+      const token = await Session.getAccessToken();
+      const res = await fetch(`${API_URL}/api/appointments/patient/${patient.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text: newNoteText.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to save note");
+      const { clinicalNotes: notes } = await res.json();
+      setClinicalNotes(notes ?? []);
+      setNewNoteText("");
+      setShowNewNoteBox(false);
+    } catch (err) {
+      console.error("Save new note error:", err);
+      setNewNoteError("Could not save note. Please try again.");
+    } finally {
+      setSavingNewNote(false);
+    }
   };
 
   return (
@@ -338,12 +437,56 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   <span>Recent</span>
                 </div>
                 <button
+                  onClick={() => setShowNewNoteBox((v) => !v)}
                   className="flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5"
                   style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
                 >
                   New Note
                 </button>
               </div>
+
+              {showNewNoteBox && (
+                <div className="flex flex-col gap-3 bg-[#F8FAFC] rounded-[12px] p-4">
+                  <textarea
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    placeholder="Add a clinical note for this patient..."
+                    rows={3}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-[12px] text-[#383F45] placeholder:text-[#9EA5AD] focus:outline-none focus:ring-2 focus:ring-[#5476FC]/30 resize-none"
+                  />
+                  {newNoteError && <span className="text-red-500 text-[11px]">{newNoteError}</span>}
+                  <div className="flex items-center gap-2 self-end">
+                    <button
+                      onClick={() => { setShowNewNoteBox(false); setNewNoteText(""); setNewNoteError(null); }}
+                      className="px-3 py-1.5 rounded-lg text-[#676E76] text-[12px] font-medium hover:bg-gray-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveNewNote}
+                      disabled={!newNoteText.trim() || savingNewNote}
+                      className="px-3 py-1.5 rounded-lg text-white text-[12px] font-medium transition-colors disabled:opacity-50"
+                      style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+                    >
+                      {savingNewNote ? "Saving..." : "Save Note"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {clinicalNotes.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[#24292E] text-[12px] font-medium">Clinical Notes</span>
+                  {clinicalNotes.slice().reverse().map((n) => (
+                    <div key={n.id} className="bg-[#F5F6FA] rounded-[12px] px-4 py-3">
+                      <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">{n.text}</p>
+                      <p className="text-[#9EA5AD] text-[11px] mt-1">
+                        Dr. {n.doctorName} &middot; {new Date(n.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Consultation rows */}
               <div className="flex flex-col gap-2">
@@ -415,12 +558,43 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   Consultation Details
                 </span>
                 <button
-                  className="flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5"
+                  onClick={() => setShowAddendumBox((v) => !v)}
+                  disabled={!selectedConsultation}
+                  className="flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 disabled:opacity-50"
                   style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
                 >
                   Add Addendum
                 </button>
               </div>
+
+              {showAddendumBox && selectedConsultation && (
+                <div className="flex flex-col gap-3 bg-[#F8FAFC] border-b border-gray-100 p-6">
+                  <textarea
+                    value={addendumText}
+                    onChange={(e) => setAddendumText(e.target.value)}
+                    placeholder="Add a follow-up note to this consultation's record..."
+                    rows={3}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-[#383F45] placeholder:text-[#9EA5AD] focus:outline-none focus:ring-2 focus:ring-[#5476FC]/30 resize-none"
+                  />
+                  {addendumError && <span className="text-red-500 text-[12px]">{addendumError}</span>}
+                  <div className="flex items-center gap-3 self-end">
+                    <button
+                      onClick={() => { setShowAddendumBox(false); setAddendumText(""); setAddendumError(null); }}
+                      className="px-4 py-2 rounded-xl text-[#676E76] text-[13px] font-medium hover:bg-gray-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveAddendum}
+                      disabled={!addendumText.trim() || savingAddendum}
+                      className="px-4 py-2 rounded-xl text-white text-[13px] font-medium transition-colors disabled:opacity-50"
+                      style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+                    >
+                      {savingAddendum ? "Saving..." : "Save Addendum"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Scrollable content */}
               {!selectedConsultation ? (
@@ -444,6 +618,57 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
                   {/* Sub-column 1: Reason for Visit + HPI + Medicines + Labs */}
                   <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
+
+                    {/* Patient Information */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                        <span>Patient Information</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[12px] pl-5 leading-[1.6]">
+                        <ModalField label="Name" value={patient.name} />
+                        <ModalField label="Date of Birth" value={patient.dob && !isNaN(new Date(patient.dob).getTime()) ? new Date(patient.dob).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : null} />
+                        <ModalField label="Gender" value={patient.gender} />
+                        <ModalField label="Blood Group" value={patient.bloodGroup} />
+                        <ModalField label="Email" value={patient.email} />
+                      </div>
+                    </div>
+
+                    <div className="w-full h-px bg-[#EBEEF5]" />
+
+                    {/* Provider Information */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
+                        <span>Provider Information</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[12px] pl-5 leading-[1.6]">
+                        <ModalField label="Provider Name" value={selectedConsultation.doctor} />
+                        <ModalField label="Date of Encounter" value={selectedConsultation.date} />
+                      </div>
+                    </div>
+
+                    <div className="w-full h-px bg-[#EBEEF5]" />
+
+                    {/* Visit Information */}
+                    {selectedConsultation.emr.visitInfo && (selectedConsultation.emr.visitInfo.visitType || selectedConsultation.emr.visitInfo.accompaniedBy || selectedConsultation.emr.visitInfo.sourceOfHistory || selectedConsultation.emr.visitInfo.referralSource || selectedConsultation.emr.visitInfo.historyLimitation) && (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                            <span>Visit Information</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[12px] pl-5 leading-[1.6]">
+                            <ModalField label="Visit Type" value={selectedConsultation.emr.visitInfo.visitType} />
+                            <ModalField label="Accompanied By" value={selectedConsultation.emr.visitInfo.accompaniedBy} />
+                            <ModalField label="Source of History" value={selectedConsultation.emr.visitInfo.sourceOfHistory} />
+                            <ModalField label="Referral Source" value={selectedConsultation.emr.visitInfo.referralSource} />
+                            <ModalField label="History Limitation" value={selectedConsultation.emr.visitInfo.historyLimitation} />
+                          </div>
+                        </div>
+                        <div className="w-full h-px bg-[#EBEEF5]" />
+                      </>
+                    )}
 
                     {/* Reason for Visit */}
                     {(selectedConsultation.emr.sections?.reasonForVisit || selectedConsultation.reason) && (
@@ -555,13 +780,22 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                     )}
                   </div>
 
-                  {/* Sub-column 2: SOAP notes */}
+                  {/* Sub-column 2: Clinical notes */}
                   <div className="flex-1 flex flex-col gap-6 bg-white rounded-[12px] p-6 border border-white">
                     {(([
+                      { label: "Review System",           color: "#8AA0FF", text: selectedConsultation.emr.sections?.reviewSystem },
+                      { label: "Health Status",           color: "#3CB3DA", text: selectedConsultation.emr.sections?.healthStatus },
+                      { label: "Histories",                color: "#8AA0FF", text: selectedConsultation.emr.sections?.histories },
+                      { label: "Physical Examination",    color: "#3CB3DA", text: selectedConsultation.emr.sections?.physicalExamination },
+                      { label: "Medical Decision Making", color: "#8AA0FF", text: selectedConsultation.emr.sections?.medicalDecisionMaking },
+                      { label: "Procedure",               color: "#3CB3DA", text: selectedConsultation.emr.sections?.procedure },
+                      { label: "Impression and Plan",     color: "#8AA0FF", text: selectedConsultation.emr.sections?.impressionAndPlan },
+                      { label: "Professional Services",   color: "#3CB3DA", text: selectedConsultation.emr.sections?.professionalServices },
+                      // Legacy SOAP fields from older appointments saved before this format change
                       { label: "Subjective",  color: "#8AA0FF", text: selectedConsultation.emr.sections?.subjective },
                       { label: "Objective",   color: "#3CB3DA", text: selectedConsultation.emr.sections?.objective },
                       { label: "Assessment",  color: "#8AA0FF", text: selectedConsultation.emr.sections?.assessment },
-                      { label: "Plan",        color: "#3CB3DA", text: selectedConsultation.emr.sections?.plan ?? selectedConsultation.emr.sections?.impressionAndPlan },
+                      { label: "Plan",        color: "#3CB3DA", text: selectedConsultation.emr.sections?.plan },
                     ] as { label: string; color: string; text?: string }[])
                       .filter((s) => s.text && s.text.trim())
                       .map((section, i, arr) => (
@@ -581,14 +815,40 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                         </React.Fragment>
                       ))
                     )}
-                    {!selectedConsultation.emr.sections?.subjective &&
+                    {!selectedConsultation.emr.sections?.reviewSystem &&
+                      !selectedConsultation.emr.sections?.healthStatus &&
+                      !selectedConsultation.emr.sections?.histories &&
+                      !selectedConsultation.emr.sections?.physicalExamination &&
+                      !selectedConsultation.emr.sections?.medicalDecisionMaking &&
+                      !selectedConsultation.emr.sections?.procedure &&
+                      !selectedConsultation.emr.sections?.impressionAndPlan &&
+                      !selectedConsultation.emr.sections?.professionalServices &&
+                      !selectedConsultation.emr.sections?.subjective &&
                       !selectedConsultation.emr.sections?.objective &&
                       !selectedConsultation.emr.sections?.assessment &&
-                      !selectedConsultation.emr.sections?.plan &&
-                      !selectedConsultation.emr.sections?.impressionAndPlan && (
+                      !selectedConsultation.emr.sections?.plan && (
                       <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <p className="text-[#9EA5AD] text-[12px] text-center">No SOAP notes recorded for this consultation.</p>
+                        <p className="text-[#9EA5AD] text-[12px] text-center">No clinical notes recorded for this consultation.</p>
                       </div>
+                    )}
+
+                    {selectedConsultation.emr.addenda && selectedConsultation.emr.addenda.length > 0 && (
+                      <>
+                        <div className="w-full h-px bg-[#EBEEF5]" />
+                        <div className="flex flex-col gap-3">
+                          <span className="text-[#24292E] text-[14px] font-medium leading-[1.2] tracking-[-0.28px]">
+                            Addenda
+                          </span>
+                          {selectedConsultation.emr.addenda.map((a, i) => (
+                            <div key={i} className="bg-[#F5F6FA] rounded-[12px] px-4 py-3">
+                              <p className="text-[#676E76] text-[12px] leading-[1.6] whitespace-pre-line">{a.text}</p>
+                              <p className="text-[#9EA5AD] text-[11px] mt-1">
+                                Dr. {a.doctorName} &middot; {new Date(a.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
 

@@ -29,7 +29,9 @@ interface PatientRow {
   name: string;
   avatar: string;
   tags: string[];
-  time: string;
+  status: string;
+  scheduledAt: string;
+  updatedAt: string;
 }
 
 const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -45,13 +47,37 @@ function parseLocalTime(isoString: string): Date {
   return new Date(clean);
 }
 
-function timeUntil(iso: string) {
-  const diff = parseLocalTime(iso).getTime() - Date.now();
-  if (diff <= 0) return "Now";
-  const mins = Math.round(diff / 60000);
-  if (mins < 60) return `Consultation in ${mins} min`;
+// Formats a duration in minutes as "Xh Ym" / "Xm", always showing at least
+// the minutes so a fresh event reads "0m" rather than nothing.
+function formatDuration(totalMins: number) {
+  const mins = Math.max(0, Math.round(totalMins));
+  if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
-  return `Consultation in ${hrs}h ${mins % 60}m`;
+  return `${hrs}h ${mins % 60}m`;
+}
+
+// Real-time, status-aware label for an appointment row:
+//   - completed  -> "Completed Xh Ym ago" (from updatedAt, i.e. when it was
+//                   actually marked complete, not the original schedule time)
+//   - scheduled, time still ahead -> "Consultation in Xh Ym"
+//   - scheduled, time has passed but not started/completed -> "Xh Ym overdue"
+//   - in_progress -> "In progress"
+function appointmentTimeLabel(scheduledAt: string, status: string, updatedAt?: string) {
+  if (status === "completed") {
+    // updatedAt is set server-side with new Date().toISOString() — genuine,
+    // correctly-suffixed UTC. Parse it directly; parseLocalTime's Z-stripping
+    // workaround is only for scheduledAt (which the patient app mislabels as
+    // UTC when it's really local time) and would corrupt this by ~the user's
+    // UTC offset if applied here.
+    const updated = updatedAt ? new Date(updatedAt) : parseLocalTime(scheduledAt);
+    const ago = (Date.now() - updated.getTime()) / 60000;
+    return ago < 1 ? "Completed just now" : `Completed ${formatDuration(ago)} ago`;
+  }
+  if (status === "in_progress") return "In progress";
+
+  const diffMins = (parseLocalTime(scheduledAt).getTime() - Date.now()) / 60000;
+  if (diffMins > 0) return `Consultation in ${formatDuration(diffMins)}`;
+  return `${formatDuration(-diffMins)} overdue`;
 }
 
 function pctChange(today: number, yesterday: number): { value: number; direction: "up" | "down" | "none" } {
@@ -73,6 +99,13 @@ export default function DashboardPage() {
   // Appointments
   const [patients, setPatients]               = useState<PatientRow[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  // Ticks every 30s so relative-time labels ("Consultation in 4m", "Completed
+  // 2m ago") stay accurate without needing a full data refetch.
+  const [, setTimeTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTimeTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const [totalAppointments, setTotalAppointments] = useState(0);
   const [todayCount, setTodayCount]           = useState(0);
   const [consultationChange, setConsultationChange] = useState<{ value: number; direction: "up" | "down" | "none" } | null>(null);
@@ -163,26 +196,29 @@ export default function DashboardPage() {
 
         const todays    = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), today) && a.status !== "cancelled");
         const yesterdays = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), yesterday) && a.status !== "cancelled");
-        const inProgress = all.filter(a => a.status === "in_progress");
+        // Patients who have signalled they're actually present in the
+        // waiting room, not just whoever the doctor last connected to.
+        const waitingNow = all.filter(a => a.patientWaitingSince && a.status !== "completed" && a.status !== "cancelled");
 
         setTotalAppointments(all.length);
         setTodayCount(todays.length);
         setConsultationChange(pctChange(todays.length, yesterdays.length));
 
-        // Waiting room: patients currently in_progress
-        setWaitingCount(inProgress.length);
+        setWaitingCount(waitingNow.length);
         setWaitingAvatars(
-          inProgress.slice(0, 3).map((a: any) =>
+          waitingNow.slice(0, 3).map((a: any) =>
             a.patientAvatarUrl || "/default-avatar.svg"
           )
         );
 
         const rows: PatientRow[] = todays.map((a: any) => ({
-          id:     a.id,
-          name:   a.patientName ?? "Patient",
-          avatar: a.patientAvatarUrl || "/default-avatar.svg",
-          tags:   [a.reason ?? "Consultation"],
-          time:   timeUntil(a.scheduledAt),
+          id:          a.id,
+          name:        a.patientName ?? "Patient",
+          avatar:      a.patientAvatarUrl || "/default-avatar.svg",
+          tags:        [a.reason ?? "Consultation"],
+          status:      a.status,
+          scheduledAt: a.scheduledAt,
+          updatedAt:   a.updatedAt ?? a.scheduledAt,
         }));
         setPatients(rows);
         if (rows.length > 0) setSelectedPatientId(rows[0].id);
@@ -568,21 +604,25 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-6 mt-3 sm:mt-0">
                         <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {p.time}
+                          {appointmentTimeLabel(p.scheduledAt, p.status, p.updatedAt)}
                         </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (p.status === "completed") return;
                             router.push(`/appointments/consult?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
                           }}
+                          disabled={p.status === "completed"}
                           className={`h-[32px] px-[13px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all ${
-                            isSelected
+                            p.status === "completed"
+                              ? "bg-gray-100 text-[#A0A8B0] border border-gray-150 cursor-not-allowed"
+                              : isSelected
                               ? "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
                               : "bg-white text-[#24292E] border border-gray-150 hover:bg-gray-50"
                           }`}
                           style={{ fontFamily: "Outfit, sans-serif" }}
                         >
-                          Consult Now
+                          {p.status === "completed" ? "Completed" : "Consult Now"}
                         </button>
                       </div>
                     </div>
