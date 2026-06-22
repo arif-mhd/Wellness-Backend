@@ -33,6 +33,7 @@ import feedbackRouter from "./routes/feedback";
 import notificationsRouter from "./routes/notifications";
 import adminActivityLogRouter from "./routes/adminActivityLog";
 import adminDashboardRouter from "./routes/adminDashboard";
+import messagesRouter from "./routes/messages";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -106,6 +107,7 @@ app.use("/api/feedback",       feedbackRouter);
 app.use("/api/notifications",  notificationsRouter);
 app.use("/api/admin/activity-logs", adminActivityLogRouter);
 app.use("/api/admin/dashboard", adminDashboardRouter);
+app.use("/api/messages", messagesRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
