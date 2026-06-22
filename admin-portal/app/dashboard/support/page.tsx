@@ -398,7 +398,7 @@ function SupportPageInner() {
                 <button
                   onClick={handleSendReply}
                   disabled={savingReply || !replyText.trim()}
-                  className="w-full py-3 mt-2 bg-[#6A8BFF] hover:bg-[#5a7aff] disabled:opacity-50 text-white rounded-[1rem] text-[13px] font-bold transition duration-200"
+                  className="w-full py-3 mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-50 text-white rounded-[1rem] text-[13px] font-bold transition duration-200"
                 >
                   {savingReply ? "Sending..." : "Send Reply"}
                 </button>

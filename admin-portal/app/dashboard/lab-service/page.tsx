@@ -31,7 +31,7 @@ const mockLabServices: LabService[] = [
     id: 1,
     name: "LifeCare Diagnostics",
     email: "admin@lifecare.com",
-    avatar: "/doctor-avatar.png",
+    avatar: "",
     totalTests: 3820,
     testsCompleted: 3654,
     rating: 5,
@@ -51,7 +51,7 @@ const mockLabServices: LabService[] = [
     id: 2,
     name: "MedScan Labs",
     email: "info@medscan.com",
-    avatar: "/doctor-avatar.png",
+    avatar: "",
     totalTests: 2100,
     testsCompleted: 1877,
     rating: 4,
@@ -71,7 +71,7 @@ const mockLabServices: LabService[] = [
     id: 3,
     name: "PrimeLab Testing",
     email: "contact@primelab.ae",
-    avatar: "/doctor-avatar.png",
+    avatar: "",
     totalTests: 5200,
     testsCompleted: 5010,
     rating: 5,
@@ -91,7 +91,7 @@ const mockLabServices: LabService[] = [
     id: 4,
     name: "QuickDiagnose Center",
     email: "hello@quickdiagnose.ae",
-    avatar: "/doctor-avatar.png",
+    avatar: "",
     totalTests: 890,
     testsCompleted: 542,
     rating: 3,
@@ -111,7 +111,7 @@ const mockLabServices: LabService[] = [
     id: 5,
     name: "BioPrecision Labs",
     email: "labs@bioprecision.ae",
-    avatar: "/doctor-avatar.png",
+    avatar: "",
     totalTests: 4100,
     testsCompleted: 3988,
     rating: 5,
@@ -155,13 +155,33 @@ const StarRating = ({ rating }: { rating: number }) => (
   </div>
 );
 
+function Avatar({ lab, size = "md" }: { lab: LabService; size?: "sm" | "md" | "lg" | "xl" }) {
+  const sz = size === "sm" ? "w-9 h-9 text-sm" : size === "lg" ? "w-14 h-14 text-xl" : size === "xl" ? "w-[3.5rem] h-[3.5rem] text-xl" : "w-10 h-10 text-sm";
+  const name = lab.name || "?";
+  const imageUrl = lab.avatar;
+  return (
+    <div className={`relative shrink-0`}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} className={`${sz} rounded-full object-cover border border-slate-100 shadow-sm`} />
+      ) : (
+        <div className={`${sz} rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-medium shadow-sm`}>
+          {name[0].toUpperCase()}
+        </div>
+      )}
+      {lab.isVerified && (
+        <div className={`absolute top-0 right-0 bg-teal-400 ${size === "xl" ? "w-3 h-3 border-2 -translate-y-1 translate-x-1" : size === "lg" ? "w-3.5 h-3.5 border-[2.5px] translate-x-0.5 -translate-y-0.5" : "w-2.5 h-2.5 border-2"} rounded-full border-white`}></div>
+      )}
+    </div>
+  );
+}
+
 export default function ManageLabServicePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"onboard" | "queue">("onboard");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
   const [selectedLabId, setSelectedLabId] = useState<number | null>(1);
-  const [search, setSearch]         = useState("");
+  const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const selectedLab = mockLabServices.find((l) => l.id === selectedLabId);
 
@@ -190,12 +210,12 @@ export default function ManageLabServicePage() {
           <div className={`${selectedLab ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
             {/* Top Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">
                 Manage Lab Services
               </h1>
               <button
                 onClick={() => router.push("/dashboard/lab-service/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -209,21 +229,19 @@ export default function ManageLabServicePage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setActiveTab("onboard")}
-                  className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
-                    activeTab === "onboard"
+                  className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${activeTab === "onboard"
                       ? "bg-[#1E293B] text-white"
                       : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
-                  }`}
+                    }`}
                 >
                   Labs Onboard
                 </button>
                 <button
                   onClick={() => setActiveTab("queue")}
-                  className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
-                    activeTab === "queue"
+                  className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${activeTab === "queue"
                       ? "bg-[#1E293B] text-white"
                       : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
-                  }`}
+                    }`}
                 >
                   Onboarding Queue
                 </button>
@@ -251,7 +269,7 @@ export default function ManageLabServicePage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                   Today
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -261,7 +279,7 @@ export default function ManageLabServicePage() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-4">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name
@@ -288,8 +306,8 @@ export default function ManageLabServicePage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                      <th className="pb-4 pt-1 font-bold pl-2">
+                    <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
+                      <th className="pb-4 pt-1 font-semibold pl-2">
                         <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                           Name <DoubleCaret />
                         </div>
@@ -297,24 +315,24 @@ export default function ManageLabServicePage() {
 
                       {activeTab === "onboard" ? (
                         <>
-                          <th className="pb-4 pt-1 font-bold">
+                          <th className="pb-4 pt-1 font-semibold">
                             <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                               Total Tests <DoubleCaret />
                             </div>
                           </th>
-                          <th className="pb-4 pt-1 font-bold">
+                          <th className="pb-4 pt-1 font-semibold">
                             <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                               Tests Completed <DoubleCaret />
                             </div>
                           </th>
-                          <th className="pb-4 pt-1 font-bold">
+                          <th className="pb-4 pt-1 font-semibold">
                             <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                               Ratings <DoubleCaret />
                             </div>
                           </th>
                         </>
                       ) : (
-                        <th className="pb-4 pt-1 font-bold">
+                        <th className="pb-4 pt-1 font-semibold">
                           <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                             Date Joined <DoubleCaret />
                           </div>
@@ -331,22 +349,16 @@ export default function ManageLabServicePage() {
                         <tr
                           key={lab.id}
                           onClick={() => setSelectedLabId(lab.id)}
-                          className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
-                            isSelected
+                          className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${isSelected
                               ? "bg-[#f8fafd] rounded-[1.5rem]"
                               : "hover:bg-slate-50/50"
-                          }`}
+                            }`}
                         >
                           <td className="py-4 px-3 flex items-center gap-3">
-                            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                              <img src={lab.avatar} alt={lab.name} className="w-full h-full object-cover" />
-                              {lab.isVerified && (
-                                <div className="absolute top-0 right-0 bg-teal-400 w-2.5 h-2.5 rounded-full border border-white" />
-                              )}
-                            </div>
+                            <Avatar lab={lab} size="md" />
                             <div className="min-w-0 flex flex-col justify-center">
                               <div className="flex items-center gap-1.5">
-                                <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
+                                <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
                                   {lab.name}
                                 </p>
                                 {lab.isVerified && (
@@ -380,11 +392,11 @@ export default function ManageLabServicePage() {
                           {activeTab === "queue" && (
                             <td className="py-4 pr-4 text-right">
                               {lab.status === "pending_onboarding" ? (
-                                <button className="bg-[#6A8BFF] text-white text-[11px] font-bold px-6 py-2 rounded-full shadow-md shadow-blue-200/50 hover:-translate-y-0.5 transition active:translate-y-0">
+                                <button className="bg-[#6A8BFF] text-white text-[11px] font-semibold px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 transition active:translate-y-0">
                                   Complete Onboarding
                                 </button>
                               ) : (
-                                <button className="bg-[#E5EDFF] text-[#6A8BFF] text-[11px] font-bold px-8 py-2 rounded-full hover:-translate-y-0.5 transition active:translate-y-0">
+                                <button className="bg-[#E5EDFF] text-[#6A8BFF] text-[11px] font-semibold px-8 py-2 rounded-full hover:-translate-y-0.5 transition active:translate-y-0">
                                   Verify
                                 </button>
                               )}
@@ -398,13 +410,13 @@ export default function ManageLabServicePage() {
               </div>
 
               {/* Pagination Controls */}
-                            {/* Pagination Controls */}
+              {/* Pagination Controls */}
               <div className="mt-6 border-t border-slate-50 pt-5">
                 {displayedLabs.length > 0 && (
-                  <Pagination 
-                    currentPage={currentPage} 
-                    totalPages={Math.ceil(displayedLabs.length / itemsPerPage)} 
-                    onPageChange={setCurrentPage} 
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(displayedLabs.length / itemsPerPage)}
+                    onPageChange={setCurrentPage}
                   />
                 )}
               </div>
@@ -416,7 +428,7 @@ export default function ManageLabServicePage() {
             <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Lab Details</h2>
+                <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Lab Details</h2>
                 <button
                   onClick={() => setSelectedLabId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -430,26 +442,21 @@ export default function ManageLabServicePage() {
 
               {/* Profile Header */}
               <div className="mb-6 mt-2 flex items-center gap-4">
-                <div className="relative w-[3.5rem] h-[3.5rem] rounded-xl overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                  <img src={selectedLab.avatar} alt={selectedLab.name} className="w-full h-full object-cover p-1" />
-                  {selectedLab.isVerified && (
-                    <div className="absolute top-0 right-0 bg-teal-400 w-3 h-3 rounded-full border-2 border-white -translate-y-1 translate-x-1" />
-                  )}
-                </div>
+                <Avatar lab={selectedLab} size="xl" />
                 <div>
-                  <h3 className="text-[14px] font-black text-slate-800">{selectedLab.name}</h3>
+                  <h3 className="text-[14px] font-semibold text-slate-800">{selectedLab.name}</h3>
                   <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedLab.email}</p>
                 </div>
               </div>
 
               {/* Specializations */}
               <div className="mb-6">
-                <p className="text-[11px] font-bold text-slate-400 mb-2">Specializations</p>
+                <p className="text-[11px] font-semibold text-slate-400 mb-2">Specializations</p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedLab.specializations.map((spec) => (
                     <span
                       key={spec}
-                      className="px-2.5 py-1 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-bold rounded-full"
+                      className="px-2.5 py-1 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-semibold rounded-full"
                     >
                       {spec}
                     </span>
@@ -470,8 +477,8 @@ export default function ManageLabServicePage() {
                   { label: "Email ID", value: selectedLab.email },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-bold w-1/2 shrink-0">{label}</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{value}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold w-1/2 shrink-0">{label}</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{value}</span>
                   </div>
                 ))}
               </div>
@@ -479,7 +486,7 @@ export default function ManageLabServicePage() {
               {/* Action Button */}
               <button
                 onClick={() => router.push(`/dashboard/lab-service/${selectedLab.id}`)}
-                className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
               >
                 View Detailed Profile
               </button>

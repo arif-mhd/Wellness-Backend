@@ -483,7 +483,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <button
                       onClick={handleVerifySlots}
                       disabled={verifying}
-                      className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white px-6 py-2.5 rounded-full text-[11px] font-bold shadow-md shadow-blue-200/50 transition active:scale-95 disabled:opacity-50"
+                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-6 py-2.5 rounded-xl text-[11px] font-bold shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition active:scale-95 disabled:opacity-50"
                     >
                       {verifying ? "Verifying..." : "Verify Now"}
                     </button>

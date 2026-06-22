@@ -59,7 +59,7 @@ function FieldPreview({ field, onUpdate }: { field: FormField; onUpdate: (u: Par
   const base = "w-full bg-[#f8fafd] rounded-xl px-4 py-3 text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/40 transition border border-slate-100";
   switch (field.type) {
     case 'heading':
-      return <input value={field.label} onChange={e => onUpdate({ label: e.target.value })} className="text-[18px] font-black text-slate-800 bg-transparent border-b-2 border-[#6A8BFF]/30 focus:outline-none focus:border-[#6A8BFF] w-full pb-1 transition" placeholder="Section Heading" />;
+      return <input value={field.label} onChange={e => onUpdate({ label: e.target.value })} className="text-[18px] font-medium text-slate-800 bg-transparent border-b-2 border-[#6A8BFF]/30 focus:outline-none focus:border-[#6A8BFF] w-full pb-1 transition" placeholder="Section Heading" />;
     case 'date': return <input type="date" className={base} />;
     case 'time': return <input type="time" className={base} />;
     case 'number': return <input type="number" placeholder={field.placeholder} className={base} />;
@@ -113,14 +113,14 @@ function FieldPreview({ field, onUpdate }: { field: FormField; onUpdate: (u: Par
       return (
         <div className="border-2 border-dashed border-[#c7d5ff] bg-[#f4f7ff] rounded-xl p-6 flex flex-col items-center gap-2 text-[#6A8BFF] cursor-pointer hover:bg-[#edf1ff] transition">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          <span className="text-[12px] font-bold">Click to take / upload photo</span>
+          <span className="text-[12px] font-semibold">Click to take / upload photo</span>
         </div>
       );
     case 'signature':
       return (
         <div className="border-2 border-dashed border-[#c7d5ff] bg-[#f4f7ff] rounded-xl p-6 flex flex-col items-center gap-2 text-[#6A8BFF] cursor-pointer hover:bg-[#edf1ff] transition">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-          <span className="text-[12px] font-bold">Click to add signature</span>
+          <span className="text-[12px] font-semibold">Click to add signature</span>
         </div>
       );
     default:
@@ -186,13 +186,13 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
           <button onClick={() => router.push('/dashboard/forms')} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 transition shadow-sm border border-slate-100">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7"/></svg>
           </button>
-          <input value={formTitle} onChange={e => setFormTitle(e.target.value)} className="text-[24px] font-black text-[#1e293b] tracking-tight bg-transparent focus:outline-none border-b-2 border-transparent focus:border-[#6A8BFF]/30 transition" />
+          <input value={formTitle} onChange={e => setFormTitle(e.target.value)} className="text-[24px] font-medium text-[#1e293b] tracking-tight bg-transparent focus:outline-none border-b-2 border-transparent focus:border-[#6A8BFF]/30 transition" />
         </div>
 
         <div className="flex gap-7 items-start min-h-[800px]">
           {/* Elements Sidebar */}
           <div className="w-[260px] bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-50 flex-shrink-0 sticky top-4">
-            <h2 className="text-[14px] font-black text-slate-800 mb-4">Form elements</h2>
+            <h2 className="text-[14px] font-medium text-slate-800 mb-4">Form elements</h2>
             <div className="space-y-0.5 overflow-y-auto max-h-[700px]">
               {ELEMENT_TYPES.map(el => (
                 <div key={el.type} onClick={() => addField(el.type)} className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-[#f0f4ff] text-slate-600 hover:text-[#6A8BFF] transition-colors">
@@ -206,7 +206,7 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
           {/* Canvas */}
           <div className="flex-1 bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50 flex flex-col min-h-[800px]">
             <div className="mb-8">
-              <input value={formTitle} onChange={e => setFormTitle(e.target.value)} className="w-full bg-[#f8fafd] border-none rounded-2xl px-6 py-4 text-[15px] font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/50 transition" />
+              <input value={formTitle} onChange={e => setFormTitle(e.target.value)} className="w-full bg-[#f8fafd] border-none rounded-2xl px-6 py-4 text-[15px] font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/50 transition" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -220,9 +220,9 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
                     {field.type !== 'heading' && (
                       <div className="flex items-center gap-1.5 mb-2">
                         <input value={field.label} onClick={e => e.stopPropagation()} onChange={e => updateField(field.id, { label: e.target.value })}
-                          className="text-[11.5px] font-bold text-slate-800 bg-transparent focus:outline-none focus:border-b focus:border-[#6A8BFF] w-full"
+                          className="text-[11.5px] font-semibold text-slate-800 bg-transparent focus:outline-none focus:border-b focus:border-[#6A8BFF] w-full"
                         />
-                        {field.required && <span className="text-red-500 text-[11px] font-black shrink-0">*</span>}
+                        {field.required && <span className="text-red-500 text-[11px] font-medium shrink-0">*</span>}
                       </div>
                     )}
                     {field.subLabel && <p className="text-[10px] text-slate-400 -mt-1 mb-2 px-0.5">{field.subLabel}</p>}
@@ -243,21 +243,21 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
             </div>
 
             <div className="mt-8 border-t border-slate-100 pt-6">
-              <button className="w-full py-3.5 border-2 border-dashed border-[#dce5fe] text-[#6A8BFF] text-[13px] font-bold rounded-2xl hover:bg-[#f4f7ff] transition">
+              <button className="w-full py-3.5 border-2 border-dashed border-[#dce5fe] text-[#6A8BFF] text-[13px] font-semibold rounded-2xl hover:bg-[#f4f7ff] transition">
                 + Add New Page
               </button>
             </div>
 
             <div className="mt-6 flex items-center gap-5 border-t border-slate-50 pt-6">
-              <button onClick={() => router.push('/dashboard/forms')} className="flex-1 py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] text-[13px] font-bold rounded-2xl transition">Cancel</button>
-              <button onClick={() => router.push('/dashboard/forms')} className="flex-1 py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold rounded-2xl transition shadow-md shadow-blue-200/50">Save Changes</button>
+              <button onClick={() => router.push('/dashboard/forms')} className="flex-1 py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] text-[13px] font-semibold rounded-2xl transition">Cancel</button>
+              <button onClick={() => router.push('/dashboard/forms')} className="flex-1 py-3.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold rounded-xl transition shadow-[0_4px_10px_rgba(84,118,252,0.2)]">Save Changes</button>
             </div>
           </div>
 
           {/* Properties Panel */}
           <div className="w-[310px] bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 flex-shrink-0 sticky top-4">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[15px] font-black text-slate-800">Properties</h2>
+              <h2 className="text-[15px] font-medium text-slate-800">Properties</h2>
               <button onClick={() => setActiveId(null)} className="w-6 h-6 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 transition border border-slate-100">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
@@ -267,7 +267,7 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
               <>
                 <div className="flex gap-1.5 mb-6">
                   {(['General', 'AllOptions', 'Advanced'] as const).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-colors ${activeTab === tab ? 'bg-[#1E293B] text-white' : 'bg-[#f1f5f9] text-slate-500 hover:text-slate-800'}`}>
+                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-semibold transition-colors ${activeTab === tab ? 'bg-[#1E293B] text-white' : 'bg-[#f1f5f9] text-slate-500 hover:text-slate-800'}`}>
                       {tab === 'AllOptions' ? 'All Options' : tab}
                     </button>
                   ))}
@@ -276,34 +276,34 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
                 <div className="space-y-5">
                   {active.type !== 'heading' && (
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Field Label</label>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">Field Label</label>
                       <input value={active.label} onChange={e => updateActive({ label: e.target.value })} className="w-full bg-[#f8fafd] rounded-xl px-4 py-3 text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 border border-slate-100" />
                     </div>
                   )}
                   {!['radio', 'checkbox', 'dropdown', 'photo', 'signature', 'date', 'time', 'appointment', 'heading'].includes(active.type) && (
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Placeholder</label>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">Placeholder</label>
                       <input value={active.placeholder} onChange={e => updateActive({ placeholder: e.target.value })} className="w-full bg-[#f8fafd] rounded-xl px-4 py-3 text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 border border-slate-100" />
                     </div>
                   )}
                   {active.type !== 'heading' && (
                     <>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Label alignment</label>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">Label alignment</label>
                         <div className="flex gap-2">
                           {['RIGHT', 'LEFT', 'TOP'].map(align => (
-                            <button key={align} className={`flex-1 py-1.5 rounded-full text-[11px] font-bold transition ${align === 'RIGHT' ? 'bg-[#6A8BFF] text-white' : 'bg-[#f1f5f9] text-slate-500 hover:bg-[#e2e8f0]'}`}>{align}</button>
+                            <button key={align} className={`flex-1 py-1.5 rounded-full text-[11px] font-semibold transition ${align === 'RIGHT' ? 'bg-[#6A8BFF] text-white' : 'bg-[#f1f5f9] text-slate-500 hover:bg-[#e2e8f0]'}`}>{align}</button>
                           ))}
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700">Required</label>
+                        <label className="text-[11px] font-semibold text-slate-700">Required</label>
                         <div onClick={() => updateActive({ required: !active.required })} className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${active.required ? 'bg-[#6A8BFF]' : 'bg-slate-300'}`}>
                           <div className={`absolute top-[2.5px] w-3.5 h-3.5 bg-white rounded-full shadow transition-all ${active.required ? 'left-5' : 'left-0.5'}`}></div>
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Sub-label</label>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">Sub-label</label>
                         <input value={active.subLabel} onChange={e => updateActive({ subLabel: e.target.value })} placeholder="Short description below field" className="w-full bg-[#f8fafd] rounded-xl px-4 py-3 text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 border border-slate-100" />
                       </div>
                     </>
@@ -311,13 +311,13 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
                   {['radio', 'checkbox', 'dropdown'].includes(active.type) && (
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-[11px] font-bold text-slate-700">Options</label>
-                        <button onClick={addOption} className="text-[11px] text-[#6A8BFF] font-bold hover:underline">+ Add</button>
+                        <label className="text-[11px] font-semibold text-slate-700">Options</label>
+                        <button onClick={addOption} className="text-[11px] text-[#6A8BFF] font-semibold hover:underline">+ Add</button>
                       </div>
                       <div className="space-y-2">
                         {active.options.map((opt, idx) => (
                           <div key={opt.id} className="flex items-center gap-2">
-                            <span className="text-[11px] text-slate-400 font-bold w-4">{idx + 1}.</span>
+                            <span className="text-[11px] text-slate-400 font-semibold w-4">{idx + 1}.</span>
                             <input value={opt.value} onChange={e => updateOption(opt.id, e.target.value)} className="flex-1 bg-[#f8fafd] rounded-lg px-3 py-2 text-[12px] font-medium text-slate-700 focus:outline-none border border-slate-100 focus:ring-1 focus:ring-[#6A8BFF]/30" />
                             <button onClick={() => removeOption(opt.id)} className="text-slate-300 hover:text-red-400 transition">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -328,8 +328,8 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
                     </div>
                   )}
                   <div className="pt-4 border-t border-slate-100">
-                    <label className="block text-[11px] font-bold text-slate-700 mb-2">Duplicate field</label>
-                    <button onClick={duplicateField} className="px-5 py-2 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold rounded-full shadow-md shadow-blue-200/50 transition active:scale-95">
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-2">Duplicate field</label>
+                    <button onClick={duplicateField} className="px-5 py-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-semibold rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition active:scale-95">
                       Duplicate field
                     </button>
                     <p className="text-[10px] text-slate-400 mt-1.5">Duplicate with all saved settings</p>
@@ -339,7 +339,7 @@ export default function EditFormPage({ params }: { params: Promise<{ id: string 
             ) : (
               <div className="text-center text-slate-400 text-[13px] mt-12 space-y-2">
                 <svg className="w-10 h-10 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
-                <p className="font-bold">Select a field to edit its properties</p>
+                <p className="font-semibold">Select a field to edit its properties</p>
               </div>
             )}
           </div>

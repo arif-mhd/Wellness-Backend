@@ -360,7 +360,7 @@ export default function SettingsPage() {
                             <div className="col-span-12 mt-2">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setExpandedSpecialization(null); }}
-                                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold px-7 py-2.5 rounded-full shadow-md shadow-blue-200/50 transition-all active:scale-95"
+                                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-7 py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95"
                               >
                                 Save Changes
                               </button>
@@ -813,7 +813,7 @@ export default function SettingsPage() {
               <button className="flex-1 max-w-xs bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#1e293b] text-[13px] font-bold py-4 rounded-[1rem] transition-colors active:scale-[0.98]">
                 Cancel
               </button>
-              <button className="flex-1 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold py-4 rounded-[1rem] shadow-md shadow-blue-200/50 transition-all active:scale-[0.98]">
+              <button className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-bold py-4 rounded-[1rem] shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-[0.98]">
                 Save Changes
               </button>
             </div>

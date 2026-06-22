@@ -55,14 +55,14 @@ const STATUS_CONFIG = {
 const DetailRow = ({
   label,
   value,
-  valueClass = "text-[11px] text-slate-800 font-bold text-right",
+  valueClass = "text-[11px] text-slate-800 font-semibold text-right",
 }: {
   label: string;
   value: React.ReactNode;
   valueClass?: string;
 }) => (
   <div className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0 gap-4">
-    <span className="text-[11px] text-slate-400 font-bold shrink-0">{label}</span>
+    <span className="text-[11px] text-slate-400 font-semibold shrink-0">{label}</span>
     <span className={valueClass}>{value ?? "—"}</span>
   </div>
 );
@@ -136,7 +136,7 @@ export default function AdminProductDetailPage({
         <p className="text-red-500 font-semibold text-sm">{error || "Product not found."}</p>
         <button
           onClick={() => router.back()}
-          className="text-[#6A8BFF] text-sm font-bold hover:underline"
+          className="text-[#6A8BFF] text-sm font-semibold hover:underline"
         >
           Go Back
         </button>
@@ -204,14 +204,14 @@ export default function AdminProductDetailPage({
               </div>
 
               {/* Status */}
-              <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold ${statusCfg.bg} ${statusCfg.text}`}>
+              <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
                 <span className={`w-2 h-2 rounded-full ${statusCfg.dot}`} />
                 {statusCfg.label}
               </span>
 
               {/* Flagged banner */}
               {product.flagged && (
-                <div className="w-full bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-[11px] font-bold text-red-600 flex items-start gap-2">
+                <div className="w-full bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-[11px] font-semibold text-red-600 flex items-start gap-2">
                   <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M3 21V4l1-1h10l1 2h6v12H14l-1-2H5v8H3z" />
                   </svg>
@@ -229,24 +229,24 @@ export default function AdminProductDetailPage({
             {/* Price & stock */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-bold">Price</span>
+                <span className="text-[11px] text-slate-400 font-semibold">Price</span>
                 <span className="text-[20px] font-black text-[#6A8BFF]">AED {product.price.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-bold">Stock</span>
+                <span className="text-[11px] text-slate-400 font-semibold">Stock</span>
                 <div className="flex items-center gap-2">
                   <span className={`text-[14px] font-black ${isLowStock ? "text-red-500" : "text-slate-800"}`}>
                     {product.stock} units
                   </span>
                   {isLowStock && (
-                    <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">Low</span>
+                    <span className="text-[10px] bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">Low</span>
                   )}
                 </div>
               </div>
               {product.reorderLevel != null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Reorder At</span>
-                  <span className="text-[13px] font-bold text-slate-600">{product.reorderLevel} units</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">Reorder At</span>
+                  <span className="text-[13px] font-semibold text-slate-600">{product.reorderLevel} units</span>
                 </div>
               )}
             </div>
@@ -255,7 +255,7 @@ export default function AdminProductDetailPage({
             <button
               onClick={toggleFlag}
               disabled={flagging}
-              className={`w-full py-3.5 rounded-[1rem] text-[13px] font-bold transition disabled:opacity-60 ${
+              className={`w-full py-3.5 rounded-[1rem] text-[13px] font-semibold transition disabled:opacity-60 ${
                 product.flagged
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-600"
                   : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-100"
@@ -275,14 +275,14 @@ export default function AdminProductDetailPage({
               <DetailRow
                 label="Prescription"
                 value={
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${product.requiresPrescription ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${product.requiresPrescription ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
                     {product.requiresPrescription ? "Required" : "Not required"}
                   </span>
                 }
               />
               {product.description && (
                 <div className="py-3 border-b border-slate-50">
-                  <span className="text-[11px] text-slate-400 font-bold block mb-2">Description</span>
+                  <span className="text-[11px] text-slate-400 font-semibold block mb-2">Description</span>
                   <p className="text-[13px] text-slate-700 font-medium leading-relaxed">{product.description}</p>
                 </div>
               )}
@@ -329,14 +329,14 @@ export default function AdminProductDetailPage({
                 <DetailRow
                   label="Flagged At"
                   value={new Date(product.flaggedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  valueClass="text-[11px] text-red-500 font-bold text-right"
+                  valueClass="text-[11px] text-red-500 font-semibold text-right"
                 />
               )}
               {product.rejectedAt && (
                 <DetailRow
                   label="Rejected At"
                   value={new Date(product.rejectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  valueClass="text-[11px] text-red-500 font-bold text-right"
+                  valueClass="text-[11px] text-red-500 font-semibold text-right"
                 />
               )}
             </div>

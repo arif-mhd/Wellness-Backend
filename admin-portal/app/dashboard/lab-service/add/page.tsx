@@ -55,7 +55,7 @@ const emptyTest = (): LabTestForm => ({
 });
 
 const inputCls = "w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition";
-const labelCls = "text-[11px] font-bold text-slate-500 uppercase tracking-wider";
+const labelCls = "text-[11px] font-semibold text-slate-500 uppercase tracking-wider";
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -182,7 +182,7 @@ export default function AddLabServicePage() {
             </svg>
           </button>
           <div>
-            <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight leading-tight">Add New Lab Service</h1>
+            <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight leading-tight">Add New Lab Service</h1>
             <p className="text-[13px] text-slate-400 font-medium mt-0.5">Onboard a diagnostic lab and add its available tests</p>
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function AddLabServicePage() {
 
               {/* Basic Information */}
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-8">
-                <h2 className="text-[16px] font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
+                <h2 className="text-[16px] font-medium text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                   <SectionIcon>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -230,7 +230,7 @@ export default function AddLabServicePage() {
 
               {/* Management Details */}
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-8">
-                <h2 className="text-[16px] font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
+                <h2 className="text-[16px] font-medium text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                   <SectionIcon>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -247,7 +247,7 @@ export default function AddLabServicePage() {
               {/* Lab Tests Section */}
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-8">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-[16px] font-black text-slate-800 tracking-tight flex items-center gap-2">
+                  <h2 className="text-[16px] font-medium text-slate-800 tracking-tight flex items-center gap-2">
                     <SectionIcon>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -256,7 +256,7 @@ export default function AddLabServicePage() {
                     Lab Tests
                   </h2>
                   <button type="button" onClick={addTest}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#EEF2FF] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-bold rounded-full transition">
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#EEF2FF] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-semibold rounded-full transition">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                     Add Test
                   </button>
@@ -267,7 +267,7 @@ export default function AddLabServicePage() {
                   {tests.map((t, idx) => (
                     <div key={idx} className="flex items-center gap-1">
                       <button type="button" onClick={() => setActiveTestTab(idx)}
-                        className={`px-4 py-1.5 rounded-full text-[12px] font-bold transition-all ${activeTestTab === idx ? "bg-[#1E293B] text-white" : "bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-100"}`}>
+                        className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-all ${activeTestTab === idx ? "bg-[#1E293B] text-white" : "bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-100"}`}>
                         {t.name || `Test ${idx + 1}`}
                       </button>
                       {tests.length > 1 && (
@@ -310,14 +310,14 @@ export default function AddLabServicePage() {
                       <div className={`w-10 h-6 rounded-full transition-colors relative ${currentTest.requires_fasting ? "bg-[#6A8BFF]" : "bg-slate-200"}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${currentTest.requires_fasting ? "translate-x-5" : "translate-x-1"}`} />
                       </div>
-                      <span className="text-[12px] font-bold text-slate-600">Requires Fasting</span>
+                      <span className="text-[12px] font-semibold text-slate-600">Requires Fasting</span>
                     </button>
                     <button type="button" onClick={() => updateTest(activeTestTab, "requires_doctor_approval", !currentTest.requires_doctor_approval)}
                       className="flex items-center gap-3 group">
                       <div className={`w-10 h-6 rounded-full transition-colors relative ${currentTest.requires_doctor_approval ? "bg-[#6A8BFF]" : "bg-slate-200"}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${currentTest.requires_doctor_approval ? "translate-x-5" : "translate-x-1"}`} />
                       </div>
-                      <span className="text-[12px] font-bold text-slate-600">Requires Doctor Approval</span>
+                      <span className="text-[12px] font-semibold text-slate-600">Requires Doctor Approval</span>
                     </button>
                   </div>
 
@@ -338,7 +338,7 @@ export default function AddLabServicePage() {
                     <div className="flex items-center justify-between mb-3">
                       <label className={labelCls}>Normal Value &amp; Interpretation</label>
                       <button type="button" onClick={() => addNormalValue(activeTestTab)}
-                        className="text-[11px] font-bold text-[#6A8BFF] hover:text-[#5a7ae6] flex items-center gap-1 transition">
+                        className="text-[11px] font-semibold text-[#6A8BFF] hover:text-[#5a7ae6] flex items-center gap-1 transition">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                         Add Range
                       </button>
@@ -383,7 +383,7 @@ export default function AddLabServicePage() {
             <div className="flex flex-col gap-6">
               {/* Licenses */}
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-8">
-                <h2 className="text-[16px] font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
+                <h2 className="text-[16px] font-medium text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                   <SectionIcon>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -400,7 +400,7 @@ export default function AddLabServicePage() {
 
               {/* Upload Documents */}
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-8">
-                <h2 className="text-[16px] font-black text-slate-800 tracking-tight mb-6 flex items-center gap-2">
+                <h2 className="text-[16px] font-medium text-slate-800 tracking-tight mb-6 flex items-center gap-2">
                   <SectionIcon>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -417,7 +417,7 @@ export default function AddLabServicePage() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-bold text-slate-700 truncate">{doc}</p>
+                        <p className="text-[12px] font-semibold text-slate-700 truncate">{doc}</p>
                         <p className="text-[10px] text-slate-400 font-medium">PDF, JPG or PNG · Max 5MB</p>
                       </div>
                       <svg className="w-4 h-4 text-slate-300 group-hover:text-[#6A8BFF] transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,16 +430,16 @@ export default function AddLabServicePage() {
 
               {/* Summary Preview */}
               <div className="bg-[#f8faff] rounded-[2rem] border border-[#e0e7ff] p-6">
-                <p className="text-[12px] font-black text-slate-500 uppercase tracking-wider mb-4">Summary</p>
+                <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wider mb-4">Summary</p>
                 <div className="space-y-2">
-                  <p className="text-[13px] font-bold text-slate-800">{form.name || "Lab name not set"}</p>
+                  <p className="text-[13px] font-semibold text-slate-800">{form.name || "Lab name not set"}</p>
                   {form.location && <p className="text-[12px] text-slate-500">{form.location}</p>}
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[11px] font-bold text-[#6A8BFF] bg-[#EEF2FF] px-3 py-1 rounded-full">
+                    <span className="text-[11px] font-semibold text-[#6A8BFF] bg-[#EEF2FF] px-3 py-1 rounded-full">
                       {tests.filter(t => t.name).length} test{tests.filter(t => t.name).length !== 1 ? "s" : ""} added
                     </span>
                     {tests.some(t => t.requires_doctor_approval) && (
-                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Doctor approval required</span>
+                      <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Doctor approval required</span>
                     )}
                   </div>
                 </div>
@@ -448,7 +448,7 @@ export default function AddLabServicePage() {
               {/* Actions */}
               <div className="flex flex-col gap-3">
                 <button type="submit" disabled={isSubmitting}
-                  className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] disabled:opacity-60 text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/60 flex items-center justify-center gap-2">
+                  className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-60 text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] flex items-center justify-center gap-2">
                   {isSubmitting ? (
                     <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Adding Lab Service...</>
                   ) : (
@@ -456,7 +456,7 @@ export default function AddLabServicePage() {
                   )}
                 </button>
                 <button type="button" onClick={() => router.back()}
-                  className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-[1rem] text-[13px] font-bold transition duration-200">
+                  className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-[1rem] text-[13px] font-semibold transition duration-200">
                   Cancel
                 </button>
               </div>

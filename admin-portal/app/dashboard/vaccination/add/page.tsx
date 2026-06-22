@@ -125,13 +125,13 @@ export default function AddVaccinePage() {
             </svg>
           </button>
           <div>
-            <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Add New Vaccine</h1>
+            <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Add New Vaccine</h1>
             <p className="text-[13px] text-slate-500 font-medium mt-0.5">Fill in the details that will appear in the patient app</p>
           </div>
         </div>
 
         {success && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700 text-[13px] font-bold flex items-center gap-2">
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700 text-[13px] font-semibold flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
             Vaccine added successfully! Redirecting…
           </div>
@@ -225,26 +225,31 @@ export default function AddVaccinePage() {
             {/* RIGHT — Preview & Submit */}
             <div className="lg:col-span-1 flex flex-col gap-6">
               <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-6 sticky top-6">
-                <h3 className="text-[15px] font-black text-slate-800 mb-5">Preview</h3>
+                <h3 className="text-[15px] font-semibold text-slate-800 mb-5">Preview</h3>
 
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-xl bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                    <svg className="w-6 h-6 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+                    <svg className="w-5 h-5 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m18 2 4 4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m17 7 3-3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9 11 4 4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m5 19-3 3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14 4 6 6" />
                     </svg>
                   </div>
                   <div>
-                    <p className="text-[14px] font-bold text-slate-800">{form.name || "Vaccine Name"}</p>
+                    <p className="text-[14px] font-semibold text-slate-800">{form.name || "Vaccine Name"}</p>
                     <p className="text-[11px] text-slate-500">{form.manufacturer || "Manufacturer"}</p>
                   </div>
                 </div>
 
                 {form.vaccineType && (
-                  <span className="inline-block px-2.5 py-1 bg-[#FFECE0] text-[#885433] text-[10px] font-bold rounded-full mb-4">{form.vaccineType}</span>
+                  <span className="inline-block px-2.5 py-1 bg-[#FFECE0] text-[#885433] text-[10px] font-semibold rounded-full mb-4">{form.vaccineType}</span>
                 )}
 
                 <div className="flex items-baseline gap-2 mb-5">
-                  <span className="text-[20px] font-bold text-slate-800">
+                  <span className="text-[20px] font-semibold text-slate-800">
                     {form.price ? `AED ${parseFloat(form.price).toFixed(2)}` : "AED —"}
                   </span>
                   {form.originalPrice && (
@@ -257,10 +262,10 @@ export default function AddVaccinePage() {
                   {form.doses_required && <PreviewRow label="Doses" value={form.doses_required} />}
                   {form.targetGroups && (
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 mb-1.5">Target Groups</p>
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1.5">Target Groups</p>
                       <div className="flex flex-wrap gap-1">
                         {form.targetGroups.split(",").filter(Boolean).map((g, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-bold rounded-full">{g.trim()}</span>
+                          <span key={i} className="px-2 py-0.5 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-semibold rounded-full">{g.trim()}</span>
                         ))}
                       </div>
                     </div>
@@ -270,14 +275,14 @@ export default function AddVaccinePage() {
                 <button
                   type="submit"
                   disabled={submitting || success}
-                  className="mt-6 w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] disabled:opacity-60 text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                  className="mt-6 w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-60 text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
                 >
                   {submitting ? "Adding Vaccine…" : success ? "Added!" : "Add Vaccine"}
                 </button>
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="mt-3 w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-[1rem] text-[13px] font-bold transition duration-200"
+                  className="mt-3 w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-[1rem] text-[13px] font-semibold transition duration-200"
                 >
                   Cancel
                 </button>
@@ -293,7 +298,7 @@ export default function AddVaccinePage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7">
-      <h2 className="text-[16px] font-black text-slate-800 mb-5">{title}</h2>
+      <h2 className="text-[16px] font-semibold text-slate-800 mb-5">{title}</h2>
       {children}
     </div>
   );
@@ -302,7 +307,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label className="text-[11px] font-bold text-slate-500 tracking-wide uppercase">{label}</label>
+      <label className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">{label}</label>
       {children}
     </div>
   );
@@ -311,8 +316,8 @@ function Field({ label, children, className = "" }: { label: string; children: R
 function PreviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-[10px] font-bold text-slate-400">{label}</span>
-      <span className="text-[11px] font-bold text-slate-700">{value}</span>
+      <span className="text-[10px] font-semibold text-slate-400">{label}</span>
+      <span className="text-[11px] font-semibold text-slate-700">{value}</span>
     </div>
   );
 }

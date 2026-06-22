@@ -166,7 +166,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
              Cancel
            </button>
            <button 
-             className="flex-1 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white py-4 rounded-[1.25rem] text-[13px] font-bold transition-colors shadow-md shadow-blue-200/50"
+             className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white py-4 rounded-[1.25rem] text-[13px] font-bold transition-colors shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
            >
              Generate report
            </button>

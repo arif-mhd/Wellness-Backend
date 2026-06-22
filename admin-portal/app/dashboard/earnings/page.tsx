@@ -70,7 +70,7 @@ export default function EarningsPage() {
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Consultations & Earnings</h1>
           <div className="flex items-center gap-3">
-            <button className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white px-5 py-2.5 rounded-full text-[13px] font-bold shadow-md shadow-blue-200/50 transition">
+            <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition">
               Export Report
             </button>
             <button className="flex items-center gap-2 bg-[#f4f7ff] hover:bg-[#eaf0ff] text-[#6A8BFF] px-5 py-2.5 rounded-full text-[13px] font-bold transition">
@@ -197,7 +197,7 @@ export default function EarningsPage() {
                           {t.status}
                         </span>
                         {hoveredId === t.id && (
-                          <button className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold px-5 py-2 rounded-full shadow-md shadow-blue-200/50 transition-transform active:scale-95 whitespace-nowrap ml-4">
+                          <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-transform active:scale-95 whitespace-nowrap ml-4">
                             View Details
                           </button>
                         )}

@@ -368,7 +368,7 @@ export default function ManagePatientsPage() {
               {/* CTA */}
               <button
                 onClick={() => router.push(`/dashboard/patients/${selectedPatient.id}`)}
-                className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
               >
                 View Detailed Profile
               </button>

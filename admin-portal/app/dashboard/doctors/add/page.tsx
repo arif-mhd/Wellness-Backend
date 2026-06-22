@@ -156,7 +156,7 @@ export default function AddDoctorPage() {
 
            {/* Footer Button */}
            <div className="mt-8 flex justify-end">
-              <button className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white px-12 py-3.5 rounded-[1.25rem] text-[13px] font-bold shadow-md shadow-blue-200/50 transition active:scale-[0.98]">
+              <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-12 py-3.5 rounded-[1.25rem] text-[13px] font-bold shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition active:scale-[0.98]">
                  Continue
               </button>
            </div>

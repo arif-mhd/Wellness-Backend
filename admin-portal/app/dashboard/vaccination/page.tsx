@@ -104,10 +104,10 @@ export default function ManageVaccinationPage() {
           <div className={`${selected ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Vaccines</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Vaccines</h1>
               <button
                 onClick={() => router.push("/dashboard/vaccination/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -133,7 +133,7 @@ export default function ManageVaccinationPage() {
             </div>
 
             {/* Sort row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-2">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-2">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Name <DoubleCaret /></span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Type <DoubleCaret /></span>
@@ -151,12 +151,12 @@ export default function ManageVaccinationPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                        <th className="pb-4 pt-1 font-bold pl-2">Name</th>
-                        <th className="pb-4 pt-1 font-bold text-center">Type</th>
-                        <th className="pb-4 pt-1 font-bold text-center">Doses</th>
-                        <th className="pb-4 pt-1 font-bold text-center">Price</th>
-                        <th className="pb-4 pt-1 font-bold text-center">Status</th>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
+                        <th className="pb-4 pt-1 font-semibold pl-2">Name</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Type</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Doses</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Price</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -171,13 +171,17 @@ export default function ManageVaccinationPage() {
                             <td className="py-4 px-3">
                               <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                                  <svg className="w-4.5 h-4.5 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3v4m0 4h.01" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" />
+                                  <svg className="w-4 h-4 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m18 2 4 4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m17 7 3-3" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 11 4 4" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 19-3 3" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14 4 6 6" />
                                   </svg>
                                 </div>
                                 <div>
-                                  <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors">{vaccine.name}</p>
+                                  <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors">{vaccine.name}</p>
                                   {vaccine.manufacturer && <p className="text-[11px] text-slate-400 font-medium">{vaccine.manufacturer}</p>}
                                 </div>
                               </div>
@@ -188,14 +192,14 @@ export default function ManageVaccinationPage() {
                             <td className="py-4 text-[12px] text-slate-500 font-medium text-center">
                               {vaccine.doses_required ?? 1}
                             </td>
-                            <td className="py-4 text-[13px] font-bold text-slate-700 text-center">
+                            <td className="py-4 text-[13px] font-semibold text-slate-700 text-center">
                               AED {vaccine.price.toFixed(2)}
                             </td>
                             <td className="py-4 text-center">
                               <button
                                 onClick={e => { e.stopPropagation(); handleToggle(vaccine.id); }}
                                 disabled={togglingId === vaccine.id}
-                                className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${vaccine.is_active ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                                className={`px-3 py-1 rounded-full text-[10px] font-semibold transition ${vaccine.is_active ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
                               >
                                 {togglingId === vaccine.id ? "..." : vaccine.is_active ? "Active" : "Inactive"}
                               </button>
@@ -235,7 +239,7 @@ export default function ManageVaccinationPage() {
           {selected && (
             <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
               <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Vaccine Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Vaccine Details</h2>
                 <button
                   onClick={() => setSelectedVaccineId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -247,19 +251,24 @@ export default function ManageVaccinationPage() {
               {/* Vaccine Header */}
               <div className="mb-5 flex items-center gap-4">
                 <div className="w-14 h-14 rounded-xl bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                  <svg className="w-7 h-7 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+                  <svg className="w-6 h-6 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m18 2 4 4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m17 7 3-3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 11 4 4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 19-3 3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m14 4 6 6" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-black text-slate-800">{selected.name}</h3>
+                  <h3 className="text-[15px] font-medium text-slate-800">{selected.name}</h3>
                   {selected.manufacturer && <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selected.manufacturer}</p>}
                 </div>
               </div>
 
               {/* Status badge */}
               <div className="mb-5">
-                <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${selected.is_active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
+                <span className={`px-3 py-1.5 rounded-full text-[11px] font-semibold ${selected.is_active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
                   {selected.is_active ? "● Active" : "○ Inactive"}
                 </span>
               </div>
@@ -267,10 +276,10 @@ export default function ManageVaccinationPage() {
               {/* Target groups chips */}
               {(selected.targetGroups?.length ?? 0) > 0 && (
                 <div className="mb-5">
-                  <p className="text-[11px] font-bold text-slate-400 mb-2">Target Groups</p>
+                  <p className="text-[11px] font-semibold text-slate-400 mb-2">Target Groups</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selected.targetGroups!.map(g => (
-                      <span key={g} className="px-2.5 py-1 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-bold rounded-full">{g}</span>
+                      <span key={g} className="px-2.5 py-1 bg-[#EEF2FF] text-[#6A8BFF] text-[10px] font-semibold rounded-full">{g}</span>
                     ))}
                   </div>
                 </div>
@@ -287,8 +296,8 @@ export default function ManageVaccinationPage() {
                   { label: "Original Price", value: selected.originalPrice ? `AED ${selected.originalPrice.toFixed(2)}` : "—" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-bold w-1/2 shrink-0">{label}</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{value}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold w-1/2 shrink-0">{label}</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{value}</span>
                   </div>
                 ))}
               </div>
@@ -303,7 +312,7 @@ export default function ManageVaccinationPage() {
                 { label: "Patient Instructions", value: selected.patientInstructions },
               ].filter(f => f.value).map(({ label, value }) => (
                 <div key={label} className="mb-4 px-1">
-                  <p className="text-[11px] font-bold text-slate-400 mb-1">{label}</p>
+                  <p className="text-[11px] font-semibold text-slate-400 mb-1">{label}</p>
                   <p className="text-[12px] text-slate-700 leading-relaxed">{value}</p>
                 </div>
               ))}
@@ -312,7 +321,7 @@ export default function ManageVaccinationPage() {
               <button
                 onClick={() => handleToggle(selected.id)}
                 disabled={togglingId === selected.id}
-                className={`w-full py-3.5 rounded-[1rem] text-[13px] font-bold transition duration-200 mt-2 ${selected.is_active ? "bg-slate-100 text-slate-600 hover:bg-slate-200" : "bg-[#6A8BFF] text-white hover:bg-[#5a7ae6] shadow-md shadow-blue-200/50"}`}
+                className={`w-full py-3.5 rounded-[1rem] text-[13px] font-semibold transition duration-200 mt-2 ${selected.is_active ? "bg-slate-100 text-slate-600 hover:bg-slate-200" : "bg-[#6A8BFF] text-white hover:bg-[#5a7ae6] shadow-[0_4px_10px_rgba(84,118,252,0.2)]"}`}
               >
                 {togglingId === selected.id ? "Updating..." : selected.is_active ? "Deactivate Vaccine" : "Activate Vaccine"}
               </button>

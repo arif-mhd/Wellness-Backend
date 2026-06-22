@@ -283,7 +283,7 @@ export default function OrdersPage() {
                               {hoveredId === o.id && (
                                 <button
                                   onClick={e => { e.stopPropagation(); setSelectedId(o.id); }}
-                                  className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold px-5 py-2 rounded-full shadow-md shadow-blue-200/50 transition-transform active:scale-95 whitespace-nowrap ml-4"
+                                  className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-transform active:scale-95 whitespace-nowrap ml-4"
                                 >
                                   View Details
                                 </button>
