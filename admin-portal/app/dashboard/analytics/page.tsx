@@ -17,10 +17,10 @@ const ReportCard = ({ title, description, slug }: { title: string, description: 
         </svg>
       </div>
       <div className="flex flex-col gap-1.5 pt-1">
-        <h3 className="text-[13px] font-black text-[#2f4281] tracking-tight group-hover:text-[#6A8BFF] transition-colors pr-2">
+        <h3 className="text-[14px] font-semibold text-[#4861e9] tracking-tight group-hover:text-[#6A8BFF] transition-colors pr-2">
           {title}
         </h3>
-        <p className="text-[11px] font-bold text-slate-500 leading-relaxed pr-2">
+        <p className="text-[12px] font-normal text-slate-500 leading-relaxed pr-2">
           {description}
         </p>
       </div>
@@ -31,11 +31,11 @@ const ReportCard = ({ title, description, slug }: { title: string, description: 
 export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
-      <div className="max-w-[1440px] mx-auto pb-12 font-sans px-1 animate-in fade-in duration-300">
+      <div className="max-w-[1440px] mx-auto pb-12 font-sans px-1 animate-in fade-in duration-300" style={{ fontFamily: 'Outfit, sans-serif' }}>
         
         {/* Page Header */}
         <div className="pt-2 mb-8">
-          <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Generate report</h1>
+          <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Generate report</h1>
         </div>
 
         <div className="space-y-10">
@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
 
           {/* Doctor Activity Section */}
           <div className="space-y-4">
-            <h2 className="text-[14px] font-black text-slate-800 tracking-tight ml-1">Doctor Activity</h2>
+            <h2 className="text-[15px] font-medium text-slate-800 tracking-tight ml-1">Doctor Activity</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               <ReportCard 
                 title="Number of Consultations" 
@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
 
           {/* Patient Activity Section */}
           <div className="space-y-4">
-            <h2 className="text-[14px] font-black text-slate-800 tracking-tight ml-1">Patient Activity</h2>
+            <h2 className="text-[15px] font-medium text-slate-800 tracking-tight ml-1">Patient Activity</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               <ReportCard 
                 title="Number of Appointments" 

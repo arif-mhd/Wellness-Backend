@@ -1,5 +1,6 @@
 "use client";
 
+import Pagination from "@/components/Pagination";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
@@ -72,7 +73,7 @@ function Avatar({ patient, size = "md" }: { patient: Patient; size?: "sm" | "md"
     return <img src={patient.avatarUrl} alt={patient.fullName} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
   }
   return (
-    <div className={`${sz} rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-bold shrink-0`}>
+    <div className={`${sz} rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-medium shrink-0`}>
       {(patient.fullName ?? "?")[0].toUpperCase()}
     </div>
   );
@@ -81,6 +82,8 @@ function Avatar({ patient, size = "md" }: { patient: Patient; size?: "sm" | "md"
 export default function ManagePatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -97,9 +100,31 @@ export default function ManagePatientsPage() {
         return;
       }
       const data = await res.json();
-      setPatients(data.patients ?? []);
-      if ((data.patients ?? []).length > 0 && !selectedId) {
-        setSelectedId(data.patients[0].id);
+      const patientsList = data.patients ?? [];
+
+      const patientsWithStats = await Promise.all(
+        patientsList.map(async (p: Patient) => {
+          try {
+            const ehrRes = await adminFetch(`/api/admin/patients/${p.id}/ehr`);
+            if (ehrRes.ok) {
+              const ehrData = await ehrRes.json();
+              const history = ehrData.visitHistory || [];
+              return { 
+                ...p, 
+                totalAppointments: history.length, 
+                lastAppointment: history.length > 0 ? history[0].scheduledAt : undefined 
+              };
+            }
+          } catch (e) {
+            console.error(e);
+          }
+          return p;
+        })
+      );
+
+      setPatients(patientsWithStats);
+      if (patientsWithStats.length > 0 && !selectedId) {
+        setSelectedId(patientsWithStats[0].id);
       }
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
@@ -120,7 +145,7 @@ export default function ManagePatientsPage() {
 
   return (
     <ProtectedRoute>
-      <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
+      <div className="w-full pb-12 font-sans animate-in fade-in duration-300" style={{ fontFamily: 'Outfit, sans-serif' }}>
 
         {fetchError && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
@@ -135,7 +160,7 @@ export default function ManagePatientsPage() {
 
             {/* Top Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Patients</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Patients</h1>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 bg-white border border-slate-100 rounded-full px-4 h-10 shadow-sm">
                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -161,7 +186,7 @@ export default function ManagePatientsPage() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none">
+            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -197,21 +222,21 @@ export default function ManagePatientsPage() {
                 ) : (
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                        <th className="pb-4 pt-1 font-bold pl-2">
+                      <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-800 tracking-wider">
+                        <th className="pb-4 pt-1 font-medium pl-2">
                           <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold">
+                        <th className="pb-4 pt-1 font-medium">
                           <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Total Appointments <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold">
+                        <th className="pb-4 pt-1 font-medium">
                           <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Last Appointment <DoubleCaret /></div>
                         </th>
                         <th className="pb-4 pt-1"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map(patient => {
+                      {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(patient => {
                         const isSelected = selectedId === patient.id;
                         return (
                           <tr
@@ -225,13 +250,13 @@ export default function ManagePatientsPage() {
                               <div className="flex items-center gap-3">
                                 <Avatar patient={patient} size="md" />
                                 <div className="min-w-0">
-                                  <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
+                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">
                                     {patient.fullName}
                                     {age(patient.dateOfBirth) && (
-                                      <span className="font-semibold text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
+                                      <span className="font-normal text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
                                     )}
                                   </p>
-                                  <p className="text-[11px] font-semibold text-slate-400 truncate">{patient.email}</p>
+                                  <p className="text-[11px] font-normal text-slate-400 truncate">{patient.email}</p>
                                 </div>
                               </div>
                             </td>
@@ -242,21 +267,12 @@ export default function ManagePatientsPage() {
                               {patient.lastAppointment ? formatDate(patient.lastAppointment) : "—"}
                             </td>
                             <td className="py-3 pr-4 text-right">
-                              {isSelected ? (
-                                <button
-                                  onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
-                                  className="bg-[#6A8BFF] text-white text-[12px] font-bold px-6 py-2 rounded-full shadow-md shadow-blue-200/50 transition"
-                                >
-                                  View Details
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
-                                  className="text-[12px] font-bold text-slate-500 mr-6 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                  View Details
-                                </button>
-                              )}
+                              <button
+                                onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
+                                className="text-[12px] font-medium text-slate-800 px-6 py-2 rounded-xl hover:bg-[#6A8BFF] hover:text-white hover:shadow-md hover:shadow-blue-200/50 transition-all"
+                              >
+                                View Details
+                              </button>
                             </td>
                           </tr>
                         );
@@ -267,18 +283,12 @@ export default function ManagePatientsPage() {
               </div>
 
               {/* Pagination */}
-              {!loading && filtered.length > 0 && (
-                <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                  <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition" aria-label="Previous">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                  </button>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button key={n} className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{n}</button>
-                  ))}
-                  <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition" aria-label="Next">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </div>
+              {filtered.length > 0 && (
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={Math.ceil(filtered.length / itemsPerPage)} 
+                  onPageChange={setCurrentPage} 
+                />
               )}
             </div>
           </div>
@@ -289,7 +299,7 @@ export default function ManagePatientsPage() {
 
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Patient Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Patient Details</h2>
                 <button
                   onClick={() => setSelectedId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -303,7 +313,7 @@ export default function ManagePatientsPage() {
                 <div className="flex items-center gap-4">
                   <Avatar patient={selectedPatient} size="lg" />
                   <div>
-                    <h3 className="text-[14px] font-black text-slate-800">{selectedPatient.fullName}</h3>
+                    <h3 className="text-[14px] font-medium text-slate-800">{selectedPatient.fullName}</h3>
                     <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPatient.email}</p>
                   </div>
                 </div>
@@ -316,37 +326,37 @@ export default function ManagePatientsPage() {
               <div className="bg-[#f8fafd] rounded-[1.5rem] p-6 space-y-5 mb-6">
                 {selectedPatient.emiratesId && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Emirates ID</span>
-                    <span className="text-[11px] text-slate-800 font-bold">{selectedPatient.emiratesId}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">Emirates ID</span>
+                    <span className="text-[11px] text-slate-800 font-medium">{selectedPatient.emiratesId}</span>
                   </div>
                 )}
                 {selectedPatient.gender && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Gender</span>
-                    <span className="text-[11px] text-slate-800 font-bold">{selectedPatient.gender}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">Gender</span>
+                    <span className="text-[11px] text-slate-800 font-medium">{selectedPatient.gender}</span>
                   </div>
                 )}
                 {selectedPatient.dateOfBirth && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Date of Birth</span>
-                    <span className="text-[11px] text-slate-800 font-bold">{formatDate(selectedPatient.dateOfBirth)}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">Date of Birth</span>
+                    <span className="text-[11px] text-slate-800 font-medium">{formatDate(selectedPatient.dateOfBirth)}</span>
                   </div>
                 )}
                 {selectedPatient.phone && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Contact Number</span>
-                    <span className="text-[11px] text-slate-800 font-bold">{selectedPatient.phone}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">Contact Number</span>
+                    <span className="text-[11px] text-slate-800 font-medium">{selectedPatient.phone}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Email ID</span>
-                  <span className="text-[11px] text-slate-800 font-bold truncate max-w-[170px]">{selectedPatient.email}</span>
+                  <span className="text-[11px] text-slate-400 font-medium">Email ID</span>
+                  <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{selectedPatient.email}</span>
                 </div>
                 {selectedPatient.address && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Location</span>
+                    <span className="text-[11px] text-slate-400 font-medium">Location</span>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-800 font-bold text-right max-w-[160px] truncate">{selectedPatient.address}</span>
+                      <span className="text-[11px] text-slate-800 font-medium text-right max-w-[160px] truncate">{selectedPatient.address}</span>
                       <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" />
                       </svg>
@@ -358,7 +368,7 @@ export default function ManagePatientsPage() {
               {/* CTA */}
               <button
                 onClick={() => router.push(`/dashboard/patients/${selectedPatient.id}`)}
-                className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
               >
                 View Detailed Profile
               </button>

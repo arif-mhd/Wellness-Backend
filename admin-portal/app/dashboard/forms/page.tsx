@@ -1,5 +1,6 @@
 "use client";
 
+import Pagination from "@/components/Pagination";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -90,6 +91,8 @@ const DoubleCaret = () => (
 export default function ManageFormsPage() {
   const router = useRouter();
   const [selectedFormId, setSelectedFormId] = useState<number | null>(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const selectedForm = mockForms.find((f) => f.id === selectedFormId);
 
   return (
@@ -168,7 +171,7 @@ export default function ManageFormsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {mockForms.map((form) => {
+                      {mockForms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((form) => {
                       const isSelected = selectedFormId === form.id;
                       return (
                         <tr
@@ -225,35 +228,14 @@ export default function ManageFormsPage() {
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                <button 
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                  aria-label="Previous page"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                  <button 
-                    key={num}
-                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
-                      num === 1 
-                        ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" 
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
-                <button 
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                  aria-label="Next page"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7-7 7-7" />
-                  </svg>
-                </button>
+              <div className="mt-6 border-t border-slate-50 pt-5">
+                {mockForms.length > 0 && (
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={Math.ceil(mockForms.length / itemsPerPage)} 
+                    onPageChange={setCurrentPage} 
+                  />
+                )}
               </div>
             </div>
 

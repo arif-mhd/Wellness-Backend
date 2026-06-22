@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
+import Pagination from "@/components/Pagination";
 import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -56,6 +57,8 @@ function SupportPageInner() {
   const searchParams = useSearchParams();
   const targetId = searchParams.get("id");
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -289,8 +292,14 @@ function SupportPageInner() {
                 </table>
               )}
 
-              <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                <span className="text-[12px] text-slate-400 font-medium">{filtered.length} ticket{filtered.length !== 1 ? "s" : ""}</span>
+              <div className="mt-6 border-t border-slate-50 pt-5">
+                {(
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={Math.ceil(1 / itemsPerPage)} 
+                    onPageChange={setCurrentPage} 
+                  />
+                )}
               </div>
             </div>
           </div>

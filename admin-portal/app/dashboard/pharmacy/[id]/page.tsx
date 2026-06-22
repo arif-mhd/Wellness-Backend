@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -96,6 +97,8 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
   const router = useRouter();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState<"about" | "stock">("about");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -504,7 +507,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                           </tr>
                         </thead>
                         <tbody>
-                          {stockProducts.map((item) => {
+                          {stockProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item) => {
                             const isLowStock = item.stock < (item.reorderLevel ?? 100);
                             return (
                               <tr
@@ -591,36 +594,15 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
                   {/* Pagination Controls */}
                   {stockProducts.length > 0 && (
-                    <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                      <button
-                        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                        aria-label="Previous page"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <button
-                          key={num}
-                          className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
-                            num === 1
-                              ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100"
-                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                          }`}
-                        >
-                          {num}
-                        </button>
-                      ))}
-                      <button
-                        className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-                        aria-label="Next page"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </div>
+                    <div className="mt-6 border-t border-slate-50 pt-5">
+                {stockProducts.length > 0 && (
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={Math.ceil(stockProducts.length / itemsPerPage)} 
+                    onPageChange={setCurrentPage} 
+                  />
+                )}
+              </div>
                   )}
                 </div>
               </div>

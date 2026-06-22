@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -50,6 +51,8 @@ const DoubleCaret = () => (
 export default function ManageVaccinationPage() {
   const router = useRouter();
   const [vaccines, setVaccines] = useState<Vaccine[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedVaccineId, setSelectedVaccineId] = useState<string | null>(null);
@@ -157,7 +160,7 @@ export default function ManageVaccinationPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paged.map(vaccine => {
+                      {paged.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(vaccine => {
                         const isSelected = selectedVaccineId === vaccine.id;
                         return (
                           <tr
@@ -215,23 +218,15 @@ export default function ManageVaccinationPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                  </button>
-                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(num => (
-                    <button
-                      key={num}
-                      onClick={() => setPage(num)}
-                      className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${page === num ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </div>
+                <div className="mt-6 border-t border-slate-50 pt-5">
+                {paged.length > 0 && (
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={Math.ceil(paged.length / itemsPerPage)} 
+                    onPageChange={setCurrentPage} 
+                  />
+                )}
+              </div>
               )}
             </div>
           </div>

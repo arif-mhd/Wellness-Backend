@@ -1,5 +1,6 @@
 "use client";
 
+import Pagination from "@/components/Pagination";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -53,6 +54,8 @@ const DoubleCaret = () => (
 export default function ManageEmergenciesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"SOS" | "Past">("SOS");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [search, setSearch]         = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -159,7 +162,7 @@ export default function ManageEmergenciesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEmergencies.map((em) => {
+                      {filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
                     const isSelected = selectedId === em.id;
                     return (
                       <tr
@@ -197,18 +200,13 @@ export default function ManageEmergenciesPage() {
               </table>
 
               {/* Pagination */}
-              <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                  <button key={n} className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{n}</button>
-                ))}
-                <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                </button>
-              </div>
-            </div>
+              {filteredEmergencies.length > 0 && (
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={Math.ceil(filteredEmergencies.length / itemsPerPage)} 
+                  onPageChange={setCurrentPage} 
+                />
+              )}</div>
           </div>
 
           {/* RIGHT: Patient Details Panel */}

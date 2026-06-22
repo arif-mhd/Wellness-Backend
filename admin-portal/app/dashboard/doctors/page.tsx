@@ -1,5 +1,6 @@
 "use client";
 
+import Pagination from "@/components/Pagination";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
@@ -80,6 +81,8 @@ function ManageDoctorsPageInner() {
   const searchParams = useSearchParams();
   const targetId = searchParams.get("id");
   const [activeTab, setActiveTab] = useState<"onboard" | "queue">("onboard");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queue, setQueue] = useState<Doctor[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
@@ -313,7 +316,7 @@ function ManageDoctorsPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedDoctors.map(doc => {
+                      {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
                         const isSelected = selectedDoctorId === doc.id;
                         return (
                           <tr
@@ -351,7 +354,7 @@ function ManageDoctorsPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedDoctors.map(doc => {
+                      {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
                         const isSelected = selectedDoctorId === doc.id;
                         return (
                           <tr
@@ -387,18 +390,13 @@ function ManageDoctorsPageInner() {
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                  <button key={n} className={`w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center transition-all ${n === 1 ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>{n}</button>
-                ))}
-                <button className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7-7" /></svg>
-                </button>
-              </div>
-            </div>
+              {sortedDoctors.length > 0 && (
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={Math.ceil(sortedDoctors.length / itemsPerPage)} 
+                  onPageChange={setCurrentPage} 
+                />
+              )}</div>
           </div>
 
           {/* RIGHT — Doctor Details Panel */}
