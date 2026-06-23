@@ -347,7 +347,7 @@ export default function DashboardPage() {
           {/* Decline */}
           <button
             onClick={() => setShowInviteModal(false)}
-            className="flex-1 h-11 rounded-xl bg-[#FF3B30] hover:bg-[#E02D22] text-white text-xs font-bold shadow-sm transition-all active:scale-[0.98] select-none"
+            className="flex-1 h-11 rounded-xl bg-[#FF3B30] hover:bg-[#E02D22] text-white text-xs font-medium shadow-sm transition-all active:scale-[0.98] select-none"
             style={{ fontFamily: 'Outfit, sans-serif' }}
           >
             Decline
@@ -358,7 +358,7 @@ export default function DashboardPage() {
               setShowInviteModal(false);
               router.push(`/video-calls?appointmentId=${specialistInvite.appointmentId}&role=specialist`);
             }}
-            className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
+            className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7990FF] hover:to-[#3B5BFC] text-white text-xs font-medium shadow-[0_2px_8px_rgba(84,118,252,0.3)] transition-all active:scale-[0.98] select-none flex items-center justify-center gap-2"
             style={{ fontFamily: 'Outfit, sans-serif' }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

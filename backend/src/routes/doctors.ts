@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { doctorsContainer, appointmentsContainer, queryDocuments, notificationsContainer, patientsContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -399,51 +399,18 @@ router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res:
       }
     }
 
-    const now = new Date().toISOString();
-
-    // 2. Cancel conflicting appointments and notify patients in-app
-    for (const appt of conflicts) {
-      const updatedAppt = {
-        ...appt,
-        status: "cancelled",
-        cancellationReason: `Doctor scheduled absence: ${reason}`,
-        updatedAt: now,
-      };
-      await appointmentsContainer.items.upsert(updatedAppt);
-
-      // Create wellness app notification for patient
-      const dateText = new Date(appt.scheduledAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+    // Conflicting appointments must be explicitly rescheduled (via
+    // PATCH /:id/reschedule) before the absence can be confirmed — we no
+    // longer auto-cancel them out from under the patient.
+    if (conflicts.length > 0) {
+      res.status(409).json({
+        error: "There are appointments booked during this absence window. Please reschedule them first.",
+        conflicts,
       });
-      const timeText = new Date(appt.scheduledAt).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-
-      const patientNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
-        patientId: appt.patientId,
-        title: "Appointment Cancelled",
-        body: `Your appointment with Dr. ${doctor.fullName ?? "Doctor"} on ${dateText} at ${timeText} has been cancelled due to doctor unavailability. Reason: ${reason}.`,
-        type: "appointment_cancelled",
-        referenceId: appt.id,
-        isRead: false,
-        sentAt: now,
-      };
-      await notificationsContainer.items.create(patientNotification);
-
-      logActivity({
-        source: "doctor",
-        action: "Appointment Cancelled",
-        details: `Appointment ${appt.id} automatically cancelled due to doctor absence`,
-        performedBy: doctor.fullName ?? "Doctor",
-        performedById: doctorId,
-        entityType: "appointment",
-        entityId: appt.id,
-      });
+      return;
     }
+
+    const now = new Date().toISOString();
 
     // 3. Create the absence entry
     const startObj = new Date(startDate);

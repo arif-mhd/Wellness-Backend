@@ -11,9 +11,12 @@ export interface ScheduleItem {
   symptomType: string;
   symptomDetails: string;
   dateTime: string;
-  actionType: "Reschedule" | "Consult Now";
+  scheduledAt: string;
+  actionType: "Reschedule" | "Consult Now" | "None";
   patientBio: string;
 }
+
+type SortField = "patientName" | "patientAge" | "symptomType" | "scheduledAt";
 
 interface ScheduleListViewProps {
   items: ScheduleItem[];
@@ -21,6 +24,10 @@ interface ScheduleListViewProps {
   onSelectItem: (item: ScheduleItem) => void;
   onRescheduleClick?: (item: ScheduleItem) => void;
   onConsultClick?: (item: ScheduleItem) => void;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 export default function ScheduleListView({
@@ -33,11 +40,54 @@ export default function ScheduleListView({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [dateFilter, setDateFilter] = useState<"Today" | "All">("All");
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const filteredAndSortedItems = (() => {
+    let result = items;
+
+    if (dateFilter === "Today") {
+      const today = new Date();
+      result = result.filter((i) => isSameDay(new Date(i.scheduledAt), today));
+    }
+
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        const valA = a[sortField];
+        const valB = b[sortField];
+        if (sortField === "scheduledAt") {
+          const diff = new Date(valA).getTime() - new Date(valB).getTime();
+          return sortOrder === "asc" ? diff : -diff;
+        }
+        if (typeof valA === "number" && typeof valB === "number") {
+          return sortOrder === "asc" ? valA - valB : valB - valA;
+        }
+        return sortOrder === "asc"
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      });
+    }
+
+    return result;
+  })();
+
   // Pagination calculations
-  const totalPages = Math.max(1, Math.ceil(items.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedItems.length / itemsPerPage));
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = items.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredAndSortedItems.slice(indexOfFirstItem, indexOfLastItem);
 
   const handlePrevPage = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
@@ -48,7 +98,12 @@ export default function ScheduleListView({
   };
 
   // Dropdown filter list
-  const filterDropdowns = ["Name", "Age", "Symptoms", "Date"];
+  const filterDropdowns: { label: string; field: SortField }[] = [
+    { label: "Name", field: "patientName" },
+    { label: "Age", field: "patientAge" },
+    { label: "Symptoms", field: "symptomType" },
+    { label: "Date", field: "scheduledAt" },
+  ];
 
   return (
     <div className="flex flex-col bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm min-h-[580px] justify-between select-none">
@@ -64,39 +119,69 @@ export default function ScheduleListView({
             </span>
             {/* Inline filters */}
             <div className="flex items-center gap-4 flex-wrap mt-1">
-              {filterDropdowns.map((filter) => (
-                <button
-                  key={filter}
-                  className="flex items-center gap-1 text-[#838B95] hover:text-[#24292E] font-semibold text-xs transition-colors"
-                  style={{ fontFamily: "Outfit, sans-serif" }}
-                >
-                  {filter}
-                  <svg width="8" height="5" viewBox="0 0 8 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              ))}
+              {filterDropdowns.map(({ label, field }) => {
+                const isActive = sortField === field;
+                return (
+                  <button
+                    key={field}
+                    onClick={() => handleSort(field)}
+                    className={`flex items-center gap-1 font-semibold text-xs transition-colors ${
+                      isActive ? "text-[#5476FC]" : "text-[#838B95] hover:text-[#24292E]"
+                    }`}
+                    style={{ fontFamily: "Outfit, sans-serif" }}
+                  >
+                    {label}
+                    {isActive && (
+                      <span className="text-[10px] font-medium normal-case text-[#5476FC]/80">
+                        ({sortOrder === "asc" ? "ascending" : "descending"})
+                      </span>
+                    )}
+                    <svg
+                      width="8" height="5" viewBox="0 0 8 5" fill="none" xmlns="http://www.w3.org/2000/svg"
+                      className={`transition-transform duration-150 ${isActive && sortOrder === "desc" ? "rotate-180" : ""}`}
+                    >
+                      <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Today Filter and Slider settings */}
           <div className="flex items-center gap-3.5 self-end md:self-center">
-            <button
-              className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#EBEEF5] rounded-full text-xs font-semibold text-[#676E76] hover:bg-slate-50 transition-all"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              Today
-              <svg width="8" height="5" viewBox="0 0 8 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowDateDropdown((v) => !v)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#EBEEF5] rounded-full text-xs font-semibold text-[#676E76] hover:bg-slate-50 transition-all"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                {dateFilter === "Today" ? "Today" : "All Dates"}
+                <svg
+                  width="8" height="5" viewBox="0 0 8 5" fill="none" xmlns="http://www.w3.org/2000/svg"
+                  className={`transition-transform duration-200 ${showDateDropdown ? "rotate-180" : ""}`}
+                >
+                  <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
 
-            {/* Filter Slider Settings Icon */}
-            <button className="p-2 border border-[#EBEEF5] rounded-full text-[#676E76] hover:bg-slate-50 transition-all">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.667 4h10.666M4.667 8h6.666M6.667 12h2.666" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
+              {showDateDropdown && (
+                <div className="absolute right-0 top-9 bg-white border border-[#EBEEF5] rounded-[12px] shadow-lg py-1.5 w-28 z-20 font-outfit text-xs text-[#24292E]">
+                  <button
+                    onClick={() => { setDateFilter("Today"); setShowDateDropdown(false); setCurrentPage(1); }}
+                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${dateFilter === "Today" ? "font-bold text-[#5476FC]" : ""}`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => { setDateFilter("All"); setShowDateDropdown(false); setCurrentPage(1); }}
+                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${dateFilter === "All" ? "font-bold text-[#5476FC]" : ""}`}
+                  >
+                    All Dates
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -194,6 +279,8 @@ export default function ScheduleListView({
                       >
                         Consult Now
                       </button>
+                    ) : item.actionType === "None" ? (
+                      <span className="text-[#9EA5AD] text-xs font-medium px-3 select-none whitespace-nowrap">Slot Expired</span>
                     ) : (
                       <button
                         onClick={(e) => {

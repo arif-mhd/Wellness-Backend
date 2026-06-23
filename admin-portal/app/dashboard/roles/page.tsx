@@ -109,7 +109,7 @@ function UserAvatar({ user, size = "md" }: { user: RoleUser; size?: "sm" | "md" 
     return <img src={user.avatarUrl} alt={user.name ?? ""} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
   }
   return (
-    <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-black shrink-0`}>
+    <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-medium shrink-0`}>
       {(user.name ?? "?").split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
     </div>
   );
@@ -226,7 +226,7 @@ export default function RolesPage() {
           {/* LEFT COLUMN */}
           <div className={`${selected ? "xl:col-span-8" : "xl:col-span-12"} flex flex-col gap-5`}>
 
-            <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">User Roles</h1>
+            <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">User Roles</h1>
 
             {/* Tabs row */}
             <div className="flex items-center justify-between">
@@ -235,7 +235,7 @@ export default function RolesPage() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${
+                    className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                       activeTab === tab ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
                     }`}
                   >
@@ -264,14 +264,14 @@ export default function RolesPage() {
                   </button>
                 </div>
               </div>
-              <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+              <button className="text-[12px] font-medium text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                 Today
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
               </button>
             </div>
 
             {/* Column labels */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-1">
+            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none mt-1">
               <div className="flex items-center gap-10 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -310,16 +310,16 @@ export default function RolesPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                          <th className="pb-4 pt-1 font-bold pl-2 w-[35%]">
+                        <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
+                          <th className="pb-4 pt-1 font-medium pl-2 w-[35%]">
                             <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Name <DoubleCaret /></div>
                           </th>
-                          <th className="pb-4 pt-1 font-bold w-[25%]">
+                          <th className="pb-4 pt-1 font-medium w-[25%]">
                             <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Date Joined <DoubleCaret /></div>
                           </th>
-                          <th className="pb-4 pt-1 font-bold w-[25%]">Emirates ID</th>
+                          <th className="pb-4 pt-1 font-medium w-[25%]">Emirates ID</th>
                           {activeTab === "Doctors" && (
-                            <th className="pb-4 pt-1 font-bold w-[15%]">Speciality</th>
+                            <th className="pb-4 pt-1 font-medium w-[15%]">Speciality</th>
                           )}
                         </tr>
                       </thead>
@@ -330,7 +330,7 @@ export default function RolesPage() {
                             <tr
                               key={user.id}
                               onClick={() => selectUserWithGuard(user)}
-                              className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                              className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
                             >
                               <td className="py-4 pl-2">
                                 <div className="flex items-center gap-3">
@@ -339,7 +339,7 @@ export default function RolesPage() {
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-[13px] font-bold text-slate-800 truncate">{user.name}</p>
+                                    <p className="text-[13px] font-medium text-slate-800 truncate">{user.name}</p>
                                     <p className="text-[11px] text-slate-400 font-medium truncate">{user.email}</p>
                                   </div>
                                 </div>
@@ -373,7 +373,7 @@ export default function RolesPage() {
             <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
 
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">
                   {activeTab === "Doctors" ? "Doctor" : activeTab === "Patients" ? "Patient" : "Admin"} Details
                 </h2>
                 <button
@@ -391,9 +391,9 @@ export default function RolesPage() {
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[15px] font-black text-slate-800 truncate">{selected.name}</p>
+                  <p className="text-[15px] font-medium text-slate-800 truncate">{selected.name}</p>
                   {selected.license && (
-                    <p className="text-[10px] text-[#6A8BFF] font-bold uppercase tracking-wider mt-0.5">
+                    <p className="text-[10px] text-[#6A8BFF] font-medium uppercase tracking-wider mt-0.5">
                       LICENSE {selected.license}
                     </p>
                   )}
@@ -404,7 +404,7 @@ export default function RolesPage() {
               {/* Specialty pills */}
               {selected.specialty && (
                 <div className="flex gap-2 mb-5 flex-wrap">
-                  <span className="px-4 py-1.5 bg-[#eef2ff] text-[#6A8BFF] text-[11px] font-bold rounded-full">
+                  <span className="px-4 py-1.5 bg-[#eef2ff] text-[#6A8BFF] text-[11px] font-medium rounded-full">
                     {selected.specialty}
                   </span>
                 </div>
@@ -420,9 +420,9 @@ export default function RolesPage() {
               {/* Access Controls */}
               <div className="border-t border-slate-50 pt-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[13px] font-bold text-slate-800">Access Controls</h3>
+                  <h3 className="text-[13px] font-medium text-slate-800">Access Controls</h3>
                   {hasChanges && (
-                    <span className="text-[10px] font-bold text-amber-500 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                    <span className="text-[10px] font-medium text-amber-500 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
                       Unsaved changes
                     </span>
                   )}
@@ -441,7 +441,7 @@ export default function RolesPage() {
                         }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12.5px] font-bold text-slate-800 mb-1">{title}</p>
+                          <p className="text-[12.5px] font-medium text-slate-800 mb-1">{title}</p>
                           <p className="text-[11px] text-slate-500 font-medium leading-relaxed pr-2">{description}</p>
                         </div>
                         <ToggleSwitch
@@ -458,7 +458,7 @@ export default function RolesPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || !hasChanges}
-                className={`w-full py-4 mt-6 rounded-[1rem] text-[13px] font-bold shadow-md transition duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full py-4 mt-6 rounded-[1rem] text-[13px] font-medium shadow-md transition duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
                   hasChanges
                     ? "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white shadow-blue-200/50"
                     : "bg-slate-100 text-slate-400 shadow-none"

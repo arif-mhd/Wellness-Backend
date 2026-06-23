@@ -166,7 +166,7 @@ export default function ManageVaccinationPage() {
                           <tr
                             key={vaccine.id}
                             onClick={() => setSelectedVaccineId(isSelected ? null : vaccine.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
                           >
                             <td className="py-4 px-3">
                               <div className="flex items-center gap-3">

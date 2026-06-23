@@ -180,7 +180,7 @@ export default function HelpSupportPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowRaiseIssue(true)}
-              className="px-6 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] text-white font-bold text-xs rounded-xl shadow-sm transition-all duration-200"
+              className="px-6 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] text-white font-medium text-xs rounded-xl shadow-sm transition-all duration-200"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
               Raise an Issue
@@ -188,7 +188,7 @@ export default function HelpSupportPage() {
 
             <Link
               href="/dashboard/help/faq"
-              className="px-5 py-2.5 bg-white border border-[#EBEEF5] text-[#24292E] hover:bg-slate-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+              className="px-5 py-2.5 bg-white border border-[#EBEEF5] text-[#24292E] hover:bg-slate-50 font-medium text-xs rounded-xl transition-all flex items-center gap-1.5"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
               Frequently Asked Questions
@@ -221,7 +221,7 @@ export default function HelpSupportPage() {
                   >
                     {opt}
                     {openCount !== null && openCount > 0 && (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-[#FFF0F0] text-[#E05252]"}`}>
+                      <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-[#FFF0F0] text-[#E05252]"}`}>
                         {openCount}
                       </span>
                     )}
@@ -251,11 +251,11 @@ export default function HelpSupportPage() {
             ) : (
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="text-[10px] font-bold text-[#9EA5AD] uppercase tracking-wider">
-                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
-                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Summary</th>
-                    <th className="py-4 font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Date and Time</th>
-                    <th className="py-4 font-bold text-right" style={{ fontFamily: "Outfit, sans-serif" }}>Status</th>
+                  <tr className="text-[10px] font-medium text-[#9EA5AD] uppercase tracking-wider">
+                    <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
+                    <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Summary</th>
+                    <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Date and Time</th>
+                    <th className="py-4 font-medium text-right" style={{ fontFamily: "Outfit, sans-serif" }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,7 +274,7 @@ export default function HelpSupportPage() {
                           </svg>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[12px] font-bold text-[#24292E]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          <span className="text-[12px] font-medium text-[#24292E]" style={{ fontFamily: "Outfit, sans-serif" }}>
                             {ticket.subject}
                           </span>
                           <span className="text-[10px] text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -286,7 +286,7 @@ export default function HelpSupportPage() {
                       {/* Summary Column */}
                       <td className="py-[22px]">
                         <div className="flex items-center gap-2 max-w-[320px]">
-                          <span className="px-2.5 py-1 bg-[#EEF2FF] text-[#5476FC] text-[9.5px] font-bold rounded-[6px] shrink-0 capitalize" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          <span className="px-2.5 py-1 bg-[#EEF2FF] text-[#5476FC] text-[9.5px] font-medium rounded-[6px] shrink-0 capitalize" style={{ fontFamily: "Outfit, sans-serif" }}>
                             {ticket.category.replace(/_/g, " ")}
                           </span>
                           <span className="text-xs text-[#9EA5AD] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -302,7 +302,7 @@ export default function HelpSupportPage() {
 
                       {/* Status Column */}
                       <td className="py-[22px] text-right">
-                        <span className={`inline-block px-3 py-1.5 rounded-full text-[10px] font-bold tracking-[-0.2px] ${
+                        <span className={`inline-block px-3 py-1.5 rounded-full text-[10px] font-medium tracking-[-0.2px] ${
                           ticket.status === "Open"
                             ? "bg-[#FFF0F0] text-[#E05252]"
                             : ticket.status === "In Progress"
@@ -346,7 +346,7 @@ export default function HelpSupportPage() {
                   <button
                     key={pg}
                     onClick={() => setCurrentPage(pg)}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
                       isSelected
                         ? "bg-[#5879FC] text-white shadow-sm"
                         : "text-[#9EA5AD] hover:text-[#5879FC]"
@@ -399,7 +399,7 @@ export default function HelpSupportPage() {
             {/* Subject */}
             <div className="flex flex-col gap-2">
               <span
-                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Subject
@@ -417,7 +417,7 @@ export default function HelpSupportPage() {
             {/* Choose category list */}
             <div className="flex flex-col gap-2.5">
               <span
-                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Choose a category
@@ -460,7 +460,7 @@ export default function HelpSupportPage() {
             {/* Contact Number */}
             <div className="flex flex-col gap-2">
               <span
-                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Contact number
@@ -478,7 +478,7 @@ export default function HelpSupportPage() {
             {/* Add Comments */}
             <div className="flex flex-col gap-2">
               <span
-                className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider"
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Add Comments *
@@ -496,7 +496,7 @@ export default function HelpSupportPage() {
             <div className="flex items-center gap-3 mt-2">
               <button
                 onClick={() => setShowRaiseIssue(false)}
-                className="flex-1 py-3 rounded-[14px] bg-[#EEF2FF] text-[#243D7F] hover:bg-[#E4EAFF] font-bold text-[13px] tracking-[-0.26px] transition-all"
+                className="flex-1 py-3 rounded-[14px] bg-[#EEF2FF] text-[#243D7F] hover:bg-[#E4EAFF] font-medium text-[13px] tracking-[-0.26px] transition-all"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Cancel
@@ -504,7 +504,7 @@ export default function HelpSupportPage() {
               <button
                 onClick={handleCreateTicket}
                 disabled={submitting || !comments.trim()}
-                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] disabled:opacity-50 text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200"
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] disabled:opacity-50 text-white font-medium text-[13px] tracking-[-0.26px] transition-all duration-200"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 {submitting ? "Creating..." : "Create Ticket"}

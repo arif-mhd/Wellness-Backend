@@ -167,7 +167,7 @@ export default function AdminProductDetailPage({
             </svg>
           </button>
           <div>
-            <h1 className="text-[26px] font-black text-[#1e293b] tracking-tight">Product Details</h1>
+            <h1 className="text-[26px] font-medium text-[#1e293b] tracking-tight">Product Details</h1>
             <p className="text-[12px] text-slate-400 font-semibold mt-0.5">
               <button onClick={() => router.push("/dashboard/pharmacy")} className="hover:text-[#6A8BFF] transition">Pharmacy</button>
               <span className="mx-1.5 text-slate-300">/</span>
@@ -194,7 +194,7 @@ export default function AdminProductDetailPage({
               </div>
 
               <div className="w-full text-center">
-                <h2 className="text-[18px] font-black text-slate-800 leading-snug">{product.name}</h2>
+                <h2 className="text-[18px] font-medium text-slate-800 leading-snug">{product.name}</h2>
                 {product.strength && (
                   <p className="text-[12px] font-semibold text-slate-400 mt-0.5">{product.strength}</p>
                 )}
@@ -230,12 +230,12 @@ export default function AdminProductDetailPage({
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-semibold">Price</span>
-                <span className="text-[20px] font-black text-[#6A8BFF]">AED {product.price.toFixed(2)}</span>
+                <span className="text-[20px] font-medium text-[#6A8BFF]">AED {product.price.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-semibold">Stock</span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[14px] font-black ${isLowStock ? "text-red-500" : "text-slate-800"}`}>
+                  <span className={`text-[14px] font-medium ${isLowStock ? "text-red-500" : "text-slate-800"}`}>
                     {product.stock} units
                   </span>
                   {isLowStock && (
@@ -270,7 +270,7 @@ export default function AdminProductDetailPage({
 
             {/* Product info */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-7">
-              <h3 className="text-[16px] font-black text-slate-800 mb-5">Product Information</h3>
+              <h3 className="text-[16px] font-medium text-slate-800 mb-5">Product Information</h3>
               <DetailRow label="Category" value={product.category} />
               <DetailRow
                 label="Prescription"
@@ -290,7 +290,7 @@ export default function AdminProductDetailPage({
 
             {/* Batch & stock */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-7">
-              <h3 className="text-[16px] font-black text-slate-800 mb-5">Stock & Batch</h3>
+              <h3 className="text-[16px] font-medium text-slate-800 mb-5">Stock & Batch</h3>
               <DetailRow label="Batch Number" value={product.batchNumber} />
               <DetailRow
                 label="Expiry Date"
@@ -308,7 +308,7 @@ export default function AdminProductDetailPage({
 
             {/* Activity / timestamps */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-7">
-              <h3 className="text-[16px] font-black text-slate-800 mb-5">Activity</h3>
+              <h3 className="text-[16px] font-medium text-slate-800 mb-5">Activity</h3>
               <DetailRow
                 label="Added"
                 value={new Date(product.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
