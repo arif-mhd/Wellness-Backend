@@ -52,7 +52,7 @@ export default function TopBar() {
 
       {/* Right: Action Buttons and Notification icons */}
       <div className="flex items-center gap-3">
-        <button className="bg-[#f43f5e] hover:bg-[#e11d48] text-white px-5 py-2.5 rounded-full text-[12px] font-bold flex items-center gap-2 transition shadow-md shadow-rose-200">
+        <button className="bg-gradient-to-b from-[#FF6B6B] to-[#E84949] hover:from-[#FF7A7A] hover:to-[#D63D3D] text-white px-5 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2.5 shadow-[0_4px_10px_rgba(232,73,73,0.2)] transition-all active:scale-95 select-none">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>

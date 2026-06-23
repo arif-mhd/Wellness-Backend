@@ -124,7 +124,7 @@ function TicketContent() {
           {ticket.subject}
         </h1>
 
-        <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider ${
+        <span className={`ml-2 px-3 py-1 rounded-full text-[10px] font-medium tracking-wider ${
           ticket.status === "Open"
             ? "bg-[#FFF0F0] text-[#E05252]"
             : ticket.status === "In Progress"
@@ -144,7 +144,7 @@ function TicketContent() {
           {/* Created on Card */}
           <div className="bg-white border border-[#EBEEF5] rounded-[16px] p-5 w-[220px] flex flex-col gap-1 shadow-sm">
             <span
-              className="text-[#9EA5AD] text-[10px] font-bold uppercase tracking-wider"
+              className="text-[#9EA5AD] text-[10px] font-medium uppercase tracking-wider"
               style={{ fontFamily: "Outfit, sans-serif" }}
             >
               Created on
@@ -167,7 +167,7 @@ function TicketContent() {
             </span>
             <div className="bg-white border border-[#EBEEF5] rounded-[16px] p-6 flex flex-col gap-2 shadow-sm">
               <span
-                className="text-[#5476FC] text-xs font-bold capitalize"
+                className="text-[#5476FC] text-xs font-medium capitalize"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 {ticket.category.replace(/_/g, " ")}
@@ -208,7 +208,7 @@ function TicketContent() {
 
                       <div className="flex flex-col gap-1 flex-1">
                         <div className="bg-white border border-[#EBEEF5] rounded-[16px] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-                          <p className="text-[10px] font-bold text-[#5476FC] mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          <p className="text-[10px] font-medium text-[#5476FC] mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
                             Wellness Central Support
                           </p>
                           <p
@@ -268,7 +268,7 @@ function TicketContent() {
               Summary
             </h2>
             <span
-              className={`px-3 py-1 text-[9px] font-bold rounded-full uppercase tracking-wider ${
+              className={`px-3 py-1 text-[9px] font-medium rounded-full uppercase tracking-wider ${
                 ticket.status === "Open"
                   ? "bg-[#FFF0F0] text-[#E05252]"
                   : ticket.status === "In Progress"
@@ -284,15 +284,15 @@ function TicketContent() {
           {/* Ticket details */}
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Ticket ID
               </span>
-              <span className="text-[#24292E] text-xs font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#24292E] text-xs font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>
                 #{ticket.id.slice(0, 8).toUpperCase()}
               </span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Category
               </span>
               <span className="text-[#24292E] text-xs font-semibold capitalize" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -300,7 +300,7 @@ function TicketContent() {
               </span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Last Updated
               </span>
               <span className="text-[#24292E] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>

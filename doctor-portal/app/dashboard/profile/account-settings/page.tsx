@@ -402,7 +402,7 @@ export default function AccountSettingsPage() {
             Add an extra layer of security to your account by enabling Two-Factor Authentication (2FA). With 2FA, you&apos;ll be prompted to enter a unique verification code in addition to your password whenever you log in.
           </p>
           <p className="text-[#676E76] text-xs leading-relaxed mt-1">
-            <span className="font-bold">Benefits of Enabling 2FA:</span><br />
+            <span className="font-medium">Benefits of Enabling 2FA:</span><br />
             Enhanced protection for your sensitive information<br />
             Helps prevent unauthorized access<br />
             Easy to set up and manage

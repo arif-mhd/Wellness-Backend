@@ -625,7 +625,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
             {/* Modal header */}
             <div className="flex items-center justify-between p-7 border-b border-slate-50">
-              <h2 className="text-[17px] font-black text-slate-800">Add Product</h2>
+              <h2 className="text-[17px] font-medium text-slate-800">Add Product</h2>
               <button
                 onClick={() => setShowAddProduct(false)}
                 className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"

@@ -65,8 +65,8 @@ type Tab = "about" | "diagnosis" | "reviews";
 const DetailRow = ({
   label,
   value,
-  valueClass = "text-slate-800 font-bold",
-  labelClass = "text-slate-400 font-bold",
+  valueClass = "text-slate-800 font-medium",
+  labelClass = "text-slate-400 font-medium",
 }: {
   label: string;
   value: React.ReactNode;
@@ -82,7 +82,7 @@ const DetailRow = ({
 const DocLink = ({ title, filename, href = "#" }: { title: string; filename: string; href?: string }) => (
   <div className="flex flex-col gap-1">
     <span className="text-[11px] text-slate-600 font-medium">{title}</span>
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-[#6A8BFF] hover:underline underline-offset-2">{filename}</a>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium text-[#6A8BFF] hover:underline underline-offset-2">{filename}</a>
   </div>
 );
 
@@ -90,20 +90,20 @@ const DiagnosisCard = ({ title, count, colorHex }: { title: string; count: numbe
   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-50">
     <div className="flex items-center gap-2 mb-4">
       <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorHex }} />
-      <span className="text-[11px] font-bold text-slate-500">{title}</span>
+      <span className="text-[11px] font-medium text-slate-500">{title}</span>
     </div>
-    <div className="text-[22px] font-black text-slate-800 tracking-tight">{count}</div>
+    <div className="text-[22px] font-medium text-slate-800 tracking-tight">{count}</div>
   </div>
 );
 
 const ReviewCard = ({ name, rating, review }: { name: string; rating: number; review: string }) => (
   <div className="bg-[#f8fafd] rounded-[1rem] p-5 flex items-start gap-4">
-    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-sm bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-xs font-black">
+    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-sm bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-xs font-medium">
       {name[0]}
     </div>
     <div>
       <div className="flex items-center gap-3 mb-1.5">
-        <h4 className="text-[12px] font-bold text-slate-800">{name}</h4>
+        <h4 className="text-[12px] font-medium text-slate-800">{name}</h4>
         <div className="flex items-center gap-[2px]">
           {Array.from({ length: 5 }).map((_, i) => (
             <svg key={i} className={`w-3 h-3 ${i < rating ? "text-[#6A8BFF] fill-[#6A8BFF]" : "text-[#6A8BFF] opacity-25"}`} viewBox="0 0 24 24" fill={i < rating ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2}>
@@ -220,7 +220,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
     <ProtectedRoute>
       <div className="w-full flex flex-col items-center justify-center py-32 gap-4">
         <p className="text-red-500 font-semibold text-sm">{error || "Doctor not found."}</p>
-        <button onClick={() => router.push("/dashboard/doctors")} className="text-[#6A8BFF] text-sm font-bold hover:underline">
+        <button onClick={() => router.push("/dashboard/doctors")} className="text-[#6A8BFF] text-sm font-medium hover:underline">
           Back to Doctors
         </button>
       </div>
@@ -247,7 +247,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-[24px] font-black text-[#1e293b] tracking-tight">Doctor Profile</h1>
+          <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight">Doctor Profile</h1>
         </div>
 
         {/* Main grid */}
@@ -263,29 +263,29 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   {doctor.avatarUrl ? (
                     <img src={doctor.avatarUrl} alt={doctor.fullName} className="w-[84px] h-[84px] rounded-full object-cover border-[3px] border-slate-50 shadow-sm shrink-0" />
                   ) : (
-                    <div className="w-[84px] h-[84px] rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-black text-2xl shrink-0 border-[3px] border-slate-50 shadow-sm">
+                    <div className="w-[84px] h-[84px] rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-medium text-2xl shrink-0 border-[3px] border-slate-50 shadow-sm">
                       {doctor.fullName?.split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
                     </div>
                   )}
                   <div>
-                    <h2 className="text-[19px] font-black text-slate-800 tracking-tight">{doctor.fullName}</h2>
+                    <h2 className="text-[19px] font-medium text-slate-800 tracking-tight">{doctor.fullName}</h2>
                     {doctor.license && (
-                      <p className="text-[10px] font-bold text-[#6A8BFF] uppercase tracking-wide mt-1.5">
+                      <p className="text-[10px] font-medium text-[#6A8BFF] uppercase tracking-wide mt-1.5">
                         LICENSE NUMBER {doctor.license}
                       </p>
                     )}
                     {doctor.specialty && (
-                      <div className="mt-3 inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-black tracking-wide uppercase">
+                      <div className="mt-3 inline-block px-4 py-1.5 bg-[#e4edff] text-[#6A8BFF] rounded-md text-[11px] font-medium tracking-wide uppercase">
                         {doctor.specialty}
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-bold transition active:scale-95">
+                  <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
                     Edit
                   </button>
-                  <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-bold transition active:scale-95">
+                  <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
                     Deactivate Doctor Profile
                   </button>
                 </div>
@@ -293,7 +293,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
               {doctor.bio && (
                 <div className="mt-8 pt-6 border-t border-slate-100">
-                  <p className="text-[11px] font-bold text-slate-400 mb-2.5">Bio</p>
+                  <p className="text-[11px] font-medium text-slate-400 mb-2.5">Bio</p>
                   <p className="text-[12px] text-slate-600 font-medium leading-[1.8]">{doctor.bio}</p>
                 </div>
               )}
@@ -305,7 +305,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`px-7 py-3 rounded-full text-[13px] font-bold transition-all shadow-sm ${
+                  className={`px-7 py-3 rounded-full text-[13px] font-medium transition-all shadow-sm ${
                     activeTab === key ? "bg-[#1E293B] text-white" : "bg-white text-slate-500 border border-slate-100 hover:text-slate-800"
                   }`}
                 >
@@ -323,7 +323,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
                   {/* Personal Details */}
                   <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
-                    <h3 className="text-[14px] font-black text-slate-800 mb-6">Personal Details</h3>
+                    <h3 className="text-[14px] font-medium text-slate-800 mb-6">Personal Details</h3>
                     <div className="space-y-4">
                       {doctor.emiratesId && (
                         <DetailRow
@@ -342,7 +342,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                       <DetailRow
                         label="Email ID"
                         value={<a href={`mailto:${doctor.email}`} className="text-[#6A8BFF] hover:underline">{doctor.email}</a>}
-                        valueClass="font-bold"
+                        valueClass="font-medium"
                       />
                       <DetailRow label="Gender" value={doctor.gender} />
                       <DetailRow label="Date of Birth" value={doctor.dateOfBirth} />
@@ -357,7 +357,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
                   {/* Consultation Fee */}
                   <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
-                    <h3 className="text-[14px] font-black text-slate-800 mb-6">Consultation Fee</h3>
+                    <h3 className="text-[14px] font-medium text-slate-800 mb-6">Consultation Fee</h3>
                     <div className="space-y-4">
                       {["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al-Quwain", "Ras Al Khaimah", "Fujairah"].map(emirate => {
                         const fee = doctor.feesPerEmirate?.[emirate] ?? doctor.fees ?? "—";
@@ -368,7 +368,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
                   {/* Documents */}
                   <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
-                    <h3 className="text-[14px] font-black text-slate-800 mb-6">Documents</h3>
+                    <h3 className="text-[14px] font-medium text-slate-800 mb-6">Documents</h3>
                     <div className="space-y-6">
                       {doctor.degreeFileUrl
                         ? <DocLink title="Medical Degree Certificate" filename={doctor.degreeFileUrl.split("/").pop() || "Med_certificate.pdf"} href={doctor.degreeFileUrl} />
@@ -398,7 +398,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     </div>
                   ) : (
                     <>
-                      <p className="text-[12px] text-slate-700 font-bold max-w-2xl leading-relaxed">
+                      <p className="text-[12px] text-slate-700 font-medium max-w-2xl leading-relaxed">
                         Top {diagnosis.length} reason{diagnosis.length !== 1 ? "s" : ""} patients booked with this doctor
                         {diagTotal > 0 && <span className="text-slate-400 font-medium"> · {diagTotal} total appointments</span>}
                       </p>
@@ -429,9 +429,9 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                   ) : (
                     <>
                       <div className="flex items-center justify-between mb-7">
-                        <h3 className="text-[14px] font-black text-slate-800">All Ratings</h3>
+                        <h3 className="text-[14px] font-medium text-slate-800">All Ratings</h3>
                         {avgRating !== null && (
-                          <div className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
+                          <div className="flex items-center gap-1.5 text-[14px] font-medium text-slate-800">
                             <svg className="w-4 h-4 text-[#6A8BFF] fill-[#6A8BFF]" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                             </svg>
@@ -461,8 +461,8 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
           <div className="xl:col-span-4">
             <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50 sticky top-6">
               <div className="flex items-center justify-between mb-7">
-                <h3 className="text-[16px] font-black text-slate-800">Availability</h3>
-                <button className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5 hover:text-slate-800 transition">
+                <h3 className="text-[16px] font-medium text-slate-800">Availability</h3>
+                <button className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5 hover:text-slate-800 transition">
                   This Week
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                 </button>
@@ -475,7 +475,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <svg className="w-[18px] h-[18px] text-[#F59E0B] shrink-0 mt-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-[11px] font-bold text-slate-700 leading-relaxed pr-2">
+                    <p className="text-[11px] font-medium text-slate-700 leading-relaxed pr-2">
                       This doctor has updated their availability slots. Please review and verify the changes.
                     </p>
                   </div>
@@ -483,7 +483,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <button
                       onClick={handleVerifySlots}
                       disabled={verifying}
-                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-6 py-2.5 rounded-xl text-[11px] font-bold shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition active:scale-95 disabled:opacity-50"
+                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-6 py-2.5 rounded-xl text-[11px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition active:scale-95 disabled:opacity-50"
                     >
                       {verifying ? "Verifying..." : "Verify Now"}
                     </button>
@@ -517,7 +517,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <div key={label} className="flex justify-between items-center text-[12px] pb-5 border-b border-slate-50 last:border-0 last:pb-0">
                       <span className="text-slate-500 font-medium">{label}</span>
                       <span
-                        className={`font-bold ${sortedSlots.length > 0 ? "text-slate-800" : "text-slate-300"} text-right max-w-[70%] truncate`}
+                        className={`font-medium ${sortedSlots.length > 0 ? "text-slate-800" : "text-slate-300"} text-right max-w-[70%] truncate`}
                         title={slotsText}
                       >
                         {slotsText}

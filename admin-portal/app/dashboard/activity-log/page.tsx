@@ -111,7 +111,7 @@ export default function ActivityLogPage() {
 
         {/* Header */}
         <div className="pt-2 flex items-center justify-between">
-          <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Activity Log</h1>
+          <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Activity Log</h1>
           <span className="text-xs text-slate-400 font-medium">{total} total events</span>
         </div>
 
@@ -123,7 +123,7 @@ export default function ActivityLogPage() {
               <button
                 key={tab.key}
                 onClick={() => handleSourceChange(tab.key)}
-                className={`px-5 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                className={`px-5 py-2 rounded-full text-[12px] font-medium transition-all shadow-sm ${
                   source === tab.key
                     ? tab.color + " shadow-slate-300"
                     : "bg-white text-slate-500 border border-slate-100 hover:text-slate-800"
@@ -143,7 +143,7 @@ export default function ActivityLogPage() {
               <button
                 key={t}
                 onClick={() => handleTimeChange(t)}
-                className={`px-5 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm capitalize ${
+                className={`px-5 py-2 rounded-full text-[12px] font-medium transition-all shadow-sm capitalize ${
                   timeRange === t
                     ? "bg-[#1E293B] text-white shadow-slate-300"
                     : "bg-white text-slate-500 border border-slate-100 hover:text-slate-800"
@@ -187,11 +187,11 @@ export default function ActivityLogPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-50">
-                  <th className="py-6 px-8 text-[12px] font-black text-slate-800 w-[18%]">Date/Time</th>
-                  <th className="py-6 px-4 text-[12px] font-black text-slate-800 w-[12%]">Source</th>
-                  <th className="py-6 px-4 text-[12px] font-black text-slate-800 w-[20%]">Action</th>
-                  <th className="py-6 px-4 text-[12px] font-black text-slate-800 w-[35%]">Details</th>
-                  <th className="py-6 px-8 text-[12px] font-black text-slate-800">Performed By</th>
+                  <th className="py-6 px-8 text-[12px] font-medium text-slate-800 w-[18%]">Date/Time</th>
+                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[12%]">Source</th>
+                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[20%]">Action</th>
+                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[35%]">Details</th>
+                  <th className="py-6 px-8 text-[12px] font-medium text-slate-800">Performed By</th>
                 </tr>
               </thead>
               <tbody>
@@ -202,11 +202,11 @@ export default function ActivityLogPage() {
                       idx === 0 ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"
                     } transition-colors`}
                   >
-                    <td className="py-4 px-8 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                    <td className="py-4 px-8 text-[11px] font-medium text-slate-500 whitespace-nowrap">
                       {formatDate(log.timestamp)}
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border capitalize ${SOURCE_BADGE[log.source] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium border capitalize ${SOURCE_BADGE[log.source] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
                         {log.source}
                       </span>
                     </td>
@@ -241,7 +241,7 @@ export default function ActivityLogPage() {
                 <button
                   key={num}
                   onClick={() => setPage(num)}
-                  className={`w-9 h-9 rounded-full text-[13px] font-bold flex items-center justify-center transition-all ${
+                  className={`w-9 h-9 rounded-full text-[13px] font-medium flex items-center justify-center transition-all ${
                     num === page
                       ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-200"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -255,7 +255,7 @@ export default function ActivityLogPage() {
                   <span className="text-slate-400 text-xs px-1">…</span>
                   <button
                     onClick={() => setPage(totalPages)}
-                    className="w-9 h-9 rounded-full text-[13px] font-bold flex items-center justify-center text-slate-500 hover:bg-slate-50"
+                    className="w-9 h-9 rounded-full text-[13px] font-medium flex items-center justify-center text-slate-500 hover:bg-slate-50"
                   >
                     {totalPages}
                   </button>

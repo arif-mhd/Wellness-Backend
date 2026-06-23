@@ -16,7 +16,7 @@ function apiFetch(path: string, init?: RequestInit) {
 }
 
 type Priority = "High" | "Medium" | "Low";
-type Status = "Open" | "In Progress" | "Closed";
+type Status = "Open" | "Closed";
 type SubmitterRole = "all" | "patient" | "doctor";
 
 interface Ticket {
@@ -147,9 +147,8 @@ function SupportPageInner() {
   }
 
   const statusColors: Record<Status, string> = {
-    "Open": "bg-[#f45a5a] text-white",
-    "In Progress": "bg-amber-400 text-white",
-    "Closed": "bg-[#24b26b] text-white",
+    "Open": "bg-[#EB5757] text-white",
+    "Closed": "bg-[#1DA877] text-white",
   };
 
   const displayName = (t: Ticket) => t.submitterName || t.patientName || (t.submitterRole === "doctor" ? "Unknown Doctor" : "Unknown Patient");
@@ -162,7 +161,7 @@ function SupportPageInner() {
           {/* LEFT COLUMN */}
           <div className={`${selected ? "xl:col-span-8" : "xl:col-span-12"} flex flex-col gap-5`}>
 
-            <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Support and Tickets</h1>
+            <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Support and Tickets</h1>
 
             {/* Role tabs */}
             <div className="flex items-center gap-2">
@@ -174,13 +173,13 @@ function SupportPageInner() {
                 <button
                   key={key}
                   onClick={() => setRoleFilter(key)}
-                  className={`px-5 py-2 rounded-full text-[13px] font-bold transition-all flex items-center gap-2 ${
+                  className={`px-5 py-2 rounded-full text-[13px] font-semibold transition-all flex items-center gap-2 ${
                     roleFilter === key ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
                   }`}
                 >
                   {label}
                   {count !== undefined && count > 0 && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleFilter === key ? "bg-white/20 text-white" : "bg-rose-50 text-rose-500"}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleFilter === key ? "bg-white/20 text-white" : "bg-rose-50 text-rose-500"}`}>
                       {count} open
                     </span>
                   )}
@@ -191,11 +190,11 @@ function SupportPageInner() {
             {/* Status filters */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {(["all", "Open", "In Progress", "Closed"] as const).map((s) => (
+                {(["all", "Open", "Closed"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
-                    className={`px-5 py-2 rounded-full text-[13px] font-bold transition-all ${
+                    className={`px-5 py-2 rounded-full text-[13px] font-semibold transition-all ${
                       statusFilter === s ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
                     }`}
                   >
@@ -203,13 +202,13 @@ function SupportPageInner() {
                   </button>
                 ))}
               </div>
-              <button onClick={fetchTickets} className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+              <button onClick={fetchTickets} className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                 Refresh
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-1">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
               <div className="flex items-center gap-6 flex-1">
                 {["Date", "Priority", "Status"].map((filter) => (
                   <span key={filter} className="flex items-center gap-1.5">
@@ -227,18 +226,18 @@ function SupportPageInner() {
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                      <th className="pb-4 pt-1 font-bold pl-2 w-[24%]">
+                    <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                      <th className="pb-4 pt-1 font-semibold pl-2 w-[24%]">
                         <div className="flex items-center gap-2">Subject <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[10%]">
+                      <th className="pb-4 pt-1 font-semibold w-[10%]">
                         <div className="flex items-center gap-2">Priority <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[14%]">Category</th>
-                      <th className="pb-4 pt-1 font-bold w-[8%]">Type</th>
-                      <th className="pb-4 pt-1 font-bold w-[18%]">Submitter</th>
-                      <th className="pb-4 pt-1 font-bold w-[14%]">Date</th>
-                      <th className="pb-4 pt-1 font-bold w-[12%] text-center">Status</th>
+                      <th className="pb-4 pt-1 font-semibold w-[14%]">Category</th>
+                      <th className="pb-4 pt-1 font-semibold w-[8%]">Type</th>
+                      <th className="pb-4 pt-1 font-semibold w-[18%]">Submitter</th>
+                      <th className="pb-4 pt-1 font-semibold w-[14%]">Date</th>
+                      <th className="pb-4 pt-1 font-semibold w-[12%] text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -255,32 +254,32 @@ function SupportPageInner() {
                           <tr
                             key={t.id}
                             onClick={() => setSelectedId(t.id)}
-                            className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                            className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
                           >
                             <td className="py-4 pl-2">
-                              <p className="text-[13px] font-bold text-slate-800 leading-tight">{t.subject}</p>
+                              <p className="text-[13px] font-semibold text-slate-800 leading-tight">{t.subject}</p>
                               <p className="text-[11px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
                             </td>
-                            <td className={`py-4 text-[12px] font-bold ${priorityColor[priority]}`}>{priority}</td>
+                            <td className={`py-4 text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
                             <td className="py-4">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${isDoctor ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
+                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-semibold ${isDoctor ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
                                 {isDoctor ? "Doctor" : "Patient"}
                               </span>
                             </td>
                             <td className="py-4 pr-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[12px] flex-shrink-0">
-                                  {displayName(t).slice(0, 2).toUpperCase()}
+                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[12px] flex-shrink-0">
+                                  {displayName(t).slice(0, 1).toUpperCase()}
                                 </div>
                                 <div>
-                                  <p className="text-[12px] font-bold text-slate-800 leading-tight">{displayName(t)}</p>
+                                  <p className="text-[12px] font-semibold text-slate-800 leading-tight">{displayName(t)}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium">{formatDate(t.createdAt)}</td>
                             <td className="py-4 text-center">
-                              <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[11px] font-bold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
+                              <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[11px] font-semibold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
                                 {t.status}
                               </span>
                             </td>
@@ -309,7 +308,7 @@ function SupportPageInner() {
             <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300 flex flex-col gap-5">
 
               <div className="flex items-center justify-between">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">{selected.subject}</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">{selected.subject}</h2>
                 <button onClick={() => setSelectedId(null)} className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -317,21 +316,21 @@ function SupportPageInner() {
 
               {/* Type badge */}
               <div className="flex items-center gap-2">
-                <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-bold ${selected.submitterRole === "doctor" ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
+                <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-semibold ${selected.submitterRole === "doctor" ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
                   {selected.submitterRole === "doctor" ? "Doctor Request" : "Patient Request"}
                 </span>
               </div>
 
               {/* Status toggle */}
               <div className="flex items-center gap-2 flex-wrap">
-                {(["Open", "In Progress", "Closed"] as Status[]).map((s) => (
+                {(["Open", "Closed"] as Status[]).map((s) => (
                   <button
                     key={s}
                     disabled={savingStatus}
                     onClick={() => handleStatusChange(s)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition ${
                       selected.status === s
-                        ? s === "Open" ? "bg-rose-500 text-white border-rose-500" : s === "In Progress" ? "bg-amber-400 text-white border-amber-400" : "bg-emerald-500 text-white border-emerald-500"
+                        ? s === "Open" ? "bg-[#EB5757] text-white border-[#EB5757]" : "bg-[#1DA877] text-white border-[#1DA877]"
                         : "bg-white text-slate-400 border-slate-100 hover:border-slate-300"
                     }`}
                   >
@@ -342,15 +341,15 @@ function SupportPageInner() {
 
               {/* Created by */}
               <div>
-                <p className="text-[12.5px] font-bold text-slate-800 mb-2">
+                <p className="text-[12.5px] font-semibold text-slate-800 mb-2">
                   {selected.submitterRole === "doctor" ? "Doctor" : "Patient"}
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[13px] flex-shrink-0">
-                    {displayName(selected).slice(0, 2).toUpperCase()}
+                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[13px] flex-shrink-0">
+                    {displayName(selected).slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-[13px] font-black text-slate-800">{displayName(selected)}</p>
+                    <p className="text-[13px] font-medium text-slate-800">{displayName(selected)}</p>
                     <p className="text-[11px] text-slate-400 font-medium">ID: {selected.id.slice(0, 8).toUpperCase()}</p>
                   </div>
                 </div>
@@ -359,22 +358,22 @@ function SupportPageInner() {
               {/* Properties */}
               <div className="bg-[#f8fafd] rounded-[1.25rem] p-5 space-y-3 border border-slate-50">
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Category</span>
-                  <span className="text-[11px] text-slate-800 font-bold capitalize">{(selected.category || "").replace(/_/g, " ")}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Category</span>
+                  <span className="text-[11px] text-slate-800 font-semibold capitalize">{(selected.category || "").replace(/_/g, " ")}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Date Created</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">{formatDate(selected.createdAt)}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Date Created</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{formatDate(selected.createdAt)}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Last Updated</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">{formatDate(selected.updatedAt)}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Last Updated</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{formatDate(selected.updatedAt)}</span>
                 </div>
               </div>
 
               {/* Description */}
               <div>
-                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Message</p>
+                <p className="text-[12.5px] font-semibold text-slate-800 mb-2">Message</p>
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
@@ -382,10 +381,10 @@ function SupportPageInner() {
 
               {/* Admin Reply */}
               <div>
-                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Admin Reply</p>
+                <p className="text-[12.5px] font-semibold text-slate-800 mb-2">Admin Reply</p>
                 {selected.adminReply && (
                   <div className="bg-blue-50 border-l-4 border-[#6A8BFF] rounded-xl p-3 mb-3">
-                    <p className="text-[11px] font-bold text-[#6A8BFF] mb-1">Sent reply</p>
+                    <p className="text-[11px] font-semibold text-[#6A8BFF] mb-1">Sent reply</p>
                     <p className="text-[12px] text-slate-600 leading-relaxed">{selected.adminReply}</p>
                   </div>
                 )}
@@ -398,7 +397,7 @@ function SupportPageInner() {
                 <button
                   onClick={handleSendReply}
                   disabled={savingReply || !replyText.trim()}
-                  className="w-full py-3 mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-50 text-white rounded-[1rem] text-[13px] font-bold transition duration-200"
+                  className="w-full py-3 mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-50 text-white rounded-[1rem] text-[13px] font-semibold transition duration-200"
                 >
                   {savingReply ? "Sending..." : "Send Reply"}
                 </button>

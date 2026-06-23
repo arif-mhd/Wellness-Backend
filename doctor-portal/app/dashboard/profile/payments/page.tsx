@@ -81,10 +81,10 @@ export default function PaymentsPage() {
             Earnings Summary
           </h2>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-medium rounded-[12px] hover:bg-[#D5E1FF] transition-all">
               View Transaction History
             </button>
-            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+            <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-medium rounded-[12px] hover:bg-[#D5E1FF] transition-all">
               Withdraw Now
             </button>
           </div>
@@ -99,7 +99,7 @@ export default function PaymentsPage() {
           ].map(({ label, value }) => (
             <div key={label} className="bg-white border border-[#EBEEF5] rounded-[12px] p-6 flex flex-col gap-2 flex-1 shadow-sm">
               <span className="text-[#676E76] text-[13px] font-normal">{label}</span>
-              <span className="text-[#24292E] text-[24px] font-bold tracking-tight mt-1 leading-none">
+              <span className="text-[#24292E] text-[24px] font-medium tracking-tight mt-1 leading-none">
                 {value}
               </span>
             </div>
@@ -113,7 +113,7 @@ export default function PaymentsPage() {
           <h2 className="text-[#383F45] font-medium text-[20px] tracking-[-0.4px]">
             Payment Methods
           </h2>
-          <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-bold rounded-[12px] hover:bg-[#D5E1FF] transition-all">
+          <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-medium rounded-[12px] hover:bg-[#D5E1FF] transition-all">
             Add another account
           </button>
         </div>
@@ -176,13 +176,13 @@ export default function PaymentsPage() {
       <div className="flex gap-6 mt-2 w-full">
         <button 
           type="button"
-          className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-bold tracking-tight transition-all duration-200"
+          className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-medium tracking-tight transition-all duration-200"
         >
           Cancel
         </button>
         <button 
           type="button"
-          className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-bold tracking-tight transition-all duration-200"
+          className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-medium tracking-tight transition-all duration-200"
         >
           Save Changes
         </button>

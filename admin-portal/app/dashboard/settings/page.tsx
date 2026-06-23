@@ -149,7 +149,7 @@ export default function SettingsPage() {
         {/* Left Navigation Panel */}
         <div className="col-span-12 lg:col-span-4 xl:col-span-3">
           <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7">
-            <h1 className="text-[17px] font-black text-slate-800 mb-1">System Configurations</h1>
+            <h1 className="text-[17px] font-medium text-slate-800 mb-1">System Configurations</h1>
             <p className="text-[11px] text-slate-400 font-medium leading-relaxed mb-6">
               Manage system settings, preferences, and configurations to optimize the platform's functionality and user experience.
             </p>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
                       setActiveTab(item.label);
                       setSelectedFeeCategory(null);
                     }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-[12px] font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-[12px] font-medium transition-all ${
                       isActive
                         ? "text-[#6A8BFF] bg-blue-50/50"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -186,19 +186,19 @@ export default function SettingsPage() {
           
           {activeTab === "General Settings" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">General Settings</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">General Settings</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-1">Time Zone</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-1">Time Zone</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Select your preferred timezone for scheduling and notifications.</p>
                   
                   <div className="relative">
-                    <label className="absolute top-3 left-5 text-[10px] font-bold text-slate-400 pointer-events-none">Current Time Zone</label>
+                    <label className="absolute top-3 left-5 text-[10px] font-medium text-slate-400 pointer-events-none">Current Time Zone</label>
                     <select
                       value={timeZone}
                       onChange={(e) => setTimeZone(e.target.value)}
-                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-bold text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
+                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-medium text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
                     >
                       <option>Gulf Standard Time (GST) - UTC +4:00</option>
                       <option>Greenwich Mean Time (GMT) - UTC +0:00</option>
@@ -209,15 +209,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-1">Primary Currency</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-1">Primary Currency</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Choose the currency in which transactions will be processed.</p>
                   
                   <div className="relative">
-                    <label className="absolute top-3 left-5 text-[10px] font-bold text-slate-400 pointer-events-none">Currency</label>
+                    <label className="absolute top-3 left-5 text-[10px] font-medium text-slate-400 pointer-events-none">Currency</label>
                     <select
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-bold text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
+                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-medium text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
                     >
                       <option>United Arab Emirates Dirham (AED)</option>
                       <option>United States Dollar (USD)</option>
@@ -228,15 +228,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-1">Default Language</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-1">Default Language</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Select the system language.</p>
                   
                   <div className="relative">
-                    <label className="absolute top-3 left-5 text-[10px] font-bold text-slate-400 pointer-events-none">Language</label>
+                    <label className="absolute top-3 left-5 text-[10px] font-medium text-slate-400 pointer-events-none">Language</label>
                     <select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-bold text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
+                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-medium text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
                     >
                       <option>English (UK)</option>
                       <option>English (US)</option>
@@ -251,7 +251,7 @@ export default function SettingsPage() {
 
           {activeTab === "Platform Fee Management" && !selectedFeeCategory && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Platform Fee Management</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Platform Fee Management</h2>
               
               <div className="space-y-6">
                 {[
@@ -260,11 +260,11 @@ export default function SettingsPage() {
                   { title: "Pharmacy Fee", desc: "Adjust the percentage fees for consultations, applicable to both insurance and cash payments, to streamline your billing process. This percentage will be deducted from the consultation fee set by the doctor as the platform's fee." }
                 ].map((item, i) => (
                   <div key={i} className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                    <p className="text-[12px] font-bold text-slate-800 mb-2">{item.title}</p>
+                    <p className="text-[12px] font-medium text-slate-800 mb-2">{item.title}</p>
                     <p className="text-[11px] text-slate-400 font-medium mb-6 leading-relaxed max-w-[90%]">{item.desc}</p>
                     <button 
                       onClick={() => setSelectedFeeCategory(item.title)}
-                      className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-bold px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm"
+                      className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-medium px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm"
                     >
                       Edit Fees
                     </button>
@@ -278,14 +278,14 @@ export default function SettingsPage() {
             <div className="animate-in slide-in-from-right-4 duration-300">
               <div className="flex items-center gap-2 mb-6 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedFeeCategory(null)}>
                 <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                <h2 className="text-[15px] font-bold text-[#1e293b]">Specialization and Fee Management</h2>
+                <h2 className="text-[15px] font-medium text-[#1e293b]">Specialization and Fee Management</h2>
               </div>
 
               <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                <p className="text-[12px] font-bold text-slate-800 mb-2">Specialization and Fee Management</p>
+                <p className="text-[12px] font-medium text-slate-800 mb-2">Specialization and Fee Management</p>
                 <p className="text-[11px] text-slate-400 font-medium mb-8 leading-relaxed max-w-[90%]">Adjust the percentage fees for consultations, applicable to both insurance and cash payments, to streamline your billing process. This percentage will be deducted from the consultation fee set by the doctor as the platform's fee.</p>
 
-                <div className="grid grid-cols-12 mb-4 px-4 text-[12px] font-bold text-slate-800">
+                <div className="grid grid-cols-12 mb-4 px-4 text-[12px] font-medium text-slate-800">
                   <div className="col-span-6">Category</div>
                   <div className="col-span-3 text-center">Insurance(%)</div>
                   <div className="col-span-3 text-center">Cash(%)</div>
@@ -301,7 +301,7 @@ export default function SettingsPage() {
                           onClick={() => !isExpanded && setExpandedSpecialization(item.id)}
                         >
                           <div className="col-span-6 flex flex-col gap-1">
-                            <span className="text-[13px] font-bold text-slate-800">{item.title}</span>
+                            <span className="text-[13px] font-medium text-slate-800">{item.title}</span>
                             <span className="text-[10px] text-slate-400 font-medium">Last updated {item.date}</span>
                           </div>
                           
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                                   type="text" 
                                   value={item.insurance}
                                   onChange={(e) => updateFeeData(item.id, "insurance", e.target.value)}
-                                  className="w-full bg-white rounded-lg h-10 px-4 text-[13px] font-bold text-slate-800 text-center outline-none border-none shadow-sm focus:ring-2 focus:ring-[#6A8BFF]/20"
+                                  className="w-full bg-white rounded-lg h-10 px-4 text-[13px] font-medium text-slate-800 text-center outline-none border-none shadow-sm focus:ring-2 focus:ring-[#6A8BFF]/20"
                                 />
                               </div>
                               <div className="col-span-3 px-2">
@@ -320,16 +320,16 @@ export default function SettingsPage() {
                                   type="text" 
                                   value={item.cash}
                                   onChange={(e) => updateFeeData(item.id, "cash", e.target.value)}
-                                  className="w-full bg-white rounded-lg h-10 px-4 text-[13px] font-bold text-slate-800 text-center outline-none border-none shadow-sm focus:ring-2 focus:ring-[#6A8BFF]/20"
+                                  className="w-full bg-white rounded-lg h-10 px-4 text-[13px] font-medium text-slate-800 text-center outline-none border-none shadow-sm focus:ring-2 focus:ring-[#6A8BFF]/20"
                                 />
                               </div>
                             </>
                           ) : (
                             <>
-                              <div className="col-span-3 text-center text-[12px] font-bold text-[#6A8BFF]">
+                              <div className="col-span-3 text-center text-[12px] font-medium text-[#6A8BFF]">
                                 {item.insurance}
                               </div>
-                              <div className="col-span-3 text-center text-[12px] font-bold text-[#6A8BFF]">
+                              <div className="col-span-3 text-center text-[12px] font-medium text-[#6A8BFF]">
                                 {item.cash}
                               </div>
                             </>
@@ -339,28 +339,28 @@ export default function SettingsPage() {
                         {isExpanded && (
                           <div className="mt-5 grid grid-cols-12 gap-4 animate-in slide-in-from-top-2">
                             <div className="col-span-4 relative">
-                              <label className="absolute top-2 left-4 text-[10px] font-bold text-slate-400 pointer-events-none">Effective Date</label>
+                              <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Effective Date</label>
                               <input 
                                 type="date"
                                 value={item.effectiveDate}
                                 onChange={(e) => updateFeeData(item.id, "effectiveDate", e.target.value)}
-                                className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-bold text-slate-800 outline-none border-none shadow-sm"
+                                className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm"
                               />
                             </div>
                             <div className="col-span-8 relative">
-                              <label className="absolute top-2 left-4 text-[10px] font-bold text-slate-400 pointer-events-none">Notes</label>
+                              <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Notes</label>
                               <input 
                                 type="text"
                                 value={item.notes}
                                 onChange={(e) => updateFeeData(item.id, "notes", e.target.value)}
                                 placeholder="Add notes here..."
-                                className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-bold text-slate-800 outline-none border-none shadow-sm placeholder:text-slate-300"
+                                className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm placeholder:text-slate-300"
                               />
                             </div>
                             <div className="col-span-12 mt-2">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setExpandedSpecialization(null); }}
-                                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-7 py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95"
+                                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-medium px-7 py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95"
                               >
                                 Save Changes
                               </button>
@@ -377,31 +377,31 @@ export default function SettingsPage() {
 
           {activeTab === "Payments" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Payments</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Payments</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Set Withdrawal Frequency</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Set Withdrawal Frequency</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Control how often doctors can request withdrawals. They will only be able to withdraw once during the specified period.</p>
                   
                   <div className="max-w-xs relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5">
                     <div className="flex flex-col w-full">
-                      <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Withdrawal Interval</label>
+                      <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Withdrawal Interval</label>
                       <input 
                         type="number" 
                         value={withdrawalInterval}
                         onChange={(e) => setWithdrawalInterval(Number(e.target.value))}
-                        className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                        className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Bank Account Management</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Bank Account Management</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-8 leading-relaxed max-w-[85%]">Here you can view and manage your linked bank accounts for receiving payments. You can also add new accounts, set your primary account for withdrawals, or remove any accounts no longer in use.</p>
                   
-                  <p className="text-[11px] font-bold text-slate-600 mb-4">Set primary account</p>
+                  <p className="text-[11px] font-medium text-slate-600 mb-4">Set primary account</p>
 
                   <div className="space-y-6">
                     {/* Bank 1 */}
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                            </div>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-[13px] font-bold text-slate-800">ABC BANK *******2345</p>
+                          <p className="text-[13px] font-medium text-slate-800">ABC BANK *******2345</p>
                           <p className="text-[10px] text-slate-400 font-medium">Primary Account</p>
                           <p className="text-[11px] text-slate-500 font-medium mt-1">Account number: xxxxx xxxxx 2345</p>
                           <button className="text-red-500 hover:text-red-600 mt-1 flex items-center gap-1">
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                            </div>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-[13px] font-bold text-slate-800">XYZ BANK *******2345</p>
+                          <p className="text-[13px] font-medium text-slate-800">XYZ BANK *******2345</p>
                           <p className="text-[10px] text-slate-400 font-medium">Primary Account</p>
                           <p className="text-[11px] text-slate-500 font-medium mt-1">Account number: xxxxx xxxxx 2345</p>
                           <button className="text-red-500 hover:text-red-600 mt-1 flex items-center gap-1">
@@ -454,7 +454,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-bold px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm mt-2">
+                    <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-medium px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm mt-2">
                       Add another account
                     </button>
                   </div>
@@ -465,23 +465,23 @@ export default function SettingsPage() {
 
           {activeTab === "Appointment Settings" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Appointment Settings</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Appointment Settings</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-6">Max Bookings Per Day</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-6">Max Bookings Per Day</p>
                   
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <p className="text-[11px] text-slate-400 font-medium mb-3">Set the maximum number of bookings allowed each day.</p>
                       <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5">
                         <div className="flex flex-col w-full">
-                          <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Max Bookings</label>
+                          <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Max Bookings</label>
                           <input 
                             type="number"
                             value={maxBookings}
                             onChange={(e) => setMaxBookings(Number(e.target.value))}
-                            className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                            className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                           />
                         </div>
                       </div>
@@ -490,12 +490,12 @@ export default function SettingsPage() {
                       <p className="text-[11px] text-slate-400 font-medium mb-3">Set the maximum duration of each consultation</p>
                       <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5">
                         <div className="flex flex-col w-full">
-                          <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Duration (in Minutes)</label>
+                          <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Duration (in Minutes)</label>
                           <input 
                             type="number"
                             value={duration}
                             onChange={(e) => setDuration(Number(e.target.value))}
-                            className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                            className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                           />
                         </div>
                       </div>
@@ -504,48 +504,48 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Cancellation Policy</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Cancellation Policy</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-5">Define how many hours before an appointment can be canceled without penalty.</p>
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5 max-w-md">
                     <div className="flex flex-col w-full">
-                      <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Hour(s)</label>
+                      <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Hour(s)</label>
                       <input 
                         type="number"
                         value={cancellationHours}
                         onChange={(e) => setCancellationHours(Number(e.target.value))}
-                        className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                        className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Reminder Lead Time</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Reminder Lead Time</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-5">Set how much time before the appointment a reminder should be sent.</p>
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5 max-w-md">
                     <div className="flex flex-col w-full">
-                      <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Lead Time (in mins)</label>
+                      <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Lead Time (in mins)</label>
                       <input 
                         type="number"
                         value={reminderLead}
                         onChange={(e) => setReminderLead(Number(e.target.value))}
-                        className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                        className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Pre-Visit Form Submission Deadline</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Pre-Visit Form Submission Deadline</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-5 max-w-[90%] leading-relaxed">Define the time limit for patients to submit their pre-visit forms before their scheduled appointment. Ensuring timely submissions helps doctors prepare effectively for consultations.</p>
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5 max-w-md">
                     <div className="flex flex-col w-full">
-                      <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Submission Deadline (in mins)</label>
+                      <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Submission Deadline (in mins)</label>
                       <input 
                         type="number"
                         value={submissionDeadline}
                         onChange={(e) => setSubmissionDeadline(Number(e.target.value))}
-                        className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full"
+                        className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full"
                       />
                     </div>
                   </div>
@@ -556,29 +556,29 @@ export default function SettingsPage() {
 
           {activeTab === "Maintenance and Updates" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Maintenance and Updates</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Maintenance and Updates</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Scheduled Downtime</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Scheduled Downtime</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Set the date and time for system maintenance.</p>
                   
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center justify-between px-5 max-w-md">
                     <div className="flex flex-col w-full">
-                      <label className="text-[10px] font-bold text-slate-400 pointer-events-none">Scheduled Downtime</label>
+                      <label className="text-[10px] font-medium text-slate-400 pointer-events-none">Scheduled Downtime</label>
                       <input 
                         type="datetime-local" 
                         value={scheduledDowntime}
                         onChange={(e) => setScheduledDowntime(e.target.value)}
-                        className="bg-transparent border-none p-0 text-[13px] font-bold text-slate-800 outline-none w-full" 
+                        className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full" 
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-1">Backup Frequency</p>
-                  <p className="text-[11px] text-slate-600 font-bold mb-6">Last backup: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-1">Backup Frequency</p>
+                  <p className="text-[11px] text-slate-600 font-medium mb-6">Last backup: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
                   
                   <div className="flex flex-col gap-4">
                     {["Daily", "Weekly", "Monthly"].map((freq) => (
@@ -586,7 +586,7 @@ export default function SettingsPage() {
                         <div className={`w-5 h-5 rounded-full border-2 bg-white flex items-center justify-center transition-colors ${backupFreq === freq ? "border-[#6A8BFF]" : "border-slate-200 group-hover:border-slate-300"}`}>
                           {backupFreq === freq && <div className="w-2.5 h-2.5 rounded-full bg-[#6A8BFF] animate-in zoom-in" />}
                         </div>
-                        <span className="text-[12px] font-bold text-slate-800">{freq}</span>
+                        <span className="text-[12px] font-medium text-slate-800">{freq}</span>
                       </label>
                     ))}
                   </div>
@@ -597,19 +597,19 @@ export default function SettingsPage() {
 
           {activeTab === "Security Settings" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Security Settings</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Security Settings</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Password Expiration Policy</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Password Expiration Policy</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-6">Select how often users are required to change their passwords.</p>
                   
                   <div className="relative mb-6">
-                    <label className="absolute top-3 left-5 text-[10px] font-bold text-slate-400 pointer-events-none">Number of Days</label>
+                    <label className="absolute top-3 left-5 text-[10px] font-medium text-slate-400 pointer-events-none">Number of Days</label>
                     <select
                       value={pwdExpiration}
                       onChange={(e) => setPwdExpiration(e.target.value)}
-                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-bold text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
+                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-medium text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
                     >
                       <option>30 Days</option>
                       <option>60 Days</option>
@@ -618,13 +618,13 @@ export default function SettingsPage() {
                     <svg className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                   </div>
 
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Reminder Period</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Reminder Period</p>
                   <div className="relative">
-                    <label className="absolute top-3 left-5 text-[10px] font-bold text-slate-400 pointer-events-none">Number of Days</label>
+                    <label className="absolute top-3 left-5 text-[10px] font-medium text-slate-400 pointer-events-none">Number of Days</label>
                     <select
                       value={reminderPeriod}
                       onChange={(e) => setReminderPeriod(e.target.value)}
-                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-bold text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
+                      className="w-full bg-[#f8fafc] border-none rounded-[1.25rem] h-[64px] pl-5 pt-4 text-[13px] font-medium text-slate-800 outline-none appearance-none cursor-pointer transition focus:ring-2 focus:ring-[#6A8BFF]/20"
                     >
                       <option>5 Days</option>
                       <option>10 Days</option>
@@ -639,13 +639,13 @@ export default function SettingsPage() {
 
           {activeTab === "Privacy Policy and Terms" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Privacy Policy and Terms</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Privacy Policy and Terms</h2>
               
               <div className="space-y-6">
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Privacy Policy</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Privacy Policy</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-4 leading-relaxed max-w-[95%]">Please upload an HTML file containing the privacy policy. This file will allow for advanced formatting, including headers, links, and styling, ensuring a professional and readable document for users. The uploaded privacy policy will be displayed on the platform.</p>
-                  <p className="text-[11px] text-slate-600 font-bold mb-6">Last updated: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
+                  <p className="text-[11px] text-slate-600 font-medium mb-6">Last updated: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
 
                   <div 
                     className="w-full border border-dashed border-[#6A8BFF]/40 bg-blue-50/20 hover:bg-blue-50/40 transition-colors rounded-[1rem] p-10 flex flex-col items-center justify-center cursor-pointer mb-5"
@@ -653,20 +653,20 @@ export default function SettingsPage() {
                     onDrop={handleDrop}
                   >
                     <svg className="w-5 h-5 text-[#6A8BFF] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <p className="text-[13px] font-bold text-[#6A8BFF] mb-1">Drop your HTML here</p>
+                    <p className="text-[13px] font-medium text-[#6A8BFF] mb-1">Drop your HTML here</p>
                     <p className="text-[11px] text-[#6A8BFF]/70 font-medium">Accepted Formats: HTML</p>
                     <p className="text-[11px] text-[#6A8BFF]/70 font-medium">File Size Limit: Maximum file size: 5 MB</p>
                   </div>
                   
-                  <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-bold px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm">
+                  <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-medium px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm">
                     Preview Now
                   </button>
                 </div>
 
                 <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
-                  <p className="text-[12px] font-bold text-slate-800 mb-2">Terms and Conditions</p>
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Terms and Conditions</p>
                   <p className="text-[11px] text-slate-400 font-medium mb-4 leading-relaxed max-w-[95%]">Please upload an HTML file containing the privacy policy. This file will allow for advanced formatting, including headers, links, and styling, ensuring a professional and readable document for users. The uploaded privacy policy will be displayed on the platform.</p>
-                  <p className="text-[11px] text-slate-600 font-bold mb-6">Last updated: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
+                  <p className="text-[11px] text-slate-600 font-medium mb-6">Last updated: <span className="text-[#6A8BFF]">10 July, 2025 00:00:00</span></p>
 
                   <div 
                     className="w-full border border-dashed border-[#6A8BFF]/40 bg-blue-50/20 hover:bg-blue-50/40 transition-colors rounded-[1rem] p-10 flex flex-col items-center justify-center cursor-pointer mb-5"
@@ -674,12 +674,12 @@ export default function SettingsPage() {
                     onDrop={handleDrop}
                   >
                     <svg className="w-5 h-5 text-[#6A8BFF] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <p className="text-[13px] font-bold text-[#6A8BFF] mb-1">Drop your HTML here</p>
+                    <p className="text-[13px] font-medium text-[#6A8BFF] mb-1">Drop your HTML here</p>
                     <p className="text-[11px] text-[#6A8BFF]/70 font-medium">Accepted Formats: HTML</p>
                     <p className="text-[11px] text-[#6A8BFF]/70 font-medium">File Size Limit: Maximum file size: 5 MB</p>
                   </div>
                   
-                  <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-bold px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm">
+                  <button className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] text-[12px] font-medium px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm">
                     Preview Now
                   </button>
                 </div>
@@ -689,12 +689,12 @@ export default function SettingsPage() {
 
           {activeTab === "Insurance Providers" && (
             <div className="animate-in fade-in duration-200">
-              <h2 className="text-[15px] font-bold text-[#1e293b] mb-6">Insurance providers</h2>
+              <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Insurance providers</h2>
               
               <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8 min-h-[600px] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                    <button className="text-[12px] font-medium text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                       Status
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                     </button>
@@ -706,10 +706,10 @@ export default function SettingsPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse whitespace-nowrap">
                       <thead>
-                        <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                          <th className="pb-4 pt-1 font-bold pl-2 w-[15%]">Provider ID</th>
-                          <th className="pb-4 pt-1 font-bold w-[30%]">Provider name</th>
-                          <th className="pb-4 pt-1 font-bold w-[30%]">
+                        <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
+                          <th className="pb-4 pt-1 font-medium pl-2 w-[15%]">Provider ID</th>
+                          <th className="pb-4 pt-1 font-medium w-[30%]">Provider name</th>
+                          <th className="pb-4 pt-1 font-medium w-[30%]">
                             <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">
                               Last updated 
                               <div className="flex flex-col items-center gap-[0.5px] opacity-70 shrink-0">
@@ -718,7 +718,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           </th>
-                          <th className="pb-4 pt-1 font-bold w-[25%]">
+                          <th className="pb-4 pt-1 font-medium w-[25%]">
                             <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">
                               Status 
                               <div className="flex flex-col items-center gap-[0.5px] opacity-70 shrink-0">
@@ -740,7 +740,7 @@ export default function SettingsPage() {
                             <td className="py-2 pl-2 text-[13px] text-slate-500 font-medium">
                               {provider.id}
                             </td>
-                            <td className="py-2 text-[13px] font-bold text-slate-800">
+                            <td className="py-2 text-[13px] font-medium text-slate-800">
                               {provider.name}
                             </td>
                             <td className="py-2 text-[13px] text-slate-500 font-medium">
@@ -748,21 +748,21 @@ export default function SettingsPage() {
                             </td>
                             <td className="py-2 pr-2 relative">
                               <div className="flex items-center justify-between min-w-[120px] pr-2">
-                                <span className={`text-[12px] font-bold ${provider.status === "Active" ? "text-emerald-500" : "text-rose-500"}`}>
+                                <span className={`text-[12px] font-medium ${provider.status === "Active" ? "text-emerald-500" : "text-rose-500"}`}>
                                   {provider.status}
                                 </span>
                                 {hoveredInsurance === provider.id && (
                                   provider.status === "Active" ? (
                                     <button 
                                       onClick={() => setInsuranceData(prev => prev.map(p => p.id === provider.id ? { ...p, status: "Disabled" } : p))}
-                                      className="px-5 py-1.5 rounded-full border border-rose-500 text-rose-500 text-[11px] font-bold hover:bg-rose-50 transition-colors bg-white shadow-sm ml-4"
+                                      className="px-5 py-1.5 rounded-full border border-rose-500 text-rose-500 text-[11px] font-medium hover:bg-rose-50 transition-colors bg-white shadow-sm ml-4"
                                     >
                                       Disable
                                     </button>
                                   ) : (
                                     <button 
                                       onClick={() => setInsuranceData(prev => prev.map(p => p.id === provider.id ? { ...p, status: "Active" } : p))}
-                                      className="px-5 py-1.5 rounded-full border border-[#1e293b] text-[#1e293b] text-[11px] font-bold hover:bg-slate-50 transition-colors bg-white shadow-sm ml-4"
+                                      className="px-5 py-1.5 rounded-full border border-[#1e293b] text-[#1e293b] text-[11px] font-medium hover:bg-slate-50 transition-colors bg-white shadow-sm ml-4"
                                     >
                                       Enable
                                     </button>
@@ -802,7 +802,7 @@ export default function SettingsPage() {
           ].includes(activeTab) && (
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-12 flex flex-col items-center justify-center min-h-[400px] animate-in fade-in">
               <svg className="w-12 h-12 text-slate-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-              <h2 className="text-[15px] font-bold text-slate-800 mb-2">{activeTab}</h2>
+              <h2 className="text-[15px] font-medium text-slate-800 mb-2">{activeTab}</h2>
               <p className="text-[12px] text-slate-400 font-medium">This configuration page is currently under construction.</p>
             </div>
           )}
@@ -810,10 +810,10 @@ export default function SettingsPage() {
           {/* Bottom Action Bar (not shown on Insurance Providers) */}
           {activeTab !== "Insurance Providers" && (
             <div className="flex items-center gap-4 mt-8 animate-in fade-in duration-300">
-              <button className="flex-1 max-w-xs bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#1e293b] text-[13px] font-bold py-4 rounded-[1rem] transition-colors active:scale-[0.98]">
+              <button className="flex-1 max-w-xs bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#1e293b] text-[13px] font-medium py-4 rounded-[1rem] transition-colors active:scale-[0.98]">
                 Cancel
               </button>
-              <button className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-bold py-4 rounded-[1rem] shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-[0.98]">
+              <button className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-medium py-4 rounded-[1rem] shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-[0.98]">
                 Save Changes
               </button>
             </div>

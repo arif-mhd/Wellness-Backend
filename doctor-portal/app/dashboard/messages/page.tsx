@@ -76,7 +76,7 @@ export default function MessagesPage() {
   return (
     <div className="w-full min-h-[calc(100vh-80px)] font-outfit animate-in fade-in duration-300 px-6 py-6 lg:px-8">
       <div className="mb-6">
-        <h1 className="text-[28px] font-bold text-[#1e293b] tracking-tight">Messages</h1>
+        <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Messages</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -88,7 +88,7 @@ export default function MessagesPage() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setActiveTab("All")}
-                className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                className={`px-5 py-2.5 rounded-full text-[12px] font-medium transition-all shadow-sm ${
                   activeTab === "All" ? "bg-[#1E293B] text-white" : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
@@ -96,7 +96,7 @@ export default function MessagesPage() {
               </button>
               <button 
                 onClick={() => setActiveTab("Unread")}
-                className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                className={`px-5 py-2.5 rounded-full text-[12px] font-medium transition-all shadow-sm ${
                   activeTab === "Unread" ? "bg-[#1E293B] text-white" : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
@@ -154,7 +154,7 @@ export default function MessagesPage() {
               )}
             </div>
             <div>
-              <h2 className="text-[15px] font-bold text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
+              <h2 className="text-[15px] font-medium text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
               <p className="text-[11px] font-medium text-slate-400">{selectedContact.email}</p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function MessagesPage() {
               )}
             </div>
             <div>
-              <h2 className="text-[15px] font-bold text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
+              <h2 className="text-[15px] font-medium text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
               <p className="text-[11px] font-medium text-slate-400 mt-0.5">{selectedContact.email}</p>
             </div>
           </div>
@@ -242,7 +242,7 @@ export default function MessagesPage() {
             <>
               {/* Orders Details Section */}
               <div className="mb-6">
-                <div className="bg-[#E5EDFF] text-[#6A8BFF] text-[12px] font-bold px-4 py-2.5 rounded-xl inline-block w-full text-center mb-6">
+                <div className="bg-[#E5EDFF] text-[#6A8BFF] text-[12px] font-medium px-4 py-2.5 rounded-xl inline-block w-full text-center mb-6">
                   Orders Details
                 </div>
 

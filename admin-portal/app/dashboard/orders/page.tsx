@@ -77,7 +77,7 @@ const DoubleCaret = () => (
 );
 
 const AvatarCircle = ({ name }: { name: string }) => (
-  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[11px] font-black shrink-0 bg-[#6A8BFF]">
+  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[11px] font-medium shrink-0 bg-[#6A8BFF]">
     {initials(name)}
   </div>
 );
@@ -146,7 +146,7 @@ export default function OrdersPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Orders</h1>
+          <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Orders</h1>
           {loading && (
             <div className="flex items-center gap-2 text-[13px] text-slate-400 font-medium">
               <div className="w-4 h-4 border-2 border-slate-200 border-t-[#6A8BFF] rounded-full animate-spin" />
@@ -173,7 +173,7 @@ export default function OrdersPage() {
                   <button
                     key={tab}
                     onClick={() => { setActiveTab(tab); setPage(1); setSelectedId(null); }}
-                    className={`px-5 py-2 rounded-full text-[13px] font-bold transition-all ${
+                    className={`px-5 py-2 rounded-full text-[13px] font-medium transition-all ${
                       activeTab === tab
                         ? "bg-[#1E293B] text-white shadow-md"
                         : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
@@ -195,11 +195,11 @@ export default function OrdersPage() {
                   </svg>
                 </div>
               </div>
-              <span className="text-[12px] font-bold text-slate-400">{filtered.length} orders</span>
+              <span className="text-[12px] font-medium text-slate-400">{filtered.length} orders</span>
             </div>
 
             {/* Filter row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-4 mb-2">
+            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none mt-4 mb-2">
               <div className="flex items-center gap-5 flex-wrap flex-1">
                 {["Name", "Order Type", "Pharmacy", "Doctor", "Patient", "Date range", "Payment type", "Status"].map(f => (
                   <span key={f} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
@@ -220,22 +220,22 @@ export default function OrdersPage() {
             {/* Table */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 min-h-[600px] flex flex-col justify-between">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse whitespace-nowrap min-w-[900px]">
+                <table className="w-full text-left border-collapse min-w-full">
                   <thead>
-                    <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                      <th className="pb-4 pt-1 font-bold pl-2 w-[13%]">
+                    <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
+                      <th className="pb-4 pt-1 font-medium pl-2 w-[13%]">
                         <div className="flex items-center gap-1 cursor-pointer hover:text-slate-500">Order ID <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[20%]">Patient Name</th>
-                      <th className="pb-4 pt-1 font-bold w-[20%]">Pharmacy</th>
-                      <th className="pb-4 pt-1 font-bold w-[16%]">
+                      <th className="pb-4 pt-1 font-medium w-[20%]">Patient Name</th>
+                      <th className="pb-4 pt-1 font-medium w-[20%]">Pharmacy</th>
+                      <th className="pb-4 pt-1 font-medium w-[16%]">
                         <div className="flex items-center gap-1 cursor-pointer hover:text-slate-500">Date Ordered <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[10%]">Payment</th>
-                      <th className="pb-4 pt-1 font-bold w-[10%]">
+                      <th className="pb-4 pt-1 font-medium w-[10%]">Payment</th>
+                      <th className="pb-4 pt-1 font-medium w-[10%]">
                         <div className="flex items-center gap-1 cursor-pointer hover:text-slate-500">Amount <DoubleCaret /></div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold w-[11%]">Status</th>
+                      <th className="pb-4 pt-1 font-medium w-[11%]">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -255,39 +255,35 @@ export default function OrdersPage() {
                           onClick={() => setSelectedId(isSelected ? null : o.id)}
                           onMouseEnter={() => setHoveredId(o.id)}
                           onMouseLeave={() => setHoveredId(null)}
-                          className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors h-[68px] ${
-                            isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"
-                          }`}
+                          className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors h-[68px] hover:bg-slate-50/50`}
                         >
-                          <td className="py-2 pl-2 text-[12px] font-bold text-slate-500">{shortId}</td>
+                          <td className="py-2 pl-2 text-[12px] font-medium text-slate-500">{shortId}</td>
                           <td className="py-2 pr-2">
-                            <p className="text-[12.5px] font-bold text-slate-800 leading-tight">{o.patientName}</p>
+                            <p className="text-[12.5px] font-medium text-slate-800 leading-tight">{o.patientName}</p>
                             <p className="text-[10px] text-slate-400 font-medium">{o.patientEmail}</p>
                           </td>
                           <td className="py-2 pr-2">
-                            <p className="text-[12.5px] font-bold text-slate-800 leading-tight">{o.pharmacyName}</p>
+                            <p className="text-[12.5px] font-medium text-slate-800 leading-tight">{o.pharmacyName}</p>
                             <p className="text-[10px] text-slate-400 font-medium">{o.pharmacyEmail}</p>
                           </td>
                           <td className="py-2 text-[12px] text-slate-500 font-medium">{formatDate(o.createdAt)}</td>
-                          <td className="py-2 text-[12px] font-bold text-[#6A8BFF]">
+                          <td className="py-2 text-[12px] font-medium text-[#6A8BFF]">
                             {o.payment_method === "mock" ? "Mock" : o.payment_method}
                           </td>
-                          <td className="py-2 text-[12px] text-slate-600 font-bold">
+                          <td className="py-2 text-[12px] text-slate-600 font-medium">
                             AED {o.total_amount.toFixed(2)}
                           </td>
                           <td className="py-2 pr-2 relative">
                             <div className="flex items-center justify-between min-w-[130px] pr-2">
-                              <span className={`text-[12px] font-bold ${statusColor(o.status)}`}>
+                              <span className={`text-[12px] font-medium ${statusColor(o.status)}`}>
                                 {statusLabel(o.status)}
                               </span>
-                              {hoveredId === o.id && (
-                                <button
-                                  onClick={e => { e.stopPropagation(); setSelectedId(o.id); }}
-                                  className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-transform active:scale-95 whitespace-nowrap ml-4"
-                                >
-                                  View Details
-                                </button>
-                              )}
+                              <button
+                                onClick={e => { e.stopPropagation(); setSelectedId(o.id); }}
+                                className={`bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-medium px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95 whitespace-nowrap ml-4 ${hoveredId === o.id ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                              >
+                                View Details
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -312,7 +308,7 @@ export default function OrdersPage() {
                   <button
                     key={n}
                     onClick={() => setPage(n)}
-                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
+                    className={`w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center transition-all ${
                       n === page
                         ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -339,7 +335,7 @@ export default function OrdersPage() {
             <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
 
               <div className="flex items-center justify-between pb-5 border-b border-slate-50 mb-5">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Order Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Order Details</h2>
                 <button
                   onClick={() => setSelectedId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -352,23 +348,23 @@ export default function OrdersPage() {
 
               <div className="space-y-6">
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-1">Order ID</p>
-                  <p className="text-[13px] font-bold text-[#6A8BFF]">ORD-{selected.id.slice(-5).toUpperCase()}</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-1">Order ID</p>
+                  <p className="text-[13px] font-medium text-[#6A8BFF]">ORD-{selected.id.slice(-5).toUpperCase()}</p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-3">Patient</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-3">Patient</p>
                   <div className="flex items-center gap-3">
                     <AvatarCircle name={selected.patientName} />
                     <div>
-                      <p className="text-[13px] font-bold text-slate-800 leading-tight">{selected.patientName}</p>
+                      <p className="text-[13px] font-medium text-slate-800 leading-tight">{selected.patientName}</p>
                       <p className="text-[11px] text-slate-400 font-medium">{selected.patientEmail}</p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-3">Order Processed By</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-3">Order Processed By</p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
                       <svg className="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,7 +374,7 @@ export default function OrdersPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[13px] font-bold text-slate-800 leading-tight">{selected.pharmacyName}</p>
+                        <p className="text-[13px] font-medium text-slate-800 leading-tight">{selected.pharmacyName}</p>
                         <svg className="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                         </svg>
@@ -389,25 +385,25 @@ export default function OrdersPage() {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-1.5">Date Ordered</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-1.5">Date Ordered</p>
                   <p className="text-[12px] text-slate-500 font-medium">{formatDate(selected.createdAt)}</p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-2">Items Ordered</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-2">Items Ordered</p>
                   <div className="space-y-2">
                     {selected.items.map((item, i) => (
                       <div key={i} className="flex items-center justify-between text-[12px]">
                         <span className="font-medium text-slate-700 truncate max-w-[60%]">{item.name} × {item.quantity}</span>
-                        <span className="font-bold text-slate-600">AED {(item.unit_price * item.quantity).toFixed(2)}</span>
+                        <span className="font-medium text-slate-600">AED {(item.unit_price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-1.5">Payment</p>
-                  <p className="text-[12px] font-bold text-slate-600">
+                  <p className="text-[11px] font-medium text-slate-500 mb-1.5">Payment</p>
+                  <p className="text-[12px] font-medium text-slate-600">
                     AED {selected.total_amount.toFixed(2)}
                     <span className="text-[#6A8BFF] ml-2">
                       {selected.payment_status === "paid" ? "Paid" : selected.payment_status}
@@ -416,17 +412,17 @@ export default function OrdersPage() {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-1.5">Delivery Address</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-1.5">Delivery Address</p>
                   <p className="text-[12px] text-slate-500 font-medium">{selected.delivery_address}</p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-500 mb-2">Update Status</p>
+                  <p className="text-[11px] font-medium text-slate-500 mb-2">Update Status</p>
                   <select
                     value={selected.status}
                     disabled={updatingStatus}
                     onChange={e => handleStatusChange(selected.id, e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-[12px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 disabled:opacity-60 cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 disabled:opacity-60 cursor-pointer"
                   >
                     <option value="confirmed">Confirmed</option>
                     <option value="processing">Processing</option>
@@ -438,13 +434,13 @@ export default function OrdersPage() {
 
                 {selected.notes && (
                   <div>
-                    <p className="text-[11px] font-bold text-slate-500 mb-1.5">Notes</p>
+                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">Notes</p>
                     <p className="text-[12px] text-slate-500 font-medium">{selected.notes}</p>
                   </div>
                 )}
               </div>
 
-              <button className="w-full py-4 mt-8 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] rounded-[1rem] text-[13px] font-bold transition duration-200 active:scale-[0.98]">
+              <button className="w-full py-4 mt-8 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#6A8BFF] rounded-[1rem] text-[13px] font-medium transition duration-200 active:scale-[0.98]">
                 Go to Consultation
               </button>
             </div>
