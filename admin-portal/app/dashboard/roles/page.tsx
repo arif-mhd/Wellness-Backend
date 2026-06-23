@@ -460,7 +460,7 @@ export default function RolesPage() {
                 disabled={saving || !hasChanges}
                 className={`w-full py-4 mt-6 rounded-[1rem] text-[13px] font-bold shadow-md transition duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
                   hasChanges
-                    ? "bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white shadow-blue-200/50"
+                    ? "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white shadow-blue-200/50"
                     : "bg-slate-100 text-slate-400 shadow-none"
                 }`}
               >

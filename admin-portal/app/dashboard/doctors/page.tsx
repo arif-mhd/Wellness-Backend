@@ -190,7 +190,7 @@ function ManageDoctorsPageInner() {
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Doctors</h1>
               <button
                 onClick={() => router.push("/dashboard/doctors/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-medium px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-medium px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -374,7 +374,7 @@ function ManageDoctorsPageInner() {
                             </td>
                             <td className="py-3 pr-4 text-right">
                               {isSelected ? (
-                                <button className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-md shadow-blue-200/50">
+                                <button className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)]">
                                   Verify Manually
                                 </button>
                               ) : (
@@ -475,7 +475,7 @@ function ManageDoctorsPageInner() {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => router.push(`/dashboard/doctors/${selectedDoctor.id}`)}
-                  className="w-full py-3.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                  className="w-full py-3.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
                 >
                   View Detailed Profile
                 </button>

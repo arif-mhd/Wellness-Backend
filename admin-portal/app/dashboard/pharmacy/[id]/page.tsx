@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+
 import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -65,11 +67,31 @@ interface Document {
   name: string;
 }
 
+function Avatar({ pharmacy, size = "md" }: { pharmacy: Pharmacy; size?: "sm" | "md" | "lg" | "xl" }) {
+  const sz = size === "sm" ? "w-9 h-9 text-sm" : size === "lg" ? "w-14 h-14 text-xl" : size === "xl" ? "w-[4.5rem] h-[4.5rem] text-3xl" : "w-10 h-10 text-sm";
+  const name = pharmacy.pharmacyName || "?";
+  const imageUrl = (pharmacy as any).imageUrl; 
+  return (
+    <div className={`relative shrink-0`}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} className={`${sz} rounded-full object-cover border border-slate-100 shadow-sm`} />
+      ) : (
+        <div className={`${sz} rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-medium shadow-sm`}>
+          {name[0].toUpperCase()}
+        </div>
+      )}
+      {pharmacy.status === "approved" && (
+        <div className={`absolute top-0 right-0 bg-teal-400 ${size === "xl" ? "w-4 h-4 border-[3px]" : size === "lg" ? "w-3.5 h-3.5 border-[2.5px]" : "w-2.5 h-2.5 border-2"} rounded-full border-white ${size === "lg" || size === "xl" ? "translate-x-0.5 -translate-y-0.5" : ""}`}></div>
+      )}
+    </div>
+  );
+}
+
 const DetailRow = ({
   label,
   value,
-  valueClass = "text-slate-800 font-bold",
-  labelClass = "text-slate-400 font-bold",
+  valueClass = "text-slate-800 font-semibold",
+  labelClass = "text-slate-400 font-medium",
 }: {
   label: string;
   value: React.ReactNode;
@@ -232,7 +254,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
           <p className="text-red-500 font-semibold text-sm">{error || "Pharmacy not found."}</p>
           <button
             onClick={() => router.push("/dashboard/pharmacy")}
-            className="text-[#6A8BFF] text-sm font-bold hover:underline"
+            className="text-[#6A8BFF] text-sm font-semibold hover:underline"
           >
             Back to Pharmacy
           </button>
@@ -259,72 +281,60 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="text-[26px] font-black text-[#1e293b] tracking-tight">Pharmacy Details</h1>
+            <h1 className="text-[26px] font-medium text-[#1e293b] tracking-tight">Pharmacy Details</h1>
           </div>
 
           {/* Main Header Card */}
           <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-6">
-              <div className="w-[4.5rem] h-[4.5rem] rounded-2xl overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center">
-                <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                </svg>
-              </div>
+              <Avatar pharmacy={pharmacy} size="xl" />
               <div className="flex flex-col justify-center">
                 <div className="flex items-center gap-3 mb-1">
-                  <h2 className="text-[20px] font-black text-slate-800">{pharmacy.pharmacyName}</h2>
+                  <h2 className="text-[20px] font-semibold text-slate-800">{pharmacy.pharmacyName}</h2>
                   {pharmacy.status === "approved" && (
                     <div className="flex items-center gap-1.5 text-teal-400">
                       <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-[12px] font-bold">Verified</span>
+                      <span className="text-[12px] font-semibold">Verified by Malaffi</span>
                     </div>
                   )}
                 </div>
-                <p className="text-[13px] font-semibold text-slate-500">{pharmacy.email}</p>
+                <p className="text-[13px] font-medium text-slate-500">{pharmacy.email}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <button className="px-8 py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] text-[13px] font-bold rounded-2xl transition active:scale-95">
+            <div className="flex items-center gap-2">
+              <button className="px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95">
                 Edit
               </button>
-              <button className="px-8 py-3.5 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] text-[13px] font-bold rounded-2xl transition active:scale-95">
+              <button className="px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95">
                 Deactivate Pharmacy
               </button>
             </div>
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex items-center gap-4">
-            <div className="flex bg-white rounded-full shadow-sm border border-slate-100 p-1">
-              <button
-                onClick={() => setActiveTab("about")}
-                className={`px-8 py-3 rounded-full text-[13px] font-bold transition-all ${
-                  activeTab === "about"
-                    ? "bg-[#1E293B] text-white shadow-md"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                About
-              </button>
-              <button
-                onClick={() => setActiveTab("stock")}
-                className={`px-8 py-3 rounded-full text-[13px] font-bold transition-all ${
-                  activeTab === "stock"
-                    ? "bg-[#1E293B] text-white shadow-md"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Stock Overview
-              </button>
-            </div>
-
-            <button className="w-11 h-11 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab("about")}
+              className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all ${
+                activeTab === "about"
+                  ? "bg-[#1E293B] text-white shadow-md"
+                  : "bg-white text-slate-500 hover:text-slate-800 shadow-sm border border-slate-100"
+              }`}
+            >
+              About
+            </button>
+            <button
+              onClick={() => setActiveTab("stock")}
+              className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all ${
+                activeTab === "stock"
+                  ? "bg-[#1E293B] text-white shadow-md"
+                  : "bg-white text-slate-500 hover:text-slate-800 shadow-sm border border-slate-100"
+              }`}
+            >
+              Stock Overview
             </button>
           </div>
 
@@ -337,7 +347,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
                 {/* Details Column */}
                 <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50">
-                  <h3 className="text-[16px] font-black text-slate-800 mb-8">Details</h3>
+                  <h3 className="text-[16px] font-semibold text-slate-800 mb-8">Details</h3>
                   <div className="space-y-6">
                     {pharmacy.tradeLicense && (
                       <DetailRow label="Trade License" value={pharmacy.tradeLicense} />
@@ -361,7 +371,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                     <DetailRow
                       label="Email ID"
                       value={pharmacy.email}
-                      valueClass="text-[#6A8BFF] font-bold"
+                      valueClass="text-[#6A8BFF] font-semibold"
                     />
                     <DetailRow
                       label="Registered"
@@ -379,14 +389,12 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                 {/* Documents Column */}
                 <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50 self-start">
                   <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-[16px] font-black text-slate-800">Documents</h3>
+                    <h3 className="text-[16px] font-semibold text-slate-800">Documents</h3>
                     <button
                       onClick={addDocument}
-                      className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold px-5 py-2.5 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 active:scale-95"
+                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-semibold px-6 py-2.5 rounded-xl flex items-center gap-1.5 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-95"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                      </svg>
+                      <span className="text-[14px] leading-none">+</span>
                       Add Documents
                     </button>
                   </div>
@@ -397,12 +405,12 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                         key={doc.id}
                         className="bg-[#f8fafd] border border-slate-100 rounded-xl p-4 flex items-center justify-between animate-in fade-in duration-300"
                       >
-                        <span className="text-[13px] font-bold text-[#6A8BFF] underline decoration-[#6A8BFF]/30 underline-offset-4">
+                        <span className="text-[13px] font-medium text-[#6A8BFF] underline decoration-[#6A8BFF]/30 underline-offset-4">
                           {doc.name}
                         </span>
                         <button
                           onClick={() => removeDocument(doc.id)}
-                          className="text-[12px] font-bold text-red-400 hover:text-red-600 transition"
+                          className="text-[12px] font-medium text-red-400 hover:text-red-600 transition"
                         >
                           Remove
                         </button>
@@ -423,7 +431,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-6">
 
                 {/* Filters Row */}
-                <div className="flex items-center gap-8 text-[13px] font-bold text-[#64748B] select-none pl-2 flex-wrap">
+                <div className="flex items-center gap-8 text-[13px] font-semibold text-[#64748B] select-none pl-2 flex-wrap">
                   <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                     Medicine Name
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -451,7 +459,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   <div className="ml-auto flex items-center gap-3">
                     <button
                       onClick={() => { setShowAddProduct(true); setAddProductError(""); setProductForm(emptyProductForm()); }}
-                      className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[12px] font-bold px-5 py-2.5 rounded-full flex items-center gap-2 transition shadow-md shadow-blue-200/60 active:scale-95"
+                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-semibold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-95"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -479,30 +487,30 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                     ) : (
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                            <th className="pb-4 pt-1 font-bold pl-2">Medicine Name</th>
-                            <th className="pb-4 pt-1 font-bold">Batch No.</th>
-                            <th className="pb-4 pt-1 font-bold">
+                          <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
+                            <th className="pb-4 pt-1 font-semibold pl-2">Medicine Name</th>
+                            <th className="pb-4 pt-1 font-semibold">Batch No.</th>
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                                 Quantity <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                                 Expiry Date <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                                 Price (per unit) <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                                 Stock Status <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold text-center">Flagged</th>
+                            <th className="pb-4 pt-1 font-semibold text-center">Flagged</th>
                             <th className="pb-4 pt-1"></th>
                           </tr>
                         </thead>
@@ -516,9 +524,9 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                               >
                                 <td className="py-5 px-2">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[13px] font-bold text-slate-800">{item.name}</span>
+                                    <span className="text-[13px] font-semibold text-slate-800">{item.name}</span>
                                     {item.flagged && (
-                                      <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Flagged</span>
+                                      <span className="text-[10px] font-semibold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Flagged</span>
                                     )}
                                   </div>
                                   <span className="text-[11px] text-slate-400">{item.category}</span>
@@ -533,7 +541,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                 <td className="py-5 text-[13px] font-medium text-slate-500 pl-4">
                                   AED {item.price.toFixed(2)}
                                 </td>
-                                <td className="py-5 text-[13px] font-bold pl-4">
+                                <td className="py-5 text-[13px] font-semibold pl-4">
                                   {item.status === "pending_approval" ? (
                                     <span className="text-amber-500">Pending</span>
                                   ) : item.status === "rejected" ? (
@@ -563,21 +571,21 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                   <div className="flex items-center justify-end gap-2">
                                     <button
                                       onClick={() => router.push(`/dashboard/pharmacy/${id}/product/${item.id}`)}
-                                      className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[11px] font-bold px-5 py-2 rounded-full shadow-md shadow-blue-200/50 transition opacity-0 group-hover:opacity-100"
+                                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[11px] font-semibold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition opacity-0 group-hover:opacity-100"
                                     >
                                       View Details
                                     </button>
                                     {item.flagged ? (
                                       <button
                                         onClick={() => toggleFlag(item.id, true)}
-                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-full transition"
+                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-semibold px-4 py-2 rounded-full transition"
                                       >
                                         Unflag
                                       </button>
                                     ) : (
                                       <button
                                         onClick={() => toggleFlag(item.id, false)}
-                                        className="bg-red-50 hover:bg-red-100 text-red-500 text-[11px] font-bold px-4 py-2 rounded-full transition opacity-0 group-hover:opacity-100"
+                                        className="bg-red-50 hover:bg-red-100 text-red-500 text-[11px] font-semibold px-4 py-2 rounded-full transition opacity-0 group-hover:opacity-100"
                                       >
                                         Flag
                                       </button>
@@ -638,7 +646,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               {/* Name + Category */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Product Name *</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Product Name *</label>
                   <input
                     value={productForm.name}
                     onChange={e => setProductForm(p => ({ ...p, name: e.target.value }))}
@@ -647,7 +655,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Category *</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Category *</label>
                   <select
                     value={productForm.category}
                     onChange={e => setProductForm(p => ({ ...p, category: e.target.value }))}
@@ -664,7 +672,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               {/* Manufacturer + Strength */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Manufacturer</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Manufacturer</label>
                   <input
                     value={productForm.manufacturer}
                     onChange={e => setProductForm(p => ({ ...p, manufacturer: e.target.value }))}
@@ -673,7 +681,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Strength / Dosage</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Strength / Dosage</label>
                   <input
                     value={productForm.strength}
                     onChange={e => setProductForm(p => ({ ...p, strength: e.target.value }))}
@@ -685,7 +693,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
               {/* Description */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Description</label>
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Description</label>
                 <textarea
                   value={productForm.description}
                   onChange={e => setProductForm(p => ({ ...p, description: e.target.value }))}
@@ -698,7 +706,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               {/* Price + Stock */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
                   <input
                     type="number" min="0" step="0.01"
                     value={productForm.price}
@@ -708,7 +716,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Quantity</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Quantity</label>
                   <input
                     type="number" min="0"
                     value={productForm.stock}
@@ -722,7 +730,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               {/* Batch + Expiry */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Batch Number</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Batch Number</label>
                   <input
                     value={productForm.batchNumber}
                     onChange={e => setProductForm(p => ({ ...p, batchNumber: e.target.value }))}
@@ -731,7 +739,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Expiry Date</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Expiry Date</label>
                   <input
                     type="date"
                     value={productForm.expiryDate}
@@ -743,7 +751,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
               {/* Reorder Level */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Reorder Level</label>
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Reorder Level</label>
                 <input
                   type="number" min="0"
                   value={productForm.reorderLevel}
@@ -756,7 +764,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               {/* Prescription toggle */}
               <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
                 <div>
-                  <p className="text-[13px] font-bold text-slate-800">Prescription Required</p>
+                  <p className="text-[13px] font-semibold text-slate-800">Prescription Required</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">Patients must upload a valid prescription</p>
                 </div>
                 <button
@@ -773,14 +781,14 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                 <button
                   type="button"
                   onClick={() => setShowAddProduct(false)}
-                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-[13px] font-bold hover:bg-slate-50 transition"
+                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-[13px] font-semibold hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={addingProduct}
-                  className="flex-1 py-3 rounded-xl bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold transition shadow-md shadow-blue-200/50 disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold transition shadow-[0_4px_10px_rgba(84,118,252,0.2)] disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {addingProduct ? (
                     <>

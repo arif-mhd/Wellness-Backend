@@ -84,7 +84,7 @@ export default function ManageEmergenciesPage() {
 
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Emergencies</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Emergencies</h1>
             </div>
 
             {/* Tabs + Search + Date */}
@@ -92,13 +92,13 @@ export default function ManageEmergenciesPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveTab("SOS")}
-                  className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${activeTab === "SOS" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
+                  className={`px-6 py-2.5 rounded-full text-[13px] font-semibold transition-all ${activeTab === "SOS" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
                 >
                   SOS Requests
                 </button>
                 <button
                   onClick={() => setActiveTab("Past")}
-                  className={`px-6 py-2.5 rounded-full text-[13px] font-bold transition-all ${activeTab === "Past" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
+                  className={`px-6 py-2.5 rounded-full text-[13px] font-semibold transition-all ${activeTab === "Past" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
                 >
                   Past Emergency Requests
                 </button>
@@ -124,14 +124,14 @@ export default function ManageEmergenciesPage() {
                   </button>
                 </div>
               </div>
-              <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+              <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                 Today
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
               </button>
             </div>
 
             {/* Column headers */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-1">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
               <div className="flex items-center gap-10 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -149,13 +149,13 @@ export default function ManageEmergenciesPage() {
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 flex flex-col justify-between min-h-[600px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                    <th className="pb-4 pt-1 pl-2 font-bold w-[30%]">
+                  <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                    <th className="pb-4 pt-1 pl-2 font-semibold w-[30%]">
                       <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Patient Name <DoubleCaret /></div>
                     </th>
-                    <th className="pb-4 pt-1 font-bold w-[28%]">Address</th>
-                    <th className="pb-4 pt-1 font-bold w-[20%]">Contact Number</th>
-                    <th className="pb-4 pt-1 font-bold w-[15%]">
+                    <th className="pb-4 pt-1 font-semibold w-[28%]">Address</th>
+                    <th className="pb-4 pt-1 font-semibold w-[20%]">Contact Number</th>
+                    <th className="pb-4 pt-1 font-semibold w-[15%]">
                       <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Priority <DoubleCaret /></div>
                     </th>
                     <th className="pb-4 pt-1"></th>
@@ -171,27 +171,23 @@ export default function ManageEmergenciesPage() {
                         className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors group ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
                       >
                         <td className="py-4 pl-2 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                            <img src="/doctor-avatar.png" alt={em.name} className="w-full h-full object-cover" />
+                          <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                            </svg>
                           </div>
                           <div>
-                            <p className="text-[13px] font-bold text-slate-800 leading-tight">{em.name}</p>
+                            <p className="text-[13px] font-semibold text-slate-800 leading-tight">{em.name}</p>
                             <p className="text-[11px] text-slate-400 font-medium">{em.email}</p>
                           </div>
                         </td>
                         <td className="py-4 text-[12px] text-slate-500 font-medium max-w-[180px] truncate pr-4">{em.address}</td>
                         <td className="py-4 text-[12px] text-slate-500 font-medium">{em.contactNumber}</td>
-                        <td className={`py-4 text-[12px] font-bold ${priorityColor[em.priority]}`}>{em.priority}</td>
+                        <td className={`py-4 text-[12px] font-semibold ${priorityColor[em.priority]}`}>{em.priority}</td>
                         <td className="py-4 pr-2 text-right">
-                          {isSelected ? (
-                            <button className="bg-[#6A8BFF] text-white text-[12px] font-bold px-5 py-2 rounded-full shadow-md shadow-blue-200/50 transition whitespace-nowrap">
-                              View Details
-                            </button>
-                          ) : (
-                            <button className="text-[12px] font-bold text-slate-700 hover:text-blue-500 transition-colors whitespace-nowrap">
-                              View Details
-                            </button>
-                          )}
+                          <button className="text-[12px] font-semibold px-5 py-2 rounded-xl transition-all text-slate-700 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)] whitespace-nowrap">
+                            View Details
+                          </button>
                         </td>
                       </tr>
                     );
@@ -215,7 +211,7 @@ export default function ManageEmergenciesPage() {
 
               {/* Header */}
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Patient Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Patient Details</h2>
                 <button onClick={() => setSelectedId(null)} className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -223,12 +219,14 @@ export default function ManageEmergenciesPage() {
 
               {/* Avatar + Name */}
               <div className="flex items-center gap-4 mt-6 mb-5">
-                <div className="relative w-14 h-14 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-white">
-                  <img src="/doctor-avatar.png" alt={selected.name} className="w-full h-full object-cover" />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full"></div>
+                <div className="relative w-14 h-14 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">
+                  <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full z-10"></div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-slate-800">{selected.name}</p>
+                  <p className="text-[15px] font-medium text-slate-800">{selected.name}</p>
                   <p className="text-[12px] text-slate-400 font-medium">{selected.emailId}</p>
                 </div>
               </div>
@@ -241,33 +239,32 @@ export default function ManageEmergenciesPage() {
               {/* Details */}
               <div className="bg-[#f8fafd] rounded-[1.5rem] p-5 space-y-4 mb-7 border border-slate-50">
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Priority</span>
-                  <span className={`text-[11px] font-bold ${priorityColor[selected.priority]}`}>{selected.priority}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Priority</span>
+                  <span className={`text-[11px] font-semibold ${priorityColor[selected.priority]}`}>{selected.priority}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Gender</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selected.gender}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Gender</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.gender}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Location</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right leading-relaxed whitespace-pre-line">{selected.location}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Location</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right leading-relaxed whitespace-pre-line">{selected.location}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Address</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">California</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Address</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">California</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selected.contactNumber}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Contact Number</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.contactNumber}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] text-slate-400 font-bold shrink-0">Email ID</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selected.emailId}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0">Email ID</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.emailId}</span>
                 </div>
               </div>
 
-              {/* CTA */}
-              <button className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]">
+              <button className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-xl text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]">
                 View Detailed Profile
               </button>
             </div>

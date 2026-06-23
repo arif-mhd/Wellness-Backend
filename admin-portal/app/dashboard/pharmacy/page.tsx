@@ -70,6 +70,26 @@ const DoubleCaret = () => (
   </div>
 );
 
+function Avatar({ pharmacy, size = "md" }: { pharmacy: Pharmacy; size?: "sm" | "md" | "lg" }) {
+  const sz = size === "sm" ? "w-9 h-9 text-sm" : size === "lg" ? "w-14 h-14 text-xl" : "w-10 h-10 text-sm";
+  const name = pharmacy.pharmacyName || "?";
+  const imageUrl = (pharmacy as any).imageUrl; 
+  return (
+    <div className={`relative shrink-0`}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} className={`${sz} rounded-full object-cover border border-slate-100 shadow-sm`} />
+      ) : (
+        <div className={`${sz} rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-medium shadow-sm`}>
+          {name[0].toUpperCase()}
+        </div>
+      )}
+      {pharmacy.status === "approved" && (
+        <div className={`absolute top-0 right-0 bg-teal-400 ${size === "lg" ? "w-3.5 h-3.5 border-[2.5px]" : "w-2.5 h-2.5 border-2"} rounded-full border-white ${size === "lg" ? "translate-x-0.5 -translate-y-0.5" : ""}`}></div>
+      )}
+    </div>
+  );
+}
+
 const StarRating = ({ rating }: { rating: number }) => (
   <div className="flex items-center gap-1 justify-center">
     {[...Array(5)].map((_, i) => (
@@ -184,10 +204,10 @@ function ManagePharmacyPageInner() {
 
             {/* Top Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Pharmacy</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Pharmacy</h1>
               <button
                 onClick={() => router.push("/dashboard/pharmacy/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -201,7 +221,7 @@ function ManagePharmacyPageInner() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => { setActiveTab("onboard"); setSelectedPharmacyId(null); }}
-                  className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                  className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${
                     activeTab === "onboard"
                       ? "bg-[#1E293B] text-white"
                       : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
@@ -214,7 +234,7 @@ function ManagePharmacyPageInner() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("queue"); setSelectedPharmacyId(null); }}
-                  className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                  className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${
                     activeTab === "queue"
                       ? "bg-[#1E293B] text-white"
                       : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
@@ -234,7 +254,7 @@ function ManagePharmacyPageInner() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                   Today
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -244,7 +264,7 @@ function ManagePharmacyPageInner() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-4">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name
@@ -281,8 +301,8 @@ function ManagePharmacyPageInner() {
                 ) : (
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                        <th className="pb-4 pt-1 font-bold pl-2">
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
+                        <th className="pb-4 pt-1 font-semibold pl-2">
                           <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                             Name <DoubleCaret />
                           </div>
@@ -290,17 +310,17 @@ function ManagePharmacyPageInner() {
 
                         {activeTab === "onboard" ? (
                           <>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                                 Total Prescr.. <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                                 Medications Dispensed <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                                 Ratings <DoubleCaret />
                               </div>
@@ -308,12 +328,12 @@ function ManagePharmacyPageInner() {
                           </>
                         ) : (
                           <>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                                 Date Joined <DoubleCaret />
                               </div>
                             </th>
-                            <th className="pb-4 pt-1 font-bold">
+                            <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
                                 Status <DoubleCaret />
                               </div>
@@ -337,17 +357,10 @@ function ManagePharmacyPageInner() {
                             }`}
                           >
                             <td className="py-4 px-3 flex items-center gap-3">
-                              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center">
-                                <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                                </svg>
-                                {pharmacy.status === "approved" && (
-                                  <div className="absolute top-0 right-0 bg-teal-400 w-2.5 h-2.5 rounded-full border border-white"></div>
-                                )}
-                              </div>
+                              <Avatar pharmacy={pharmacy} size="md" />
                               <div className="min-w-0 flex flex-col justify-center">
                                 <div className="flex items-center gap-1.5">
-                                  <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
+                                  <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors truncate">
                                     {pharmacy.pharmacyName}
                                   </p>
                                   {pharmacy.status === "approved" && (
@@ -356,7 +369,7 @@ function ManagePharmacyPageInner() {
                                     </svg>
                                   )}
                                 </div>
-                                <p className="text-[11px] font-semibold text-slate-400 truncate">{pharmacy.email}</p>
+                                <p className="text-[11px] font-medium text-slate-400 truncate">{pharmacy.email}</p>
                               </div>
                             </td>
 
@@ -380,14 +393,14 @@ function ManagePharmacyPageInner() {
                                   {new Date(pharmacy.registeredAt).toLocaleDateString()}
                                 </td>
                                 <td className="py-4 text-[13px] text-slate-500 font-medium text-center">
-                                  <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600">
+                                  <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">
                                     Pending
                                   </span>
                                 </td>
                                 <td className="py-4 pr-4 text-right">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setSelectedPharmacyId(pharmacy.id); }}
-                                    className="bg-[#E5EDFF] text-[#6A8BFF] text-[11px] font-bold px-8 py-2 rounded-full hover:-translate-y-0.5 transition active:translate-y-0"
+                                    className="bg-[#E5EDFF] text-[#6A8BFF] text-[11px] font-semibold px-8 py-2 rounded-full hover:-translate-y-0.5 transition active:translate-y-0"
                                   >
                                     Review
                                   </button>
@@ -423,7 +436,7 @@ function ManagePharmacyPageInner() {
 
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Pharmacy Details</h2>
+                <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Pharmacy Details</h2>
                 <button
                   onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -437,16 +450,9 @@ function ManagePharmacyPageInner() {
 
               {/* Profile Header */}
               <div className="mb-8 mt-2 flex items-center gap-4">
-                <div className="relative w-[3.5rem] h-[3.5rem] rounded-xl border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center">
-                  <svg className="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                  </svg>
-                  {selectedPharmacy.status === "approved" && (
-                    <div className="absolute top-0 right-0 bg-teal-400 w-3 h-3 rounded-full border-2 border-white -translate-y-1 translate-x-1"></div>
-                  )}
-                </div>
+                <Avatar pharmacy={selectedPharmacy} size="lg" />
                 <div>
-                  <h3 className="text-[14px] font-black text-slate-800">{selectedPharmacy.pharmacyName}</h3>
+                  <h3 className="text-[14px] font-semibold text-slate-800">{selectedPharmacy.pharmacyName}</h3>
                   <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPharmacy.email}</p>
                 </div>
               </div>
@@ -455,48 +461,48 @@ function ManagePharmacyPageInner() {
               <div className="space-y-5 mb-8 px-1">
                 {selectedPharmacy.tradeLicense && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-bold w-1/2">Trade License</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Trade License</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
                   </div>
                 )}
                 {selectedPharmacy.healthAuthorityLicense && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-bold w-1/2">Health Authority License</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Health Authority License</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Owner</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">{selectedPharmacy.ownerName}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">Owner</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.ownerName}</span>
                 </div>
                 {selectedPharmacy.manager && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Manager</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right">{selectedPharmacy.manager}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold">Manager</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.manager}</span>
                   </div>
                 )}
                 {selectedPharmacy.pharmacistLicense && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-bold w-1/2">Pharmacist License</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Pharmacist License</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-                  <span className="text-[11px] text-slate-400 font-bold w-1/2">Location</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold w-1/2">Location</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">{selectedPharmacy.phone}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">Contact Number</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.phone}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">License No.</span>
-                  <span className="text-[11px] text-slate-800 font-bold text-right">{selectedPharmacy.licenseNumber}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">License No.</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.licenseNumber}</span>
                 </div>
                 {selectedPharmacy.emiratesId && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-bold">Emirates ID</span>
-                    <span className="text-[11px] text-slate-800 font-bold text-right">{selectedPharmacy.emiratesId}</span>
+                    <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
+                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
                   </div>
                 )}
               </div>
@@ -540,7 +546,7 @@ function ManagePharmacyPageInner() {
                       <button
                         onClick={() => approvePharmacy(selectedPharmacy.id)}
                         disabled={actionLoading}
-                        className="flex-1 py-2.5 rounded-xl bg-[#6A8BFF] text-white text-sm font-semibold hover:bg-[#5a7ae6] transition disabled:opacity-60 shadow-md shadow-blue-200/50"
+                        className="flex-1 py-2.5 rounded-xl bg-[#6A8BFF] text-white text-sm font-semibold hover:bg-[#5a7ae6] transition disabled:opacity-60 shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
                       >
                         {actionLoading ? "…" : "Approve"}
                       </button>
@@ -553,7 +559,7 @@ function ManagePharmacyPageInner() {
               {selectedPharmacy.status === "approved" && (
                 <button
                   onClick={() => router.push(`/dashboard/pharmacy/${selectedPharmacy.id}`)}
-                  className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                  className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
                 >
                   View Detailed Profile
                 </button>

@@ -107,10 +107,10 @@ export default function ManageFormsPage() {
             
             {/* Top Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Manage Forms</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Forms</h1>
               <button 
                 onClick={() => router.push("/dashboard/forms/add")}
-                className="bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white text-[13px] font-bold px-6 py-3 rounded-full flex items-center gap-2 transition duration-200 shadow-md shadow-blue-200/60 hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -122,7 +122,7 @@ export default function ManageFormsPage() {
             {/* Filter / Search Row */}
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-3">
-                <button className="px-6 py-2.5 rounded-full text-[13px] font-bold bg-[#1E293B] text-white shadow-md transition-all">
+                <button className="px-6 py-2.5 rounded-full text-[13px] font-semibold bg-[#1E293B] text-white shadow-md transition-all">
                   All Forms
                 </button>
                 <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition">
@@ -133,7 +133,7 @@ export default function ManageFormsPage() {
               </div>
               
               <div className="flex items-center gap-2">
-                <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
                   Today
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                 </button>
@@ -141,7 +141,7 @@ export default function ManageFormsPage() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-4">
+            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg></span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Date <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg></span>
@@ -156,13 +156,13 @@ export default function ManageFormsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-800 tracking-wider">
-                      <th className="pb-4 pt-1 font-bold pl-2 w-[55%]">
+                    <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
+                      <th className="pb-4 pt-1 font-semibold pl-2 w-[55%]">
                         <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                           Name <DoubleCaret />
                         </div>
                       </th>
-                      <th className="pb-4 pt-1 font-bold">
+                      <th className="pb-4 pt-1 font-semibold">
                         <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                           Last Modified <DoubleCaret />
                         </div>
@@ -190,7 +190,7 @@ export default function ManageFormsPage() {
                               </svg>
                             </div>
                             <div className="min-w-0 flex flex-col justify-center">
-                              <p className="text-[13px] font-bold text-slate-800 group-hover:text-blue-500 transition-colors truncate mb-0.5">
+                              <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors truncate mb-0.5">
                                 {form.title}
                               </p>
                               <p className="text-[11px] font-medium text-slate-400 truncate">
@@ -204,21 +204,12 @@ export default function ManageFormsPage() {
                           </td>
 
                           <td className="py-4 pr-4 text-right">
-                            {isSelected ? (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }}
-                                className="bg-[#6A8BFF] text-white text-[12px] font-bold px-6 py-2.5 rounded-full shadow-md shadow-blue-200/50 transition"
-                              >
-                                Edit Form
-                              </button>
-                            ) : (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }}
-                                className="text-[12px] font-bold text-slate-800 mr-4 hover:text-blue-500 transition-colors"
-                              >
-                                Edit Form
-                              </button>
-                            )}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }}
+                              className="text-[12px] font-semibold px-6 py-2.5 rounded-xl transition-all text-slate-800 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
+                            >
+                              Edit Form
+                            </button>
                           </td>
                         </tr>
                       );
@@ -247,7 +238,7 @@ export default function ManageFormsPage() {
               
               {/* Header */}
               <div className="flex items-center justify-between pb-6 border-b border-slate-50">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Form Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Form Details</h2>
                 <button
                   onClick={() => setSelectedFormId(null)}
                   className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
@@ -267,7 +258,7 @@ export default function ManageFormsPage() {
                   </svg>
                 </div>
                 <div className="pt-1">
-                  <h3 className="text-[15px] font-black text-slate-800 leading-snug">{selectedForm.title}</h3>
+                  <h3 className="text-[15px] font-medium text-slate-800 leading-snug">{selectedForm.title}</h3>
                   <p className="text-[12px] font-medium text-slate-500 mt-1">Created: {selectedForm.createdDate}</p>
                 </div>
               </div>
@@ -282,19 +273,19 @@ export default function ManageFormsPage() {
               {/* Details List inside grey card */}
               <div className="bg-[#f8fafd] rounded-[1.5rem] p-6 space-y-5 mb-8 border border-slate-50">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Created</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedForm.createdDate} 21:42</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">Created</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selectedForm.createdDate} 21:42</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-bold">Last Modified</span>
-                  <span className="text-[11px] text-slate-800 font-bold">{selectedForm.modifiedDate} {selectedForm.modifiedTime}</span>
+                  <span className="text-[11px] text-slate-400 font-semibold">Last Modified</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selectedForm.modifiedDate} {selectedForm.modifiedTime}</span>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <button
                 onClick={() => router.push(`/dashboard/forms/${selectedForm.id}`)}
-                className="w-full py-4 bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white rounded-[1rem] text-[13px] font-bold transition duration-200 shadow-md shadow-blue-200/50 active:scale-[0.98]"
+                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
               >
                 Edit Form
               </button>
