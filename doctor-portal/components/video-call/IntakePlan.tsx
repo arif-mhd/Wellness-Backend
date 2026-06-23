@@ -227,11 +227,22 @@ function VisitInformationTab({
 
 type TabKey = "visitInformation" | keyof EmrSections;
 
+interface SubField {
+  label: string;
+  placeholder: string;
+  rows?: number;
+}
+
 interface TabDef {
   key: TabKey;
   title: string;
+  /** Single free-text tabs (legacy/simple) provide placeholder+rows directly. */
   placeholder?: string;
   rows?: number;
+  /** Structured tabs are composed of multiple labeled sub-fields, serialized
+   *  into the same single EmrSections string so the backend/save format and
+   *  every read-only display elsewhere stay unchanged. */
+  subFields?: SubField[];
 }
 
 const TABS: TabDef[] = [
@@ -239,64 +250,126 @@ const TABS: TabDef[] = [
     key: "reasonForVisit",
     title: "Intake plan",
     placeholder: "Why is the patient consulting today? (e.g. Persistent headache for 3 days…)",
-    rows: 3,
+    rows: 4,
   },
   { key: "visitInformation", title: "Visit Information" },
   {
     key: "historyOfPresentIllness",
     title: "History of Present Illness",
-    placeholder: "Describe onset, duration, character, aggravating / relieving factors…",
-    rows: 5,
+    subFields: [
+      { label: "Onset & Duration", placeholder: "When did it start, how has it progressed…" },
+      { label: "Character & Severity", placeholder: "Quality, intensity, location, radiation…" },
+      { label: "Aggravating / Relieving Factors", placeholder: "What makes it better or worse…" },
+      { label: "Associated Symptoms", placeholder: "Any other symptoms accompanying the main complaint…" },
+    ],
   },
   {
     key: "reviewSystem",
     title: "Review System",
-    placeholder: "Systematic review of symptoms by body system (cardiovascular, respiratory, GI, neuro, etc.)…",
-    rows: 5,
+    subFields: [
+      { label: "Constitutional", placeholder: "Fever, weight change, fatigue, appetite…" },
+      { label: "Cardiovascular / Respiratory", placeholder: "Chest pain, palpitations, shortness of breath, cough…" },
+      { label: "Gastrointestinal", placeholder: "Nausea, vomiting, abdominal pain, bowel changes…" },
+      { label: "Neurological / Musculoskeletal", placeholder: "Headache, dizziness, weakness, joint/muscle pain…" },
+      { label: "Other Systems", placeholder: "Skin, ENT, genitourinary, psychiatric, etc…" },
+    ],
   },
   {
     key: "healthStatus",
     title: "Health Status",
-    placeholder: "Overall health summary — current conditions under control, recent changes, vaccination status…",
-    rows: 4,
+    subFields: [
+      { label: "Current Conditions Status", placeholder: "Are existing chronic conditions controlled, stable, worsening…" },
+      { label: "Recent Changes", placeholder: "Any recent changes in health, medications, lifestyle…" },
+      { label: "Immunization Status", placeholder: "Vaccination history relevant to this visit…" },
+    ],
   },
   {
     key: "histories",
     title: "Histories",
-    placeholder: "Past medical, surgical, family, and social history relevant to this visit…",
-    rows: 5,
+    subFields: [
+      { label: "Past Medical History", placeholder: "Prior diagnoses, hospitalizations, chronic illnesses…" },
+      { label: "Past Surgical History", placeholder: "Prior surgeries and dates…" },
+      { label: "Family History", placeholder: "Relevant conditions in immediate family…" },
+      { label: "Social History", placeholder: "Smoking, alcohol, occupation, living situation…" },
+    ],
   },
   {
     key: "physicalExamination",
     title: "Physical Examination",
-    placeholder: "Vital signs and examination findings by system (general, cardiovascular, respiratory, abdominal, neuro, etc.)…",
-    rows: 6,
+    subFields: [
+      { label: "Vital Signs", placeholder: "BP, HR, Temp, RR, SpO2, weight, height…", rows: 2 },
+      { label: "General Appearance", placeholder: "Alert, oriented, distress level…", rows: 2 },
+      { label: "Cardiovascular", placeholder: "Heart sounds, rhythm, murmurs…", rows: 2 },
+      { label: "Respiratory", placeholder: "Breath sounds, effort, auscultation findings…", rows: 2 },
+      { label: "Abdominal", placeholder: "Tenderness, bowel sounds, masses…", rows: 2 },
+      { label: "Neurological", placeholder: "Reflexes, motor/sensory findings, mental status…", rows: 2 },
+    ],
   },
   {
     key: "medicalDecisionMaking",
     title: "Medical Decision Making",
-    placeholder: "Clinical reasoning — differential diagnoses considered, risk level, data reviewed…",
-    rows: 5,
+    subFields: [
+      { label: "Differential Diagnoses Considered", placeholder: "Conditions ruled in/out and why…" },
+      { label: "Data Reviewed", placeholder: "Labs, imaging, prior records reviewed…" },
+      { label: "Risk Level & Complexity", placeholder: "Risk of complications, comorbidities, complexity of management…" },
+    ],
   },
   {
     key: "procedure",
     title: "Procedure",
-    placeholder: "Any in-visit procedures performed, technique, and findings…",
-    rows: 4,
+    subFields: [
+      { label: "Procedure Performed", placeholder: "Name of in-visit procedure, if any…" },
+      { label: "Technique & Findings", placeholder: "How it was performed and what was found…" },
+      { label: "Complications", placeholder: "Any complications encountered, or \"None\"…" },
+    ],
   },
   {
     key: "impressionAndPlan",
     title: "Impression and Plan",
-    placeholder: "Diagnosis/impression and the treatment plan — medications, referrals, follow-up timing…",
-    rows: 5,
+    subFields: [
+      { label: "Clinical Impression / Diagnosis", placeholder: "Working diagnosis or impression…" },
+      { label: "Treatment Plan", placeholder: "Medications, therapies, lifestyle advice…" },
+      { label: "Referrals", placeholder: "Specialist referrals, if any…" },
+      { label: "Follow-up", placeholder: "When and why the patient should follow up…" },
+    ],
   },
   {
     key: "professionalServices",
     title: "Professional Services",
-    placeholder: "Billable services rendered during this encounter (e.g. consultation level, procedures, screenings)…",
-    rows: 3,
+    subFields: [
+      { label: "Services Rendered", placeholder: "Consultation level, procedures, screenings performed…" },
+      { label: "Time Spent", placeholder: "Approximate consultation duration, if billed by time…", rows: 2 },
+    ],
   },
 ];
+
+// ── Serialize / parse multi-field tabs into a single EmrSections string ───────
+// Format: "## Label\ntext\n\n## Label2\ntext2" — kept human-readable so the
+// existing read-only displays (EhrPanel, PatientProfileModal, ConsultationRoom)
+// continue to show something sensible even without re-parsing it.
+function serializeSubFields(values: Record<string, string>, subFields: SubField[]): string {
+  return subFields
+    .map((f) => ({ f, v: (values[f.label] ?? "").trim() }))
+    .filter(({ v }) => v.length > 0)
+    .map(({ f, v }) => `## ${f.label}\n${v}`)
+    .join("\n\n");
+}
+
+function parseSubFields(text: string, subFields: SubField[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const f of subFields) result[f.label] = "";
+  if (!text) return result;
+
+  const blocks = text.split(/\n(?=## )/);
+  for (const block of blocks) {
+    const match = block.match(/^## (.+)\n([\s\S]*)$/);
+    if (match) {
+      const [, label, body] = match;
+      if (label.trim() in result) result[label.trim()] = body.trim();
+    }
+  }
+  return result;
+}
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -343,6 +416,53 @@ function fmtAllergies(allergies?: any[]): string {
 
 function hasVisitInfoContent(v: VisitInfo): boolean {
   return !!(v.visitType || v.accompaniedBy || v.sourceOfHistory || v.referralSource || v.historyLimitation);
+}
+
+function SubFieldsTab({
+  title,
+  subFields,
+  value,
+  onChange,
+  hint,
+}: {
+  title: string;
+  subFields: SubField[];
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+}) {
+  const values = parseSubFields(value, subFields);
+
+  const updateField = (label: string, text: string) => {
+    const next = { ...values, [label]: text };
+    onChange(serializeSubFields(next, subFields));
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <span className="text-slate-800 text-[14px] font-bold">{title}</span>
+      {hint && (
+        <p className="text-[10px] text-[#5476FC] font-semibold flex items-center gap-1 -mt-1">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+          </svg>
+          {hint}
+        </p>
+      )}
+      {subFields.map((f) => (
+        <div key={f.label} className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">{f.label}</span>
+          <textarea
+            value={values[f.label] ?? ""}
+            onChange={(e) => updateField(f.label, e.target.value)}
+            placeholder={f.placeholder}
+            rows={f.rows ?? 3}
+            className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] placeholder-[#9EA5AD] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none leading-relaxed"
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -463,17 +583,17 @@ export default function IntakePlan({
         <div className="flex-1 min-w-0 bg-white rounded-xl border border-[#5476FC]/30 ring-1 ring-[#5476FC]/10 px-5 py-5">
           {activeTab === "visitInformation" ? (
             <VisitInformationTab visitInfo={visitInfo} onChange={onVisitInfoChange} />
+          ) : activeTabDef?.subFields ? (
+            <SubFieldsTab
+              title={activeTabDef.title}
+              subFields={activeTabDef.subFields}
+              value={sections[activeTab as keyof EmrSections] ?? ""}
+              onChange={(v) => updateSection(activeTab as keyof EmrSections, v)}
+              hint={activeTab === "historyOfPresentIllness" && sections.historyOfPresentIllness.trim() ? "Pre-filled from past visit — edit as needed" : undefined}
+            />
           ) : activeTabDef ? (
             <div className="flex flex-col gap-3">
               <span className="text-slate-800 text-[14px] font-bold">{activeTabDef.title}</span>
-              {activeTab === "historyOfPresentIllness" && sections.historyOfPresentIllness.trim() && (
-                <p className="text-[10px] text-[#5476FC] font-semibold flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                  </svg>
-                  Pre-filled from past visit — edit as needed
-                </p>
-              )}
               <textarea
                 value={sections[activeTab as keyof EmrSections] ?? ""}
                 onChange={(e) => updateSection(activeTab as keyof EmrSections, e.target.value)}

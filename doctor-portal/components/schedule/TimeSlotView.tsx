@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface TimeSlotRange {
   dayOfWeek: number;
@@ -18,8 +18,6 @@ interface Task {
   sub?: string;
   completed: boolean;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 const HOURS_SLOT = [
   { label: "7 AM", start: "07:00", mid: "07:30" },
@@ -135,11 +133,7 @@ export default function TimeSlotView() {
   // Fetch slots from backend
   const fetchSlots = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-
-      const res = await fetch(`${API_URL}/api/doctors/slots`, { headers });
+      const res = await apiFetch("/api/doctors/slots");
       if (res.ok) {
         const data = await res.json();
         const slots: TimeSlotRange[] = data.slots ?? [];
@@ -279,26 +273,9 @@ export default function TimeSlotView() {
         });
       }
 
-      let accessToken: string | undefined;
-      try {
-        accessToken = await Session.getAccessToken();
-      } catch (err) {
-        console.error("Failed to retrieve access token:", err);
-      }
-
-      if (!accessToken) {
-        alert("Authentication Required: You are not logged in. Please log in to your Doctor account to save availability slots.");
-        return;
-      }
-
-      const headers = {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      };
-
-      const res = await fetch(`${API_URL}/api/doctors/slots`, {
+      const res = await apiFetch("/api/doctors/slots", {
         method: "PUT",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: allSlotsToSend }),
       });
 

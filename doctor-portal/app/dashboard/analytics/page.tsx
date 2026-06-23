@@ -2,14 +2,12 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import React, { useState, useEffect, useCallback } from "react";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import PatientRatings from "@/components/analytics/PatientRatings";
 import AllConsultations from "@/components/analytics/AllConsultations";
 import PatientsOutcome from "@/components/analytics/PatientsOutcome";
 import DiagnosticsStatus from "@/components/analytics/DiagnosticsStatus";
 import ScreeningRecommendations from "@/components/analytics/ScreeningRecommendations";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface Task {
   id: number;
@@ -35,12 +33,8 @@ export default function AnalyticsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-
       // 1. Fetch Doctor's Appointments
-      const apptRes = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+      const apptRes = await apiFetch("/api/appointments/doctor");
       let apptData: any[] = [];
       if (apptRes.ok) {
         const data = await apptRes.json();
@@ -49,7 +43,7 @@ export default function AnalyticsPage() {
       }
 
       // 2. Fetch Doctor's Feedback
-      const feedbackRes = await fetch(`${API_URL}/api/feedback/doctor`, { headers });
+      const feedbackRes = await apiFetch("/api/feedback/doctor");
       if (feedbackRes.ok) {
         const fbData = await feedbackRes.json();
         setFeedback(fbData ?? []);

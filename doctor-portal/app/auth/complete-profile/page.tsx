@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import logoImg from "@/assets/images/wellness_logo.png";
 import ProfileCompletionSidebar from "@/components/profile/ProfileCompletionSidebar";
 import PersonalInformationForm from "@/components/profile/PersonalInformationForm";
@@ -12,12 +12,9 @@ import CertificationDocumentsForm from "@/components/profile/CertificationDocume
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
 import PaymentSettingsForm from "@/components/profile/PaymentSettingsForm";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 // Upload files to blob via the backend and return { fieldName: sasUrl } map
 async function uploadFiles(
-  files: Record<string, File | null>,
-  token: string
+  files: Record<string, File | null>
 ): Promise<Record<string, string>> {
   const form = new FormData();
   let hasFile = false;
@@ -26,9 +23,8 @@ async function uploadFiles(
   }
   if (!hasFile) return {};
 
-  const res = await fetch(`${API_URL}/api/doctors/upload`, {
+  const res = await apiFetch("/api/doctors/upload", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   if (!res.ok) throw new Error("File upload failed");
@@ -143,19 +139,14 @@ function CompleteProfileContent() {
     setSubmitError("");
 
     try {
-      const token = await Session.getAccessToken() ?? "";
-
       // 1. Upload files to blob storage
-      const fileUrls = await uploadFiles(
-        {
-          avatar:     personalInfo.profilePic    ?? null,
-          emiratesId: personalInfo.emiratesIdFile ?? null,
-          degree:     certDocumentsInfo?.degreeFile ?? null,
-          spec:       certDocumentsInfo?.specFile   ?? null,
-          other:      certDocumentsInfo?.addFile    ?? null,
-        },
-        token
-      ).catch(() => ({} as Record<string, string>));
+      const fileUrls = await uploadFiles({
+        avatar:     personalInfo.profilePic    ?? null,
+        emiratesId: personalInfo.emiratesIdFile ?? null,
+        degree:     certDocumentsInfo?.degreeFile ?? null,
+        spec:       certDocumentsInfo?.specFile   ?? null,
+        other:      certDocumentsInfo?.addFile    ?? null,
+      }).catch(() => ({} as Record<string, string>));
 
       // 2. Convert availability slot keys → backend slot objects
       const slots = slotsFromKeys(availabilityInfo?.selectedSlots ?? []);
@@ -190,12 +181,9 @@ function CompleteProfileContent() {
       };
 
       // 4. Save profile
-      await fetch(`${API_URL}/api/doctors/profile`, {
+      await apiFetch("/api/doctors/profile", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 

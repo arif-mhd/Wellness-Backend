@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import Session from "supertokens-web-js/recipe/session";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 const HOURS_SLOT = [
   { label: "7 AM", start: "07:00", mid: "07:30" },
@@ -184,11 +182,7 @@ export default function ScheduleAbsencesView() {
 
   const fetchAbsences = useCallback(async () => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      const res = await fetch(`${API_URL}/api/doctors/absences`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch("/api/doctors/absences");
       if (res.ok) {
         const data = await res.json();
         setAbsences(data.absences ?? []);
@@ -213,18 +207,12 @@ export default function ScheduleAbsencesView() {
 
     const checkConflicts = async () => {
       try {
-        const token = await Session.getAccessToken();
-        if (!token) return;
-        
         const isoStart = new Date(startDate).toISOString();
         const isoEnd = new Date(endDate).toISOString();
 
-        const res = await fetch(`${API_URL}/api/doctors/absences/check-conflicts`, {
+        const res = await apiFetch("/api/doctors/absences/check-conflicts", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ startDate: isoStart, endDate: isoEnd })
         });
         if (res.ok) {
@@ -246,15 +234,11 @@ export default function ScheduleAbsencesView() {
     
     setFileUploading(true);
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      
       const form = new FormData();
       form.append("other", selectedFile);
 
-      const res = await fetch(`${API_URL}/api/doctors/upload`, {
+      const res = await apiFetch("/api/doctors/upload", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: form
       });
       if (res.ok) {
@@ -279,18 +263,12 @@ export default function ScheduleAbsencesView() {
     }
     
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-
       const isoStart = new Date(startDate).toISOString();
       const isoEnd = new Date(endDate).toISOString();
 
-      const res = await fetch(`${API_URL}/api/doctors/absences`, {
+      const res = await apiFetch("/api/doctors/absences", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startDate: isoStart,
           endDate: isoEnd,
@@ -326,12 +304,8 @@ export default function ScheduleAbsencesView() {
     if (!confirm("Are you sure you want to delete this absence? This will restore your normal availability slots.")) return;
     
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-
-      const res = await fetch(`${API_URL}/api/doctors/absences/${id}`, {
+      const res = await apiFetch(`/api/doctors/absences/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (res.ok) {

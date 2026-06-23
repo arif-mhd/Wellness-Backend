@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface PatientProfileModalProps {
   patient: Patient;
@@ -156,11 +154,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
     (async () => {
       setLoadingConsultations(true);
       try {
-        const token = await Session.getAccessToken();
-        if (!token) return;
-        const res = await fetch(`${API_URL}/api/appointments/doctor`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch("/api/appointments/doctor");
         if (res.ok) {
           const { appointments } = await res.json();
           // Filter to this patient's appointments, most-recent first
@@ -188,9 +182,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
           if (mapped.length > 0) {
             setSelectedConsultation(mapped[0]);
             try {
-              const ehrRes = await fetch(`${API_URL}/api/appointments/${mapped[0].id}/ehr`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const ehrRes = await apiFetch(`/api/appointments/${mapped[0].id}/ehr`);
               if (ehrRes.ok) {
                 const { clinicalNotes: notes } = await ehrRes.json();
                 setClinicalNotes(notes ?? []);
@@ -280,10 +272,9 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
     setSavingAddendum(true);
     setAddendumError(null);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${selectedConsultation.id}/emr`, {
+      const res = await apiFetch(`/api/appointments/${selectedConsultation.id}/emr`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ addendum: addendumText.trim() }),
       });
       if (!res.ok) throw new Error("Failed to save addendum");
@@ -306,10 +297,9 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
     setSavingNewNote(true);
     setNewNoteError(null);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/patient/${patient.id}/notes`, {
+      const res = await apiFetch(`/api/appointments/patient/${patient.id}/notes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: newNoteText.trim() }),
       });
       if (!res.ok) throw new Error("Failed to save note");

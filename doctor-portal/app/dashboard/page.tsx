@@ -3,10 +3,8 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
 import { createPortal } from "react-dom";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface SlotDef {
   dayOfWeek: number;
@@ -140,11 +138,7 @@ export default function DashboardPage() {
   // Poll backend every 10s for a pending invite
   const pollForInvite = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const res = await fetch(`${API_URL}/api/appointments/my-invite`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch("/api/appointments/my-invite");
       if (res.ok) {
         const { invite } = await res.json();
         if (invite && invite.appointmentId !== shownInviteIdRef.current) {
@@ -168,19 +162,15 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-
       // Doctor name
-      const meRes = await fetch(`${API_URL}/auth/me`, { headers });
+      const meRes = await apiFetch("/auth/me");
       if (meRes.ok) {
         const meData = await meRes.json();
         setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
       }
 
       // Appointments
-      const apptRes = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+      const apptRes = await apiFetch("/api/appointments/doctor");
       if (apptRes.ok) {
         const { appointments } = await apptRes.json();
         const all: any[] = appointments ?? [];
@@ -225,7 +215,7 @@ export default function DashboardPage() {
       }
 
       // Tasks — derived from appointments (upcoming consultations + pending EMR)
-      const tasksRes = await fetch(`${API_URL}/api/appointments/doctor/tasks`, { headers });
+      const tasksRes = await apiFetch("/api/appointments/doctor/tasks");
       if (tasksRes.ok) {
         const { tasks: rawTasks, counts } = await tasksRes.json();
         const mapped: Task[] = (rawTasks ?? []).map((t: any) => ({
@@ -242,7 +232,7 @@ export default function DashboardPage() {
       setTasksLoaded(true);
 
       // Slots
-      const slotsRes = await fetch(`${API_URL}/api/doctors/slots`, { headers });
+      const slotsRes = await apiFetch("/api/doctors/slots");
       if (slotsRes.ok) {
         const { slots: s } = await slotsRes.json();
         if (s && s.length > 0) {
@@ -253,9 +243,9 @@ export default function DashboardPage() {
             slotDurationMins: 30, isActive: true,
           }));
           setSlots(defaultSlots);
-          fetch(`${API_URL}/api/doctors/slots`, {
+          apiFetch("/api/doctors/slots", {
             method: "PUT",
-            headers: { ...headers, "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ slots: defaultSlots }),
           }).catch(() => {});
         }
@@ -383,8 +373,11 @@ export default function DashboardPage() {
   ) : null;
 
   const goToTask = (task: Task) => {
-    const tabSuffix = task.type === "pending_emr" ? "&tab=emr" : "";
-    router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}${tabSuffix}`);
+    if (task.type === "pending_emr") {
+      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
+    } else {
+      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
+    }
   };
 
   const upcomingCount       = tasks.length - pendingEmrCount;

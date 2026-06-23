@@ -8,12 +8,11 @@ import {
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication,
 } from "livekit-client";
+import { apiFetch } from "@/lib/apiFetch";
 import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import EhrPanel from "@/components/video-call/EhrPanel";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -103,7 +102,6 @@ function VideoCallInner() {
   const roomRef      = useRef<Room | null>(null);
   const localVideoEl = useRef<HTMLVideoElement>(null);
   const didConnectRef = useRef(false);
-  const tokenRef     = useRef("");
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
@@ -202,13 +200,11 @@ function VideoCallInner() {
     async function init() {
       if (!appointmentId) { setError("Missing appointment ID"); return; }
       try {
-        const token = await Session.getAccessToken();
-        if (cancelled) return;
-        tokenRef.current = token ?? "";
         const endpoint = isSpecialist
-          ? `${API_URL}/api/appointments/${appointmentId}/specialist-join`
-          : `${API_URL}/api/appointments/${appointmentId}/livekit-token`;
-        const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+          ? `/api/appointments/${appointmentId}/specialist-join`
+          : `/api/appointments/${appointmentId}/livekit-token`;
+        const res = await apiFetch(endpoint);
+        if (cancelled) return;
         if (!res.ok) { setError("Could not get call token"); return; }
         const { token: lkToken, wsUrl } = await res.json();
         if (cancelled) return;
@@ -270,13 +266,9 @@ function VideoCallInner() {
     (async () => {
       setLoadingEmr(true);
       try {
-        const token = await Session.getAccessToken();
-
         // 1. Load patient profile (for the snapshot strip)
         try {
-          const profRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/patient-profile`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const profRes = await apiFetch(`/api/appointments/${appointmentId}/patient-profile`);
           if (profRes.ok) {
             const { profile } = await profRes.json();
             setPatientProfile(profile ?? null);
@@ -284,9 +276,7 @@ function VideoCallInner() {
         } catch { /* non-fatal */ }
 
         // 2. Load saved EMR for this encounter
-        const emrRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const emrRes = await apiFetch(`/api/appointments/${appointmentId}/emr`);
         if (emrRes.ok) {
           const { emr } = await emrRes.json();
           if (emr) {
@@ -298,9 +288,7 @@ function VideoCallInner() {
             // 3. No saved EMR yet — pre-fill HPI from the patient's most recent
             //    past appointment that has an EMR (fetched via the EHR endpoint).
             try {
-              const ehrRes = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const ehrRes = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
               if (ehrRes.ok) {
                 const ehrData = await ehrRes.json();
                 const history: any[] = ehrData?.visitHistory ?? [];
@@ -333,10 +321,7 @@ function VideoCallInner() {
     refreshMedicinesRef.current = async () => {
       if (!appointmentId) return;
       try {
-        const token = await Session.getAccessToken();
-        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/appointments/${appointmentId}/emr`);
         if (res.ok) {
           const { emr } = await res.json();
           if (emr) {
@@ -355,8 +340,6 @@ function VideoCallInner() {
   const saveEmr = async () => {
     setSavingEmr(true);
     try {
-      const token = await Session.getAccessToken();
-
       // CRITICAL: Only send THIS doctor's own entries to the backend.
       // The local medicines/labs state includes entries from other doctors
       // (loaded via EMR fetch). If we sent those too, the backend would
@@ -369,9 +352,9 @@ function VideoCallInner() {
         (l) => !currentDoctorId || !l.contributorDoctorId || l.contributorDoctorId === currentDoctorId
       );
 
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/emr`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sections: emrSections, visitInfo, medicines: ownMedicines, labs: ownLabs }),
       });
       if (res.ok) {
@@ -400,10 +383,7 @@ function VideoCallInner() {
     setEhrOpen(true);
     setEhrLoading(true);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
       if (res.ok) setEhrData(await res.json());
     } catch {
       // ignore
@@ -432,10 +412,7 @@ function VideoCallInner() {
     if (!appointmentId || isSpecialist) return;
     setDoctorsLoading(true);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/available-doctors`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/available-doctors`);
       if (res.ok) { const { doctors: list } = await res.json(); setAvailableDoctors(list ?? []); }
     } catch {} finally { setDoctorsLoading(false); }
   }, [appointmentId, isSpecialist]);
@@ -450,10 +427,9 @@ function VideoCallInner() {
     if (!selectedSpecialist || !appointmentId) return;
     setInviteStatus("sending");
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/invite-specialist`, {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/invite-specialist`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ specialistDoctorId: selectedSpecialist.id }),
       });
       if (res.ok) {
@@ -461,10 +437,7 @@ function VideoCallInner() {
         setShowApprovalModal(false);
         if (patientPollRef.current) clearInterval(patientPollRef.current);
         patientPollRef.current = setInterval(async () => {
-          const t = await Session.getAccessToken();
-          const r = await fetch(`${API_URL}/api/appointments/${appointmentId}/specialist-status`, {
-            headers: { Authorization: `Bearer ${t}` },
-          });
+          const r = await apiFetch(`/api/appointments/${appointmentId}/specialist-status`);
           if (r.ok) {
             const { patientDecision } = await r.json();
             if (patientDecision === "accepted") {

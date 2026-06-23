@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Session from "supertokens-web-js/recipe/session";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 export interface EhrAddendum {
   text: string;
@@ -131,10 +129,9 @@ export default function ConsultationRoom({
     setSavingAddendum(true);
     setAddendumError(null);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${visit.appointmentId}/emr`, {
+      const res = await apiFetch(`/api/appointments/${visit.appointmentId}/emr`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ addendum: addendumText.trim() }),
       });
       if (!res.ok) throw new Error("Failed to save addendum");

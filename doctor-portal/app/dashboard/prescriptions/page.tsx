@@ -2,12 +2,10 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskListTable from "@/components/tasks/TaskListTable";
 import TaskDetailsCard, { TaskItem } from "@/components/tasks/TaskDetailsCard";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface RawTask {
   id: string;
@@ -46,11 +44,7 @@ export default function PrescriptionsTasksPage() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const res = await fetch(`${API_URL}/api/appointments/doctor/tasks`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch("/api/appointments/doctor/tasks");
       if (!res.ok) return;
       const { tasks: raw } = (await res.json()) as { tasks: RawTask[] };
 
@@ -85,7 +79,7 @@ export default function PrescriptionsTasksPage() {
     if (task.type === "upcoming_consultation") {
       router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
     } else {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}&tab=emr`);
+      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
     }
   };
 

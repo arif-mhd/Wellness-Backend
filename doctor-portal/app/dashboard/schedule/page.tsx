@@ -2,15 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ScheduleTabs from "@/components/schedule/ScheduleTabs";
 import ScheduleListView, { ScheduleItem } from "@/components/schedule/ScheduleListView";
 import ScheduleCalendarView, { CalendarAppointment } from "@/components/schedule/ScheduleCalendarView";
 import TimeSlotView from "@/components/schedule/TimeSlotView";
 import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -42,11 +40,7 @@ export default function SchedulesDashboardPage() {
   // Load appointments
   const fetchAppointments = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-
-      const res = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+      const res = await apiFetch("/api/appointments/doctor");
       if (res.ok) {
         const data = await res.json();
         setAppointments(data.appointments ?? []);

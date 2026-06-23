@@ -2,12 +2,10 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
 import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
 import ConsultationRoom, { EhrVisit } from "./ConsultationRoom";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface WaitingRoomProps {
   onClose: () => void;
@@ -108,11 +106,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      const res = await fetch(`${API_URL}/api/appointments/doctor`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch("/api/appointments/doctor");
       if (!res.ok) return;
       const { appointments: all } = await res.json();
       setAllAppointmentsRaw(all ?? []);
@@ -168,11 +162,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
     setEhrLoading(true);
     setVisitHistory([]);
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
       if (!res.ok) return;
       const data = await res.json();
       setVisitHistory(data.visitHistory ?? []);

@@ -6,7 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
 import { usePathname } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import ChatBox from "@/components/ChatBox";
 
 export default function SharedDashboardLayout({
@@ -37,12 +37,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // (apt.patientWaitingSince set), not the old hardcoded "(12)".
   const fetchWaitingCount = useCallback(async () => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/appointments/doctor`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiFetch("/api/appointments/doctor");
       if (!res.ok) return;
       const { appointments } = await res.json();
       const count = (appointments ?? []).filter(
@@ -61,13 +56,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }, [fetchWaitingCount]);
   const fetchNotifications = useCallback(async () => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiFetch("/api/notifications");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data ?? []);
@@ -86,16 +75,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleMarkAsRead = async (notifId: string) => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications/${notifId}/read`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const res = await apiFetch(`/api/notifications/${notifId}/read`, {
+        method: "PATCH",
+      });
       if (res.ok) {
         fetchNotifications();
       }

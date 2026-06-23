@@ -2,11 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Patient } from "@/app/appointments/types";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 function formatVisitDate(isoString: string): string {
   try {
@@ -48,11 +46,7 @@ export default function PatientsPage() {
   // Load API data
   const fetchData = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const headers = { Authorization: `Bearer ${accessToken}` };
-
-      const apptRes = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+      const apptRes = await apiFetch("/api/appointments/doctor");
       if (apptRes.ok) {
         const { appointments: data } = await apptRes.json();
         setAppointments(data ?? []);

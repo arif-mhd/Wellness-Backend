@@ -3,9 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Patient } from "./types";
-import Session from "supertokens-web-js/recipe/session";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -34,6 +32,16 @@ function mapToPatient(apt: any, index: number): Patient {
   let status: Patient["status"] = "Scheduled";
   if (apt.status === "in_progress") status = "Waiting";
   else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
+  else if (apt.status === "scheduled") {
+    // The backend never auto-flips status when a slot's time passes — it only
+    // changes via an explicit doctor action (starting/ending a call). A
+    // "scheduled" appointment whose time is well past is effectively a missed
+    // consultation; treat it as Completed here so its Consult Now button
+    // greys out instead of staying live for an appointment that already happened.
+    const PAST_DUE_GRACE_MINUTES = 60;
+    const minutesPast = (Date.now() - d.getTime()) / 60000;
+    if (minutesPast > PAST_DUE_GRACE_MINUTES) status = "Completed";
+  }
 
   const preVisitForm = apt.preVisitData ? {
     isQuestionnaire: true,
@@ -107,11 +115,7 @@ export default function AppointmentsPage() {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const res = await fetch(`${API_URL}/api/appointments/doctor`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch("/api/appointments/doctor");
       if (!res.ok) return;
       const { appointments } = await res.json();
       const mapped = (appointments ?? []).map(mapToPatient);
@@ -142,12 +146,7 @@ export default function AppointmentsPage() {
 
   const sendReminder = async (patient: Patient) => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const res = await fetch(`${API_URL}/api/appointments/${patient.id}/remind`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch(`/api/appointments/${patient.id}/remind`, { method: "POST" });
       if (res.ok) {
         triggerToast(`Reminder sent to ${patient.name}`);
       } else {
@@ -195,7 +194,7 @@ export default function AppointmentsPage() {
 
     // Filter by date
     if (dateFilter === "Today") {
-      result = result.filter(appt => !appt.scheduledAt || new Date(appt.scheduledAt).toDateString() === todayStr);
+      result = result.filter(appt => !appt.scheduledAt || parseLocalTime(appt.scheduledAt).toDateString() === todayStr);
     }
 
     // Filter by inline search
@@ -226,7 +225,7 @@ export default function AppointmentsPage() {
     // Filter by date
     if (dateFilter === "Today") {
       const todayStr = new Date().toDateString();
-      result = result.filter(c => !c.scheduledAt || new Date(c.scheduledAt).toDateString() === todayStr);
+      result = result.filter(c => !c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr);
     }
 
     // Filter by inline search
