@@ -1,292 +1,515 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import medicineIcon from "@/assets/images/medicine_icon_png.png";
-// We'll use next/image or standard img for avatars. For now just img or div placeholders.
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
+import { Room, RoomEvent } from "livekit-client";
 
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string;
-  avatarIcon?: React.ReactNode;
-  time: string;
-  preview: string;
-  type: "pharmacy" | "lab" | "patient";
+interface Conversation {
+  conversationId: string;
+  otherPartyId: string;
+  otherPartyName: string;
+  otherPartyRole: string;
+  otherPartyAvatarUrl?: string | null;
+  lastMessage?: { text: string; createdAt: string; senderRole: string } | null;
+  unreadCount: number;
 }
 
-const mockContacts: Contact[] = [
-  {
-    id: "1",
-    name: "Message from Pharmacy",
-    email: "mail@example.com",
-    avatarIcon: (
-      <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-    time: "11:02 AM",
-    preview: "The CBC and BMP results are now available....",
-    type: "pharmacy",
-  },
-  {
-    id: "2",
-    name: "Message from Lab",
-    email: "yelena@example.com",
-    avatarIcon: (
-      <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
-    time: "11:02 AM",
-    preview: "The CBC and BMP results are now available....",
-    type: "lab",
-  },
-  {
-    id: "3",
-    name: "Message from Pharmacy",
-    email: "mail@example.com",
-    avatarIcon: (
-      <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-    time: "11:02 AM",
-    preview: "The CBC and BMP results are now available....",
-    type: "pharmacy",
-  },
-  {
-    id: "4",
-    name: "Bessie Cooper",
-    email: "mail@example.com",
-    avatarUrl: "https://i.pravatar.cc/150?u=a042581f4e29026704d",
-    time: "11:02 AM",
-    preview: "The CBC and BMP results are now available....",
-    type: "patient",
-  },
-];
+interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderRole: "patient" | "doctor";
+  text: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+function fmtTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function Avatar({ name, avatarUrl, size = 40 }: { name: string; avatarUrl?: string | null; size?: number }) {
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const colors = ["#5476fc", "#0abc49", "#f59e0b", "#e84949", "#8b5cf6", "#06b6d4"];
+  const bg = colors[initials.charCodeAt(0) % colors.length];
+
+  if (avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt={name}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: "50%", backgroundColor: bg,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontWeight: 600, fontSize: size * 0.33, flexShrink: 0,
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+function MessageSquareIcon({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+    </svg>
+  );
+}
+function SendIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+function SpinnerIcon({ size = 24 }: { size?: number }) {
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: "50%",
+        border: "2.5px solid #eaecf0", borderTopColor: "#5476fc",
+        animation: "spin 0.8s linear infinite",
+      }}
+    />
+  );
+}
 
 export default function MessagesPage() {
-  const [activeTab, setActiveTab] = useState<"All" | "Unread">("All");
-  const [selectedContactId, setSelectedContactId] = useState<string>("4");
+  const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [filtered, setFiltered] = useState<Conversation[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [myUserId, setMyUserId] = useState<string>("");
+  const [myName, setMyName] = useState("Doctor");
 
-  const selectedContact = mockContacts.find((c) => c.id === selectedContactId) || mockContacts[0];
+  const roomRef = useRef<Room | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Fetch doctor identity ──────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const uid = await Session.getUserId().catch(() => null);
+      if (!uid) { router.push("/auth/login"); return; }
+      setMyUserId(uid);
+
+      try {
+        const r = await apiFetch("/api/doctors/me");
+        if (r.ok) {
+          const { doctor } = await r.json();
+          if (doctor?.fullName) setMyName(doctor.fullName);
+        }
+      } catch { /* keep default name */ }
+    })();
+  }, [router]);
+
+  // ── Fetch conversations ────────────────────────────────────────────────────
+  const fetchConversations = useCallback(async () => {
+    try {
+      const r = await apiFetch("/api/messages/conversations");
+      if (r.ok) {
+        const d = await r.json();
+        setConversations(d.conversations ?? []);
+        setFiltered(d.conversations ?? []);
+      }
+    } catch (e) {
+      console.error("fetchConversations:", e);
+    } finally {
+      setLoadingConvs(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
+
+  // ── Search filter ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!searchQuery.trim()) { setFiltered(conversations); return; }
+    const q = searchQuery.toLowerCase();
+    setFiltered(conversations.filter((c) => c.otherPartyName.toLowerCase().includes(q)));
+  }, [searchQuery, conversations]);
+
+  // ── Select conversation ────────────────────────────────────────────────────
+  const selectConversation = useCallback(async (conv: Conversation) => {
+    if (roomRef.current) {
+      await roomRef.current.disconnect();
+      roomRef.current = null;
+      setConnected(false);
+    }
+
+    setSelectedConv(conv);
+    setMessages([]);
+    setLoadingMsgs(true);
+
+    try {
+      const r = await apiFetch(`/api/messages/${encodeURIComponent(conv.conversationId)}`);
+      if (r.ok) {
+        const d = await r.json();
+        setMessages(d.messages ?? []);
+      }
+
+      const tokenRes = await apiFetch(`/api/messages/token?channel=${encodeURIComponent(conv.conversationId)}`);
+      if (!tokenRes.ok) throw new Error("Could not get chat token");
+      const { token: lkToken, wsUrl } = await tokenRes.json();
+
+      const room = new Room();
+      roomRef.current = room;
+
+      room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+        try {
+          const decoded = new TextDecoder().decode(payload);
+          const packet = JSON.parse(decoded);
+          if (packet.type === "chat_message") {
+            const newMsg: ChatMessage = {
+              id: packet.id ?? `tmp_${Date.now()}`,
+              conversationId: conv.conversationId,
+              senderId: packet.senderId,
+              senderRole: packet.senderRole,
+              text: packet.text,
+              createdAt: packet.createdAt ?? new Date().toISOString(),
+              isRead: false,
+            };
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        } catch { /* ignore parse errors */ }
+      });
+
+      room.on(RoomEvent.Connected, () => setConnected(true));
+      room.on(RoomEvent.Disconnected, () => setConnected(false));
+
+      await room.connect(wsUrl, lkToken);
+
+    } catch (err) {
+      console.error("selectConversation:", err);
+    } finally {
+      setLoadingMsgs(false);
+    }
+
+    setConversations((prev) =>
+      prev.map((c) => c.conversationId === conv.conversationId ? { ...c, unreadCount: 0 } : c)
+    );
+  }, []);
+
+  // ── Auto scroll ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── Send message ───────────────────────────────────────────────────────────
+  const handleSend = useCallback(async () => {
+    if (!inputText.trim() || !selectedConv || sending) return;
+    const text = inputText.trim();
+    setInputText("");
+    setSending(true);
+
+    const optimisticMsg: ChatMessage = {
+      id: `opt_${Date.now()}`,
+      conversationId: selectedConv.conversationId,
+      senderId: myUserId,
+      senderRole: "doctor",
+      text,
+      createdAt: new Date().toISOString(),
+      isRead: true,
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const r = await apiFetch(
+        `/api/messages/${encodeURIComponent(selectedConv.conversationId)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        }
+      );
+
+      let savedMsg: ChatMessage | null = null;
+      if (r.ok) {
+        const d = await r.json();
+        savedMsg = d.message;
+        if (savedMsg) {
+          setMessages((prev) =>
+            prev.map((m) => m.id === optimisticMsg.id ? savedMsg! : m)
+          );
+        }
+      }
+
+      if (roomRef.current && roomRef.current.state === "connected") {
+        const packet = {
+          type: "chat_message",
+          id: savedMsg?.id ?? optimisticMsg.id,
+          senderId: myUserId,
+          senderRole: "doctor",
+          senderName: myName,
+          text,
+          createdAt: savedMsg?.createdAt ?? optimisticMsg.createdAt,
+        };
+        const data = new TextEncoder().encode(JSON.stringify(packet));
+        await roomRef.current.localParticipant.publishData(data, { reliable: true });
+      }
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversationId === selectedConv.conversationId
+            ? { ...c, lastMessage: { text, createdAt: new Date().toISOString(), senderRole: "doctor" } }
+            : c
+        )
+      );
+
+    } catch (err) {
+      console.error("handleSend:", err);
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
+  }, [inputText, selectedConv, sending, myUserId, myName]);
+
+  // ── Cleanup on unmount ─────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => { roomRef.current?.disconnect(); };
+  }, []);
+
+  const totalUnread = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
 
   return (
-    <div className="w-full min-h-[calc(100vh-80px)] font-outfit animate-in fade-in duration-300 px-6 py-6 lg:px-8">
-      <div className="mb-6">
-        <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Messages</h1>
+    <div style={{ display: "flex", height: "calc(100vh - 48px)", background: "#f4f5fa", overflow: "hidden" }}>
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes spin{to{transform:rotate(360deg)}}` }} />
+
+      {/* ── Left panel: conversation list ── */}
+      <div style={{ width: 320, borderRight: "1px solid #eaecf0", background: "#fff", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <div style={{ padding: "20px 20px 12px", borderBottom: "1px solid #f4f5fa" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#24292e", flex: 1 }}>Messages</h1>
+            {totalUnread > 0 && (
+              <span style={{
+                padding: "2px 8px", borderRadius: 999, background: "#e84949", color: "#fff",
+                fontSize: 11, fontWeight: 700,
+              }}>
+                {totalUnread}
+              </span>
+            )}
+          </div>
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ea5ad" }}>
+              <SearchIcon />
+            </span>
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search patients..."
+              style={{
+                width: "100%", paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+                border: "1px solid #eaecf0", borderRadius: 8, fontSize: 13, outline: "none",
+                background: "#f8f9fc", color: "#24292e", boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {loadingConvs ? (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 40 }}>
+              <SpinnerIcon />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "#9ea5ad" }}>
+              <div style={{ opacity: 0.4, marginBottom: 12 }}><MessageSquareIcon /></div>
+              <p style={{ fontSize: 13 }}>
+                {conversations.length === 0
+                  ? "No patient conversations yet. Patients can message you after booking an appointment."
+                  : "No results found."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((conv) => {
+              const isSelected = selectedConv?.conversationId === conv.conversationId;
+              return (
+                <button
+                  key={conv.conversationId}
+                  onClick={() => selectConversation(conv)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 12,
+                    padding: "14px 20px", border: "none", cursor: "pointer", textAlign: "left",
+                    background: isSelected ? "#f0f3ff" : "#fff",
+                    borderLeft: isSelected ? "3px solid #5476fc" : "3px solid transparent",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <div style={{ position: "relative" }}>
+                    <Avatar name={conv.otherPartyName} avatarUrl={conv.otherPartyAvatarUrl} size={42} />
+                    {conv.unreadCount > 0 && (
+                      <span style={{
+                        position: "absolute", top: -2, right: -2, width: 16, height: 16,
+                        borderRadius: "50%", background: "#5476fc", color: "#fff",
+                        fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "2px solid #fff",
+                      }}>
+                        {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <p style={{ fontSize: 14, fontWeight: conv.unreadCount > 0 ? 700 : 600, color: "#24292e", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {conv.otherPartyName}
+                      </p>
+                      {conv.lastMessage && (
+                        <span style={{ fontSize: 11, color: "#9ea5ad", flexShrink: 0, marginLeft: 8 }}>
+                          {fmtTime(conv.lastMessage.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      fontSize: 12, color: conv.unreadCount > 0 ? "#5476fc" : "#9ea5ad",
+                      margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      fontWeight: conv.unreadCount > 0 ? 600 : 400,
+                    }}>
+                      {conv.lastMessage
+                        ? `${conv.lastMessage.senderRole === "doctor" ? "You: " : ""}${conv.lastMessage.text}`
+                        : "Tap to start chatting"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT COLUMN: CONTACTS LIST */}
-        <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col h-fit overflow-hidden">
-          {/* Tabs & Search */}
-          <div className="p-5 flex items-center justify-between border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setActiveTab("All")}
-                className={`px-5 py-2.5 rounded-full text-[12px] font-medium transition-all shadow-sm ${
-                  activeTab === "All" ? "bg-[#1E293B] text-white" : "text-slate-500 hover:bg-slate-50"
-                }`}
-              >
-                All
-              </button>
-              <button 
-                onClick={() => setActiveTab("Unread")}
-                className={`px-5 py-2.5 rounded-full text-[12px] font-medium transition-all shadow-sm ${
-                  activeTab === "Unread" ? "bg-[#1E293B] text-white" : "text-slate-500 hover:bg-slate-50"
-                }`}
-              >
-                Unread
-              </button>
+      {/* ── Right panel: chat window ── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {!selectedConv ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#9ea5ad" }}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#f0f3ff", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, color: "#5476fc" }}>
+              <MessageSquareIcon />
             </div>
-            <button className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-800 transition rounded-full hover:bg-slate-50">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#24292e", marginBottom: 8 }}>Select a conversation</h2>
+            <p style={{ fontSize: 14, textAlign: "center", maxWidth: 280 }}>
+              Choose a patient from the list to view and send messages.
+            </p>
           </div>
-
-          {/* Contacts List */}
-          <div className="overflow-y-auto flex-1 p-2">
-            {mockContacts.map((contact) => (
-              <div 
-                key={contact.id} 
-                onClick={() => setSelectedContactId(contact.id)}
-                className={`flex gap-3 p-3 rounded-[1.5rem] cursor-pointer transition-colors ${
-                  selectedContactId === contact.id ? "bg-[#f8fafd]" : "hover:bg-slate-50"
-                } border-b border-slate-50 last:border-0`}
-              >
-                <div className="w-11 h-11 rounded-full bg-[#f8fafd] border border-slate-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-                  {contact.avatarUrl ? (
-                    <img src={contact.avatarUrl} alt={contact.name} className="w-full h-full object-cover" />
-                  ) : (
-                    contact.avatarIcon
-                  )}
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] font-semibold text-slate-800 truncate pr-2">{contact.name}</h3>
-                    <span className="text-[10px] font-medium text-slate-400 flex-shrink-0">{contact.time}</span>
-                  </div>
-                  {contact.type !== "patient" && (
-                    <p className="text-[11px] font-medium text-slate-400 truncate">{contact.email}</p>
-                  )}
-                  <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">{contact.preview}</p>
-                </div>
+        ) : (
+          <>
+            <div style={{
+              padding: "16px 24px", borderBottom: "1px solid #eaecf0", background: "#fff",
+              display: "flex", alignItems: "center", gap: 12,
+            }}>
+              <Avatar name={selectedConv.otherPartyName} avatarUrl={selectedConv.otherPartyAvatarUrl} size={40} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 700, color: "#24292e", margin: 0, fontSize: 15 }}>{selectedConv.otherPartyName}</p>
+                <p style={{ fontSize: 12, color: "#9ea5ad", margin: "2px 0 0" }}>Patient</p>
               </div>
-            ))}
-          </div>
-        </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? "#0abc49" : "#9ea5ad", display: "inline-block" }} />
+                <span style={{ fontSize: 12, color: connected ? "#0abc49" : "#9ea5ad" }}>
+                  {connected ? "Connected" : "Connecting..."}
+                </span>
+              </div>
+            </div>
 
-        {/* MIDDLE COLUMN: CHAT AREA */}
-        <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col h-[650px] overflow-hidden">
-          {/* Header */}
-          <div className="p-5 flex items-center gap-4 border-b border-slate-50 bg-white z-10">
-            <div className="w-11 h-11 rounded-full bg-[#f8fafd] border border-slate-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-              {selectedContact.avatarUrl ? (
-                <img src={selectedContact.avatarUrl} alt={selectedContact.name} className="w-full h-full object-cover" />
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {loadingMsgs ? (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: 40 }}>
+                  <SpinnerIcon />
+                </div>
+              ) : messages.length === 0 ? (
+                <div style={{ textAlign: "center", marginTop: 60, color: "#9ea5ad" }}>
+                  <p style={{ fontSize: 14 }}>No messages yet. Say hello!</p>
+                </div>
               ) : (
-                selectedContact.avatarIcon
-              )}
-            </div>
-            <div>
-              <h2 className="text-[15px] font-medium text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
-              <p className="text-[11px] font-medium text-slate-400">{selectedContact.email}</p>
-            </div>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white flex flex-col">
-            {/* Incoming */}
-            <div className="flex flex-col items-start max-w-[85%]">
-              <div className="bg-slate-50 border border-slate-100 text-slate-800 text-[13px] font-medium px-5 py-3.5 rounded-2xl rounded-tl-sm">
-                Hi Doctor
-              </div>
-              <span className="text-[10px] font-semibold text-slate-400 mt-1.5 ml-1">11:02 AM</span>
-            </div>
-
-            {/* Outgoing */}
-            <div className="flex flex-col items-end self-end max-w-[85%]">
-              <div className="bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-slate-800 text-[13px] font-medium px-5 py-3.5 rounded-2xl rounded-tr-sm">
-                Yes, Let&apos;s start this meeting
-              </div>
-              <span className="text-[10px] font-semibold text-slate-400 mt-1.5 mr-1">11:02 AM</span>
-            </div>
-
-            {/* Date Divider */}
-            <div className="flex items-center justify-center py-2">
-              <span className="text-[10px] font-semibold tracking-widest text-slate-300 uppercase">Today</span>
-            </div>
-
-            {/* Incoming */}
-            <div className="flex flex-col items-start max-w-[90%]">
-              <div className="bg-slate-50 border border-slate-100 text-slate-800 text-[13px] font-medium px-5 py-3.5 rounded-2xl rounded-tl-sm leading-relaxed">
-                The CBC and BMP results are now available. Would you like me to send them directly to your EMR system?
-              </div>
-              <span className="text-[10px] font-semibold text-slate-400 mt-1.5 ml-1">11:02 AM</span>
-            </div>
-
-            {/* Outgoing */}
-            <div className="flex flex-col items-end self-end max-w-[90%]">
-              <div className="bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-slate-800 text-[13px] font-medium px-5 py-3.5 rounded-2xl rounded-tr-sm leading-relaxed">
-                Yes, please send the CBC and BMP results directly to my EMR system. I appreciate your prompt assistance!
-              </div>
-              <span className="text-[10px] font-semibold text-slate-400 mt-1.5 mr-1">11:02 AM</span>
-            </div>
-          </div>
-
-          {/* Input Area */}
-          <div className="p-4 bg-white border-t border-slate-50">
-            <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-full pr-2 pl-4 py-1.5 focus-within:ring-2 focus-within:ring-[#6A8BFF]/20 focus-within:border-[#6A8BFF]/30 transition-all">
-              <button className="text-slate-400 hover:text-slate-600 transition">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-              </button>
-              <input 
-                type="text" 
-                placeholder="Type Something..." 
-                className="flex-1 bg-transparent border-none focus:outline-none text-[13px] font-medium text-slate-700 placeholder-slate-400 py-2.5"
-              />
-              <button className="w-10 h-10 rounded-full bg-[#6A8BFF] hover:bg-[#5a7ae6] text-white flex items-center justify-center shadow-md shadow-blue-200/50 transition transform hover:scale-105 active:scale-95">
-                <svg className="w-4 h-4 ml-0.5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: DETAILS PANEL */}
-        <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 flex flex-col h-fit">
-          {/* Header */}
-          <div className="flex items-center gap-4 border-b border-slate-50 pb-6 mb-6">
-            <div className="w-12 h-12 rounded-full bg-[#f8fafd] border border-slate-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-              {selectedContact.avatarUrl ? (
-                <img src={selectedContact.avatarUrl} alt={selectedContact.name} className="w-full h-full object-cover" />
-              ) : (
-                selectedContact.avatarIcon
-              )}
-            </div>
-            <div>
-              <h2 className="text-[15px] font-medium text-slate-800">{selectedContact.type === "patient" ? selectedContact.name : "Wellness Pharmacy"}</h2>
-              <p className="text-[11px] font-medium text-slate-400 mt-0.5">{selectedContact.email}</p>
-            </div>
-          </div>
-
-          {selectedContact.type === "patient" ? (
-            <>
-              {/* Orders Details Section */}
-              <div className="mb-6">
-                <div className="bg-[#E5EDFF] text-[#6A8BFF] text-[12px] font-medium px-4 py-2.5 rounded-xl inline-block w-full text-center mb-6">
-                  Orders Details
-                </div>
-
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Image src={medicineIcon} alt="Medicine" className="w-5 h-5 object-contain" />
-                      <h4 className="text-[13px] font-semibold text-slate-800">Paracetamol 500 mg</h4>
+                messages.map((msg) => {
+                  const isMe = msg.senderId === myUserId;
+                  return (
+                    <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
+                      {!isMe && (
+                        <Avatar name={selectedConv.otherPartyName} avatarUrl={selectedConv.otherPartyAvatarUrl} size={28} />
+                      )}
+                      <div>
+                        <div style={{
+                          maxWidth: 440, padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                          background: isMe ? "#5476fc" : "#fff",
+                          color: isMe ? "#fff" : "#24292e",
+                          fontSize: 14, lineHeight: 1.5,
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                          wordBreak: "break-word",
+                        }}>
+                          {msg.text}
+                        </div>
+                        <p style={{ fontSize: 10, color: "#9ea5ad", margin: "4px 2px 0", textAlign: isMe ? "right" : "left" }}>
+                          {fmtTime(msg.createdAt)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[12px] font-medium text-slate-500 pl-6">Take 1 tablet every 6 hours for 5 days, with or after meals.</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Image src={medicineIcon} alt="Medicine" className="w-5 h-5 object-contain" />
-                      <h4 className="text-[13px] font-semibold text-slate-800">Ibuprofen 200 mg</h4>
-                    </div>
-                    <p className="text-[12px] font-medium text-slate-500 pl-6">Take 1 tablet every 6 hours for 5 days, with or after meals.</p>
-                  </div>
-                </div>
-              </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-              <div className="mt-auto pt-6 border-t border-slate-50">
-                <h4 className="text-[12px] font-semibold text-slate-800 mb-3">Summary of medicine history</h4>
-                <p className="text-[11px] font-medium leading-relaxed text-slate-500 mb-6">
-                  The lab report for <span className="text-[#6A8BFF] font-semibold">Arlene McCoy</span> has been completed and is ready for review. Please check the results, update the electronic medical record (EMR), and finalize the consultation notes to ensure accurate documentation and follow-up care.
-                </p>
-                <button className="w-full py-3.5 bg-gradient-to-r from-[#81A3FF] to-[#6A8BFF] text-white rounded-[1.25rem] text-[14px] font-semibold transition duration-200 shadow-[0_4px_14px_rgba(106,139,255,0.4)] hover:shadow-[0_6px_20px_rgba(106,139,255,0.5)] active:scale-[0.98]">
-                  Remind of Consultation
+            <div style={{ padding: "16px 24px", borderTop: "1px solid #eaecf0", background: "#fff" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <input
+                  ref={inputRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder={`Message ${selectedConv.otherPartyName}...`}
+                  style={{
+                    flex: 1, padding: "12px 18px", borderRadius: 28, border: "1.5px solid #eaecf0",
+                    fontSize: 14, outline: "none", background: "#f8f9fc", color: "#24292e",
+                    transition: "border-color 0.15s",
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = "#5476fc"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#eaecf0"; }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!inputText.trim() || sending}
+                  style={{
+                    width: 48, height: 48, borderRadius: "50%", border: "none", cursor: "pointer",
+                    background: inputText.trim() ? "#5476fc" : "#eaecf0",
+                    color: inputText.trim() ? "#fff" : "#9ea5ad",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s", flexShrink: 0,
+                  }}
+                >
+                  {sending ? <SpinnerIcon size={18} /> : <SendIcon />}
                 </button>
               </div>
-            </>
-          ) : (
-            <>
-              {/* Summary of medicine history Section */}
-              <div className="mt-2">
-                <h4 className="text-[12px] font-semibold text-slate-800 mb-3">Summary of medicine history</h4>
-                <p className="text-[11px] font-medium leading-relaxed text-slate-500">
-                  The lab report for <span className="text-[#6A8BFF] font-semibold">Arlene McCoy</span> has been completed and is ready for review. Please check the results, update the electronic medical record (EMR), and finalize the consultation notes to ensure accurate documentation and follow-up care.
-                </p>
-              </div>
-            </>
-          )}
-
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,97 +1,352 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MOCK_WAITING_PATIENTS, MOCK_PAST_CONSULTATIONS } from "./mockData";
-import { WaitingPatient, PastConsultation } from "./types";
-import ConsultationRoom from "./ConsultationRoom";
+import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
-import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
-import ConsultationModal from "@/components/appointment/ConsultationModal";
+import ConsultationRoom, { EhrVisit } from "./ConsultationRoom";
 
 interface WaitingRoomProps {
   onClose: () => void;
 }
 
+// One row in the appointment lists — derived live from the doctor's real
+// appointments for today, not mock data.
+interface SlotAppointment {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string;
+  patientAvatarUrl: string | null;
+  patientAge: number | null;
+  patientGender: string;
+  patientDob: string;
+  patientBloodGroup: string;
+  patientHeight: string;
+  patientWeight: string;
+  patientChronicIllnesses: string;
+  patientCurrentMedications: string;
+  patientAllergies: string;
+  reason: string;
+  status: "scheduled" | "in_progress" | "completed" | "cancelled";
+  patientWaitingSince: string | null;
+  preVisitData: any | null;
+}
+
+function ageFromDob(dob?: string): number | null {
+  if (!dob) return null;
+  const year = new Date(dob).getFullYear();
+  if (isNaN(year)) return null;
+  return new Date().getFullYear() - year;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function buildSlotAppointment(a: any): SlotAppointment {
+  return {
+    id: a.id,
+    patientId: a.familyMemberId || a.patientId,
+    patientName: a.patientName ?? "Patient",
+    patientEmail: a.patientEmail ?? "",
+    patientAvatarUrl: a.patientAvatarUrl ?? null,
+    patientAge: ageFromDob(a.patientDob),
+    patientGender: a.patientGender ?? "",
+    patientDob: a.patientDob ?? "",
+    patientBloodGroup: a.patientBloodGroup ?? "",
+    patientHeight: a.patientHeight ?? "",
+    patientWeight: a.patientWeight ?? "",
+    patientChronicIllnesses: a.patientChronicIllnesses ?? "None reported",
+    patientCurrentMedications: a.patientCurrentMedications ?? "None",
+    patientAllergies: a.patientAllergies ?? "None",
+    reason: a.reason ?? "Consultation",
+    status: a.status,
+    patientWaitingSince: a.patientWaitingSince ?? null,
+    preVisitData: a.preVisitData ?? null,
+  };
+}
+
+// A consultation row that also carries which patient it belongs to — needed
+// for the "doctor's recent consultations across all patients" fallback list,
+// where each row may be a different patient.
+interface RecentVisit {
+  visit: EhrVisit;
+  patientName: string;
+  patientAvatarUrl: string | null;
+}
+
 export default function WaitingRoom({ onClose }: WaitingRoomProps) {
   const router = useRouter();
-  const [selectedPatient, setSelectedPatient] = useState<WaitingPatient>(MOCK_WAITING_PATIENTS[0]);
-  const [activeConsultation, setActiveConsultation] = useState<PastConsultation | null>(null);
 
-  // Local modal states
+  const [appointments, setAppointments] = useState<SlotAppointment[]>([]);
+  // Every appointment for this doctor (not just today's) — kept around so any
+  // consultation opened from the doctor-wide recent list can be resolved to
+  // its full patient record without a second fetch.
+  const [allAppointmentsRaw, setAllAppointmentsRaw] = useState<any[]>([]);
+  // This doctor's own recent consultations with saved EMRs, across all
+  // patients — shown in the middle column as a fallback when no specific
+  // patient's EMR history is selected.
+  const [recentDoctorVisits, setRecentDoctorVisits] = useState<RecentVisit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // EMR history (visitHistory) for the currently selected patient's appointment
+  const [visitHistory, setVisitHistory] = useState<EhrVisit[]>([]);
+  const [ehrLoading, setEhrLoading] = useState(false);
+  const [activeVisit, setActiveVisit] = useState<EhrVisit | null>(null);
+  // Full patient/appointment record for whichever consultation is open —
+  // resolved from allAppointmentsRaw so the detail view always has real
+  // demographics and pre-visit data, regardless of which list it was opened from.
+  const [activeVisitPatient, setActiveVisitPatient] = useState<SlotAppointment | null>(null);
+
   const [preVisitPatient, setPreVisitPatient] = useState<Patient | null>(null);
-  const [consultationPatient, setConsultationPatient] = useState<Patient | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/appointments/doctor");
+      if (!res.ok) return;
+      const { appointments: all } = await res.json();
+      setAllAppointmentsRaw(all ?? []);
+      const today = new Date();
+      const todays: SlotAppointment[] = (all ?? [])
+        .filter((a: any) => a.status !== "cancelled" && isSameDay(new Date(a.scheduledAt), today))
+        .map(buildSlotAppointment);
+      setAppointments(todays);
+      if (!selectedId && todays.length > 0) setSelectedId(todays[0].id);
+
+      // Derive this doctor's recent EMRs across all patients, newest first —
+      // no extra fetch needed, /doctor already embeds each appointment's emr.
+      const withEmr: RecentVisit[] = (all ?? [])
+        .filter((a: any) => a.emr)
+        .sort((a: any, b: any) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
+        .slice(0, 10)
+        .map((a: any): RecentVisit => ({
+          visit: {
+            appointmentId: a.id,
+            scheduledAt: a.scheduledAt,
+            status: a.status,
+            reason: a.reason ?? "Consultation",
+            doctorId: a.doctorId,
+            doctorName: "You",
+            emr: a.emr ?? null,
+          },
+          patientName: a.patientName ?? "Patient",
+          patientAvatarUrl: a.patientAvatarUrl ?? null,
+        }));
+      setRecentDoctorVisits(withEmr);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    fetchAppointments();
+    // Poll so "Online Now" reflects patients joining the waiting room in real time.
+    const interval = setInterval(fetchAppointments, 10000);
+    return () => clearInterval(interval);
+  }, [fetchAppointments]);
+
+  // "Online Now" = patient has signalled they're in the waiting room and the
+  // visit isn't finished yet. "Other Appointments in This Slot" = today's
+  // remaining scheduled/in-progress appointments without that signal.
+  // Completed ones are still shown, just with a distinct badge.
+  const onlinePatients = appointments.filter(a => a.patientWaitingSince && a.status !== "completed");
+  const otherSlotPatients = appointments.filter(a => !a.patientWaitingSince || a.status === "completed");
+
+  const selected = appointments.find(a => a.id === selectedId) ?? null;
+
+  const fetchEhr = useCallback(async (appointmentId: string) => {
+    setEhrLoading(true);
+    setVisitHistory([]);
+    try {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setVisitHistory(data.visitHistory ?? []);
+    } finally {
+      setEhrLoading(false);
+    }
+  }, []);
+
+  // Also load EMR history whenever the selected patient changes — including
+  // the initial auto-selection on first load, not just explicit clicks.
+  useEffect(() => {
+    if (selectedId) fetchEhr(selectedId);
+  }, [selectedId, fetchEhr]);
+
+  const handleOpenEmr = (apt: SlotAppointment) => {
+    setSelectedId(apt.id);
   };
 
-  // Helper to map WaitingPatient to Patient type
-  const mapToPatient = (wp: WaitingPatient): Patient => ({
-    id: wp.id,
-    name: wp.name,
-    age: wp.age,
-    email: wp.email,
-    diagnosis: wp.reasonForVisit,
-    description: wp.description,
-    status: wp.status === "Connected" ? "Waiting" : "Waiting",
+  // Resolves the full patient/appointment record for a given visit's
+  // appointmentId from the already-fetched full list — no extra network call.
+  const resolveVisitPatient = (appointmentId: string): SlotAppointment | null => {
+    const raw = allAppointmentsRaw.find((a: any) => a.id === appointmentId);
+    return raw ? buildSlotAppointment(raw) : null;
+  };
+
+  const handleConnectNow = (apt: SlotAppointment) => {
+    router.push(`/appointments/consult?appointmentId=${apt.id}&patientName=${encodeURIComponent(apt.patientName)}`);
+  };
+
+  const mapToPatient = (apt: SlotAppointment): Patient => ({
+    id: apt.patientId,
+    name: apt.patientName,
+    age: apt.patientAge ?? 0,
+    email: apt.patientEmail,
+    diagnosis: apt.reason,
+    description: apt.reason,
+    status: apt.status === "completed" ? "Completed" : "Waiting",
     dateTime: "Today",
-    avatar: wp.avatar,
-    bio: wp.description,
-    preVisitForm: {
-      chronicIllnesses: "None reported",
-      currentMedications: "None",
-      allergies: "None",
-      primaryConcern: wp.reasonDescription,
+    avatar: apt.patientAvatarUrl || "/default-avatar.svg",
+    bio: apt.reason,
+    gender: apt.patientGender,
+    bloodGroup: apt.patientBloodGroup,
+    height: apt.patientHeight,
+    weight: apt.patientWeight,
+    dob: apt.patientDob,
+    preVisitForm: apt.preVisitData ? {
+      isQuestionnaire: true,
+      chronicIllnesses: apt.preVisitData.conditions || "None reported",
+      currentMedications: apt.preVisitData.medications || "None",
+      allergies: apt.preVisitData.allergies || "None",
+      primaryConcern: apt.preVisitData.primaryReason || apt.reason || "Consultation",
+      smokes: Array.isArray(apt.preVisitData.symptoms) ? apt.preVisitData.symptoms.join(", ") : (apt.preVisitData.symptoms || "None"),
+      drinks: apt.preVisitData.additionalNotes || "None",
+    } : {
+      isQuestionnaire: false,
+      chronicIllnesses: apt.patientChronicIllnesses,
+      currentMedications: apt.patientCurrentMedications,
+      allergies: apt.patientAllergies,
+      primaryConcern: apt.reason,
       smokes: "No",
-      drinks: "No"
-    }
+      drinks: "No",
+    },
   });
 
-  const onlinePatients = MOCK_WAITING_PATIENTS.slice(0, 3);
-  const otherSlotPatients = MOCK_WAITING_PATIENTS.slice(3);
-
-  if (activeConsultation) {
+  if (activeVisit && activeVisitPatient) {
     return (
       <ConsultationRoom
-        patient={selectedPatient}
-        consultation={activeConsultation}
-        onBack={() => setActiveConsultation(null)}
+        patient={activeVisitPatient}
+        visit={activeVisit}
+        onBack={() => { setActiveVisit(null); setActiveVisitPatient(null); }}
+        onViewProfile={() => router.push("/appointments/patient-details?id=" + activeVisitPatient.patientId)}
+        onViewPreVisitForm={() => setPreVisitPatient(mapToPatient(activeVisitPatient))}
+        onAddendumSaved={(emr) => {
+          const appointmentId = activeVisit.appointmentId;
+          setActiveVisit((prev) => (prev ? { ...prev, emr } : prev));
+          setVisitHistory((prev) => prev.map((v) => (v.appointmentId === appointmentId ? { ...v, emr } : v)));
+          setRecentDoctorVisits((prev) =>
+            prev.map((rv) => (rv.visit.appointmentId === appointmentId ? { ...rv, visit: { ...rv.visit, emr } } : rv))
+          );
+          setAllAppointmentsRaw((prev) =>
+            prev.map((a) => (a.id === appointmentId ? { ...a, emr } : a))
+          );
+        }}
       />
+    );
+  }
+
+  function renderCard(apt: SlotAppointment) {
+    const isSelected = selectedId === apt.id;
+    const isOnline = !!apt.patientWaitingSince && apt.status !== "completed";
+    const isCompleted = apt.status === "completed";
+    return (
+      <div
+        key={apt.id}
+        className={`flex flex-col gap-4 p-4 rounded-[8px] border transition-all duration-200 ${isSelected
+            ? "bg-white border-[#5476FC] shadow-[0_4px_12px_rgba(84,118,252,0.08)]"
+            : "bg-white/50 hover:bg-white border-transparent"
+          }`}
+      >
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src={apt.patientAvatarUrl || "/default-avatar.svg"}
+              alt={apt.patientName}
+              className="w-9 h-9 rounded-full object-cover shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
+              }}
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#24292E] font-medium text-[14px] leading-[1.5] tracking-[-0.28px] truncate">
+                {apt.patientName}{apt.patientAge != null ? `, ${apt.patientAge} y/o` : ""}
+              </span>
+              <span className="text-[#9EA5AD] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
+                {apt.patientEmail}
+              </span>
+            </div>
+          </div>
+
+          {/* Status badge */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isCompleted ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-[#9EA5AD]" />
+                <span className="text-[#9EA5AD] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
+                  Completed
+                </span>
+              </>
+            ) : isOnline ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22A181] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22A181]"></span>
+                </span>
+                <span className="text-[#22A181] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
+                  Connected
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-[#F4A308]"></span>
+                <span className="text-[#F4A308] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
+                  Waiting
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] shrink-0 truncate max-w-[140px]">
+            {apt.reason}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 mt-1">
+          <button
+            onClick={() => handleOpenEmr(apt)}
+            className={`flex-1 py-1.5 rounded-[12px] font-medium text-[13px] leading-5 border transition-all duration-200 ${isSelected
+                ? "bg-[#2E344E] text-white border-transparent"
+                : "bg-white text-[#24292E] border-gray-200 hover:bg-gray-50"
+              }`}
+          >
+            EMR
+          </button>
+          <button
+            onClick={() => handleConnectNow(apt)}
+            disabled={isCompleted}
+            className="flex-1 py-1.5 rounded-[12px] text-white font-medium text-[13px] leading-5 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+          >
+            Connect Now
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="w-full min-h-full bg-[#F7F9FC] font-outfit select-none flex flex-col p-4 md:p-6 lg:p-8 animate-fade-in relative">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#24292E] text-white px-4 py-3 rounded-[12px] flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-white/10 animate-slide-up text-sm font-medium">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]"></div>
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-
-
-      {/* Pre-Visit Form Modal */}
       {preVisitPatient && (
         <PreVisitFormModal
           patient={preVisitPatient}
           onClose={() => setPreVisitPatient(null)}
-        />
-      )}
-
-      {/* Video Call Modal */}
-      {consultationPatient && (
-        <ConsultationModal
-          patient={consultationPatient}
-          onClose={() => {
-            triggerToast(`Completed consultation with ${consultationPatient.name}`);
-            setConsultationPatient(null);
-          }}
         />
       )}
 
@@ -111,187 +366,44 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
         </h1>
       </div>
 
-      {/* Main Responsive Grid */}
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full flex-1">
 
         {/* Left Column: Waiting Lists */}
         <div className="w-full lg:w-[324px] flex flex-col gap-6 shrink-0">
 
-          {/* Section: Online Now */}
           <div className="flex flex-col gap-3">
             <h2 className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] px-1">
               Online Now
             </h2>
             <div className="flex flex-col gap-3">
-              {onlinePatients.map((patient) => {
-                const isSelected = selectedPatient.id === patient.id;
-                return (
-                  <div
-                    key={patient.id}
-                    className={`flex flex-col gap-4 p-4 rounded-[8px] border transition-all duration-200 ${isSelected
-                        ? "bg-white border-[#5476FC] shadow-[0_4px_12px_rgba(84,118,252,0.08)]"
-                        : "bg-white/50 hover:bg-white border-transparent"
-                      }`}
-                  >
-                    {/* Top Row: Avatar & Status */}
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={patient.avatar}
-                          alt={patient.name}
-                          className="w-9 h-9 rounded-full object-cover shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
-                          }}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[#24292E] font-medium text-[14px] leading-[1.5] tracking-[-0.28px] truncate">
-                            {patient.name}, {patient.age} y/o
-                          </span>
-                          <span className="text-[#9EA5AD] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
-                            {patient.email}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status badge */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22A181] opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22A181]"></span>
-                        </span>
-                        <span className="text-[#22A181] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
-                          Connected
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Middle Row: Diagnosis Tag & Reason */}
-                    <div className="flex items-center gap-2">
-                      <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] shrink-0">
-                        {patient.reasonForVisit}
-                      </span>
-                      <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
-                        {patient.reasonDescription}
-                      </span>
-                    </div>
-
-                    {/* Bottom Row: Actions */}
-                    <div className="flex items-center gap-2 mt-1">
-                      <button
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setActiveConsultation(MOCK_PAST_CONSULTATIONS[0]);
-                        }}
-                        className={`flex-1 py-1.5 rounded-[12px] font-medium text-[13px] leading-5 border transition-all duration-200 ${isSelected
-                            ? "bg-[#2E344E] text-white border-transparent"
-                            : "bg-white text-[#24292E] border-gray-200 hover:bg-gray-50"
-                          }`}
-                      >
-                        EMR
-                      </button>
-                      <button
-                        onClick={() => setConsultationPatient(mapToPatient(patient))}
-                        className="flex-1 py-1.5 rounded-[12px] text-white font-medium text-[13px] leading-5 transition-all duration-200"
-                        style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
-                      >
-                        Connect Now
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {loading ? (
+                <p className="text-[#9EA5AD] text-[13px] px-1">Loading…</p>
+              ) : onlinePatients.length === 0 ? (
+                <p className="text-[#9EA5AD] text-[13px] px-1">No patients currently online.</p>
+              ) : (
+                onlinePatients.map(renderCard)
+              )}
             </div>
           </div>
 
-          {/* Section: Other Slot Appointments */}
           <div className="flex flex-col gap-3">
             <h2 className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] px-1">
               Other Appointments in This Slot
             </h2>
             <div className="flex flex-col gap-3">
-              {otherSlotPatients.map((patient) => {
-                const isSelected = selectedPatient.id === patient.id;
-                return (
-                  <div
-                    key={patient.id}
-                    className={`flex flex-col gap-4 p-4 rounded-[8px] border transition-all duration-200 ${isSelected
-                        ? "bg-white border-[#5476FC] shadow-[0_4px_12px_rgba(84,118,252,0.08)]"
-                        : "bg-white/50 hover:bg-white border-transparent"
-                      }`}
-                  >
-                    {/* Top Row: Avatar & Status */}
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={patient.avatar}
-                          alt={patient.name}
-                          className="w-9 h-9 rounded-full object-cover shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
-                          }}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[#24292E] font-medium text-[14px] leading-[1.5] tracking-[-0.28px] truncate">
-                            {patient.name}, {patient.age} y/o
-                          </span>
-                          <span className="text-[#9EA5AD] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
-                            {patient.email}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status badge */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="h-2 w-2 rounded-full bg-[#F4A308]"></span>
-                        <span className="text-[#F4A308] text-[14px] font-normal leading-[1.23] tracking-[-0.28px]">
-                          Waiting
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Middle Row: Diagnosis Tag & Reason */}
-                    <div className="flex items-center gap-2">
-                      <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[12px] font-light leading-[1] tracking-[-0.24px] shrink-0">
-                        {patient.reasonForVisit}
-                      </span>
-                      <span className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
-                        {patient.reasonDescription}
-                      </span>
-                    </div>
-
-                    {/* Bottom Row: Actions */}
-                    <div className="flex items-center gap-2 mt-1">
-                      <button
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setActiveConsultation(MOCK_PAST_CONSULTATIONS[0]);
-                        }}
-                        className={`flex-1 py-1.5 rounded-[12px] font-medium text-[13px] leading-5 border transition-all duration-200 ${isSelected
-                            ? "bg-[#2E344E] text-white border-transparent"
-                            : "bg-white text-[#24292E] border-gray-200 hover:bg-gray-50"
-                          }`}
-                      >
-                        EMR
-                      </button>
-                      <button
-                        onClick={() => setConsultationPatient(mapToPatient(patient))}
-                        className="flex-1 py-1.5 rounded-[12px] text-white font-medium text-[13px] leading-5 transition-all duration-200"
-                        style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
-                      >
-                        Connect Now
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {loading ? null : otherSlotPatients.length === 0 ? (
+                <p className="text-[#9EA5AD] text-[13px] px-1">No other appointments today.</p>
+              ) : (
+                otherSlotPatients.map(renderCard)
+              )}
             </div>
           </div>
         </div>
 
-        {/* Middle Column: Selected EMR History */}
+        {/* Middle Column: Selected EMR History (falls back to this doctor's
+            own recent consultations across all patients when nothing's
+            selected, or the selected patient has no history yet) */}
         <div className="flex-1 min-w-0 bg-white rounded-[12px] border border-gray-100 p-8 flex flex-col gap-5">
-          {/* Header */}
           <div className="flex justify-between items-center pb-2 border-b border-gray-50">
             <span className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px]">
               EMR
@@ -304,41 +416,32 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
             </div>
           </div>
 
-          {/* List of Consultations */}
           <div className="flex flex-col gap-3 overflow-y-auto">
-            {MOCK_PAST_CONSULTATIONS.map((c, idx) => {
-              const isFirst = idx === 0;
-              return (
+            {selected && ehrLoading ? (
+              <p className="text-[#9EA5AD] text-[13px] py-6 text-center">Loading EMR history…</p>
+            ) : selected && visitHistory.length > 0 ? (
+              visitHistory.map((visit, idx) => (
                 <div
-                  key={c.id}
-                  onClick={() => setActiveConsultation(c)}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-[12px] cursor-pointer transition-all duration-200 ${isFirst ? "bg-[#EDF0FF]" : "bg-transparent hover:bg-gray-50"
-                    }`}
+                  key={visit.appointmentId}
+                  onClick={() => { setActiveVisit(visit); setActiveVisitPatient(resolveVisitPatient(visit.appointmentId) ?? selected); }}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-[12px] cursor-pointer transition-all duration-200 ${idx === 0 ? "bg-[#EDF0FF]" : "bg-transparent hover:bg-gray-50"}`}
                 >
                   <div className="flex flex-col gap-1 min-w-0">
                     <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px]">
-                      {c.title}
+                      {visit.reason || "Consultation"}
                     </span>
                     <span className="text-[#777F86] text-[14px] font-normal leading-[1.5] tracking-[-0.28px]">
-                      {c.ref}
+                      {visit.appointmentId}
                     </span>
-
                     <div className="flex items-center gap-2 mt-1">
-                      <img
-                        src={c.doctorAvatar}
-                        alt={c.doctor}
-                        className="w-[21px] h-[21px] rounded-full object-cover shrink-0"
-                      />
                       <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
-                        {c.doctor}
+                        Dr. {visit.doctorName}
                       </span>
                     </div>
-
                     <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-1">
-                      {c.date}
+                      {new Date(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
-
                   <div className="flex justify-end items-center shrink-0">
                     <button className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-black/5 transition-all">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -347,101 +450,145 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
                     </button>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : recentDoctorVisits.length === 0 ? (
+              <p className="text-[#9EA5AD] text-[13px] py-6 text-center">
+                {selected ? "No past consultations recorded for this patient." : "No recent consultations yet."}
+              </p>
+            ) : (
+              <>
+                {selected && (
+                  <p className="text-[#9EA5AD] text-[12px] px-1 -mb-1">
+                    No history for {selected.patientName} yet — showing your recent consultations
+                  </p>
+                )}
+                {recentDoctorVisits.map(({ visit, patientName, patientAvatarUrl }, idx) => (
+                  <div
+                    key={visit.appointmentId}
+                    onClick={() => {
+                      setActiveVisit(visit);
+                      const resolved = resolveVisitPatient(visit.appointmentId);
+                      setActiveVisitPatient(resolved ?? {
+                        id: visit.appointmentId, patientId: "", patientName, patientEmail: "",
+                        patientAvatarUrl, patientAge: null, patientGender: "", patientDob: "",
+                        patientBloodGroup: "", patientHeight: "", patientWeight: "",
+                        patientChronicIllnesses: "None reported", patientCurrentMedications: "None",
+                        patientAllergies: "None", reason: visit.reason, status: visit.status as any,
+                        patientWaitingSince: null, preVisitData: null,
+                      });
+                    }}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-[12px] cursor-pointer transition-all duration-200 ${idx === 0 ? "bg-[#EDF0FF]" : "bg-transparent hover:bg-gray-50"}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={patientAvatarUrl || "/default-avatar.svg"}
+                        alt={patientName}
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
+                        }}
+                      />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[#24292E] text-[14px] font-medium leading-[1.5] tracking-[-0.28px] truncate">
+                          {patientName}
+                        </span>
+                        <span className="text-[#777F86] text-[13px] font-normal leading-[1.4] tracking-[-0.26px] truncate">
+                          {visit.reason || "Consultation"}
+                        </span>
+                        <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-1">
+                          {new Date(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-end items-center shrink-0">
+                      <button className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-black/5 transition-all">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M5.25 10.5L8.75 7L5.25 3.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
         {/* Right Column: Selected Patient Details Card */}
         <div className="w-full lg:w-[372px] shrink-0 bg-[#F5F6FA] border border-white rounded-[12px] p-6 flex flex-col gap-6">
-
-          {/* Patient Details Header */}
           <div className="flex flex-col gap-1">
             <h3 className="text-[#24292E] font-medium text-[20px] leading-[1.5] tracking-[-0.4px]">
               Patient Details
             </h3>
           </div>
 
-          {/* Profile Card */}
-          <div className="flex items-center gap-4 bg-white/40 p-4 rounded-[12px] border border-white">
-            <img
-              src={selectedPatient.avatar}
-              alt={selectedPatient.name}
-              className="w-11 h-11 rounded-full object-cover shrink-0"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
-              }}
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] truncate">
-                {selectedPatient.name}
-              </span>
-              <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px]">
-                {selectedPatient.age} Year Old
-              </span>
-            </div>
-          </div>
-
-          {/* Patient Description bio snippet */}
-          <p className="text-[#676E76] text-[12px] leading-[16px] tracking-[-0.24px] bg-white/40 p-4 rounded-[12px] border border-white whitespace-pre-wrap">
-            {selectedPatient.description}
-          </p>
-
-          {/* View Profile Primary-Color-tint Button */}
-          <button
-            onClick={() => router.push("/appointments/patient-details?id=" + selectedPatient.id + "&from=waitingroom")}
-            className="flex w-full justify-center items-center py-2.5 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[13px] transition-all duration-200"
-          >
-            View Profile
-          </button>
-
-          <div className="w-full h-px bg-[#EBEEF5]" />
-
-          {/* Fields sections */}
-          <div className="flex flex-col gap-3">
-            {/* Reason for visit */}
-            <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-1">
-              <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                Reason for visit
-              </span>
-              <p className="text-[#676E76] text-[12px] leading-[16px] line-clamp-2">
-                {selectedPatient.reasonDescription}
-              </p>
-            </div>
-
-            {/* EMR summary / <Some other field> */}
-            <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-1">
-              <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                EMR Summary
-              </span>
-              <p className="text-[#676E76] text-[12px] leading-[16px] line-clamp-2">
-                Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry&apos;s standard dummy text ever since the 1500s.
-              </p>
-            </div>
-
-            {/* Pre-visit form review card */}
-            <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                  Pre-visit Form
-                </span>
-                <p className="text-[#676E76] text-[12px] leading-[16px]">
-                  Review the patient&apos;s pre-visit form to understand their medical history and reason for the appointment.
-                </p>
+          {!selected ? (
+            <p className="text-[#9EA5AD] text-[13px]">Select a patient to view their details.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 bg-white/40 p-4 rounded-[12px] border border-white">
+                <img
+                  src={selected.patientAvatarUrl || "/default-avatar.svg"}
+                  alt={selected.patientName}
+                  className="w-11 h-11 rounded-full object-cover shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
+                  }}
+                />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] truncate">
+                    {selected.patientName}
+                  </span>
+                  {selected.patientAge != null && (
+                    <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px]">
+                      {selected.patientAge} Year Old
+                    </span>
+                  )}
+                </div>
               </div>
 
               <button
-                onClick={() => setPreVisitPatient(mapToPatient(selectedPatient))}
-                className="flex items-center gap-2 text-[#182A6F] font-semibold text-[13px] hover:text-[#5476FC] transition-colors"
+                onClick={() => router.push("/appointments/patient-details?id=" + selected.patientId + "&from=waitingroom")}
+                className="flex w-full justify-center items-center py-2.5 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[13px] transition-all duration-200"
               >
-                <span>Read Pre-visit form</span>
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                View Profile
               </button>
-            </div>
-          </div>
 
+              <div className="w-full h-px bg-[#EBEEF5]" />
+
+              <div className="flex flex-col gap-3">
+                <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-1">
+                  <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                    Reason for visit
+                  </span>
+                  <p className="text-[#676E76] text-[12px] leading-[16px] line-clamp-2">
+                    {selected.reason}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
+                      Pre-visit Form
+                    </span>
+                    <p className="text-[#676E76] text-[12px] leading-[16px]">
+                      Review the patient&apos;s pre-visit form to understand their medical history and reason for the appointment.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setPreVisitPatient(mapToPatient(selected))}
+                    className="flex items-center gap-2 text-[#182A6F] font-semibold text-[13px] hover:text-[#5476FC] transition-colors"
+                  >
+                    <span>Read Pre-visit form</span>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
       </div>

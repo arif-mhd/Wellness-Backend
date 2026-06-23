@@ -6,7 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import WaitingRoom from "@/components/waiting-room/WaitingRoom";
 import { usePathname } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import ChatBox from "@/components/ChatBox";
 
 export default function SharedDashboardLayout({
@@ -31,15 +31,32 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showChat, setShowChat] = useState(false);
+  const [waitingCount, setWaitingCount] = useState(0);
+
+  // Real count of patients currently signalling presence in the waiting room
+  // (apt.patientWaitingSince set), not the old hardcoded "(12)".
+  const fetchWaitingCount = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/appointments/doctor");
+      if (!res.ok) return;
+      const { appointments } = await res.json();
+      const count = (appointments ?? []).filter(
+        (a: any) => a.patientWaitingSince && a.status !== "completed" && a.status !== "cancelled"
+      ).length;
+      setWaitingCount(count);
+    } catch (err) {
+      console.error("Fetch waiting count error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWaitingCount();
+    const id = setInterval(fetchWaitingCount, 10_000);
+    return () => clearInterval(id);
+  }, [fetchWaitingCount]);
   const fetchNotifications = useCallback(async () => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-      
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiFetch("/api/notifications");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data ?? []);
@@ -58,16 +75,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleMarkAsRead = async (notifId: string) => {
     try {
-      const token = await Session.getAccessToken();
-      if (!token) return;
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/notifications/${notifId}/read`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const res = await apiFetch(`/api/notifications/${notifId}/read`, {
+        method: "PATCH",
+      });
       if (res.ok) {
         fetchNotifications();
       }
@@ -153,7 +163,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <span>Emergency Records</span>
             </button>
 
-            {/* Waiting Room (12) Button */}
+            {/* Waiting Room Button — shows real count of patients currently waiting */}
             <button
               onClick={() => router.push("/appointments/waitingroom")}
               className="h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-5 rounded-xl text-[13px] font-bold flex items-center gap-2.5 shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] transition-all select-none"
@@ -161,7 +171,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12.0398 10.8189C11.3984 10.8189 10.8525 10.5844 10.4021 10.1155C9.95171 9.64665 9.72651 9.07735 9.72651 8.40763C9.72651 7.73791 9.95104 7.168 10.4001 6.69788C10.8492 6.22762 11.3944 5.99249 12.0358 5.99249C12.6772 5.99249 13.2232 6.22685 13.6735 6.69558C14.1238 7.16446 14.3489 7.73376 14.3489 8.40348C14.3489 9.0732 14.1244 9.64319 13.6755 10.1135C13.2265 10.5837 12.6812 10.8189 12.0398 10.8189ZM7.07542 16V14.6019C7.07542 14.34 7.13632 14.0906 7.25812 13.8536C7.37993 13.6166 7.5479 13.4284 7.76205 13.2889C8.40214 12.8972 9.07765 12.6006 9.78859 12.399C10.4997 12.1972 11.2494 12.0963 12.0378 12.0963C12.8262 12.0963 13.5759 12.1972 14.2868 12.399C14.9978 12.6006 15.6733 12.8972 16.3136 13.2889C16.5276 13.4284 16.6955 13.6166 16.8173 13.8536C16.9391 14.0906 17 14.34 17 14.6019V16H7.07542ZM8.48249 14.4741V14.616H15.5929V14.4741C15.0434 14.1487 14.4687 13.9017 13.8688 13.7332C13.269 13.5646 12.6586 13.4804 12.0378 13.4804C11.4169 13.4804 10.8065 13.5646 10.2066 13.7332C9.6067 13.9017 9.032 14.1487 8.48249 14.4741ZM12.0378 9.43482C12.3109 9.43482 12.5434 9.33455 12.7353 9.13402C12.9273 8.93349 13.0234 8.69067 13.0234 8.40556C13.0234 8.12044 12.9273 7.8777 12.7353 7.67732C12.5434 7.47679 12.3109 7.37652 12.0378 7.37652C11.7648 7.37652 11.5322 7.47679 11.3401 7.67732C11.1481 7.8777 11.0521 8.12044 11.0521 8.40556C11.0521 8.69067 11.1481 8.93349 11.3401 9.13402C11.5322 9.33455 11.7648 9.43482 12.0378 9.43482ZM1 10.7656V9.38153H7.62773V10.7656H1ZM1 3.38404V2H11.1625V3.38404H1ZM8.03047 7.0748H1V5.69077H8.68154C8.5263 5.89299 8.39596 6.10798 8.2905 6.33573C8.18519 6.56348 8.09852 6.80984 8.03047 7.0748Z" fill="#E8EAED" />
               </svg>
-              <span>Waiting Room (12)</span>
+              <span>Waiting Room{waitingCount > 0 ? ` (${waitingCount})` : ""}</span>
             </button>
 
             {/* Notification Bell */}

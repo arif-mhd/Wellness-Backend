@@ -3,14 +3,24 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Patient } from "./types";
-import Session from "supertokens-web-js/recipe/session";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
   const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
   return new Date(clean);
+}
+
+function ageFromDob(dob?: string): number {
+  if (!dob) return 0;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return 0;
+  let age = new Date().getFullYear() - birth.getFullYear();
+  const notYetBirthdayThisYear =
+    new Date().getMonth() < birth.getMonth() ||
+    (new Date().getMonth() === birth.getMonth() && new Date().getDate() < birth.getDate());
+  if (notYetBirthdayThisYear) age--;
+  return Math.max(0, age);
 }
 
 function mapToPatient(apt: any, index: number): Patient {
@@ -22,6 +32,16 @@ function mapToPatient(apt: any, index: number): Patient {
   let status: Patient["status"] = "Scheduled";
   if (apt.status === "in_progress") status = "Waiting";
   else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
+  else if (apt.status === "scheduled") {
+    // The backend never auto-flips status when a slot's time passes — it only
+    // changes via an explicit doctor action (starting/ending a call). A
+    // "scheduled" appointment whose time is well past is effectively a missed
+    // consultation; treat it as Completed here so its Consult Now button
+    // greys out instead of staying live for an appointment that already happened.
+    const PAST_DUE_GRACE_MINUTES = 60;
+    const minutesPast = (Date.now() - d.getTime()) / 60000;
+    if (minutesPast > PAST_DUE_GRACE_MINUTES) status = "Completed";
+  }
 
   const preVisitForm = apt.preVisitData ? {
     isQuestionnaire: true,
@@ -48,7 +68,7 @@ function mapToPatient(apt: any, index: number): Patient {
   return {
     id: apt.id,
     name: apt.patientName ?? "Patient",
-    age: 0,
+    age: ageFromDob(apt.patientDob),
     email: apt.patientEmail ?? "",
     diagnosis: apt.reason ?? "Consultation",
     description: apt.reason ?? "",
@@ -61,6 +81,10 @@ function mapToPatient(apt: any, index: number): Patient {
     earnings: `${apt.paymentAmount ?? 250} AED`,
     preVisitForm,
     preVisitFormDate,
+    scheduledAt: apt.scheduledAt,
+    medicines: Array.isArray(apt.emr?.medicines)
+      ? apt.emr.medicines.map((m: any) => ({ name: m.name, dosage: m.dosage }))
+      : undefined,
   };
 }
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";
@@ -91,11 +115,7 @@ export default function AppointmentsPage() {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const accessToken = await Session.getAccessToken();
-      if (!accessToken) return;
-      const res = await fetch(`${API_URL}/api/appointments/doctor`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch("/api/appointments/doctor");
       if (!res.ok) return;
       const { appointments } = await res.json();
       const mapped = (appointments ?? []).map(mapToPatient);
@@ -122,6 +142,19 @@ export default function AppointmentsPage() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const sendReminder = async (patient: Patient) => {
+    try {
+      const res = await apiFetch(`/api/appointments/${patient.id}/remind`, { method: "POST" });
+      if (res.ok) {
+        triggerToast(`Reminder sent to ${patient.name}`);
+      } else {
+        triggerToast("Failed to send reminder");
+      }
+    } catch {
+      triggerToast("Failed to send reminder");
+    }
   };
 
   // Toggle sorting
@@ -159,6 +192,11 @@ export default function AppointmentsPage() {
       result = []; // New appointments are generally not past/completed
     }
 
+    // Filter by date
+    if (dateFilter === "Today") {
+      result = result.filter(appt => !appt.scheduledAt || parseLocalTime(appt.scheduledAt).toDateString() === todayStr);
+    }
+
     // Filter by inline search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -171,7 +209,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery, allAppointments]);
+  }, [activeTab, dateFilter, searchQuery, allAppointments]);
 
   // Filter & Sort All Consultations list
   const filteredAllConsultations = useMemo(() => {
@@ -182,6 +220,12 @@ export default function AppointmentsPage() {
       result = result.filter(c => c.status === "Scheduled" || c.status === "Waiting");
     } else if (activeTab === "Past") {
       result = result.filter(c => c.status === "Completed");
+    }
+
+    // Filter by date
+    if (dateFilter === "Today") {
+      const todayStr = new Date().toDateString();
+      result = result.filter(c => !c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr);
     }
 
     // Filter by inline search
@@ -214,7 +258,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, searchQuery, sortField, sortOrder, allAppointments]);
+  }, [activeTab, dateFilter, searchQuery, sortField, sortOrder, allAppointments]);
 
   return (
     <div className={`p-4 font-outfit select-none relative min-h-full flex flex-col lg:flex-row gap-8 transition-all duration-300 ${sidebarOpen
@@ -475,6 +519,7 @@ export default function AppointmentsPage() {
           onConsult={startConsult}
           onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
           onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+          onSendReminder={sendReminder}
           activeTab={activeTab}
         />
       </div>

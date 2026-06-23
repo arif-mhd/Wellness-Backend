@@ -3,18 +3,16 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
 import {
   Room, RoomEvent, Track,
   RemoteTrack, RemoteTrackPublication, RemoteParticipant,
   LocalTrackPublication, Participant,
 } from "livekit-client";
-import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS } from "@/components/video-call/IntakePlan";
+import { apiFetch } from "@/lib/apiFetch";
+import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import EhrPanel from "@/components/video-call/EhrPanel";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -74,12 +72,15 @@ function ConsultRoom() {
 
   // EMR
   const [emrSections, setEmrSections] = useState<EmrSections>(EMPTY_EMR_SECTIONS);
+  const [visitInfo, setVisitInfo] = useState<VisitInfo>(EMPTY_VISIT_INFO);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [labs,      setLabs]      = useState<LabRecommendation[]>([]);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved,  setEmrSaved]  = useState(false);
+  const [emrSavedAtLeastOnce, setEmrSavedAtLeastOnce] = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
-  const [expandedSection, setExpandedSection] = useState<string | null>("visitInformation");
+  const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
+  const [showUnsavedEmrPrompt, setShowUnsavedEmrPrompt] = useState(false);
 
   // EHR panel
   const [ehrOpen, setEhrOpen] = useState(false);
@@ -101,7 +102,6 @@ function ConsultRoom() {
   const roomRef       = useRef<Room | null>(null);
   const localVideoEl  = useRef<HTMLVideoElement>(null);
   const didConnectRef = useRef(false);
-  const tokenRef      = useRef("");
   // Map participantId → <video> element ref
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
@@ -200,12 +200,8 @@ function ConsultRoom() {
     async function init() {
       if (!appointmentId) { setError("Missing appointment ID"); return; }
       try {
-        const token = await Session.getAccessToken();
+        const res = await apiFetch(`/api/appointments/${appointmentId}/livekit-token`);
         if (cancelled) return;
-        tokenRef.current = token ?? "";
-        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/livekit-token`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         if (!res.ok) { setError("Could not get call token"); return; }
         const { token: lkToken, wsUrl } = await res.json();
         if (cancelled) return;
@@ -225,9 +221,9 @@ function ConsultRoom() {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
 
-        fetch(`${API_URL}/api/appointments/${appointmentId}/status`, {
+        apiFetch(`/api/appointments/${appointmentId}/status`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "in_progress" }),
         }).catch(() => {});
       } catch (e: any) {
@@ -260,15 +256,24 @@ function ConsultRoom() {
     });
   }, []);
 
-  const disconnect = useCallback(async () => {
+  const confirmDisconnect = useCallback(async () => {
+    setShowUnsavedEmrPrompt(false);
     await roomRef.current?.disconnect();
-    fetch(`${API_URL}/api/appointments/${appointmentId}/status`, {
+    apiFetch(`/api/appointments/${appointmentId}/status`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     }).catch(() => {});
     setEnded(true);
   }, [appointmentId]);
+
+  const disconnect = useCallback(() => {
+    if (!emrSavedAtLeastOnce) {
+      setShowUnsavedEmrPrompt(true);
+      return;
+    }
+    confirmDisconnect();
+  }, [emrSavedAtLeastOnce, confirmDisconnect]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -289,10 +294,7 @@ function ConsultRoom() {
     if (!appointmentId) return;
     setDoctorsLoading(true);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/available-doctors`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/available-doctors`);
       if (res.ok) {
         const { doctors: list } = await res.json();
         setAvailableDoctors(list ?? []);
@@ -316,10 +318,9 @@ function ConsultRoom() {
     if (!selectedSpecialist || !appointmentId) return;
     setInviteStatus("sending");
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/invite-specialist`, {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/invite-specialist`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ specialistDoctorId: selectedSpecialist.id }),
       });
       if (res.ok) {
@@ -328,10 +329,7 @@ function ConsultRoom() {
         // Poll every 5s
         if (patientPollRef.current) clearInterval(patientPollRef.current);
         patientPollRef.current = setInterval(async () => {
-          const t = await Session.getAccessToken();
-          const r = await fetch(`${API_URL}/api/appointments/${appointmentId}/specialist-status`, {
-            headers: { Authorization: `Bearer ${t}` },
-          });
+          const r = await apiFetch(`/api/appointments/${appointmentId}/specialist-status`);
           if (r.ok) {
             const { patientDecision } = await r.json();
             if (patientDecision === "accepted") {
@@ -360,16 +358,15 @@ function ConsultRoom() {
     (async () => {
       setLoadingEmr(true);
       try {
-        const token = await Session.getAccessToken();
-        const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/appointments/${appointmentId}/emr`);
         if (res.ok) {
           const { emr } = await res.json();
           if (emr) {
             if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
+            if (emr.visitInfo) setVisitInfo({ ...EMPTY_VISIT_INFO, ...emr.visitInfo });
             setMedicines(emr.medicines ?? []);
             setLabs(emr.labs ?? []);
+            setEmrSavedAtLeastOnce(true);
           }
         }
       } catch {
@@ -383,11 +380,12 @@ function ConsultRoom() {
   const saveEmr = async () => {
     setSavingEmr(true);
     try {
-      await fetch(`${API_URL}/api/appointments/${appointmentId}/emr`, {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/emr`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
-        body: JSON.stringify({ sections: emrSections, medicines, labs }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
       });
+      if (res.ok) setEmrSavedAtLeastOnce(true);
       setEmrSaved(true);
       setTimeout(() => setEmrSaved(false), 2500);
     } catch {} finally { setSavingEmr(false); }
@@ -397,10 +395,7 @@ function ConsultRoom() {
     setEhrOpen(true);
     setEhrLoading(true);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/ehr`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
       if (res.ok) setEhrData(await res.json());
     } catch {
       // ignore
@@ -565,6 +560,30 @@ function ConsultRoom() {
               className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 transition-all">
               Connect Now
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Unsaved EMR reminder (shown when ending the call before any EMR save) ── */}
+      {showUnsavedEmrPrompt && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowUnsavedEmrPrompt(false)}/>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[380px] mx-4 p-7 flex flex-col items-center gap-4 animate-[zoomIn_0.2s_ease-out]">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-2xl">⚠️</div>
+            <h3 className="text-[#24292e] font-semibold text-base text-center">EMR Not Saved</h3>
+            <p className="text-gray-500 text-[12px] text-center leading-relaxed">
+              You haven&apos;t saved an EMR for this consultation yet. If you end the call now, you can fill it in later from your Tasks list.
+            </p>
+            <div className="flex flex-col gap-2.5 w-full">
+              <button onClick={() => setShowUnsavedEmrPrompt(false)}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 transition-all">
+                Go Back &amp; Fill EMR
+              </button>
+              <button onClick={confirmDisconnect}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors">
+                I&apos;ll Fill It Later
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -795,7 +814,9 @@ function ConsultRoom() {
                   sections={emrSections}
                   onChange={setEmrSections}
                   openSection={expandedSection}
-                  onToggleSection={(key) => setExpandedSection(expandedSection === key ? null : key)}
+                  onToggleSection={setExpandedSection}
+                  visitInfo={visitInfo}
+                  onVisitInfoChange={setVisitInfo}
                 />
 
                 <div className="grid grid-cols-2 gap-4">

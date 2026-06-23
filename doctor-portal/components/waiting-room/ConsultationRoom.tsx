@@ -1,73 +1,154 @@
 "use client";
 
 import React, { useState } from "react";
-import { WaitingPatient, PastConsultation } from "./types";
-import PatientProfileModal from "@/components/appointment/PatientProfileModal";
-import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
-import { Patient } from "@/app/appointments/types";
+import { apiFetch } from "@/lib/apiFetch";
+
+export interface EhrAddendum {
+  text: string;
+  doctorId: string;
+  doctorName: string;
+  createdAt: string;
+}
+
+export interface EhrVisitInfo {
+  visitType?: string;
+  accompaniedBy?: string;
+  sourceOfHistory?: string;
+  referralSource?: string;
+  historyLimitation?: string;
+}
+
+export interface EhrVisit {
+  appointmentId: string;
+  scheduledAt: string;
+  status: string;
+  reason: string;
+  doctorId: string;
+  doctorName: string;
+  emr: {
+    sections?: {
+      reasonForVisit?: string;
+      historyOfPresentIllness?: string;
+      reviewSystem?: string;
+      healthStatus?: string;
+      histories?: string;
+      physicalExamination?: string;
+      medicalDecisionMaking?: string;
+      procedure?: string;
+      impressionAndPlan?: string;
+      professionalServices?: string;
+      // Legacy SOAP fields — kept for read-only display of older appointments
+      // saved before this format change; never written by the current UI.
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+    };
+    visitInfo?: EhrVisitInfo | null;
+    medicines?: { name: string; dosage: string; timing: string; frequency: string; instructions: string }[];
+    labs?: { name: string; notes: string }[];
+    addenda?: EhrAddendum[];
+    savedAt?: string;
+  } | null;
+}
+
+// Matches WaitingRoom's SlotAppointment shape — the full real patient/
+// appointment record, however the consultation was opened (selected patient's
+// own history, or the doctor-wide recent-consultations fallback).
+export interface ConsultationPatientInfo {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string;
+  patientAvatarUrl: string | null;
+  patientAge: number | null;
+  patientGender: string;
+  patientDob: string;
+  patientBloodGroup: string;
+  patientHeight: string;
+  patientWeight: string;
+  patientChronicIllnesses: string;
+  patientCurrentMedications: string;
+  patientAllergies: string;
+  reason: string;
+  status: string;
+  preVisitData: any | null;
+}
 
 interface ConsultationRoomProps {
-  patient: WaitingPatient;
-  consultation: PastConsultation;
+  patient: ConsultationPatientInfo;
+  visit: EhrVisit;
   onBack: () => void;
+  onViewProfile: () => void;
+  onViewPreVisitForm: () => void;
+  onAddendumSaved?: (emr: EhrVisit["emr"]) => void;
+}
+
+function Field({ label, value }: { label: string; value?: string | number | null }) {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <div>
+      <strong className="text-[#383F45] font-medium">{label}:</strong> {value}
+    </div>
+  );
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function ConsultationRoom({
   patient,
-  consultation,
+  visit,
   onBack,
+  onViewProfile,
+  onViewPreVisitForm,
+  onAddendumSaved,
 }: ConsultationRoomProps) {
-  const [addendumText, setAddendumText] = useState(
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-  );
-  
-  const [noteText, setNoteText] = useState(
-    "Documentation used by providers to input notes into patients' medical records. Documentation used by providers to input notes into patients' medical records."
+  const sections = visit.emr?.sections;
+  const medicines = visit.emr?.medicines ?? [];
+  const labs = visit.emr?.labs ?? [];
+  const addenda = visit.emr?.addenda ?? [];
+  const hasNotes = !!(
+    sections?.reasonForVisit || sections?.historyOfPresentIllness ||
+    sections?.reviewSystem || sections?.healthStatus || sections?.histories ||
+    sections?.physicalExamination || sections?.medicalDecisionMaking ||
+    sections?.procedure || sections?.impressionAndPlan || sections?.professionalServices ||
+    sections?.subjective || sections?.objective || sections?.assessment || sections?.plan
   );
 
-  // Profile & pre-visit modal states inside the Consultation Room
-  const [profilePatient, setProfilePatient] = useState<Patient | null>(null);
-  const [preVisitPatient, setPreVisitPatient] = useState<Patient | null>(null);
+  const [showAddendumBox, setShowAddendumBox] = useState(false);
+  const [addendumText, setAddendumText] = useState("");
+  const [savingAddendum, setSavingAddendum] = useState(false);
+  const [addendumError, setAddendumError] = useState<string | null>(null);
 
-  // Helper to map WaitingPatient to Patient type
-  const mapToPatient = (wp: WaitingPatient): Patient => ({
-    id: wp.id,
-    name: wp.name,
-    age: wp.age,
-    email: wp.email,
-    diagnosis: wp.reasonForVisit,
-    description: wp.description,
-    status: wp.status === "Connected" ? "Waiting" : "Waiting",
-    dateTime: "Today",
-    avatar: wp.avatar,
-    bio: wp.description,
-    preVisitForm: {
-      chronicIllnesses: "None reported",
-      currentMedications: "None",
-      allergies: "None",
-      primaryConcern: wp.reasonDescription,
-      smokes: "No",
-      drinks: "No"
+  const saveAddendum = async () => {
+    if (!addendumText.trim()) return;
+    setSavingAddendum(true);
+    setAddendumError(null);
+    try {
+      const res = await apiFetch(`/api/appointments/${visit.appointmentId}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addendum: addendumText.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to save addendum");
+      const { emr } = await res.json();
+      onAddendumSaved?.(emr);
+      setAddendumText("");
+      setShowAddendumBox(false);
+    } catch (err) {
+      console.error("Save addendum error:", err);
+      setAddendumError("Could not save addendum. Please try again.");
+    } finally {
+      setSavingAddendum(false);
     }
-  });
+  };
 
   return (
     <div className="w-full min-h-full bg-[#F7F9FC] font-outfit select-none flex flex-col p-4 md:p-6 lg:p-8 animate-fade-in relative">
-      {/* Modals */}
-      {profilePatient && (
-        <PatientProfileModal
-          patient={profilePatient}
-          onClose={() => setProfilePatient(null)}
-        />
-      )}
-
-      {preVisitPatient && (
-        <PreVisitFormModal
-          patient={preVisitPatient}
-          onClose={() => setPreVisitPatient(null)}
-        />
-      )}
-
       {/* Header with Back Button */}
       <div className="flex items-center gap-3 mb-6">
         <button
@@ -87,13 +168,11 @@ export default function ConsultationRoom({
         </div>
       </div>
 
-      {/* Content Grid */}
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full flex-1">
-        
-        {/* Left Column: EMR Detail Forms */}
+
+        {/* Left Column: EMR Detail */}
         <div className="flex-1 min-w-0 bg-white rounded-[12px] border border-gray-100 p-6 md:p-8 flex flex-col gap-6">
-          
-          {/* EMR Sub-Header */}
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#EDF0FF] flex items-center justify-center text-[#5476FC]">
@@ -104,29 +183,74 @@ export default function ConsultationRoom({
               </div>
               <div className="flex flex-col">
                 <span className="text-[#24292E] font-medium text-[16px] leading-tight tracking-[-0.28px]">
-                  {patient.name} / {consultation.title}
+                  {patient.patientName} / {visit.reason || "Consultation"}
                 </span>
-                <span className="text-[#9EA5AD] text-[12px]">Ref: {consultation.ref}</span>
+                <span className="text-[#9EA5AD] text-[12px]">
+                  {formatDateTime(visit.scheduledAt)}
+                </span>
               </div>
             </div>
 
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#F5F6FA] hover:bg-gray-100 rounded-xl text-[#707070] text-[13px] font-medium transition-colors">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                <path d="M10 18H14V16H10V18ZM3 6V8H21V6H3ZM6 13H18V11H6V13Z" fill="currentColor"/>
-              </svg>
-              <span>Lab Reports</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddendumBox((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-[13px] font-medium transition-colors"
+                style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+                  <path d="M8 3.33V12.67M3.33 8H12.67" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span>Add Addendum</span>
+              </button>
+              <button
+                onClick={() => window.open(`/appointments/patient-details/lab-reports?id=${patient.id}`, "_blank")}
+                className="flex items-center gap-2 px-4 py-2 bg-[#F5F6FA] hover:bg-gray-100 rounded-xl text-[#707070] text-[13px] font-medium transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                  <path d="M10 18H14V16H10V18ZM3 6V8H21V6H3ZM6 13H18V11H6V13Z" fill="currentColor"/>
+                </svg>
+                <span>Lab Reports</span>
+              </button>
+            </div>
           </div>
 
-          {/* EMR Content Sheets */}
+          {showAddendumBox && (
+            <div className="flex flex-col gap-3 bg-[#F8FAFC] border border-gray-100 rounded-2xl p-5 -mt-2">
+              <span className="text-[#24292E] font-semibold text-[13px]">Add Addendum</span>
+              <textarea
+                value={addendumText}
+                onChange={(e) => setAddendumText(e.target.value)}
+                placeholder="Add a follow-up note to this consultation's record..."
+                rows={3}
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-[#383F45] placeholder:text-[#9EA5AD] focus:outline-none focus:ring-2 focus:ring-[#5476FC]/30 resize-none"
+              />
+              {addendumError && <span className="text-red-500 text-[12px]">{addendumError}</span>}
+              <div className="flex items-center gap-3 self-end">
+                <button
+                  onClick={() => { setShowAddendumBox(false); setAddendumText(""); setAddendumError(null); }}
+                  className="px-4 py-2 rounded-xl text-[#676E76] text-[13px] font-medium hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveAddendum}
+                  disabled={!addendumText.trim() || savingAddendum}
+                  className="px-4 py-2 rounded-xl text-white text-[13px] font-medium transition-colors disabled:opacity-50"
+                  style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+                >
+                  {savingAddendum ? "Saving..." : "Save Addendum"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-6">
             <h3 className="text-[#24292E] text-[14px] font-bold tracking-[-0.24px] uppercase border-l-4 border-[#5476FC] pl-2.5">
               Electronic Medical Record (EMR)
             </h3>
 
-            {/* Grid of EMR details */}
             <div className="flex flex-col gap-5 bg-[#F8FAFC] rounded-2xl p-6 border border-gray-100">
-              
+
               {/* Patient Information */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
@@ -134,14 +258,14 @@ export default function ConsultationRoom({
                   <span>Patient Information</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[13px] pl-5 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Name:</strong> {patient.name}</div>
-                  <div><strong className="text-[#383F45] font-medium">Date of Birth:</strong> {patient.dob}</div>
-                  <div><strong className="text-[#383F45] font-medium">Gender:</strong> {patient.gender}</div>
-                  <div><strong className="text-[#383F45] font-medium">Emirates ID:</strong> E123456789</div>
-                  <div><strong className="text-[#383F45] font-medium">Address:</strong> Villa 23, Al Wasl Road, Dubai, UAE</div>
-                  <div><strong className="text-[#383F45] font-medium">Contact Number:</strong> +971 50 123 4567</div>
-                  <div><strong className="text-[#383F45] font-medium">Email:</strong> {patient.email}</div>
-                  <div><strong className="text-[#383F45] font-medium">Medical Record Number:</strong> MRN123456</div>
+                  <Field label="Name" value={patient.patientName} />
+                  <Field label="Date of Birth" value={patient.patientDob ? new Date(patient.patientDob).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : null} />
+                  <Field label="Gender" value={patient.patientGender} />
+                  <Field label="Blood Group" value={patient.patientBloodGroup} />
+                  <Field label="Email" value={patient.patientEmail} />
+                  <Field label="Chronic Conditions" value={patient.patientChronicIllnesses} />
+                  <Field label="Current Medications" value={patient.patientCurrentMedications} />
+                  <Field label="Known Allergies" value={patient.patientAllergies} />
                 </div>
               </div>
 
@@ -154,79 +278,104 @@ export default function ConsultationRoom({
                   <span>Provider Information</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[13px] pl-5 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Healthcare Facility:</strong> Dubai Health Authority (DHA) Clinic</div>
-                  <div><strong className="text-[#383F45] font-medium">Provider Name:</strong> {consultation.doctor}</div>
-                  <div><strong className="text-[#383F45] font-medium">Specialty:</strong> General Practitioner</div>
-                  <div><strong className="text-[#383F45] font-medium">Date of Encounter:</strong> 29/01/2025</div>
+                  <Field label="Provider Name" value={`Dr. ${visit.doctorName}`} />
+                  <Field label="Status" value={visit.status} />
+                  <Field label="Date of Encounter" value={formatDateTime(visit.scheduledAt)} />
                 </div>
+              </div>
+
+              {visit.emr?.visitInfo && (visit.emr.visitInfo.visitType || visit.emr.visitInfo.accompaniedBy || visit.emr.visitInfo.sourceOfHistory || visit.emr.visitInfo.referralSource || visit.emr.visitInfo.historyLimitation) && (
+                <>
+                  <div className="w-full h-px bg-gray-200/60" />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                      <span>Visit Information</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[#676E76] text-[13px] pl-5 leading-[1.6]">
+                      <Field label="Visit Type" value={visit.emr.visitInfo.visitType} />
+                      <Field label="Accompanied By" value={visit.emr.visitInfo.accompaniedBy} />
+                      <Field label="Source of History" value={visit.emr.visitInfo.sourceOfHistory} />
+                      <Field label="Referral Source" value={visit.emr.visitInfo.referralSource} />
+                      <Field label="History Limitation" value={visit.emr.visitInfo.historyLimitation} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {hasNotes && (
+                <>
+                  <div className="w-full h-px bg-gray-200/60" />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
+                      <span>Clinical Notes</span>
+                    </div>
+                    <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
+                      <Field label="Reason for Visit" value={sections?.reasonForVisit} />
+                      <Field label="History of Present Illness" value={sections?.historyOfPresentIllness} />
+                      <Field label="Review System" value={sections?.reviewSystem} />
+                      <Field label="Health Status" value={sections?.healthStatus} />
+                      <Field label="Histories" value={sections?.histories} />
+                      <Field label="Physical Examination" value={sections?.physicalExamination} />
+                      <Field label="Medical Decision Making" value={sections?.medicalDecisionMaking} />
+                      <Field label="Procedure" value={sections?.procedure} />
+                      <Field label="Impression and Plan" value={sections?.impressionAndPlan} />
+                      <Field label="Professional Services" value={sections?.professionalServices} />
+                      {/* Legacy SOAP fields from older appointments saved before this format change */}
+                      <Field label="Subjective" value={sections?.subjective} />
+                      <Field label="Objective" value={sections?.objective} />
+                      <Field label="Assessment" value={sections?.assessment} />
+                      <Field label="Plan" value={sections?.plan} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="w-full h-px bg-gray-200/60" />
+
+              {/* Medicines */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
+                  <span>Medicines</span>
+                </div>
+                {medicines.length === 0 ? (
+                  <p className="text-[#9EA5AD] text-[13px] pl-5">No medicines prescribed for this consultation.</p>
+                ) : (
+                  <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
+                    {medicines.map((med, i) => (
+                      <div key={i}>
+                        <strong className="text-[#383F45] font-medium">{med.name}</strong>
+                        {med.dosage ? ` — ${med.dosage}` : ""}
+                        {med.timing || med.frequency ? ` (${[med.timing, med.frequency].filter(Boolean).join(" · ")})` : ""}
+                        {med.instructions ? ` — ${med.instructions}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="w-full h-px bg-gray-200/60" />
 
-              {/* Medical History */}
+              {/* Lab Tests */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
-                  <span>Medical History</span>
+                  <span>Lab Tests</span>
                 </div>
-                <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Chief Complaint:</strong> Persistent cough and fever for the past 3 days</div>
-                  <div><strong className="text-[#383F45] font-medium">History of Present Illness:</strong> Ahmed has been experiencing a dry cough and fever (up to 38.5°C) for the past 3 days. He also reports feeling fatigued and having a slight headache. No recent travel history or contact with sick individuals.</div>
-                  <div><strong className="text-[#383F45] font-medium">Past Medical History:</strong> Hypertension (controlled with medication)</div>
-                  <div><strong className="text-[#383F45] font-medium">Medications:</strong> Amlodipine 5 mg daily</div>
-                  <div><strong className="text-[#383F45] font-medium">Allergies:</strong> None known</div>
-                  <div><strong className="text-[#383F45] font-medium">Family Medical History:</strong> Father with type 2 diabetes, mother with hypertension</div>
-                  <div><strong className="text-[#383F45] font-medium">Social History:</strong> Non-smoker, occasional alcohol consumption, works as a software engineer</div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-gray-200/60" />
-
-              {/* Physical Examination */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
-                  <span>Physical Examination</span>
-                </div>
-                <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Vital Signs:</strong> Temperature: 38.2°C | Blood Pressure: 135/85 mmHg | Heart Rate: 90 bpm | Respiratory Rate: 18 breaths/min | Oxygen Saturation: 98%</div>
-                  <div><strong className="text-[#383F45] font-medium">General Appearance:</strong> Well-developed, well-nourished, in no acute distress</div>
-                  <div><strong className="text-[#383F45] font-medium">HEENT:</strong> Conjunctivae clear, tympanic membranes intact, pharynx without erythema</div>
-                  <div><strong className="text-[#383F45] font-medium">Cardiovascular:</strong> Regular rate and rhythm, no murmurs</div>
-                  <div><strong className="text-[#383F45] font-medium">Respiratory:</strong> Clear to auscultation bilaterally, no wheezes or crackles</div>
-                  <div><strong className="text-[#383F45] font-medium">Abdomen:</strong> Soft, non-tender, no organomegaly</div>
-                  <div><strong className="text-[#383F45] font-medium">Musculoskeletal:</strong> Full range of motion in all extremities, no joint swelling</div>
-                  <div><strong className="text-[#383F45] font-medium">Neurological:</strong> Alert and oriented x3, normal motor and sensory function</div>
-                  <div><strong className="text-[#383F45] font-medium">Skin:</strong> No rashes or lesions</div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-gray-200/60" />
-
-              {/* Diagnostic Tests */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
-                  <span>Diagnostic Tests</span>
-                </div>
-                <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Laboratory Results:</strong> CBC: WBC 11.2 x10^9/L, Hb 14.5 g/dL, Platelets 250 x10^9/L | CRP: Elevated at 45 mg/L</div>
-                  <div><strong className="text-[#383F45] font-medium">Imaging Studies:</strong> Chest X-ray shows no significant findings</div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-gray-200/60" />
-
-              {/* Assessment */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
-                  <span>Assessment</span>
-                </div>
-                <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Diagnosis:</strong> Upper respiratory tract infection</div>
-                  <div><strong className="text-[#383F45] font-medium">Differential Diagnosis:</strong> Viral syndrome, early bacterial infection</div>
-                </div>
+                {labs.length === 0 ? (
+                  <p className="text-[#9EA5AD] text-[13px] pl-5">No lab tests recommended for this consultation.</p>
+                ) : (
+                  <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-2 leading-[1.6]">
+                    {labs.map((lab, i) => (
+                      <div key={i}>
+                        <strong className="text-[#383F45] font-medium">{lab.name}</strong>
+                        {lab.notes ? ` — ${lab.notes}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="w-full h-px bg-gray-200/60" />
@@ -238,99 +387,48 @@ export default function ConsultationRoom({
                   <span>Documentation</span>
                 </div>
                 <div className="text-[#676E76] text-[13px] pl-5 flex flex-col gap-1 leading-[1.6]">
-                  <div><strong className="text-[#383F45] font-medium">Electronic Signature:</strong> {consultation.doctor}</div>
-                  <div><strong className="text-[#383F45] font-medium">Date:</strong> 29/01/2025</div>
+                  <Field label="Electronic Signature" value={`Dr. ${visit.doctorName}`} />
+                  <Field label="Saved At" value={visit.emr?.savedAt ? formatDateTime(visit.emr.savedAt) : null} />
                 </div>
               </div>
 
+              {addenda.length > 0 && (
+                <>
+                  <div className="w-full h-px bg-gray-200/60" />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-[#24292E] font-semibold text-[13px]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                      <span>Addenda</span>
+                    </div>
+                    <div className="flex flex-col gap-3 pl-5">
+                      {addenda.map((a, i) => (
+                        <div key={i} className="bg-white rounded-xl p-3 border border-gray-100">
+                          <p className="text-[#383F45] text-[13px] leading-[1.6] whitespace-pre-line">{a.text}</p>
+                          <p className="text-[#9EA5AD] text-[11px] mt-1">
+                            Dr. {a.doctorName} &middot; {formatDateTime(a.createdAt)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-
-            {/* Add Addendum Box */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[#24292E] font-medium text-[13px] pl-1">Add Addendum</label>
-              <textarea
-                value={addendumText}
-                onChange={(e) => setAddendumText(e.target.value)}
-                className="w-full h-[120px] p-4 bg-[#F5F6FA] border border-transparent hover:border-gray-200 focus:border-[#5476FC] focus:bg-white rounded-xl text-[#676E76] text-[13px] leading-relaxed transition-all focus:outline-none resize-none"
-              />
-            </div>
-
-            {/* Rich Text Editor Note Box */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[#24292E] font-medium text-[13px] pl-1">Write note / Add to EMR here</label>
-              <div className="w-full rounded-xl bg-[#F5F6FA] border border-transparent overflow-hidden flex flex-col">
-                
-                {/* Editor Toolbar */}
-                <div className="flex items-center gap-1.5 p-2 bg-white/70 border-b border-gray-100">
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 transition-colors" title="Bold">
-                    <strong>B</strong>
-                  </button>
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 italic transition-colors" title="Italic">
-                    I
-                  </button>
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 underline transition-colors" title="Underline">
-                    U
-                  </button>
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 line-through transition-colors" title="Strikethrough">
-                    S
-                  </button>
-                  <div className="w-px h-5 bg-gray-300 mx-1" />
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 font-mono text-xs transition-colors" title="Inline Code">
-                    &lt;/&gt;
-                  </button>
-                  <button type="button" className="p-1.5 hover:bg-gray-200 rounded text-gray-700 transition-colors" title="Clear Formatting">
-                    Tx
-                  </button>
-                </div>
-
-                {/* Editor Textarea */}
-                <textarea
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  className="w-full h-[150px] p-4 bg-white focus:bg-white text-[#676E76] text-[13px] leading-relaxed transition-all focus:outline-none resize-none border-none"
-                />
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex items-center gap-3 justify-end mt-2">
-              <button
-                onClick={onBack}
-                className="px-6 py-2.5 rounded-xl border border-gray-200 text-[#24292E] font-medium text-[13px] hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  alert("EMR Saved successfully!");
-                  onBack();
-                }}
-                className="px-6 py-2.5 rounded-xl text-white font-medium text-[13px] transition-all hover:opacity-90"
-                style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
-              >
-                Save EMR
-              </button>
-            </div>
-
           </div>
-
         </div>
 
-        {/* Right Column: Selected Patient Details Card */}
+        {/* Right Column: Patient Details */}
         <div className="w-full lg:w-[372px] shrink-0 bg-[#F5F6FA] border border-white rounded-[12px] p-6 flex flex-col gap-6">
-          
-          {/* Patient Details Header */}
           <div className="flex flex-col gap-1">
             <h3 className="text-[#24292E] font-medium text-[20px] leading-[1.5] tracking-[-0.4px]">
               Patient Details
             </h3>
           </div>
 
-          {/* Profile Card */}
           <div className="flex items-center gap-4 bg-white/40 p-4 rounded-[12px] border border-white">
             <img
-              src={patient.avatar}
-              alt={patient.name}
+              src={patient.patientAvatarUrl || "/default-avatar.svg"}
+              alt={patient.patientName}
               className="w-11 h-11 rounded-full object-cover shrink-0"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = "https://api.builder.io/api/v1/image/assets/TEMP/f3dc26797671e7caea0bc2f0647901599c916831?width=72";
@@ -338,22 +436,18 @@ export default function ConsultationRoom({
             />
             <div className="flex flex-col min-w-0">
               <span className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] truncate">
-                {patient.name}
+                {patient.patientName}
               </span>
-              <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px]">
-                {patient.age} Year Old
-              </span>
+              {patient.patientAge != null && (
+                <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px]">
+                  {patient.patientAge} Year Old
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Patient Description bio snippet */}
-          <p className="text-[#676E76] text-[12px] leading-[16px] tracking-[-0.24px] bg-white/40 p-4 rounded-[12px] border border-white whitespace-pre-wrap">
-            {patient.description}
-          </p>
-
-          {/* View Profile Primary-Color-tint Button */}
           <button
-            onClick={() => setProfilePatient(mapToPatient(patient))}
+            onClick={onViewProfile}
             className="flex w-full justify-center items-center py-2.5 rounded-[12px] bg-[#E0E7FF] hover:bg-[#D0DBFF] text-[#182A6F] font-semibold text-[13px] transition-all duration-200"
           >
             View Profile
@@ -361,19 +455,16 @@ export default function ConsultationRoom({
 
           <div className="w-full h-px bg-[#EBEEF5]" />
 
-          {/* Fields sections */}
           <div className="flex flex-col gap-3">
-            {/* Reason for visit */}
             <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-1">
               <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
                 Reason for visit
               </span>
-              <p className="text-[#676E76] text-[12px] leading-[16px] line-clamp-2">
-                {patient.reasonDescription}
+              <p className="text-[#676E76] text-[12px] leading-[16px]">
+                {patient.reason || "Not specified"}
               </p>
             </div>
 
-            {/* Pre-visit form review card */}
             <div className="p-4 rounded-[12px] bg-white shadow-sm flex flex-col gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
@@ -385,17 +476,16 @@ export default function ConsultationRoom({
               </div>
 
               <button
-                onClick={() => setPreVisitPatient(mapToPatient(patient))}
+                onClick={onViewPreVisitForm}
                 className="flex items-center gap-2 text-[#182A6F] font-semibold text-[13px] hover:text-[#5476FC] transition-colors"
               >
                 <span>Read Pre-visit form</span>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10.125 14.625L15.75 9L10.125 3.375M15.75 9H2.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
           </div>
-
         </div>
 
       </div>

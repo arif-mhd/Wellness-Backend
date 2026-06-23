@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
-import Session, { signOut } from "supertokens-web-js/recipe/session";
+import { signOut } from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 
 // ─── Icons (memoised, never recreated) ───────────────────────────────────────
 const HomeIcon = ({ active }: { active: boolean }) => (
@@ -92,7 +93,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
   { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon },
   { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon },
-  { href: "/dashboard/video-calls", label: "Messages", Icon: MessagesIcon },
+  { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
   { href: "/dashboard/wallet", label: "Payment", Icon: PaymentIcon },
 ];
 
@@ -110,12 +111,7 @@ export default function Sidebar() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const token = await Session.getAccessToken();
-        if (!token) return;
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/auth/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await apiFetch("/auth/me");
         if (res.ok) {
           const data = await res.json();
           if (data.profile) {

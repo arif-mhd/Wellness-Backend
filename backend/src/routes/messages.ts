@@ -105,7 +105,7 @@ router.get("/token", verifySession(), async (req: SessionRequest, res: Response)
       }
     } catch { /* use undefined */ }
 
-    const wsUrl = process.env.LIVEKIT_WS_URL || "wss://wellness-4eu2167u.livekit.cloud";
+    const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
     const token = await makeChatToken(userId, channel, displayName);
 
     res.json({ token, wsUrl, channel });

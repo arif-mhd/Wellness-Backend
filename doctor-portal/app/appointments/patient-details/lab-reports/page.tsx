@@ -2,11 +2,9 @@
 
 import React, { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
+import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "../../types";
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function LabReportsContent() {
   const router = useRouter();
@@ -23,13 +21,7 @@ function LabReportsContent() {
         return;
       }
       try {
-        const accessToken = await Session.getAccessToken();
-        if (!accessToken) {
-          setLoading(false);
-          return;
-        }
-        const headers = { Authorization: `Bearer ${accessToken}` };
-        const res = await fetch(`${API_URL}/api/appointments/doctor`, { headers });
+        const res = await apiFetch("/api/appointments/doctor");
         if (res.ok) {
           const { appointments } = await res.json();
           const match = appointments?.find((a: any) => a.id === id || a.patientId === id || a.familyMemberId === id);

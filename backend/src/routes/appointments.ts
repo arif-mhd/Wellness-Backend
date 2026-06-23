@@ -935,6 +935,91 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
   }
 });
 
+// ─── PATCH /api/appointments/:id/waiting ────────────────────────────────────
+// Patient signals they're present in the waiting room (or leaves it). Body:
+// { waiting: boolean }. Sets/clears apt.patientWaitingSince, which the doctor
+// portal reads (via GET /doctor) to show real "Online Now" presence instead
+// of inferring it from call state alone.
+router.patch("/:id/waiting", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id } = req.params;
+  const { waiting } = req.body;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+    if (apt.patientId !== patientId) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const updated = {
+      ...apt,
+      patientWaitingSince: waiting ? new Date().toISOString() : null,
+      updatedAt: new Date().toISOString(),
+    };
+    await appointmentsContainer.items.upsert(updated);
+
+    res.json({ status: "OK", patientWaitingSince: updated.patientWaitingSince });
+  } catch (err) {
+    console.error("Update waiting status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/:id/remind ──────────────────────────────────────
+// Doctor sends the patient a manual reminder notification about an upcoming
+// appointment.
+router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+    if (apt.doctorId !== doctorId) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const docDoc = await doctorsContainer.item(doctorId, doctorId).read().then(r => r.resource).catch(() => null);
+    const doctorName = docDoc?.fullName ?? "Doctor";
+
+    const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeText = parseLocalTime(apt.scheduledAt).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    const patientNotification = {
+      id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      patientId: apt.patientId,
+      title: "Appointment Reminder",
+      body: `Dr. ${doctorName} sent you a reminder about your appointment on ${dateText} at ${timeText}.`,
+      type: "appointment_reminder",
+      referenceId: id,
+      isRead: false,
+      sentAt: new Date().toISOString(),
+    };
+    await notificationsContainer.items.create(patientNotification);
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Send reminder error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/appointments/:id/emr ─────────────────────────────────────────
 // Doctor saves the structured EMR for this single encounter: per-section
 // clinical notes, prescribed medicines, and recommended labs. This is the
@@ -950,7 +1035,7 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { id }   = req.params;
-  const { sections, medicines, labs } = req.body;
+  const { sections, visitInfo, medicines, labs, addendum } = req.body;
 
   try {
     const { resource: apt } = await appointmentsContainer.item(id, id).read();
@@ -1007,12 +1092,30 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
     const existingSections = apt.emr?.sections ?? {};
     const mergedSections   = { ...existingSections, ...(sections ?? {}) };
 
+    // Addenda are append-only: each note is timestamped and signed at write
+    // time and never edited or removed afterward, matching real EMR
+    // audit-trail conventions (a correction is a new addendum, not an edit).
+    const existingAddenda: any[] = apt.emr?.addenda ?? [];
+    const mergedAddenda = addendum && String(addendum).trim()
+      ? [
+          ...existingAddenda,
+          {
+            text: String(addendum).trim(),
+            doctorId,
+            doctorName: contributorName,
+            createdAt: new Date().toISOString(),
+          },
+        ]
+      : existingAddenda;
+
     const updated = {
       ...apt,
       emr: {
         sections:  mergedSections,
+        visitInfo: visitInfo ?? apt.emr?.visitInfo ?? null,
         medicines: mergedMedicines,
         labs:      mergedLabs,
+        addenda:   mergedAddenda,
         savedAt:   new Date().toISOString(),
       },
       updatedAt: new Date().toISOString(),
@@ -1112,9 +1215,69 @@ router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: R
         emr:           a.emr ?? null,
       }));
 
-    res.json({ profile, visitHistory, preVisitData: apt.preVisitData ?? null });
+    res.json({
+      profile,
+      visitHistory,
+      preVisitData: apt.preVisitData ?? null,
+      clinicalNotes: patient.clinicalNotes ?? [],
+    });
   } catch (err) {
     console.error("Fetch EHR error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/patient/:patientId/notes ────────────────────────
+// Doctor adds a freestanding clinical note to a patient's record — not tied
+// to any specific appointment/encounter (unlike an EMR addendum). Append-only,
+// timestamped and signed, same audit-trail convention as EMR addenda. Only a
+// doctor who has actually had at least one appointment with this patient may
+// add notes for them.
+router.post("/patient/:patientId/notes", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { patientId } = req.params;
+  const { text } = req.body;
+
+  if (!text || !String(text).trim()) {
+    res.status(400).json({ error: "Note text is required." });
+    return;
+  }
+
+  try {
+    const hasSeenPatient = await queryDocuments<any>(appointmentsContainer, {
+      query: "SELECT TOP 1 c.id FROM c WHERE c.patientId = @patientId AND (c.doctorId = @doctorId OR c.specialistInvite.doctorId = @doctorId)",
+      parameters: [
+        { name: "@patientId", value: patientId },
+        { name: "@doctorId", value: doctorId },
+      ],
+    });
+    if (hasSeenPatient.length === 0) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const { resource: patient } = await patientsContainer.item(patientId, patientId).read();
+    if (!patient) { res.status(404).json({ error: "Patient not found." }); return; }
+
+    let doctorName = "Doctor";
+    try {
+      const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
+      doctorName = doc?.fullName ?? doctorName;
+    } catch { /* use default */ }
+
+    const newNote = {
+      id: "note_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      text: String(text).trim(),
+      doctorId,
+      doctorName,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedNotes = [...(patient.clinicalNotes ?? []), newNote];
+
+    await patientsContainer.items.upsert({ ...patient, clinicalNotes: updatedNotes });
+    res.json({ status: "OK", clinicalNotes: updatedNotes });
+  } catch (err) {
+    console.error("Add clinical note error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

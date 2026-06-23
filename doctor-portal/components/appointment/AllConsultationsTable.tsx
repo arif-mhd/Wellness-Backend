@@ -61,6 +61,11 @@ export default function AllConsultationsTable({
         </div>
 
         {/* Rows */}
+        {consultations.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <p className="text-[#9EA5AD] text-[13px]">No consultations found.</p>
+          </div>
+        )}
         {paginatedItems.map((patient, index) => {
           const isSelected = selectedPatientId === patient.id;
           const isAlternate = index % 2 === 1;

@@ -10,6 +10,7 @@ interface AppointmentDetailsCardProps {
   onConsult: (patient: Patient) => void;
   onViewProfile?: (patient: Patient) => void;
   onViewPreVisitForm?: (patient: Patient) => void;
+  onSendReminder?: (patient: Patient) => void;
   activeTab?: "All" | "Upcoming" | "Past";
 }
 
@@ -19,6 +20,7 @@ export default function AppointmentDetailsCard({
   onConsult,
   onViewProfile,
   onViewPreVisitForm,
+  onSendReminder,
   activeTab,
 }: AppointmentDetailsCardProps) {
   const router = useRouter();
@@ -136,15 +138,23 @@ export default function AppointmentDetailsCard({
           </p>
         </div>
 
-        {/* Pre-visit Form or placeholder field */}
+        {/* Pre-visit Form or medicines advised (completed/past appointments) */}
         {patient.status === "Completed" || activeTab === "Past" ? (
           <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
             <span className="text-[#24292E] font-medium text-[12px] tracking-[-0.24px]">
-              &lt;Some other field&gt;
+              Medicines Advised
             </span>
-            <p className="text-[#676E76] text-[12px] leading-[1.4] select-text">
-              Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,
-            </p>
+            {patient.medicines && patient.medicines.length > 0 ? (
+              <ul className="text-[#676E76] text-[12px] leading-[1.5] select-text list-disc pl-4">
+                {patient.medicines.map((med, i) => (
+                  <li key={i}>{med.name}{med.dosage ? ` — ${med.dosage}` : ""}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[#9EA5AD] text-[12px] leading-[1.4]">
+                No medicines were prescribed for this consultation.
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-white shadow-sm border border-[#EBEEF5]/30">
@@ -169,7 +179,7 @@ export default function AppointmentDetailsCard({
           <>
             {/* Send Reminder */}
             <button
-              onClick={() => router.push(`/appointments/patient-details?id=${patient.id}&mode=summary`)}
+              onClick={() => onSendReminder?.(patient)}
               className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[14px] transition-all duration-200"
             >
               Send Reminder

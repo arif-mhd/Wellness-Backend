@@ -58,12 +58,20 @@ interface EmrLab {
 interface EmrSections {
   reasonForVisit?: string;
   historyOfPresentIllness?: string;
+  reviewSystem?: string;
+  healthStatus?: string;
+  histories?: string;
+  physicalExamination?: string;
+  medicalDecisionMaking?: string;
+  procedure?: string;
+  impressionAndPlan?: string;
+  professionalServices?: string;
+  // Legacy SOAP fields — kept for read-only display of older appointments
+  // saved before this format change; never written by the current UI.
   subjective?: string;
   objective?: string;
   assessment?: string;
   plan?: string;
-  impressionAndPlan?: string;
-  medicalDecisionMaking?: string;
 }
 
 interface VisitHistoryEntry {
@@ -395,10 +403,19 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                           </p>
                         )}
                         {[
+                          { title: "Review System", text: selectedVisit.emr?.sections?.reviewSystem },
+                          { title: "Health Status", text: selectedVisit.emr?.sections?.healthStatus },
+                          { title: "Histories", text: selectedVisit.emr?.sections?.histories },
+                          { title: "Physical Examination", text: selectedVisit.emr?.sections?.physicalExamination },
+                          { title: "Medical Decision Making", text: selectedVisit.emr?.sections?.medicalDecisionMaking },
+                          { title: "Procedure", text: selectedVisit.emr?.sections?.procedure },
+                          { title: "Impression and Plan", text: selectedVisit.emr?.sections?.impressionAndPlan },
+                          { title: "Professional Services", text: selectedVisit.emr?.sections?.professionalServices },
+                          // Legacy SOAP fields from older appointments saved before this format change
                           { title: "Subjective", text: selectedVisit.emr?.sections?.subjective },
                           { title: "Objective", text: selectedVisit.emr?.sections?.objective },
                           { title: "Assessment", text: selectedVisit.emr?.sections?.assessment },
-                          { title: "Plan", text: selectedVisit.emr?.sections?.plan ?? selectedVisit.emr?.sections?.impressionAndPlan },
+                          { title: "Plan", text: selectedVisit.emr?.sections?.plan },
                         ].filter(({ text }) => !!text).map(({ title, text }) => (
                           <div key={title} className="pt-2">
                             <div className="flex items-center gap-2 mb-2">
@@ -409,12 +426,19 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                           </div>
                         ))}
                         {!selectedVisit.emr?.sections?.historyOfPresentIllness &&
+                          !selectedVisit.emr?.sections?.reviewSystem &&
+                          !selectedVisit.emr?.sections?.healthStatus &&
+                          !selectedVisit.emr?.sections?.histories &&
+                          !selectedVisit.emr?.sections?.physicalExamination &&
+                          !selectedVisit.emr?.sections?.medicalDecisionMaking &&
+                          !selectedVisit.emr?.sections?.procedure &&
+                          !selectedVisit.emr?.sections?.impressionAndPlan &&
+                          !selectedVisit.emr?.sections?.professionalServices &&
                           !selectedVisit.emr?.sections?.subjective &&
                           !selectedVisit.emr?.sections?.objective &&
                           !selectedVisit.emr?.sections?.assessment &&
-                          !selectedVisit.emr?.sections?.plan &&
-                          !selectedVisit.emr?.sections?.impressionAndPlan && (
-                            <p className="text-[12px] font-medium text-slate-400">No SOAP notes recorded for this consultation.</p>
+                          !selectedVisit.emr?.sections?.plan && (
+                            <p className="text-[12px] font-medium text-slate-400">No clinical notes recorded for this consultation.</p>
                           )}
                       </div>
                     </div>
