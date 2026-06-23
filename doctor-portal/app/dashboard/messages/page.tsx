@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { Room, RoomEvent } from "livekit-client";
@@ -97,6 +97,8 @@ function SpinnerIcon({ size = 24 }: { size?: number }) {
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetPatientId = searchParams.get("patientId");
   const [conversations, setConversations]     = useState<Conversation[]>([]);
   const [filtered, setFiltered]               = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery]         = useState("");
@@ -148,6 +150,16 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
+
+  // ── Auto-select conversation from patientId query param ───────────────────
+  useEffect(() => {
+    if (!targetPatientId || loadingConvs || conversations.length === 0) return;
+    const match = conversations.find((c) => c.otherPartyId === targetPatientId);
+    if (match && selectedConv?.conversationId !== match.conversationId) {
+      selectConversation(match);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetPatientId, loadingConvs, conversations]);
 
   // ── Search filter ──────────────────────────────────────────────────────────
   useEffect(() => {

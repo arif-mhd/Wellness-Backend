@@ -10,6 +10,8 @@ interface PatientProfileModalProps {
   onClose: () => void;
   mode?: string | null;
   initialTab?: ProfileTab;
+  /** The specific appointment ID to pre-select in the consultation list */
+  appointmentId?: string | null;
 }
 
 type ProfileTab = "Consultations" | "Medications" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
@@ -22,6 +24,10 @@ interface RealConsultation {
   doctor: string;
   doctorAvatar: string | null;
   date: string;
+  bookedAt: string;
+  scheduledFor: string;
+  completedAt: string | null;
+  status: string;
   reason: string;
   emr: {
     sections?: {
@@ -131,7 +137,7 @@ const GradientPillIcon = () => (
   </div>
 );
 
-export default function PatientProfileModal({ patient, onClose, mode, initialTab }: PatientProfileModalProps) {
+export default function PatientProfileModal({ patient, onClose, mode, initialTab, appointmentId }: PatientProfileModalProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ProfileTab>(
     initialTab || (mode === "lab-reports" ? "Labs" : "Consultations")
@@ -163,26 +169,40 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             .sort((a: any, b: any) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
 
           const mapped: RealConsultation[] = patientApts.map((a: any) => {
-            const d = new Date(a.scheduledAt);
-            const dateStr = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
+            const bookedD = new Date(a.createdAt || a.scheduledAt);
+            const scheduledD = new Date(a.scheduledAt);
+            const isCompleted = a.status === 'completed' || !!a.emr;
+            const completedD = isCompleted ? new Date(a.updatedAt || a.emr?.savedAt || a.scheduledAt) : null;
+
+            const formatTime = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
               ", " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-            const dateKey = d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "");
+
+            const dateKey = scheduledD.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "");
             return {
               id: a.id,
               title: `Consultation_${dateKey}`,
               ref: `APT-${a.id.slice(-8).toUpperCase()}`,
               doctor: a.doctorName ? `Dr. ${a.doctorName}` : "Doctor",
               doctorAvatar: a.doctorAvatarUrl ?? null,
-              date: dateStr,
+              date: formatTime(scheduledD),
+              bookedAt: formatTime(bookedD),
+              scheduledFor: formatTime(scheduledD),
+              completedAt: completedD ? formatTime(completedD) : null,
+              status: a.status,
               reason: a.reason ?? "",
               emr: a.emr ?? null,
             };
           });
           setConsultations(mapped);
-          if (mapped.length > 0) {
-            setSelectedConsultation(mapped[0]);
+          // Pre-select the specific appointment if appointmentId is provided,
+          // otherwise fall back to the most-recent consultation (mapped[0])
+          const target = appointmentId
+            ? (mapped.find((c) => c.id === appointmentId) ?? mapped[0])
+            : mapped[0];
+          if (target) {
+            setSelectedConsultation(target);
             try {
-              const ehrRes = await apiFetch(`/api/appointments/${mapped[0].id}/ehr`);
+              const ehrRes = await apiFetch(`/api/appointments/${target.id}/ehr`);
               if (ehrRes.ok) {
                 const { clinicalNotes: notes } = await ehrRes.json();
                 setClinicalNotes(notes ?? []);
@@ -515,9 +535,11 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                             {c.doctor}
                           </span>
                         </div>
-                        <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-0.5">
-                          {c.date}
-                        </span>
+                        <div className="flex flex-col gap-0.5 mt-1 text-[#9EA5AD] text-[11px] font-normal leading-[1.5]">
+                          <span>Booked: {c.bookedAt}</span>
+                          <span>Scheduled: {c.scheduledFor}</span>
+                          {c.completedAt && <span>Completed: {c.completedAt}</span>}
+                        </div>
                         {/* EMR badge */}
                         {c.emr ? (
                           <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold w-fit">

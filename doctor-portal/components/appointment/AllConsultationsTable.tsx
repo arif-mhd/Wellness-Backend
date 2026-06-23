@@ -10,6 +10,8 @@ interface AllConsultationsTableProps {
   onConsult: (patient: Patient) => void;
   onViewPreVisitForm?: (patient: Patient) => void;
   activeTab: "All" | "Upcoming" | "Past";
+  /** When true, completed appointments are faded (used in the "All" tab) */
+  fadeCompleted?: boolean;
 }
 
 export default function AllConsultationsTable({
@@ -19,6 +21,7 @@ export default function AllConsultationsTable({
   onConsult,
   onViewPreVisitForm,
   activeTab,
+  fadeCompleted = false,
 }: AllConsultationsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -69,12 +72,18 @@ export default function AllConsultationsTable({
         {paginatedItems.map((patient, index) => {
           const isSelected = selectedPatientId === patient.id;
           const isAlternate = index % 2 === 1;
+          const isCompleted = patient.status === "Completed";
+          const shouldFade = fadeCompleted && isCompleted;
 
           return (
             <div
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${isSelected
+              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
+                shouldFade
+                  ? "opacity-40 grayscale-[30%]"
+                  : ""
+              } ${isSelected
                   ? "bg-[#EEF1FF]/60 border border-[#8AA0FF]/40"
                   : isAlternate
                     ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"

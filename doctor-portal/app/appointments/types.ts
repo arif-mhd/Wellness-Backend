@@ -30,6 +30,8 @@ export interface Patient {
   dob?: string;
   /** Raw ISO appointment time — needed for real date filtering (e.g. "Today" vs "All Dates"); dateTime is a formatted display string, not parseable. */
   scheduledAt?: string;
+  /** The patient's user ID — used to look up their conversation in the messages page. */
+  patientUserId?: string;
   /** Medicines prescribed in this encounter's EMR, if any was saved. */
   medicines?: { name: string; dosage?: string }[];
 }

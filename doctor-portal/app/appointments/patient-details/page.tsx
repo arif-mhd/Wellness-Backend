@@ -13,6 +13,8 @@ function PatientDetailsContent() {
   const from = searchParams.get("from");
   const mode = searchParams.get("mode");
   const tab = searchParams.get("tab") as any;
+  // appointmentId: the specific appointment to pre-select in the consultation history
+  const appointmentId = searchParams.get("appointmentId");
 
   const [dbPatient, setDbPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ function PatientDetailsContent() {
     );
   }
 
-  return <PatientProfileModal patient={dbPatient} onClose={handleClose} mode={mode} initialTab={tab} />;
+  return <PatientProfileModal patient={dbPatient} onClose={handleClose} mode={mode} initialTab={tab} appointmentId={appointmentId} />;
 }
 
 export default function PatientDetailsPage() {

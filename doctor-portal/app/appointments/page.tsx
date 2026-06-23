@@ -82,6 +82,7 @@ function mapToPatient(apt: any, index: number): Patient {
     preVisitForm,
     preVisitFormDate,
     scheduledAt: apt.scheduledAt,
+    patientUserId: apt.familyMemberId || apt.patientId,
     medicines: Array.isArray(apt.emr?.medicines)
       ? apt.emr.medicines.map((m: any) => ({ name: m.name, dosage: m.dosage }))
       : undefined,
@@ -108,8 +109,7 @@ export default function AppointmentsPage() {
   const [sortField, setSortField] = useState<"name" | "age" | "diagnosis" | "dateTime" | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
-  // Selection states
-  // By default, select Albert Flores (MOCK_NEW_APPOINTMENTS[1]) to match figma page load
+  // Selection states — no patient selected by default; side card only shows on explicit click
   const [allAppointments, setAllAppointments] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
@@ -120,7 +120,7 @@ export default function AppointmentsPage() {
       const { appointments } = await res.json();
       const mapped = (appointments ?? []).map(mapToPatient);
       setAllAppointments(mapped);
-      if (mapped.length > 0) setSelectedPatient(mapped[0]);
+      // Do NOT auto-select; side card only appears when user clicks a row
     } catch { /* silently ignore */ }
   }, []);
 
@@ -177,24 +177,27 @@ export default function AppointmentsPage() {
     triggerToast("Reset all table filters");
   };
 
-  // Filter New Appointments list
+  // Filter New Appointments list — only shown in the "All" tab
+  // Shows only non-consulted (non-Completed) appointments, filtered by today/date
   const filteredNewAppointments = useMemo(() => {
-    const todayStr = new Date().toDateString();
-    let result = allAppointments.filter(a => {
-      // "New" = today's scheduled or waiting appointments
-      return a.status !== "Completed";
-    });
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Filter by tab selection
-    if (activeTab === "Upcoming") {
-      result = result.filter(appt => appt.status === "Scheduled");
-    } else if (activeTab === "Past") {
-      result = []; // New appointments are generally not past/completed
-    }
+    // "New Appointments" section only appears in "All" tab
+    // Only include non-Completed appointments
+    let result = allAppointments.filter(a => a.status !== "Completed");
 
     // Filter by date
     if (dateFilter === "Today") {
+      // Only today's non-completed
       result = result.filter(appt => !appt.scheduledAt || parseLocalTime(appt.scheduledAt).toDateString() === todayStr);
+    } else {
+      // All Dates: only show non-completed from today or future — never past-dated stale ones
+      result = result.filter(appt => {
+        if (!appt.scheduledAt) return true;
+        return parseLocalTime(appt.scheduledAt) >= startOfToday;
+      });
     }
 
     // Filter by inline search
@@ -209,23 +212,54 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [activeTab, dateFilter, searchQuery, allAppointments]);
+  }, [dateFilter, searchQuery, allAppointments]);
 
   // Filter & Sort All Consultations list
+  // - "All" tab: show ALL appointments (completed ones will be faded in the table)
+  // - "Upcoming" tab: only non-Completed appointments (today or future dates)
+  // - "Past" tab: only Completed appointments OR appointments from past dates
   const filteredAllConsultations = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+
     let result = [...allAppointments];
 
-    // Filter by tab selection
     if (activeTab === "Upcoming") {
-      result = result.filter(c => c.status === "Scheduled" || c.status === "Waiting");
+      if (dateFilter === "Today") {
+        // Today's non-completed
+        result = result.filter(c =>
+          (c.status === "Scheduled" || c.status === "Waiting") &&
+          (!c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr)
+        );
+      } else {
+        // All Dates: non-completed that are scheduled for today OR the future
+        result = result.filter(c => {
+          if (c.status === "Completed") return false;
+          if (!c.scheduledAt) return true;
+          const d = parseLocalTime(c.scheduledAt);
+          // Include if it's today or a future date
+          return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        });
+      }
     } else if (activeTab === "Past") {
-      result = result.filter(c => c.status === "Completed");
-    }
-
-    // Filter by date
-    if (dateFilter === "Today") {
-      const todayStr = new Date().toDateString();
-      result = result.filter(c => !c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr);
+      if (dateFilter === "Today") {
+        // Today's completed
+        result = result.filter(c =>
+          c.status === "Completed" &&
+          (!c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr)
+        );
+      } else {
+        // All Dates: completed appointments (any date, including previous dates)
+        result = result.filter(c => c.status === "Completed");
+      }
+    } else {
+      // "All" tab — keep all appointments; date filter applied below if Today
+      if (dateFilter === "Today") {
+        result = result.filter(c =>
+          !c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr
+        );
+      }
+      // "All Dates": no date restriction — show everything (completed rows will be faded)
     }
 
     // Filter by inline search
@@ -302,7 +336,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("All");
-                setSelectedPatient(allAppointments[1] || allAppointments[0] || null);
+                setSelectedPatient(null);
               }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "All"
                   ? "bg-[#2E344E] text-white"
@@ -314,8 +348,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("Upcoming");
-                const upcoming = allAppointments.find(p => p.status === "Scheduled" || p.status === "Waiting") || allAppointments[0] || null;
-                setSelectedPatient(upcoming);
+                setSelectedPatient(null);
               }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Upcoming"
                   ? "bg-[#2E344E] text-white"
@@ -327,10 +360,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => {
                 setActiveTab("Past");
-                const completed = allAppointments.find(c => c.status === "Completed");
-                if (completed) {
-                  setSelectedPatient(completed);
-                }
+                setSelectedPatient(null);
               }}
               className={`px-4 py-2 text-[14px] font-normal leading-[1.3] tracking-[-0.28px] rounded-full transition-all duration-200 ${activeTab === "Past"
                   ? "bg-[#2E344E] text-white"
@@ -430,10 +460,10 @@ export default function AppointmentsPage() {
           </div>
         )}
 
-        {/* Section 2: All Consultations */}
+        {/* Section 2: All Consultations / Upcoming / Past */}
         <div className="flex flex-col gap-3">
           <h2 className="text-[#24292E] font-medium text-[16px] tracking-[-0.32px]">
-            All Consultations
+            {activeTab === "Upcoming" ? "Upcoming Appointments" : activeTab === "Past" ? "Past Consultations" : "All Consultations"}
           </h2>
 
           {/* Table Sorting Filters Bar */}
@@ -507,22 +537,25 @@ export default function AppointmentsPage() {
             onConsult={startConsult}
             onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
             activeTab={activeTab}
+            fadeCompleted={activeTab === "All"}
           />
         </div>
       </div>
 
-      {/* Right Panel - Details Sidecard */}
-      <div className="w-full lg:w-[372px] lg:shrink-0 lg:sticky lg:top-8 self-start">
-        <AppointmentDetailsCard
-          patient={selectedPatient}
-          onClose={() => setSelectedPatient(null)}
-          onConsult={startConsult}
-          onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
-          onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
-          onSendReminder={sendReminder}
-          activeTab={activeTab}
-        />
-      </div>
+      {/* Right Panel - Details Sidecard — only visible when a patient is selected */}
+      {selectedPatient && (
+        <div className="w-full lg:w-[372px] lg:shrink-0 lg:sticky lg:top-8 self-start">
+          <AppointmentDetailsCard
+            patient={selectedPatient}
+            onClose={() => setSelectedPatient(null)}
+            onConsult={startConsult}
+            onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
+            onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+            onSendReminder={sendReminder}
+            activeTab={activeTab}
+          />
+        </div>
+      )}
     </div>
   );
 }
