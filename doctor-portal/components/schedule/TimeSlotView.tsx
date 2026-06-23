@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface TimeSlotRange {
@@ -12,11 +13,12 @@ interface TimeSlotRange {
 }
 
 interface Task {
-  id: number;
+  id: string;
+  type: "upcoming_consultation" | "pending_emr";
   title: string;
-  desc?: string;
-  sub?: string;
-  completed: boolean;
+  summary: string;
+  patientName: string;
+  appointmentId: string;
 }
 
 const HOURS_SLOT = [
@@ -72,7 +74,9 @@ const formatSlotRange = (timeStr: string) => {
 };
 
 export default function TimeSlotView() {
+  const router = useRouter();
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
+  const [activeDayOfWeek, setActiveDayOfWeek] = useState<number>(new Date().getDay());
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   
   // Slot tracking sets
@@ -180,30 +184,38 @@ export default function TimeSlotView() {
     fetchSlots();
   }, [fetchSlots]);
 
-  // Load tasks from localStorage
-  useEffect(() => {
+  // Load real tasks, derived live from appointments (same source as the Tasks page)
+  const fetchTasks = useCallback(async () => {
     try {
-      const saved = localStorage.getItem("doctor_tasks");
-      if (saved) {
-        setTasks(JSON.parse(saved));
+      const res = await apiFetch("/api/appointments/doctor/tasks");
+      if (res.ok) {
+        const { tasks: raw } = await res.json();
+        setTasks(
+          (raw ?? []).map((t: any) => ({
+            id: t.id,
+            type: t.type,
+            title: t.title,
+            summary: t.summary,
+            patientName: t.patientName,
+            appointmentId: t.appointmentId,
+          }))
+        );
       }
     } catch (err) {
-      console.error("Error reading tasks from localStorage:", err);
+      console.error("Error loading doctor tasks:", err);
+    } finally {
+      setTasksLoaded(true);
     }
-    setTasksLoaded(true);
   }, []);
 
-  // Sync tasks back to localStorage
-  useEffect(() => {
-    if (tasksLoaded) {
-      localStorage.setItem("doctor_tasks", JSON.stringify(tasks));
-    }
-  }, [tasks, tasksLoaded]);
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
-  const toggleTask = (id: number) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
+  const goToTask = (task: Task) => {
+    if (task.type === "pending_emr") {
+      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
+    } else {
+      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
+    }
   };
 
   const handleCellClick = (dayOfWeek: number, timeStr: string) => {
@@ -297,8 +309,7 @@ export default function TimeSlotView() {
     }
   };
 
-  const completedCount = tasks.filter((t) => t.completed).length;
-  const progressPct = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const pendingEmrCount = tasks.filter((t) => t.type === "pending_emr").length;
 
   return (
     <div className="flex flex-col gap-6 w-full select-none">
@@ -384,7 +395,10 @@ export default function TimeSlotView() {
                 return (
                   <button
                     key={r}
-                    onClick={() => setActiveRange(r)}
+                    onClick={() => {
+                      setActiveRange(r);
+                      if (r === "Day") setActiveDayOfWeek(currentDate.getDay());
+                    }}
                     className={`px-5 py-2 rounded-full text-xs font-semibold tracking-[-0.24px] transition-all duration-200 ${
                       isActive
                         ? "bg-[#24292E] text-white border border-transparent shadow-sm"
@@ -401,24 +415,25 @@ export default function TimeSlotView() {
 
           {/* Scrollable grid wrapper to prevent dashboard layout stretch */}
           <div className="overflow-x-auto relative">
-            <div className="min-w-[840px] border border-[#EBEEF5] rounded-[14px] overflow-hidden bg-white relative max-h-[520px] overflow-y-auto">
+            <div className={`${activeRange === "Week" ? "min-w-[840px]" : "min-w-[320px]"} border border-[#EBEEF5] rounded-[14px] overflow-hidden bg-white relative max-h-[520px] overflow-y-auto`}>
 
               {/* Header */}
-              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "56px repeat(7, 1fr) 56px" }}>
+              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: activeRange === "Week" ? "56px repeat(7, 1fr) 56px" : "56px 1fr 56px" }}>
                 <div className="bg-[#F9FAFC] border-b border-r border-[#EBEEF5] py-3 px-1 flex items-center justify-center text-[9px] font-bold text-[#9EA5AD]"
                   style={{ fontFamily: "Outfit, sans-serif" }}>
                   GMT
                 </div>
-                {weekDays.map((day) => {
+                {(activeRange === "Week" ? weekDays : weekDays.filter((d) => d.dayOfWeek === activeDayOfWeek)).map((day) => {
                   return (
-                    <div
+                    <button
                       key={day.label}
+                      onClick={() => { if (activeRange === "Day") setActiveDayOfWeek(day.dayOfWeek); }}
                       className={`${day.isToday ? "bg-[#F2F5FF]" : "bg-[#F9FAFC]"} border-b border-r border-[#EBEEF5] py-3 px-1 flex flex-col items-center gap-0.5`}
                       style={{ fontFamily: "Outfit, sans-serif" }}
                     >
                       <span className="text-[8px] font-bold text-[#9EA5AD] tracking-widest uppercase">{day.label}</span>
                       <span className="text-[13px] font-bold text-[#24292E]">{day.num}</span>
-                    </div>
+                    </button>
                   );
                 })}
                 <div className="bg-[#F9FAFC] border-b border-[#EBEEF5] py-3 px-1 flex items-center justify-center text-[9px] font-bold text-[#9EA5AD]"
@@ -427,9 +442,29 @@ export default function TimeSlotView() {
                 </div>
               </div>
 
+              {/* Day selector strip, Day mode only */}
+              {activeRange === "Day" && (
+                <div className="flex items-center gap-1.5 px-2 py-2 border-b border-[#EBEEF5] bg-[#F9FAFC]/60 overflow-x-auto">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.label}
+                      onClick={() => setActiveDayOfWeek(day.dayOfWeek)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide transition-colors shrink-0 ${
+                        day.dayOfWeek === activeDayOfWeek
+                          ? "bg-[#24292E] text-white"
+                          : "bg-white border border-[#EBEEF5] text-[#9EA5AD] hover:text-[#24292E]"
+                      }`}
+                      style={{ fontFamily: "Outfit, sans-serif" }}
+                    >
+                      {day.label} {day.num}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Main Body */}
-              <div className="grid" style={{ gridTemplateColumns: "56px repeat(7, 1fr) 56px" }}>
-                
+              <div className="grid" style={{ gridTemplateColumns: activeRange === "Week" ? "56px repeat(7, 1fr) 56px" : "56px 1fr 56px" }}>
+
                 {/* Time label Left (Spans hourly rows) */}
                 <div className="flex flex-col bg-[#F9FAFC]/60 border-r border-[#EBEEF5] shrink-0">
                   {HOURS_SLOT.map((hour) => (
@@ -444,7 +479,7 @@ export default function TimeSlotView() {
                 </div>
 
                 {/* Day Columns */}
-                {weekDays.map((day) => {
+                {(activeRange === "Week" ? weekDays : weekDays.filter((d) => d.dayOfWeek === activeDayOfWeek)).map((day) => {
                   return (
                     <div
                       key={day.label}
@@ -591,37 +626,31 @@ export default function TimeSlotView() {
             >
               {tasks.length} Tasks
             </span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex flex-col gap-1.5">
-            <div className="w-full h-1.5 bg-[#EBEEF5] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <span className="text-[#9EA5AD] text-[10px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {progressPct}% of tasks are completed
-            </span>
+            {pendingEmrCount > 0 && (
+              <span className="bg-[#F25252] text-white text-[10px] font-bold px-2 py-0.5 rounded-full select-none">
+                {pendingEmrCount} EMR
+              </span>
+            )}
           </div>
 
           {/* Task items */}
           <div className="flex flex-col gap-3">
-            {tasks.length === 0 ? (
-              <span className="text-xs text-[#9EA5AD] text-center py-4">No tasks found. Add tasks in the dashboard.</span>
+            {!tasksLoaded ? (
+              <span className="text-xs text-[#9EA5AD] text-center py-4">Loading tasks…</span>
+            ) : tasks.length === 0 ? (
+              <span className="text-xs text-[#9EA5AD] text-center py-4">No tasks right now.</span>
             ) : (
               tasks.slice(0, 8).map((task) => {
-                const isChecked = task.completed;
+                const isHighPriority = task.type === "pending_emr";
                 return (
                   <div
                     key={task.id}
                     className="flex items-start gap-3 p-3 rounded-[14px] bg-[#F9FAFC] border border-[#EBEEF5]/60 cursor-pointer hover:bg-[#ECEFFE]/50 transition-colors"
-                    onClick={() => toggleTask(task.id)}
+                    onClick={() => goToTask(task)}
                   >
                     <div className="flex flex-col flex-1 min-w-0 gap-0.5">
                       <span
-                        className={`text-[12px] font-semibold tracking-[-0.24px] truncate ${isChecked ? "text-[#9EA5AD] line-through" : "text-[#24292E]"}`}
+                        className="text-[12px] font-semibold tracking-[-0.24px] truncate text-[#24292E]"
                         style={{ fontFamily: "Outfit, sans-serif" }}
                       >
                         {task.title}
@@ -630,24 +659,16 @@ export default function TimeSlotView() {
                         className="text-[10px] text-[#9EA5AD] truncate"
                         style={{ fontFamily: "Outfit, sans-serif" }}
                       >
-                        {task.sub || task.desc || "Pending checklist item."}
+                        {task.patientName} — {task.summary}
                       </span>
                     </div>
 
-                    {/* Circle checkbox */}
+                    {/* Priority dot */}
                     <div
-                      className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all mt-0.5 ${
-                        isChecked
-                          ? "border-[#5476FC] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC]"
-                          : "border-[#D1D5DB] bg-white"
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${
+                        isHighPriority ? "bg-[#F25252]" : "bg-[#5476FC]"
                       }`}
-                    >
-                      {isChecked && (
-                        <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                          <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
+                    />
                   </div>
                 );
               })

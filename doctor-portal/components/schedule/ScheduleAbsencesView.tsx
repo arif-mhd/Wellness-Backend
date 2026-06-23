@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 
 const HOURS_SLOT = [
@@ -20,6 +21,15 @@ const HOURS_SLOT = [
   { label: "8 PM", start: "20:00", mid: "20:30" },
   { label: "9 PM", start: "21:00", mid: "21:30" }
 ];
+
+const formatHHMM = (timeStr: string) => {
+  const [hStr, mStr] = timeStr.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayHour = h % 12 || 12;
+  return `${displayHour}${m === 0 ? "" : `:${String(m).padStart(2, "0")}`} ${ampm}`;
+};
 
 const formatTimeOnly = (isoStr: string) => {
   try {
@@ -89,6 +99,8 @@ const getAge = (dobString: string | null) => {
 
 export default function ScheduleAbsencesView() {
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
+  const [activeDayOfWeek, setActiveDayOfWeek] = useState<number>(new Date().getDay());
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showMarkAbsence, setShowMarkAbsence] = useState(false);
   const [reasonComment, setReasonComment] = useState("");
 
@@ -106,6 +118,16 @@ export default function ScheduleAbsencesView() {
   // Range selection states on calendar grid
   const [selectStart, setSelectStart] = useState<Date | null>(null);
   const [selectEnd, setSelectEnd] = useState<Date | null>(null);
+
+  // Reschedule-a-conflict sub-flow (must resolve every conflict before the
+  // absence itself can be confirmed — we no longer auto-cancel conflicts).
+  const [reschedulingAppt, setReschedulingAppt] = useState<any | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [reschedulingSaving, setReschedulingSaving] = useState(false);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
 
   const handleCellClick = (cellStart: Date, cellEnd: Date) => {
     if (!selectStart || (selectStart && selectEnd && selectStart.getTime() !== selectEnd.getTime() - 30 * 60 * 1000)) {
@@ -198,6 +220,10 @@ export default function ScheduleAbsencesView() {
     fetchAbsences();
   }, [fetchAbsences]);
 
+  useEffect(() => {
+    Session.getUserId().then((id) => setDoctorId(id ?? null)).catch(() => {});
+  }, []);
+
   // Real-time conflict checking
   useEffect(() => {
     if (!startDate || !endDate) {
@@ -261,7 +287,11 @@ export default function ScheduleAbsencesView() {
       alert("Please fill in start date, end date, and reason.");
       return;
     }
-    
+    if (conflicts.length > 0) {
+      alert("Please reschedule the conflicting appointment(s) below before marking this absence.");
+      return;
+    }
+
     try {
       const isoStart = new Date(startDate).toISOString();
       const isoEnd = new Date(endDate).toISOString();
@@ -289,14 +319,89 @@ export default function ScheduleAbsencesView() {
         setFileUrl("");
         setSelectStart(null);
         setSelectEnd(null);
-        alert("Absence marked and conflicting appointments cancelled successfully.");
+        alert("Absence marked successfully.");
       } else {
         const err = await res.json();
+        if (res.status === 409 && Array.isArray(err.conflicts)) {
+          setConflicts(err.conflicts);
+        }
         alert(err.error ?? "Failed to mark absence.");
       }
     } catch (err) {
       console.error("Error saving absence:", err);
       alert("Error saving absence.");
+    }
+  };
+
+  // ── Reschedule a single conflicting appointment ──────────────────────────
+  const openReschedule = (appt: any) => {
+    setReschedulingAppt(appt);
+    setRescheduleDate(new Date(appt.scheduledAt).toISOString().split("T")[0]);
+    setRescheduleTime("");
+    setRescheduleSlots([]);
+  };
+
+  useEffect(() => {
+    if (!reschedulingAppt || !rescheduleDate || !doctorId) return;
+    setRescheduleSlotsLoading(true);
+    setRescheduleTime("");
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/doctors/${doctorId}/available-slots?date=${rescheduleDate}`);
+        if (res.ok) {
+          const data = await res.json();
+          let available: string[] = data.available ?? [];
+
+          // The absence being marked right now hasn't been saved to the
+          // backend yet (it only exists in this form's state), so
+          // available-slots can't know to exclude it. Filter it out
+          // client-side too, otherwise slots inside the about-to-be-marked
+          // absence window would be wrongly offered as reschedule targets.
+          if (startDate && endDate) {
+            const absStart = new Date(startDate);
+            const absEnd = new Date(endDate);
+            available = available.filter((t) => {
+              const [h, m] = t.split(":").map(Number);
+              const slotStart = new Date(`${rescheduleDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`);
+              const slotEnd = new Date(slotStart.getTime() + (data.slotDurationMins ?? 30) * 60 * 1000);
+              return !(slotStart < absEnd && slotEnd > absStart);
+            });
+          }
+
+          setRescheduleSlots(available);
+        } else {
+          setRescheduleSlots([]);
+        }
+      } catch {
+        setRescheduleSlots([]);
+      } finally {
+        setRescheduleSlotsLoading(false);
+      }
+    })();
+  }, [reschedulingAppt, rescheduleDate, doctorId]);
+
+  const handleConfirmReschedule = async () => {
+    if (!reschedulingAppt || !rescheduleDate || !rescheduleTime) return;
+    setReschedulingSaving(true);
+    try {
+      const scheduledAt = new Date(`${rescheduleDate}T${rescheduleTime}:00.000Z`).toISOString();
+      const res = await apiFetch(`/api/appointments/${reschedulingAppt.id}/reschedule`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledAt, reason: `Doctor marked absence: ${reasonComment || "unavailable"}` }),
+      });
+      if (res.ok) {
+        setConflicts((prev) => prev.filter((c) => c.id !== reschedulingAppt.id));
+        setReschedulingAppt(null);
+      } else {
+        const err = await res.json();
+        alert(err.error ?? "Failed to reschedule appointment.");
+      }
+    } catch (err) {
+      console.error("Error rescheduling appointment:", err);
+      alert("Error rescheduling appointment.");
+    } finally {
+      setReschedulingSaving(false);
     }
   };
 
@@ -381,24 +486,53 @@ export default function ScheduleAbsencesView() {
                   <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <button
-                className="flex items-center gap-1.5 text-[#24292E] font-medium text-[14px] tracking-[-0.28px] ml-1 hover:opacity-75 transition-opacity"
-                style={{ fontFamily: "Outfit, sans-serif" }}
-              >
-                {monthYearLabel}
-                <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-                  <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+              <div className="relative ml-1">
+                <button
+                  onClick={() => setShowMonthDropdown((v) => !v)}
+                  className="flex items-center gap-1.5 text-[#24292E] font-medium text-[14px] tracking-[-0.28px] hover:opacity-75 transition-opacity"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {monthYearLabel}
+                  <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className={`transition-transform duration-200 ${showMonthDropdown ? "rotate-180" : ""}`}>
+                    <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {showMonthDropdown && (
+                  <div className="absolute left-0 top-9 bg-white border border-[#EBEEF5] rounded-[12px] shadow-lg py-1.5 w-36 z-20 font-outfit text-xs text-[#24292E] max-h-60 overflow-y-auto">
+                    {Array.from({ length: 12 }, (_, idx) => idx).map((idx) => {
+                      const label = new Date(2000, idx, 1).toLocaleString("default", { month: "long" });
+                      const isActive = currentDate.getMonth() === idx;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const next = new Date(currentDate);
+                            next.setDate(1);
+                            next.setMonth(idx);
+                            setCurrentDate(next);
+                            setShowMonthDropdown(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${isActive ? "font-bold text-[#5476FC]" : ""}`}
+                        >
+                          {label} {currentDate.getFullYear()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
- 
+
             <div className="flex items-center gap-2">
               {(["Day", "Week"] as const).map((r) => {
                 const isActive = activeRange === r;
                 return (
                   <button
                     key={r}
-                    onClick={() => setActiveRange(r)}
+                    onClick={() => {
+                      setActiveRange(r);
+                      if (r === "Day") setActiveDayOfWeek(currentDate.getDay());
+                    }}
                     className={`px-5 py-2 rounded-full text-xs font-semibold tracking-[-0.24px] transition-all duration-200 ${
                       isActive
                         ? "bg-[#24292E] text-white border border-transparent shadow-sm"
@@ -412,27 +546,28 @@ export default function ScheduleAbsencesView() {
               })}
             </div>
           </div>
- 
+
           {/* Scrollable grid */}
           <div className="overflow-x-auto relative">
-            <div className="min-w-[560px] border border-[#EBEEF5] rounded-[14px] overflow-hidden bg-white relative max-h-[520px] overflow-y-auto">
-              
+            <div className={`${activeRange === "Week" ? "min-w-[560px]" : "min-w-[280px]"} border border-[#EBEEF5] rounded-[14px] overflow-hidden bg-white relative max-h-[520px] overflow-y-auto`}>
+
               {/* Header Grid */}
-              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: "56px repeat(7, 1fr) 56px" }}>
+              <div className="grid sticky top-0 z-10" style={{ gridTemplateColumns: activeRange === "Week" ? "56px repeat(7, 1fr) 56px" : "56px 1fr 56px" }}>
                 <div className="bg-[#F9FAFC] border-b border-r border-[#EBEEF5] py-3 px-1 flex items-center justify-center text-[9px] font-bold text-[#9EA5AD]"
                   style={{ fontFamily: "Outfit, sans-serif" }}>
                   GMT
                 </div>
-                {weekDays.map((day) => {
+                {(activeRange === "Week" ? weekDays : weekDays.filter((d) => d.dayOfWeek === activeDayOfWeek)).map((day) => {
                   return (
-                    <div
+                    <button
                       key={day.label}
+                      onClick={() => { if (activeRange === "Day") setActiveDayOfWeek(day.dayOfWeek); }}
                       className={`${day.isToday ? "bg-[#F2F5FF]" : "bg-[#F9FAFC]"} border-b border-r border-[#EBEEF5] py-3 px-1 flex flex-col items-center gap-0.5`}
                       style={{ fontFamily: "Outfit, sans-serif" }}
                     >
                       <span className="text-[8px] font-bold text-[#9EA5AD] tracking-widest uppercase">{day.label}</span>
                       <span className="text-[13px] font-bold text-[#24292E]">{day.num}</span>
-                    </div>
+                    </button>
                   );
                 })}
                 <div className="bg-[#F9FAFC] border-b border-[#EBEEF5] py-3 px-1 flex items-center justify-center text-[9px] font-bold text-[#9EA5AD]"
@@ -440,10 +575,30 @@ export default function ScheduleAbsencesView() {
                   GMT
                 </div>
               </div>
- 
+
+              {/* Day selector strip, Day mode only */}
+              {activeRange === "Day" && (
+                <div className="flex items-center gap-1.5 px-2 py-2 border-b border-[#EBEEF5] bg-[#F9FAFC]/60 overflow-x-auto">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.label}
+                      onClick={() => setActiveDayOfWeek(day.dayOfWeek)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide transition-colors shrink-0 ${
+                        day.dayOfWeek === activeDayOfWeek
+                          ? "bg-[#24292E] text-white"
+                          : "bg-white border border-[#EBEEF5] text-[#9EA5AD] hover:text-[#24292E]"
+                      }`}
+                      style={{ fontFamily: "Outfit, sans-serif" }}
+                    >
+                      {day.label} {day.num}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Body Grid */}
-              <div className="grid relative" style={{ gridTemplateColumns: "56px repeat(7, 1fr) 56px" }}>
-                
+              <div className="grid relative" style={{ gridTemplateColumns: activeRange === "Week" ? "56px repeat(7, 1fr) 56px" : "56px 1fr 56px" }}>
+
                 {/* Left GMT Labels */}
                 <div className="flex flex-col bg-[#F9FAFC]/60 border-r border-[#EBEEF5] shrink-0">
                   {HOURS_SLOT.map((hour) => (
@@ -456,9 +611,9 @@ export default function ScheduleAbsencesView() {
                     </div>
                   ))}
                 </div>
- 
+
                 {/* Day Columns */}
-                {weekDays.map((day) => {
+                {(activeRange === "Week" ? weekDays : weekDays.filter((d) => d.dayOfWeek === activeDayOfWeek)).map((day) => {
                   return (
                     <div
                       key={day.label}
@@ -551,12 +706,9 @@ export default function ScheduleAbsencesView() {
             >
               Absence Log
             </span>
-            <button
-              className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold transition-colors"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              View All
-            </button>
+            {absences.length > 0 && (
+              <span className="text-[#9EA5AD] text-xs font-medium">{absences.length} total</span>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">
@@ -670,14 +822,14 @@ export default function ScheduleAbsencesView() {
  
             {/* Warning Alert Box with Conflict Card */}
             {conflicts.length > 0 && (
-              <div className="bg-[#FFF0F0] rounded-[16px] p-4 flex flex-col gap-3 max-h-[180px] overflow-y-auto">
+              <div className="bg-[#FFF0F0] rounded-[16px] p-4 flex flex-col gap-3 max-h-[220px] overflow-y-auto">
                 <p
                   className="text-[#24292E] text-[11px] font-semibold leading-[1.5]"
                   style={{ fontFamily: "Outfit, sans-serif" }}
                 >
-                  An appointment is already scheduled on this day. This appointment will be canceled if you choose to mark absence.
+                  {conflicts.length} appointment{conflicts.length > 1 ? "s" : ""} already booked during this window. Reschedule each one before you can mark this absence.
                 </p>
-                
+
                 {conflicts.map((apt) => (
                   <div key={apt.id} className="flex items-center gap-3 p-3 bg-white/95 border border-[#FFD4D4] rounded-[12px]">
                     <img
@@ -688,7 +840,7 @@ export default function ScheduleAbsencesView() {
                         (e.target as HTMLImageElement).src = "/default-avatar.svg";
                       }}
                     />
-                    <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                       <span
                         className="text-[12px] font-bold text-[#24292E] truncate"
                         style={{ fontFamily: "Outfit, sans-serif" }}
@@ -702,6 +854,13 @@ export default function ScheduleAbsencesView() {
                         {formatPillDate(new Date(apt.scheduledAt))}
                       </span>
                     </div>
+                    <button
+                      onClick={() => openReschedule(apt)}
+                      className="shrink-0 px-3 py-1.5 rounded-full bg-white border border-[#5476FC]/40 text-[#5476FC] text-[11px] font-bold hover:bg-[#EEF2FF] transition-colors"
+                      style={{ fontFamily: "Outfit, sans-serif" }}
+                    >
+                      Reschedule
+                    </button>
                   </div>
                 ))}
               </div>
@@ -770,13 +929,102 @@ export default function ScheduleAbsencesView() {
               </button>
               <button
                 onClick={handleConfirmAbsence}
-                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200"
+                disabled={conflicts.length > 0}
+                title={conflicts.length > 0 ? "Reschedule the conflicting appointment(s) first" : undefined}
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
                 Confirm Absence
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── Reschedule a conflicting appointment ──────────────────────────────── */}
+      {reschedulingAppt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_50px_rgba(0,0,0,0.15)] w-full max-w-[420px] mx-4 flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3
+                className="text-[#24292E] font-semibold text-[16px] tracking-[-0.32px]"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Reschedule {reschedulingAppt.patientName}
+              </h3>
+              <button
+                onClick={() => setReschedulingAppt(null)}
+                className="w-7 h-7 rounded-full hover:bg-[#F5F6FA] flex items-center justify-center text-[#9EA5AD] hover:text-[#383F45] transition-all"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1.5 10.5l9-9M1.5 1.5l9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-[#9EA5AD] text-[11px] -mt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Currently: {formatPillDate(new Date(reschedulingAppt.scheduledAt))}
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+                New Date
+              </span>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[12px] p-3 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+                New Time
+              </span>
+              {rescheduleSlotsLoading ? (
+                <span className="text-xs text-[#9EA5AD] py-2">Loading available slots...</span>
+              ) : rescheduleSlots.length === 0 ? (
+                <span className="text-xs text-[#9EA5AD] py-2">No available slots on this date.</span>
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto">
+                  {rescheduleSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => setRescheduleTime(slot)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                        rescheduleTime === slot
+                          ? "bg-[#5476FC] text-white"
+                          : "bg-[#F5F6FA] text-[#676E76] hover:bg-[#EBEEF5]"
+                      }`}
+                      style={{ fontFamily: "Outfit, sans-serif" }}
+                    >
+                      {formatHHMM(slot)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={() => setReschedulingAppt(null)}
+                className="flex-1 py-3 rounded-[14px] bg-[#EEF2FF] text-[#243D7F] hover:bg-[#E4EAFF] font-bold text-[13px] tracking-[-0.26px] transition-all"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReschedule}
+                disabled={!rescheduleTime || reschedulingSaving}
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200 disabled:opacity-50"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                {reschedulingSaving ? "Saving..." : "Confirm New Time"}
+              </button>
+            </div>
           </div>
         </div>
       )}

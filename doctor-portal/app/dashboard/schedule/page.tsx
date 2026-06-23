@@ -79,7 +79,11 @@ export default function SchedulesDashboardPage() {
                       apptDate.getDate() === today.getDate();
       
       const isCompleted = apt.status?.toLowerCase() === "completed";
-      const actionType = (isToday && !isCompleted) ? "Consult Now" : "Reschedule";
+      const isFuture = apptDate.getTime() > Date.now();
+      const actionType: ScheduleItem["actionType"] =
+        isToday && !isCompleted ? "Consult Now" :
+        isFuture && !isCompleted ? "Reschedule" :
+        "None";
 
       // Extract brief symptom type from reason
       const symptomType = apt.reason ? apt.reason.split(" ")[0].substring(0, 12) : "Checkup";
@@ -93,6 +97,7 @@ export default function SchedulesDashboardPage() {
         symptomType: symptomType,
         symptomDetails: apt.reason ?? "General Consultation",
         dateTime: formatScheduleDateTime(apt.scheduledAt),
+        scheduledAt: apptDate.toISOString(),
         actionType,
         patientBio: apt.patientChronicIllnesses || "No conditions reported.",
       };

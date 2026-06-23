@@ -107,6 +107,45 @@ router.get("/:ticketId", verifySession(), async (req: SessionRequest, res: Respo
   return res.json(resources[0]);
 });
 
+// POST /api/support/:ticketId/comments — submitter (patient or doctor) adds a
+// follow-up comment to their own ticket. Comments form a single shared thread
+// with admin's own comments (added via the admin endpoint below).
+router.post("/:ticketId/comments", verifySession(), async (req: SessionRequest, res: Response) => {
+  const session = req.session!;
+  const userId = session.getUserId();
+  const { ticketId } = req.params;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: "message is required" });
+  }
+
+  const { resources } = await supportContainer.items
+    .query({
+      query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @patientId",
+      parameters: [
+        { name: "@id", value: ticketId },
+        { name: "@patientId", value: userId },
+      ] as any[],
+    })
+    .fetchAll();
+
+  if (!resources[0]) return res.status(404).json({ error: "Ticket not found" });
+
+  const ticket = resources[0] as any;
+  const comment = {
+    id: uuidv4(),
+    authorRole: ticket.submitterRole === "doctor" ? "doctor" : "patient",
+    message: message.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  ticket.comments = [...(ticket.comments ?? []), comment];
+  ticket.updatedAt = comment.createdAt;
+
+  await supportContainer.items.upsert(ticket);
+  return res.status(201).json(ticket);
+});
+
 // ── Admin routes ──────────────────────────────────────────────────────────────
 
 // GET /api/support/admin/all — admin gets all tickets
@@ -197,6 +236,41 @@ router.patch("/admin/:ticketId/reply", verifySession(), async (req: SessionReque
 
   await supportContainer.items.upsert(ticket);
   return res.json(ticket);
+});
+
+// POST /api/support/admin/:ticketId/comments — admin adds a comment to the
+// shared thread (distinct from the single "official" adminReply field).
+router.post("/admin/:ticketId/comments", verifySession(), async (req: SessionRequest, res: Response) => {
+  if (!(await requireRole(req, res, "admin"))) return;
+
+  const { ticketId } = req.params;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: "message is required" });
+  }
+
+  const { resources } = await supportContainer.items
+    .query({
+      query: "SELECT * FROM c WHERE c.id = @id",
+      parameters: [{ name: "@id", value: ticketId }] as any[],
+    })
+    .fetchAll();
+
+  if (!resources[0]) return res.status(404).json({ error: "Ticket not found" });
+
+  const ticket = resources[0] as any;
+  const comment = {
+    id: uuidv4(),
+    authorRole: "admin",
+    message: message.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  ticket.comments = [...(ticket.comments ?? []), comment];
+  ticket.updatedAt = comment.createdAt;
+
+  await supportContainer.items.upsert(ticket);
+  return res.status(201).json(ticket);
 });
 
 // PATCH /api/support/admin/:ticketId/status — admin changes status

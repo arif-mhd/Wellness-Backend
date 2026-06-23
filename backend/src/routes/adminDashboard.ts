@@ -338,7 +338,7 @@ router.get("/stats", requireRole("admin"), async (req: Request, res: Response) =
 // (doctor approved/rejected, pharmacy approved/rejected, ticket closed).
 router.get("/tasks", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
-    const [pendingDoctors, pendingPharmacies, openTickets] = await Promise.all([
+    const [pendingDoctors, pendingPharmacies, openTickets, pendingSlotChanges] = await Promise.all([
       queryDocuments<any>(doctorsContainer, {
         query: "SELECT c.id, c.fullName, c.email, c.specialty, c.registeredAt FROM c WHERE c.status = @status",
         parameters: [{ name: "@status", value: "pending_approval" }],
@@ -350,6 +350,9 @@ router.get("/tasks", requireRole("admin"), async (_req: Request, res: Response) 
       queryDocuments<any>(supportContainer, {
         query: "SELECT c.id, c.subject, c.description, c.submitterRole, c.category, c.createdAt FROM c WHERE c.status = @status",
         parameters: [{ name: "@status", value: "Open" }],
+      }),
+      queryDocuments<any>(doctorsContainer, {
+        query: "SELECT c.id, c.fullName, c.email, c.specialty, c.updatedAt FROM c WHERE c.slotsPending = true",
       }),
     ]);
 
@@ -384,6 +387,16 @@ router.get("/tasks", requireRole("admin"), async (_req: Request, res: Response) 
         createdAt: t.createdAt ?? new Date(0).toISOString(),
         link: `/dashboard/support?id=${t.id}`,
       })),
+      ...pendingSlotChanges.map((d) => ({
+        id: `slots:${d.id}`,
+        type: "slot_change" as const,
+        title: d.fullName ?? "Doctor availability update",
+        email: d.email ?? "",
+        summary: `${d.specialty ?? "Doctor"} — updated weekly availability, awaiting verification`,
+        priority: "High Priority" as const,
+        createdAt: d.updatedAt ?? new Date(0).toISOString(),
+        link: `/dashboard/doctors?id=${d.id}`,
+      })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     res.json({
@@ -392,6 +405,7 @@ router.get("/tasks", requireRole("admin"), async (_req: Request, res: Response) 
         doctorApprovals: pendingDoctors.length,
         pharmacyApprovals: pendingPharmacies.length,
         openTickets: openTickets.length,
+        slotChanges: pendingSlotChanges.length,
         total: tasks.length,
       },
     });

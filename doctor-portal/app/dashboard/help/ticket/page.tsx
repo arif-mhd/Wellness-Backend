@@ -6,6 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+interface TicketComment {
+  id: string;
+  authorRole: "admin" | "doctor" | "patient";
+  message: string;
+  createdAt: string;
+}
+
 interface Ticket {
   id: string;
   patientId: string;
@@ -14,6 +21,7 @@ interface Ticket {
   category: string;
   status: "Open" | "In Progress" | "Closed";
   adminReply?: string | null;
+  comments?: TicketComment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +42,7 @@ function TicketContent() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
     if (!ticketId) { setNotFound(true); setLoading(false); return; }
@@ -53,9 +62,23 @@ function TicketContent() {
     })();
   }, [ticketId]);
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNewComment("");
+    if (!ticket || !newComment.trim() || postingComment) return;
+    setPostingComment(true);
+    try {
+      const res = await apiFetch(`/api/support/${ticket.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: newComment.trim() }),
+      });
+      if (res.ok) {
+        setTicket(await res.json());
+        setNewComment("");
+      }
+    } finally {
+      setPostingComment(false);
+    }
   };
 
   if (loading) {
@@ -77,15 +100,26 @@ function TicketContent() {
     );
   }
 
-  const updates: Array<{ id: string; sender: "support" | "doctor"; message: string; dateTime: string }> = [];
+  const updates: Array<{ id: string; sender: "support" | "doctor"; message: string; dateTime: string; sortKey: string }> = [];
   if (ticket.adminReply) {
     updates.push({
       id: "admin-reply",
       sender: "support",
       message: ticket.adminReply,
       dateTime: formatDate(ticket.updatedAt),
+      sortKey: ticket.updatedAt,
     });
   }
+  for (const c of ticket.comments ?? []) {
+    updates.push({
+      id: c.id,
+      sender: c.authorRole === "admin" ? "support" : "doctor",
+      message: c.message,
+      dateTime: formatDate(c.createdAt),
+      sortKey: c.createdAt,
+    });
+  }
+  updates.sort((a, b) => new Date(a.sortKey).getTime() - new Date(b.sortKey).getTime());
 
   return (
     <div className="px-10 pb-12 select-none flex flex-col gap-8">
@@ -182,40 +216,45 @@ function TicketContent() {
                 </p>
               ) : (
                 <div className="flex flex-col gap-6 w-full">
-                  {updates.map((update) => (
-                    <div key={update.id} className="flex gap-4 items-start w-full">
-                      <div className="w-9 h-9 rounded-full border border-[#EBF2FC] bg-[#EBF2FC] flex items-center justify-center text-[#5476FC] shrink-0 shadow-sm">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                          <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
+                  {updates.map((update) => {
+                    const isDoctor = update.sender === "doctor";
+                    return (
+                      <div key={update.id} className={`flex gap-4 items-start w-full ${isDoctor ? "flex-row-reverse" : ""}`}>
+                        <div className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 shadow-sm ${
+                          isDoctor ? "border-[#E0E7FF] bg-[#E0E7FF] text-[#182A6F]" : "border-[#EBF2FC] bg-[#EBF2FC] text-[#5476FC]"
+                        }`}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
 
-                      <div className="flex flex-col gap-1 flex-1">
-                        <div className="bg-white border border-[#EBEEF5] rounded-[16px] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-                          <p className="text-[10px] font-bold text-[#5476FC] mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-                            Wellness Central Support
-                          </p>
-                          <p
-                            className="text-[#24292E] text-xs font-semibold leading-relaxed"
+                        <div className={`flex flex-col gap-1 flex-1 ${isDoctor ? "items-end" : "items-start"}`}>
+                          <div className={`bg-white border border-[#EBEEF5] rounded-[16px] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] max-w-[85%]`}>
+                            <p className="text-[10px] font-bold mb-1" style={{ fontFamily: "Outfit, sans-serif", color: isDoctor ? "#182A6F" : "#5476FC" }}>
+                              {isDoctor ? "You" : "Wellness Central Support"}
+                            </p>
+                            <p
+                              className="text-[#24292E] text-xs font-semibold leading-relaxed"
+                              style={{ fontFamily: "Outfit, sans-serif" }}
+                            >
+                              {update.message}
+                            </p>
+                          </div>
+                          <span
+                            className="text-[#9EA5AD] text-[10px] px-1"
                             style={{ fontFamily: "Outfit, sans-serif" }}
                           >
-                            {update.message}
-                          </p>
+                            {update.dateTime}
+                          </span>
                         </div>
-                        <span
-                          className="text-[#9EA5AD] text-[10px] pl-1"
-                          style={{ fontFamily: "Outfit, sans-serif" }}
-                        >
-                          {update.dateTime}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Add Comment Input Row — informational only, comments go through new ticket */}
+              {/* Add Comment Input Row */}
               <form onSubmit={handleAddComment} className="flex gap-4 items-center w-full mt-2 border-t border-[#EBEEF5] pt-5">
                 <div className="w-9 h-9 rounded-full border border-[#EEF2FF] bg-[#EEF2FF]/40 flex items-center justify-center text-[#5476FC] shrink-0">
                   <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
@@ -227,14 +266,22 @@ function TicketContent() {
                 <div className="flex-1 relative">
                   <input
                     type="text"
-                    placeholder="Add comment (coming soon)"
+                    placeholder={ticket.status === "Closed" ? "This ticket is closed" : "Add a comment..."}
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    disabled
-                    className="w-full bg-white border border-[#5879FC]/20 rounded-[14px] px-5 py-3 text-xs text-[#24292E] placeholder-[#9EA5AD] outline-none shadow-sm transition-all opacity-60 cursor-not-allowed"
+                    disabled={postingComment || ticket.status === "Closed"}
+                    className="w-full bg-white border border-[#5879FC]/20 rounded-[14px] px-5 py-3 text-xs text-[#24292E] placeholder-[#9EA5AD] outline-none shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{ fontFamily: "Outfit, sans-serif" }}
                   />
                 </div>
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || postingComment || ticket.status === "Closed"}
+                  className="shrink-0 px-4 py-3 rounded-[14px] bg-[#5476FC] hover:bg-[#4466ec] text-white text-xs font-bold transition-colors disabled:opacity-50"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {postingComment ? "Sending..." : "Send"}
+                </button>
               </form>
 
             </div>

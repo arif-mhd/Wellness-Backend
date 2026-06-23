@@ -19,6 +19,13 @@ type Priority = "High" | "Medium" | "Low";
 type Status = "Open" | "In Progress" | "Closed";
 type SubmitterRole = "all" | "patient" | "doctor";
 
+interface TicketComment {
+  id: string;
+  authorRole: "admin" | "doctor" | "patient";
+  message: string;
+  createdAt: string;
+}
+
 interface Ticket {
   id: string;
   patientId: string;
@@ -30,6 +37,7 @@ interface Ticket {
   category: string;
   status: Status;
   adminReply?: string | null;
+  comments?: TicketComment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +74,8 @@ function SupportPageInner() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [roleFilter, setRoleFilter] = useState<SubmitterRole>("all");
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -98,6 +108,7 @@ function SupportPageInner() {
 
   useEffect(() => {
     if (selected) setReplyText(selected.adminReply || "");
+    setNewComment("");
   }, [selectedId]);
 
   const handleSendReply = async () => {
@@ -114,6 +125,24 @@ function SupportPageInner() {
       }
     } finally {
       setSavingReply(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!selected || !newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      const res = await apiFetch(`/api/support/admin/${selected.id}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ message: newComment.trim() }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTickets(prev => prev.map(t => t.id === updated.id ? { ...t, ...updated } : t));
+        setNewComment("");
+      }
+    } finally {
+      setPostingComment(false);
     }
   };
 
@@ -378,6 +407,49 @@ function SupportPageInner() {
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
+              </div>
+
+              {/* Comment Thread */}
+              <div>
+                <p className="text-[12.5px] font-bold text-slate-800 mb-2">Conversation</p>
+                <div className="flex flex-col gap-3 max-h-[260px] overflow-y-auto mb-3">
+                  {(selected.comments ?? []).length === 0 ? (
+                    <p className="text-[11px] text-slate-400 font-medium text-center py-2">No comments yet.</p>
+                  ) : (
+                    selected.comments!.map((c) => {
+                      const isAdmin = c.authorRole === "admin";
+                      return (
+                        <div key={c.id} className={`flex flex-col gap-0.5 ${isAdmin ? "items-end" : "items-start"}`}>
+                          <div className={`max-w-[85%] rounded-xl p-3 ${isAdmin ? "bg-[#6A8BFF] text-white" : "bg-slate-50 text-slate-700"}`}>
+                            <p className={`text-[10px] font-bold mb-0.5 ${isAdmin ? "text-white/80" : "text-slate-400"}`}>
+                              {isAdmin ? "You (Admin)" : selected.submitterRole === "doctor" ? "Doctor" : "Patient"}
+                            </p>
+                            <p className="text-[12px] leading-relaxed">{c.message}</p>
+                          </div>
+                          <span className="text-[10px] text-slate-400 px-1">{formatDate(c.createdAt)}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(); }}
+                    placeholder={selected.status === "Closed" ? "This ticket is closed" : "Add a comment..."}
+                    disabled={postingComment || selected.status === "Closed"}
+                    className="flex-1 border border-slate-100 rounded-xl px-3 py-2.5 text-[12px] font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-[#6A8BFF] bg-[#f8fafd] transition disabled:opacity-60"
+                  />
+                  <button
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim() || postingComment || selected.status === "Closed"}
+                    className="px-4 py-2.5 bg-[#6A8BFF] hover:bg-[#5a7ae6] disabled:opacity-50 text-white rounded-xl text-[12px] font-bold transition"
+                  >
+                    {postingComment ? "..." : "Send"}
+                  </button>
+                </div>
               </div>
 
               {/* Admin Reply */}
