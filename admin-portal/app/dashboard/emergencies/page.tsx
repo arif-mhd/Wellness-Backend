@@ -168,7 +168,7 @@ export default function ManageEmergenciesPage() {
                       <tr
                         key={em.id}
                         onClick={() => setSelectedId(em.id)}
-                        className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors group ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                        className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors group hover:bg-slate-50/50`}
                       >
                         <td className="py-4 pl-2 flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">

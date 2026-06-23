@@ -135,7 +135,7 @@ function MiniBarChart({ data, labels, color = "#FFC107" }: { data: number[]; lab
                   <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <span 
-                  className="absolute text-[11px] font-bold text-slate-800 transition-all duration-300 pointer-events-none" 
+                  className="absolute text-[11px] font-medium text-slate-800 transition-all duration-300 pointer-events-none" 
                   style={{ 
                     fontFamily: "Outfit, sans-serif",
                     bottom: barHeight > 24 ? `${barHeight - 20}px` : `${barHeight + 4}px`
@@ -197,8 +197,8 @@ function MiniLineChart({ data, labels, color = "#3b82f6" }: { data: number[]; la
         >
           <span className="text-[10px] text-slate-400 font-medium tracking-wide" style={{ fontFamily: "Outfit, sans-serif" }}>{labels[hoveredIdx]} 00:00</span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[15px] font-bold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>{data[hoveredIdx] >= 1000 ? `${(data[hoveredIdx]/1000).toFixed(0)}K` : data[hoveredIdx]}</span>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-emerald-600 bg-emerald-50">+3.4%</span>
+            <span className="text-[15px] font-medium text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>{data[hoveredIdx] >= 1000 ? `${(data[hoveredIdx]/1000).toFixed(0)}K` : data[hoveredIdx]}</span>
+            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded text-emerald-600 bg-emerald-50">+3.4%</span>
           </div>
         </div>
       )}
@@ -520,7 +520,7 @@ function ConsultCard({
             <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
               {parseFloat(cancellation.totalLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalLabel}
             </span>
-            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
               {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
             </span>
           </div>
@@ -536,7 +536,7 @@ function ConsultCard({
 
           <div className="grid grid-cols-2 gap-3 mt-auto pt-4">
             <div className="border border-[#eef2f7] rounded-xl p-3 bg-white shadow-sm flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mb-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#a855f7]" />
                 Total Booking
               </div>
@@ -544,13 +544,13 @@ function ConsultCard({
                 <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
                   {parseFloat(cancellation.totalBookingLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.totalBookingLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.totalBookingLabel}
                 </span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
+                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${cancellation.bookingChange.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.bookingChange.positive ? "+" : "-"}{cancellation.bookingChange.value}%
                 </span>
               </div>
             </div>
             <div className="border border-[#eef2f7] rounded-xl p-3 bg-white shadow-sm flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mb-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
                 Cancellations
               </div>
@@ -558,7 +558,7 @@ function ConsultCard({
                 <span className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Outfit, sans-serif" }}>
                   {parseFloat(cancellation.cancellationsLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(cancellation.cancellationsLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : cancellation.cancellationsLabel}
                 </span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cancellation.change.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
+                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md ${cancellation.change.positive ? "text-emerald-600 bg-emerald-50" : "text-rose-500 bg-rose-50"}`}>
                   {cancellation.change.positive ? "+" : "-"}{cancellation.change.value}%
                 </span>
               </div>
@@ -616,7 +616,7 @@ function PrimaryReasonsCard({
             <span className="text-[28px] font-medium text-[#24292E] tracking-tight leading-none" style={{ fontFamily: "Outfit, sans-serif" }}>
               {parseFloat(primaryReasons.totalLabel.replace(/,/g, '')) >= 1000 ? `${(parseFloat(primaryReasons.totalLabel.replace(/,/g, ''))/1000).toFixed(1)}K` : primaryReasons.totalLabel}
             </span>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md text-emerald-600 bg-emerald-50">+3.4%</span>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-md text-emerald-600 bg-emerald-50">+3.4%</span>
           </div>
 
           <div className="flex gap-[4px] w-full mt-5 select-none">
@@ -653,7 +653,7 @@ function PrimaryReasonsCard({
           <div className="grid grid-cols-4 gap-2 mt-auto pt-4">
             {primaryReasons.reasons.map((r, i) => (
               <div key={r.reason} className="border border-[#eef2f7] rounded-xl p-2.5 bg-white shadow-sm flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 mb-2">
+                <div className="flex items-center gap-1.5 text-[9px] font-medium text-slate-400 mb-2">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: REASON_COLORS[i % REASON_COLORS.length] }} />
                   <span className="truncate">{r.reason.length > 8 ? `${r.reason.slice(0, 7)}.` : r.reason}</span>
                 </div>
@@ -673,10 +673,10 @@ function PrimaryReasonsCard({
 function SectionHeader({ title, count }: { title: string; count?: number }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-[15px] font-bold text-[#212b36] flex items-center gap-2">
+      <h2 className="text-[15px] font-medium text-[#212b36] flex items-center gap-2">
         {title}
         {count !== undefined && count > 0 && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-500 normal-case tracking-normal">
+          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-500 normal-case tracking-normal">
             {count} pending
           </span>
         )}
@@ -799,7 +799,7 @@ export default function AdminDashboardPage() {
       <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-2">
 
         {fetchError && (
-          <div className="px-5 py-4 bg-red-50 border border-red-100 rounded-2xl text-[13px] font-bold text-red-600">
+          <div className="px-5 py-4 bg-red-50 border border-red-100 rounded-2xl text-[13px] font-medium text-red-600">
             Failed to load dashboard data: {fetchError}
           </div>
         )}
@@ -814,7 +814,7 @@ export default function AdminDashboardPage() {
           </div>
           <button
             id="generate-report-btn"
-            className="bg-[#4F83FD] hover:bg-[#3d70e6] hover:shadow-lg hover:shadow-blue-200/50 hover:-translate-y-0.5 active:translate-y-0 text-white text-xs font-bold px-6 py-3 rounded-full transition-all duration-200 shadow-md shadow-blue-100"
+            className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-6 py-2.5 rounded-xl text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95"
           >
             Generate Report
           </button>
@@ -971,7 +971,7 @@ export default function AdminDashboardPage() {
           <SectionHeader title="Tasks" count={taskCounts?.total} />
           <div className="bg-white rounded-3xl shadow-sm border border-[#eef2f7] overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-8 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-8 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-medium text-slate-400 uppercase tracking-widest">
               <span>Task</span>
               <span>Summary</span>
               <span>Time</span>
@@ -998,7 +998,7 @@ export default function AdminDashboardPage() {
                         {TASK_TYPE_ICON[task.type]}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{task.title}</p>
+                        <p className="text-sm font-medium text-slate-800 truncate">{task.title}</p>
                         {task.email && <p className="text-xs text-slate-400 truncate">{task.email}</p>}
                       </div>
                     </div>
@@ -1006,7 +1006,7 @@ export default function AdminDashboardPage() {
                     {/* Summary & Badge */}
                     <div className="flex items-center gap-3">
                       {task.priority && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-600 uppercase tracking-wider shrink-0">
+                        <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-red-100 text-red-600 uppercase tracking-wider shrink-0">
                           {task.priority}
                         </span>
                       )}
@@ -1020,7 +1020,7 @@ export default function AdminDashboardPage() {
                     <div className="flex items-center gap-3 pr-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); router.push(task.link); }}
-                        className="text-xs font-bold px-5 py-2.5 rounded-full transition-all active:scale-95 duration-150 bg-[#4F83FD] hover:bg-[#3d70e6] text-white shadow-sm shadow-blue-100 hover:shadow-md"
+                        className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2 rounded-xl text-[12px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95 duration-150"
                       >
                         Review
                       </button>

@@ -327,12 +327,12 @@ export default function PatientsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider">Patient Name</th>
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider">Demographics</th>
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider">Contact Info</th>
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider">Diagnosis</th>
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider">Last Consultation</th>
-                  <th className="px-6 py-4 text-xs font-bold text-[#676E76] uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Patient Name</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Demographics</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Contact Info</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Diagnosis</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Last Consultation</th>
+                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EBEEF5]">

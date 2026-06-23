@@ -177,11 +177,7 @@ export default function ManageFormsPage() {
                         <tr
                           key={form.id}
                           onClick={() => setSelectedFormId(form.id)}
-                          className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
-                            isSelected 
-                              ? "bg-[#f8fafd] rounded-[1.5rem]" 
-                              : "hover:bg-slate-50/50"
-                          }`}
+                          className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
                         >
                           <td className="py-4 px-3 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0">

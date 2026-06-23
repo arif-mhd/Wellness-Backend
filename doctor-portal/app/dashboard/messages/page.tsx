@@ -97,22 +97,22 @@ function SpinnerIcon({ size = 24 }: { size?: number }) {
 
 export default function MessagesPage() {
   const router = useRouter();
-  const [conversations, setConversations]     = useState<Conversation[]>([]);
-  const [filtered, setFiltered]               = useState<Conversation[]>([]);
-  const [searchQuery, setSearchQuery]         = useState("");
-  const [selectedConv, setSelectedConv]       = useState<Conversation | null>(null);
-  const [messages, setMessages]               = useState<ChatMessage[]>([]);
-  const [inputText, setInputText]             = useState("");
-  const [loadingConvs, setLoadingConvs]       = useState(true);
-  const [loadingMsgs, setLoadingMsgs]         = useState(false);
-  const [sending, setSending]                 = useState(false);
-  const [connected, setConnected]             = useState(false);
-  const [myUserId, setMyUserId]               = useState<string>("");
-  const [myName, setMyName]                   = useState("Doctor");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [filtered, setFiltered] = useState<Conversation[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [myUserId, setMyUserId] = useState<string>("");
+  const [myName, setMyName] = useState("Doctor");
 
-  const roomRef         = useRef<Room | null>(null);
-  const messagesEndRef  = useRef<HTMLDivElement | null>(null);
-  const inputRef        = useRef<HTMLInputElement | null>(null);
+  const roomRef = useRef<Room | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // ── Fetch doctor identity ──────────────────────────────────────────────────
   useEffect(() => {
@@ -188,13 +188,13 @@ export default function MessagesPage() {
           const packet = JSON.parse(decoded);
           if (packet.type === "chat_message") {
             const newMsg: ChatMessage = {
-              id:             packet.id ?? `tmp_${Date.now()}`,
+              id: packet.id ?? `tmp_${Date.now()}`,
               conversationId: conv.conversationId,
-              senderId:       packet.senderId,
-              senderRole:     packet.senderRole,
-              text:           packet.text,
-              createdAt:      packet.createdAt ?? new Date().toISOString(),
-              isRead:         false,
+              senderId: packet.senderId,
+              senderRole: packet.senderRole,
+              text: packet.text,
+              createdAt: packet.createdAt ?? new Date().toISOString(),
+              isRead: false,
             };
             setMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
@@ -233,13 +233,13 @@ export default function MessagesPage() {
     setSending(true);
 
     const optimisticMsg: ChatMessage = {
-      id:             `opt_${Date.now()}`,
+      id: `opt_${Date.now()}`,
       conversationId: selectedConv.conversationId,
-      senderId:       myUserId,
-      senderRole:     "doctor",
+      senderId: myUserId,
+      senderRole: "doctor",
       text,
-      createdAt:      new Date().toISOString(),
-      isRead:         true,
+      createdAt: new Date().toISOString(),
+      isRead: true,
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
@@ -266,13 +266,13 @@ export default function MessagesPage() {
 
       if (roomRef.current && roomRef.current.state === "connected") {
         const packet = {
-          type:       "chat_message",
-          id:         savedMsg?.id ?? optimisticMsg.id,
-          senderId:   myUserId,
+          type: "chat_message",
+          id: savedMsg?.id ?? optimisticMsg.id,
+          senderId: myUserId,
           senderRole: "doctor",
           senderName: myName,
           text,
-          createdAt:  savedMsg?.createdAt ?? optimisticMsg.createdAt,
+          createdAt: savedMsg?.createdAt ?? optimisticMsg.createdAt,
         };
         const data = new TextEncoder().encode(JSON.stringify(packet));
         await roomRef.current.localParticipant.publishData(data, { reliable: true });

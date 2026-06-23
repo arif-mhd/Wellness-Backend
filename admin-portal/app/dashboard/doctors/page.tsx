@@ -322,7 +322,7 @@ function ManageDoctorsPageInner() {
                           <tr
                             key={doc.id}
                             onClick={() => setSelectedDoctorId(doc.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
                           >
                             <td className="py-3 px-2 flex items-center gap-3">
                               <div className="relative shrink-0">
@@ -360,7 +360,7 @@ function ManageDoctorsPageInner() {
                           <tr
                             key={doc.id}
                             onClick={() => setSelectedDoctorId(doc.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${isSelected ? "bg-[#f8fafd] rounded-2xl" : "hover:bg-slate-50/50"}`}
+                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
                           >
                             <td className="py-3 px-2 flex items-center gap-3">
                               <div className="relative shrink-0">

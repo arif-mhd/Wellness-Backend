@@ -98,7 +98,7 @@ export default function NotificationsPage() {
           </h3>
           <p className="text-[13px] leading-[1.6] font-normal">
             <span className="text-[#676E76]">Select which types of notifications you&apos;d like to receive in-app. </span>
-            <span className="text-[#24292E] font-bold">
+            <span className="text-[#24292E] font-medium">
               Please note that some critical notifications, like appointment reminders, cannot be disabled.
             </span>
           </p>
@@ -122,13 +122,13 @@ export default function NotificationsPage() {
         <div className="flex gap-6 mt-2 w-full">
           <button 
             type="button"
-            className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-bold tracking-tight transition-all duration-200"
+            className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-medium tracking-tight transition-all duration-200"
           >
             Cancel
           </button>
           <button 
             type="button"
-            className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-bold tracking-tight transition-all duration-200"
+            className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-medium tracking-tight transition-all duration-200"
           >
             Save Changes
           </button>

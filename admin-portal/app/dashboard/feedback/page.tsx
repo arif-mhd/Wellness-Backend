@@ -65,6 +65,11 @@ const DoubleCaret = () => (
   </div>
 );
 
+const getProviderInitials = (name: string) => {
+  if (!name) return "";
+  return name.replace(/^Dr\.\s*/i, "").charAt(0).toUpperCase();
+};
+
 export default function FeedbackPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -127,7 +132,7 @@ export default function FeedbackPage() {
     <ProtectedRoute>
       <div className="w-full pb-12 font-sans animate-in fade-in duration-300">
         {error && (
-          <div className="mb-6 px-5 py-4 bg-red-50 border border-red-100 rounded-2xl text-[13px] font-bold text-red-600">
+          <div className="mb-6 px-5 py-4 bg-red-50 border border-red-100 rounded-2xl text-[13px] font-semibold text-red-600">
             {error}
           </div>
         )}
@@ -136,7 +141,7 @@ export default function FeedbackPage() {
           {/* LEFT CONTENT */}
           <div className={`${selected ? "xl:col-span-8" : "xl:col-span-12"} flex flex-col gap-5`}>
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Feedback and Rating</h1>
+              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Feedback and Rating</h1>
             </div>
 
             {/* Filter Tabs */}
@@ -153,7 +158,7 @@ export default function FeedbackPage() {
                     <button
                       key={tab.value}
                       onClick={() => setFilterFolder(tab.value)}
-                      className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all border ${
+                      className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all border ${
                         isActive
                           ? "bg-[#24292E] text-white border-transparent shadow-sm"
                           : "bg-white text-[#475569] border-[#e2e8f0] hover:border-slate-300 hover:text-slate-800"
@@ -195,14 +200,14 @@ export default function FeedbackPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                        <th className="pb-4 pt-1 font-bold pl-2 w-[25%]">
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2 w-[18%]">
                           <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Name <DoubleCaret /></div>
                         </th>
-                        <th className="pb-4 pt-1 font-bold w-[25%]">Provider Rated</th>
-                        <th className="pb-4 pt-1 font-bold w-[35%]">Comments</th>
-                        <th className="pb-4 pt-1 font-bold w-[5%] text-center">Service</th>
-                        <th className="pb-4 pt-1 font-bold w-[10%] text-right pr-2">Rating</th>
+                        <th className="pb-4 pt-1 font-semibold w-[22%]">Provider Rated</th>
+                        <th className="pb-4 pt-1 font-semibold w-[40%]">Comments</th>
+                        <th className="pb-4 pt-1 font-semibold w-[8%] text-center">Service</th>
+                        <th className="pb-4 pt-1 font-semibold w-[12%] text-right pr-4">Rating</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -212,24 +217,26 @@ export default function FeedbackPage() {
                           <tr
                             key={rev.id}
                             onClick={() => setSelectedId(rev.id)}
-                            className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${isSelected ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"}`}
+                            className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
                           >
-                            <td className="py-4 pl-2 flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-bold text-sm">
+                            <td className="py-4 pl-2">
+                              <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-semibold text-sm">
                                 {rev.reviewer.avatar || rev.reviewer.name[0]}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-bold text-slate-800 leading-tight truncate">{rev.reviewer.name}</p>
+                                <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">{rev.reviewer.name}</p>
                                 <p className="text-[11px] text-slate-400 font-medium truncate">{rev.reviewer.email}</p>
                               </div>
+                            </div>
                             </td>
                             <td className="py-4 pr-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full border border-slate-100 flex-shrink-0 bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-[10px]">
-                                  {rev.provider.avatar || rev.provider.name[0]}
+                                <div className="w-8 h-8 rounded-full border border-slate-100 flex-shrink-0 bg-slate-100 flex items-center justify-center text-slate-500 font-semibold text-[10px]">
+                                  {getProviderInitials(rev.provider.name)}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[12px] font-bold text-slate-800 leading-tight truncate">{rev.provider.name}</p>
+                                  <p className="text-[12px] font-semibold text-slate-800 leading-tight truncate">{rev.provider.name}</p>
                                   <p className="text-[10px] text-slate-400 font-medium truncate">{rev.provider.email}</p>
                                 </div>
                               </div>
@@ -238,7 +245,7 @@ export default function FeedbackPage() {
                               <p className="line-clamp-1">{rev.comment || <span className="italic text-slate-300">No comment left</span>}</p>
                             </td>
                             <td className="py-4 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getFolderColor(rev.folder)}`}>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getFolderColor(rev.folder)}`}>
                                 {getFolderLabel(rev.folder)}
                               </span>
                             </td>
@@ -274,7 +281,7 @@ export default function FeedbackPage() {
           {selected && (
             <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
-                <h2 className="text-[17px] font-black text-slate-800 tracking-tight">Rating Details</h2>
+                <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Rating Details</h2>
                 <button onClick={() => setSelectedId(null)} className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -282,23 +289,23 @@ export default function FeedbackPage() {
 
               {/* Reviewer Details */}
               <div className="flex items-center gap-4 mt-6 mb-8">
-                <div className="relative w-12 h-12 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-bold text-base">
+                <div className="relative w-12 h-12 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-semibold text-base">
                   {selected.reviewer.avatar || selected.reviewer.name[0]}
                   <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></div>
                 </div>
                 <div>
-                  <p className="text-[14px] font-black text-slate-800">{selected.reviewer.name}</p>
+                  <p className="text-[14px] font-medium text-slate-800">{selected.reviewer.name}</p>
                   <p className="text-[11px] text-slate-400 font-medium">{selected.reviewer.email}</p>
                 </div>
               </div>
 
               {/* Provider Rated Block */}
               <div className="bg-[#f8fafd] rounded-[1rem] p-4 flex items-center gap-4 mb-4 border border-slate-50">
-                <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-white flex items-center justify-center text-slate-600 font-bold text-xs">
-                  {selected.provider.avatar || selected.provider.name[0]}
+                <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-white flex items-center justify-center text-slate-600 font-semibold text-xs">
+                  {getProviderInitials(selected.provider.name)}
                 </div>
                 <div>
-                  <p className="text-[13px] font-black text-slate-800">{selected.provider.name}</p>
+                  <p className="text-[13px] font-medium text-slate-800">{selected.provider.name}</p>
                   <p className="text-[10px] text-slate-400 font-medium">{selected.provider.email}</p>
                 </div>
               </div>
@@ -315,7 +322,7 @@ export default function FeedbackPage() {
 
               {/* Past Reviews List from this User */}
               <div className="pt-6 border-t border-slate-50">
-                <h3 className="text-[13px] font-bold text-slate-800 mb-6">
+                <h3 className="text-[13px] font-semibold text-slate-800 mb-6">
                   Past Reviews from this user ({reviewerPastReviews.length})
                 </h3>
                 {reviewerPastReviews.length === 0 ? (
@@ -324,12 +331,12 @@ export default function FeedbackPage() {
                   <div className="space-y-6 max-h-[350px] overflow-y-auto pr-1">
                     {reviewerPastReviews.map((pr) => (
                       <div key={pr.id} className="flex gap-4">
-                        <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-500 font-bold text-xs mt-1">
-                          {pr.provider.avatar || pr.provider.name[0]}
+                        <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-500 font-semibold text-xs mt-1">
+                          {getProviderInitials(pr.provider.name)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
-                            <p className="text-[12px] font-bold text-slate-800">{pr.provider.name}</p>
+                            <p className="text-[12px] font-semibold text-slate-800">{pr.provider.name}</p>
                             <StarRating rating={pr.rating} />
                           </div>
                           <p className="text-[11.5px] text-slate-500 font-medium leading-relaxed">

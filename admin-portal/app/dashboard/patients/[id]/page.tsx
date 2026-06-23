@@ -109,8 +109,8 @@ function age(dob?: string) {
 const DetailRow = ({
   label,
   value,
-  valueClass = "text-slate-800 font-bold",
-  labelClass = "text-slate-400 font-bold",
+  valueClass = "text-slate-800 font-medium",
+  labelClass = "text-slate-400 font-medium",
 }: {
   label: string;
   value: React.ReactNode;
@@ -190,7 +190,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
     <ProtectedRoute>
       <div className="w-full flex flex-col items-center justify-center py-32 gap-4">
         <p className="text-red-500 font-semibold text-sm">{error || "Patient not found."}</p>
-        <button onClick={() => router.push("/dashboard/patients")} className="text-[#6A8BFF] text-sm font-bold hover:underline">
+        <button onClick={() => router.push("/dashboard/patients")} className="text-[#6A8BFF] text-sm font-medium hover:underline">
           Back to Patients
         </button>
       </div>
@@ -221,7 +221,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-[24px] font-black text-[#1e293b] tracking-tight">Patient Profile</h1>
+          <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight">Patient Profile</h1>
         </div>
 
         {/* Header Card */}
@@ -231,12 +231,12 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
               {patient.avatarUrl ? (
                 <img src={patient.avatarUrl} alt={patient.fullName} className="w-[84px] h-[84px] rounded-full object-cover border-[3px] border-slate-50 shadow-sm shrink-0" />
               ) : (
-                <div className="w-[84px] h-[84px] rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-black text-3xl shrink-0 border-[3px] border-slate-50 shadow-sm">
+                <div className="w-[84px] h-[84px] rounded-full bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-medium text-3xl shrink-0 border-[3px] border-slate-50 shadow-sm">
                   {patient.fullName[0].toUpperCase()}
                 </div>
               )}
               <div>
-                <h2 className="text-[19px] font-black text-slate-800 tracking-tight">
+                <h2 className="text-[19px] font-medium text-slate-800 tracking-tight">
                   {patient.fullName}
                   {age(patient.dateOfBirth) && (
                     <span className="text-[15px] font-semibold text-slate-400 ml-2">{age(patient.dateOfBirth)}</span>
@@ -246,10 +246,10 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-bold transition active:scale-95">
+              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
                 Edit
               </button>
-              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-bold transition active:scale-95">
+              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
                 Deactivate Patient Profile
               </button>
             </div>
@@ -268,7 +268,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`px-7 py-3 rounded-full text-[13px] font-bold transition-all shadow-sm ${
+              className={`px-7 py-3 rounded-full text-[13px] font-medium transition-all shadow-sm ${
                 activeTab === key
                   ? "bg-[#1E293B] text-white"
                   : "bg-white text-slate-500 border border-slate-100 hover:text-slate-800"
@@ -288,7 +288,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
               {/* Personal Details */}
               <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
-                <h3 className="text-[14px] font-black text-slate-800 mb-6">Personal Details</h3>
+                <h3 className="text-[14px] font-medium text-slate-800 mb-6">Personal Details</h3>
                 <div className="space-y-4 max-w-sm">
                   {patient.emiratesId && (
                     <DetailRow
@@ -307,7 +307,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   <DetailRow
                     label="Email ID"
                     value={<a href={`mailto:${patient.email}`} className="text-[#6A8BFF] hover:underline">{patient.email}</a>}
-                    valueClass="font-bold"
+                    valueClass="font-medium"
                   />
                   <DetailRow label="Gender" value={patient.gender} />
                   {patient.bloodGroup && <DetailRow label="Blood Group" value={patient.bloodGroup} />}
@@ -316,7 +316,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
               {/* Other Details */}
               <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50">
-                <h3 className="text-[14px] font-black text-slate-800 mb-6">Other Details</h3>
+                <h3 className="text-[14px] font-medium text-slate-800 mb-6">Other Details</h3>
                 <div className="space-y-4 max-w-sm">
                   <DetailRow label="Date of Birth" value={formatDate(patient.dateOfBirth)} />
                   {patient.height && <DetailRow label="Height (cm)" value={patient.height} />}
@@ -339,7 +339,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
-                  <span className="text-[12px] font-bold text-slate-800">Recent</span>
+                  <span className="text-[12px] font-medium text-slate-800">Recent</span>
                 </div>
                 {visitsLoading ? (
                   <p className="text-[12px] font-medium text-slate-400 px-2 py-4">Loading consultations…</p>
@@ -358,7 +358,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                           }`}
                         >
                           <div>
-                            <h4 className="text-[13px] font-bold text-slate-800">Dr. {visit.doctorName}</h4>
+                            <h4 className="text-[13px] font-medium text-slate-800">Dr. {visit.doctorName}</h4>
                             <p className="text-[11px] font-medium text-slate-500 mt-1">{formatDateTime(visit.scheduledAt)}</p>
                           </div>
                           <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,7 +373,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
               {/* Details */}
               <div className="xl:col-span-8 bg-transparent">
-                <h3 className="text-[16px] font-black text-slate-800 mb-6 px-1">Consultation Details</h3>
+                <h3 className="text-[16px] font-medium text-slate-800 mb-6 px-1">Consultation Details</h3>
 
                 {!selectedVisit ? (
                   <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm">
@@ -384,7 +384,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                     {/* Reason for visit */}
                     {(selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason) && (
                       <div className="mb-6">
-                        <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">Reason for visit</h4>
+                        <h4 className="text-[12px] font-medium text-slate-800 mb-3 px-1">Reason for visit</h4>
                         <div className="bg-white border border-slate-100 rounded-[1rem] p-5 shadow-sm">
                           <p className="text-[12px] font-medium text-slate-600">
                             {selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason}
@@ -395,7 +395,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
                     {/* EMR */}
                     <div className="mb-8">
-                      <h4 className="text-[12px] font-bold text-slate-800 mb-3 px-1">EMR</h4>
+                      <h4 className="text-[12px] font-medium text-slate-800 mb-3 px-1">EMR</h4>
                       <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm space-y-6">
                         {selectedVisit.emr?.sections?.historyOfPresentIllness && (
                           <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
@@ -420,7 +420,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                           <div key={title} className="pt-2">
                             <div className="flex items-center gap-2 mb-2">
                               <div className="w-2 h-2 bg-[#6A8BFF] rotate-45 shrink-0" />
-                              <span className="text-[12px] font-bold text-slate-800">{title}</span>
+                              <span className="text-[12px] font-medium text-slate-800">{title}</span>
                             </div>
                             <p className="text-[12px] font-medium text-slate-500 leading-relaxed pl-4 border-l-2 border-slate-50 ml-1">{text}</p>
                           </div>
@@ -446,7 +446,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                     {/* Medicines */}
                     <div className="mb-8">
                       <div className="flex items-center justify-between mb-4 px-1">
-                        <h4 className="text-[12px] font-bold text-slate-800">Medicines</h4>
+                        <h4 className="text-[12px] font-medium text-slate-800">Medicines</h4>
                       </div>
                       <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
                         {!selectedVisit.emr?.medicines || selectedVisit.emr.medicines.length === 0 ? (
@@ -461,7 +461,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                                   </svg>
                                 </div>
                                 <div>
-                                  <h5 className="text-[13px] font-bold text-slate-800">
+                                  <h5 className="text-[13px] font-medium text-slate-800">
                                     {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
                                   </h5>
                                   <p className="text-[12px] font-medium text-slate-500 mt-1">
@@ -470,7 +470,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                                 </div>
                               </div>
                               {(med.timing || med.frequency) && (
-                                <div className="text-[11px] font-bold text-slate-500 text-right shrink-0">
+                                <div className="text-[11px] font-medium text-slate-500 text-right shrink-0">
                                   {med.timing}{med.timing && med.frequency ? " · " : ""}{med.frequency}
                                 </div>
                               )}
@@ -482,7 +482,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
                     {/* Lab Tests */}
                     <div>
-                      <h4 className="text-[12px] font-bold text-slate-800 mb-4 px-1">Lab Tests</h4>
+                      <h4 className="text-[12px] font-medium text-slate-800 mb-4 px-1">Lab Tests</h4>
                       <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
                         {!selectedVisit.emr?.labs || selectedVisit.emr.labs.length === 0 ? (
                           <p className="text-[12px] font-medium text-slate-400">No lab tests recommended for this consultation.</p>
@@ -496,7 +496,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                                   </svg>
                                 </div>
                                 <div>
-                                  <h5 className="text-[13px] font-bold text-slate-800">{lab.name}</h5>
+                                  <h5 className="text-[13px] font-medium text-slate-800">{lab.name}</h5>
                                   {lab.notes && <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: {lab.notes}</p>}
                                 </div>
                               </div>
@@ -514,14 +514,14 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
           {/* MEDICATIONS */}
           {activeTab === "medications" && (
             <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h3 className="text-[14px] font-black text-slate-800 mb-6">Current Medications</h3>
+              <h3 className="text-[14px] font-medium text-slate-800 mb-6">Current Medications</h3>
               {patient.medications && patient.medications.length > 0 ? (
                 <div className="space-y-4">
                   {patient.medications.map((med, i) => (
                     <div key={i} className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
-                      <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">{i + 1}</div>
+                      <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-medium">{i + 1}</div>
                       <div>
-                        <p className="text-[13px] font-bold text-slate-800">{typeof med === "string" ? med : med.name}</p>
+                        <p className="text-[13px] font-medium text-slate-800">{typeof med === "string" ? med : med.name}</p>
                         {typeof med !== "string" && med.dosage && <p className="text-[11px] text-slate-400 mt-0.5">Dosage: {med.dosage}</p>}
                         {typeof med !== "string" && med.notes && <p className="text-[11px] text-slate-500 mt-0.5">{med.notes}</p>}
                       </div>
@@ -537,11 +537,11 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
           {/* ALLERGIES */}
           {activeTab === "allergies" && (
             <div className="bg-white rounded-[2rem] p-7 shadow-sm border border-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h3 className="text-[14px] font-black text-slate-800 mb-6">Known Allergies</h3>
+              <h3 className="text-[14px] font-medium text-slate-800 mb-6">Known Allergies</h3>
               {patient.allergies && patient.allergies.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {patient.allergies.map((a, i) => (
-                    <span key={i} className="bg-red-50 text-red-600 border border-red-100 text-[12px] font-bold px-4 py-2 rounded-full">{a}</span>
+                    <span key={i} className="bg-red-50 text-red-600 border border-red-100 text-[12px] font-medium px-4 py-2 rounded-full">{a}</span>
                   ))}
                 </div>
               ) : (
@@ -558,7 +558,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-[14px] font-bold text-slate-400">No {activeTab} data available for this patient.</p>
+              <p className="text-[14px] font-medium text-slate-400">No {activeTab} data available for this patient.</p>
             </div>
           )}
 

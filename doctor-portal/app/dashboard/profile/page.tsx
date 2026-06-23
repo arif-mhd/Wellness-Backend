@@ -30,7 +30,7 @@ function InfoCard({ label, value, editable = false, children }: { label: string;
         <span className="text-[#676E76] text-xs font-normal tracking-tight">{label}</span>
         {editable && <EditBtn />}
       </div>
-      {value && <span className="text-[#24292E] text-xs font-bold leading-relaxed">{value}</span>}
+      {value && <span className="text-[#24292E] text-xs font-medium leading-relaxed">{value}</span>}
       {children}
     </div>
   );
@@ -90,7 +90,7 @@ export default function ProfilePage() {
           </h1>
           <p className="text-xs tracking-tight">
             <span className="text-[#676E76]">LICENSE NUMBER </span>
-            <span className="text-[#5476FC] font-bold">{profileData?.medical?.licenseNumber || "DHA-12345678"}</span>
+            <span className="text-[#5476FC] font-medium">{profileData?.medical?.licenseNumber || "DHA-12345678"}</span>
           </p>
           <span 
             className="inline-flex items-center justify-center bg-[#D6DEFF] text-[#182A6E] text-xs font-semibold leading-none shrink-0"
@@ -119,7 +119,7 @@ export default function ProfilePage() {
           <InfoCard label="License Info" value={profileData?.medical?.licenseNumber || "DHA-12345678"} editable />
           <InfoCard label="Languages Known" value={profileData?.personal?.languages || "English, Arabic"} editable />
           <InfoCard label="Consultation Time Limit" editable>
-            <div className="flex items-center gap-1.5 text-xs text-[#24292E] font-bold">
+            <div className="flex items-center gap-1.5 text-xs text-[#24292E] font-medium">
               <span>15 Minutes</span>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M4 6l4 4 4-4" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -143,7 +143,7 @@ export default function ProfilePage() {
             ].map(({ label, value }) => (
               <div key={label} className="flex flex-col gap-1.5">
                 <span className="text-[#676E76] text-xs">{label}</span>
-                <span className="text-[#24292E] text-xs font-bold">{value}</span>
+                <span className="text-[#24292E] text-xs font-medium">{value}</span>
               </div>
             ))}
           </div>
@@ -157,7 +157,7 @@ export default function ProfilePage() {
             ].map(({ label, value }) => (
               <div key={label} className="flex flex-col gap-1.5">
                 <span className="text-[#676E76] text-xs">{label}</span>
-                <span className="text-[#24292E] text-xs font-bold">{value}</span>
+                <span className="text-[#24292E] text-xs font-medium">{value}</span>
               </div>
             ))}
           </div>
@@ -177,7 +177,7 @@ export default function ProfilePage() {
               {currentFees.map(({ city, fee }) => (
                 <div key={city} className="flex justify-between items-center">
                   <span className="text-[#676E76] text-xs">{city}</span>
-                  <span className="text-[#24292E] text-xs font-bold">{fee}</span>
+                  <span className="text-[#24292E] text-xs font-medium">{fee}</span>
                 </div>
               ))}
             </div>
@@ -188,7 +188,7 @@ export default function ProfilePage() {
               {currentDocs.map(({ label, file }) => (
                 <div key={label} className="flex flex-col gap-0.5">
                   <span className="text-[#596066] text-xs">{label}</span>
-                  <a href="#" className="text-[#5476FC] text-sm font-bold underline underline-offset-2">{file}</a>
+                  <a href="#" className="text-[#5476FC] text-sm font-medium underline underline-offset-2">{file}</a>
                 </div>
               ))}
             </div>

@@ -18,18 +18,18 @@ interface Transaction {
 }
 
 const mockTransactions: Transaction[] = [
-  { id: "1", transactionId: "TXN22414", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Failed" },
-  { id: "2", transactionId: "TXN36532", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "3", transactionId: "TXN30927", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "4", transactionId: "TXN28511", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "5", transactionId: "TXN32119", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "6", transactionId: "TXN29826", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "7", transactionId: "TXN29522", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "8", transactionId: "TXN23220", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "9", transactionId: "TXN34330", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "10", transactionId: "TXN32128", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "11", transactionId: "TXN44339", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
-  { id: "12", transactionId: "TXN29817", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.c..." }, patient: { name: "Kristin Watson", email: "yelena@example.c..." }, date: "15 May 2020 8:30...", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "1", transactionId: "TXN22414", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Failed" },
+  { id: "2", transactionId: "TXN36532", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "3", transactionId: "TXN30927", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "4", transactionId: "TXN28511", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "5", transactionId: "TXN32119", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "6", transactionId: "TXN29826", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "7", transactionId: "TXN29522", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "8", transactionId: "TXN23220", source: "Lab", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "9", transactionId: "TXN34330", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "10", transactionId: "TXN32128", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "11", transactionId: "TXN44339", source: "Consultation", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
+  { id: "12", transactionId: "TXN29817", source: "Pharmacy", doctor: { name: "Dr. Rahman Ali", email: "yelena@example.com" }, patient: { name: "Kristin Watson", email: "yelena@example.com" }, date: "15 May 2020 8:30 AM", amountCharged: "AED 299.00", platformFee: "AED 50.00", paymentMethod: "Insurance", status: "Completed" },
 ];
 
 const DoubleCaret = () => (
@@ -68,12 +68,12 @@ export default function EarningsPage() {
         
         {/* Header Block */}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-[28px] font-black text-[#1e293b] tracking-tight">Consultations & Earnings</h1>
+          <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Consultations & Earnings</h1>
           <div className="flex items-center gap-3">
-            <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition">
+            <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition">
               Export Report
             </button>
-            <button className="flex items-center gap-2 bg-[#f4f7ff] hover:bg-[#eaf0ff] text-[#6A8BFF] px-5 py-2.5 rounded-full text-[13px] font-bold transition">
+            <button className="flex items-center gap-2 bg-[#f4f7ff] hover:bg-[#eaf0ff] text-[#6A8BFF] px-5 py-2.5 rounded-full text-[13px] font-medium transition">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
               Manage Platform Fee
             </button>
@@ -87,7 +87,7 @@ export default function EarningsPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 rounded-full text-[13px] font-bold transition-all ${
+                className={`px-5 py-2 rounded-full text-[13px] font-medium transition-all ${
                   activeTab === tab ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
                 }`}
               >
@@ -116,14 +116,14 @@ export default function EarningsPage() {
               </button>
             </div>
           </div>
-          <button className="text-[12px] font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+          <button className="text-[12px] font-medium text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
             Today
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
           </button>
         </div>
 
         {/* Filters Row */}
-        <div className="flex items-center justify-between text-[13px] font-bold text-[#64748B] select-none mt-4 mb-2">
+        <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none mt-4 mb-2">
           <div className="flex items-center gap-5 flex-wrap flex-1">
             {["Name", "Order Type", "Pharmacy", "Lab", "Doctor", "Patient", "Date range", "Payment type", "Status"].map((filter) => (
               <span key={filter} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
@@ -139,22 +139,22 @@ export default function EarningsPage() {
         {/* Main Table */}
         <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 min-h-[600px] flex flex-col justify-between">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-[1200px]">
+            <table className="w-full text-left border-collapse min-w-full">
               <thead>
-                <tr className="border-b border-slate-100 text-[12px] font-bold text-slate-700">
-                  <th className="pb-4 pt-1 font-bold pl-2 w-[10%]">
+                <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
+                  <th className="pb-4 pt-1 font-medium pl-2 w-[10%]">
                     <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Transaction ID <DoubleCaret /></div>
                   </th>
-                  <th className="pb-4 pt-1 font-bold w-[9%]">Source</th>
-                  <th className="pb-4 pt-1 font-bold w-[15%]">Doctor Consulted</th>
-                  <th className="pb-4 pt-1 font-bold w-[15%]">Patient Name</th>
-                  <th className="pb-4 pt-1 font-bold w-[12%]">
+                  <th className="pb-4 pt-1 font-medium w-[9%]">Source</th>
+                  <th className="pb-4 pt-1 font-medium w-[15%]">Doctor Consulted</th>
+                  <th className="pb-4 pt-1 font-medium w-[15%]">Patient Name</th>
+                  <th className="pb-4 pt-1 font-medium w-[12%]">
                     <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Date <DoubleCaret /></div>
                   </th>
-                  <th className="pb-4 pt-1 font-bold w-[10%]">Amount Charged</th>
-                  <th className="pb-4 pt-1 font-bold w-[9%]">Platform Fee</th>
-                  <th className="pb-4 pt-1 font-bold w-[10%]">Payment Method</th>
-                  <th className="pb-4 pt-1 font-bold w-[10%]">Status</th>
+                  <th className="pb-4 pt-1 font-medium w-[10%]">Amount Charged</th>
+                  <th className="pb-4 pt-1 font-medium w-[9%]">Platform Fee</th>
+                  <th className="pb-4 pt-1 font-medium w-[10%]">Payment Method</th>
+                  <th className="pb-4 pt-1 font-medium w-[10%]">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,42 +165,40 @@ export default function EarningsPage() {
                     onMouseLeave={() => setHoveredId(null)}
                     className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors h-[68px]"
                   >
-                    <td className="py-2 pl-2 text-[12.5px] font-bold text-slate-500">
+                    <td className="py-2 pl-2 text-[12.5px] font-medium text-slate-500">
                       {t.transactionId}
                     </td>
                     <td className="py-2 text-[12px] text-slate-500 font-medium">
                       {t.source}
                     </td>
                     <td className="py-2 pr-2">
-                      <p className="text-[12.5px] font-bold text-slate-800 leading-tight">{t.doctor.name}</p>
+                      <p className="text-[12.5px] font-medium text-slate-800 leading-tight">{t.doctor.name}</p>
                       <p className="text-[10px] text-slate-400 font-medium">{t.doctor.email}</p>
                     </td>
                     <td className="py-2 pr-2">
-                      <p className="text-[12.5px] font-bold text-slate-800 leading-tight">{t.patient.name}</p>
+                      <p className="text-[12.5px] font-medium text-slate-800 leading-tight">{t.patient.name}</p>
                       <p className="text-[10px] text-slate-400 font-medium">{t.patient.email}</p>
                     </td>
                     <td className="py-2 text-[12px] text-slate-500 font-medium">
                       {t.date}
                     </td>
-                    <td className="py-2 text-[12px] text-slate-600 font-bold">
+                    <td className="py-2 text-[12px] text-slate-600 font-medium">
                       {t.amountCharged}
                     </td>
-                    <td className="py-2 text-[12px] text-slate-600 font-bold">
+                    <td className="py-2 text-[12px] text-slate-600 font-medium">
                       {t.platformFee}
                     </td>
-                    <td className="py-2 text-[12px] font-bold text-blue-500">
+                    <td className="py-2 text-[12px] font-medium text-blue-500">
                       {t.paymentMethod}
                     </td>
                     <td className="py-2 pr-2">
                       <div className="flex items-center justify-between min-w-[140px] pr-2">
-                        <span className={`text-[12px] font-bold ${t.status === "Failed" ? "text-rose-500" : "text-slate-500"}`}>
+                        <span className={`text-[12px] font-medium ${t.status === "Failed" ? "text-rose-500" : "text-slate-500"}`}>
                           {t.status}
                         </span>
-                        {hoveredId === t.id && (
-                          <button className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-bold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-transform active:scale-95 whitespace-nowrap ml-4">
-                            View Details
-                          </button>
-                        )}
+                        <button className={`bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[12px] font-medium px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95 whitespace-nowrap ml-4 ${hoveredId === t.id ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                          View Details
+                        </button>
                       </div>
                     </td>
                   </tr>
