@@ -343,7 +343,8 @@ router.delete("/products/:productId", requireRole("pharmacy"), async (req: Sessi
 });
 
 // ─── GET /api/pharmacy/orders ─────────────────────────────────────────────────
-// Returns all orders that contain at least one item belonging to this pharmacy
+// Returns all orders that contain at least one item belonging to this pharmacy.
+// medicineOrders is partitioned by /patientId so we must enable cross-partition.
 router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
@@ -351,7 +352,8 @@ router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: 
       {
         query: "SELECT * FROM c WHERE EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.pharmacyId = @pid) ORDER BY c.createdAt DESC",
         parameters: [{ name: "@pid", value: pharmacyId }],
-      }
+      },
+      { maxItemCount: 100 }   // cross-partition query — no partitionKey hint
     ).fetchAll();
 
     res.json({ orders: resources });

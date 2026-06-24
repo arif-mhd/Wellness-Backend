@@ -69,6 +69,23 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
 
     await medicineOrdersContainer.items.upsert(order);
 
+    // Decrement stock for each ordered product
+    for (const item of validatedItems) {
+      try {
+        const { resources: prodDocs } = await pharmacyProductsContainer.items.query({
+          query: "SELECT * FROM c WHERE c.id = @id",
+          parameters: [{ name: "@id", value: item.medicine_id }],
+        }).fetchAll();
+        if (prodDocs.length) {
+          const prod = prodDocs[0];
+          const newStock = Math.max(0, (prod.stock ?? 0) - item.quantity);
+          await pharmacyProductsContainer.items.upsert({ ...prod, stock: newStock, updatedAt: new Date().toISOString() });
+        }
+      } catch (stockErr) {
+        console.warn(`Stock decrement failed for ${item.medicine_id}:`, stockErr);
+      }
+    }
+
     const itemNames = validatedItems.map(i => i.name).join(", ");
     logActivity({
       source: "patient",
