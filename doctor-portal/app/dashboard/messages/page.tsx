@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
@@ -95,7 +95,7 @@ function SpinnerIcon({ size = 24 }: { size?: number }) {
   );
 }
 
-export default function MessagesPage() {
+function MessagesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetPatientId = searchParams.get("patientId");
@@ -524,5 +524,17 @@ export default function MessagesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: "flex", height: "calc(100vh - 48px)", alignItems: "center", justifyContent: "center" }}>
+        <SpinnerIcon size={32} />
+      </div>
+    }>
+      <MessagesPageInner />
+    </Suspense>
   );
 }

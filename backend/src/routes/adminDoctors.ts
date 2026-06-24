@@ -1,11 +1,15 @@
 import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
+import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
+import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { doctorsContainer, appointmentsContainer, feedbackContainer, queryDocuments } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
+import { uploadBlob, generateSasUrl } from "../config/blob";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // All routes here require the "admin" role
 // ─── GET /api/admin/doctors/pending ─────────────────────────────────────────
@@ -283,5 +287,154 @@ router.post("/:id/verify-slots", requireRole("admin"), async (req: SessionReques
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
+// ─── POST /api/admin/doctors ─────────────────────────────────────────────────
+// Admin manually creates a fully-onboarded doctor account in one step: real
+// SuperTokens credentials (admin sets an initial password), role "doctor"
+// directly (not "doctor_pending" — the admin already vetted/entered every
+// field themselves, so there's no separate approval step to wait on), and
+// status "approved" immediately. Mirrors the self-registration doctor doc
+// shape (POST /api/doctors/register + PUT /api/doctors/profile combined).
+router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const adminId = req.session!.getUserId();
+  const {
+    email, password, fullName, phone,
+    dateOfBirth, gender, emiratesId,
+    bio, businessEmail, bloodGroup, height, weight,
+    maritalStatus, address, postalCode, languages,
+    avatarUrl, emiratesIdFileUrl,
+    specialty, license, experience, medicalSchool, residency,
+    fees, feesPerEmirate,
+    slots,
+    degreeFileUrl, specFileUrl, otherFileUrl,
+    bankDetails,
+  } = req.body;
+
+  if (!email || !password || !fullName || !phone) {
+    res.status(400).json({ error: "email, password, fullName and phone are required." });
+    return;
+  }
+
+  try {
+    const signUpResult = await EmailPassword.signUp("public", email, password);
+
+    if (signUpResult.status === "EMAIL_ALREADY_EXISTS_ERROR") {
+      res.status(409).json({ error: "An account with this email already exists." });
+      return;
+    }
+    if (signUpResult.status !== "OK") {
+      res.status(400).json({ error: "Could not create the doctor's account. Please try again." });
+      return;
+    }
+
+    const supertokensId = signUpResult.user.id;
+
+    // Admin-created doctors skip "doctor_pending" entirely — assign "doctor"
+    // directly since the admin has already entered/verified every field.
+    await UserRoles.addRoleToUser("public", supertokensId, "doctor");
+
+    const now = new Date().toISOString();
+    const doctorDoc = {
+      id:             supertokensId,
+      supertokens_id: supertokensId,
+      status:         "approved",
+      email,
+      fullName,
+      phone,
+      dateOfBirth:    dateOfBirth    || null,
+      gender:         gender         || null,
+      emiratesId:     emiratesId     || null,
+      bio:            bio            || null,
+      businessEmail:  businessEmail  || null,
+      bloodGroup:      bloodGroup     || null,
+      height:          height         || null,
+      weight:          weight         || null,
+      maritalStatus:   maritalStatus  || null,
+      address:         address        || null,
+      postalCode:      postalCode     || null,
+      languages:       languages      || null,
+      avatarUrl:       avatarUrl      || null,
+      emiratesIdFileUrl: emiratesIdFileUrl || null,
+      specialty:       specialty      || null,
+      license:         license        || null,
+      experience:      experience     || null,
+      medicalSchool:   medicalSchool  || null,
+      residency:       residency      || null,
+      fees:            fees           ?? null,
+      feesPerEmirate:  feesPerEmirate ?? null,
+      slots:           slots          ?? [],
+      degreeFileUrl:   degreeFileUrl  || null,
+      specFileUrl:     specFileUrl    || null,
+      otherFileUrl:    otherFileUrl   || null,
+      bankDetails:     bankDetails    ?? null,
+      registeredAt:    now,
+      approvedAt:      now,
+      approvedBy:      adminId,
+      createdByAdmin:  true,
+      profileCompletedAt: now,
+    };
+
+    await doctorsContainer.items.upsert(doctorDoc);
+
+    logActivity({
+      source: "admin",
+      action: "Doctor Created",
+      details: `Dr. ${fullName} added directly by admin (${specialty ?? "specialty TBD"})`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "doctor",
+      entityId: supertokensId,
+    });
+
+    res.status(201).json({ status: "OK", doctor: doctorDoc });
+  } catch (err) {
+    console.error("Admin create doctor error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/doctors/upload ──────────────────────────────────────────
+// Admin-scoped equivalent of POST /api/doctors/upload, for use while building
+// the Add Doctor wizard before the doctor account exists yet. Files are
+// staged under a temp folder keyed by a client-generated draftId, then moved
+// into the doctor's real blob path once the account is created — simplest
+// approach: just upload now under doctors/{draftId}/... and pass the
+// resulting URLs straight into POST /api/admin/doctors's body (blob storage
+// doesn't care that draftId isn't a real Cosmos id).
+router.post(
+  "/upload",
+  requireRole("admin"),
+  upload.fields([
+    { name: "avatar",     maxCount: 1 },
+    { name: "emiratesId", maxCount: 1 },
+    { name: "degree",     maxCount: 1 },
+    { name: "spec",       maxCount: 1 },
+    { name: "other",      maxCount: 1 },
+  ]),
+  async (req: Request, res: Response) => {
+    const draftId = (req.body?.draftId as string) || `draft_${Date.now()}`;
+    const files = req.files as Record<string, Express.Multer.File[]>;
+    const urls: Record<string, string> = {};
+
+    const MIME_EXT: Record<string, string> = {
+      "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+      "application/pdf": "pdf",
+    };
+
+    try {
+      for (const [field, fileArr] of Object.entries(files ?? {})) {
+        const file = fileArr[0];
+        const ext  = MIME_EXT[file.mimetype] ?? "bin";
+        const blobPath = `doctors/${draftId}/${field}_${Date.now()}.${ext}`;
+        await uploadBlob(blobPath, file.buffer, file.mimetype);
+        urls[field] = generateSasUrl(blobPath);
+      }
+      res.json({ status: "OK", urls });
+    } catch (err) {
+      console.error("Admin doctor file upload error:", err);
+      res.status(500).json({ error: "File upload failed." });
+    }
+  }
+);
 
 export default router;
