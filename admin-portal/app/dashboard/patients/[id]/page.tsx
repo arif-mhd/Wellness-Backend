@@ -55,6 +55,20 @@ interface EmrLab {
   notes?: string;
 }
 
+interface EmrVisitInfo {
+  visitType?: string;
+  accompaniedBy?: string;
+  sourceOfHistory?: string;
+  referralSource?: string;
+  historyLimitation?: string;
+}
+
+interface EmrAddendum {
+  text: string;
+  doctorName: string;
+  createdAt: string;
+}
+
 interface EmrSections {
   reasonForVisit?: string;
   historyOfPresentIllness?: string;
@@ -81,7 +95,13 @@ interface VisitHistoryEntry {
   reason: string;
   doctorId: string;
   doctorName: string;
-  emr: { sections?: EmrSections; medicines?: EmrMedicine[]; labs?: EmrLab[] } | null;
+  emr: {
+    sections?: EmrSections;
+    medicines?: EmrMedicine[];
+    labs?: EmrLab[];
+    visitInfo?: EmrVisitInfo | null;
+    addenda?: EmrAddendum[];
+  } | null;
 }
 
 type Tab = "about" | "consultations" | "diagnostics" | "surgeries" | "medications" | "vaccinations" | "allergies";
@@ -105,6 +125,17 @@ function age(dob?: string) {
   if (isNaN(d.getTime())) return null;
   return `${Math.floor((Date.now() - d.getTime()) / 31557600000)} y/o`;
 }
+
+// Hides the row entirely when there's no value — used in the consultation
+// detail panel where blank fields shouldn't show as "—" clutter.
+const EmrField = ({ label, value }: { label: string; value?: string | number | null }) => {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <div>
+      <strong className="text-slate-800 font-semibold">{label}:</strong> {value}
+    </div>
+  );
+};
 
 const DetailRow = ({
   label,
@@ -134,6 +165,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
   const [visitHistory, setVisitHistory] = useState<VisitHistoryEntry[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   useEffect(() => {
     async function fetchPatient() {
@@ -177,6 +209,35 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
   }, [id]);
 
   const selectedVisit = visitHistory.find((v) => v.appointmentId === selectedVisitId) ?? null;
+
+  const isDeactivated = patient?.status === "deactivated";
+
+  async function handleToggleStatus() {
+    if (!patient) return;
+    const nextStatus = isDeactivated ? "active" : "deactivated";
+    const confirmMsg = isDeactivated
+      ? `Reactivate ${patient.fullName}'s account? They will be able to log in again.`
+      : `Deactivate ${patient.fullName}'s account? They will be unable to log in until reactivated.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setStatusUpdating(true);
+    try {
+      const res = await adminFetch(`/api/admin/patients/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setPatient(d.patient);
+      } else {
+        window.alert("Failed to update patient status.");
+      }
+    } catch {
+      window.alert("Failed to update patient status.");
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
 
   if (loading) return (
     <ProtectedRoute>
@@ -236,21 +297,31 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                 </div>
               )}
               <div>
-                <h2 className="text-[19px] font-medium text-slate-800 tracking-tight">
+                <h2 className="text-[19px] font-medium text-slate-800 tracking-tight flex items-center gap-2">
                   {patient.fullName}
                   {age(patient.dateOfBirth) && (
                     <span className="text-[15px] font-semibold text-slate-400 ml-2">{age(patient.dateOfBirth)}</span>
+                  )}
+                  {isDeactivated && (
+                    <span className="px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full text-[11px] font-semibold">
+                      Deactivated
+                    </span>
                   )}
                 </h2>
                 <p className="text-[12px] font-medium text-slate-500 mt-1">{patient.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
-                Edit
-              </button>
-              <button className="px-7 py-3 bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF] rounded-[1rem] text-[12px] font-medium transition active:scale-95">
-                Deactivate Patient Profile
+              <button
+                onClick={handleToggleStatus}
+                disabled={statusUpdating}
+                className={`px-7 py-3 rounded-[1rem] text-[12px] font-medium transition active:scale-95 disabled:opacity-50 ${
+                  isDeactivated
+                    ? "bg-[#E5EDFF] hover:bg-[#dbe6ff] text-[#6A8BFF]"
+                    : "bg-red-50 hover:bg-red-100 text-red-600"
+                }`}
+              >
+                {statusUpdating ? "Updating…" : isDeactivated ? "Activate Patient Profile" : "Deactivate Patient Profile"}
               </button>
             </div>
           </div>
@@ -379,133 +450,209 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm">
                     <p className="text-[12px] font-medium text-slate-400">Select a consultation to view details.</p>
                   </div>
+                ) : !selectedVisit.emr ? (
+                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm flex flex-col items-center justify-center gap-2 py-16">
+                    <p className="text-[12px] font-medium text-slate-400 text-center">No consultation notes recorded for this visit.</p>
+                    <p className="text-[11px] font-medium text-slate-300 text-center max-w-[260px]">
+                      Notes filled during the video call will appear here after the doctor saves them.
+                    </p>
+                  </div>
                 ) : (
-                  <>
-                    {/* Reason for visit */}
-                    {(selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason) && (
-                      <div className="mb-6">
-                        <h4 className="text-[12px] font-medium text-slate-800 mb-3 px-1">Reason for visit</h4>
-                        <div className="bg-white border border-slate-100 rounded-[1rem] p-5 shadow-sm">
-                          <p className="text-[12px] font-medium text-slate-600">
-                            {selectedVisit.emr?.sections?.reasonForVisit || selectedVisit.reason}
-                          </p>
+                  <div className="flex flex-col lg:flex-row gap-6">
+
+                    {/* Sub-column 1: Patient/Provider/Visit Info + Reason + HPI + Medicines + Labs */}
+                    <div className="flex-1 bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm flex flex-col gap-6">
+
+                      {/* Patient Information */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-slate-800 font-semibold text-[13px]">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                          <span>Patient Information</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-slate-500 text-[12px] pl-5 leading-[1.6]">
+                          <EmrField label="Name" value={patient.fullName} />
+                          <EmrField label="Date of Birth" value={patient.dateOfBirth ? formatDate(patient.dateOfBirth) : null} />
+                          <EmrField label="Gender" value={patient.gender} />
+                          <EmrField label="Blood Group" value={patient.bloodGroup} />
+                          <EmrField label="Email" value={patient.email} />
                         </div>
                       </div>
-                    )}
 
-                    {/* EMR */}
-                    <div className="mb-8">
-                      <h4 className="text-[12px] font-medium text-slate-800 mb-3 px-1">EMR</h4>
-                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm space-y-6">
-                        {selectedVisit.emr?.sections?.historyOfPresentIllness && (
-                          <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
-                            {selectedVisit.emr.sections.historyOfPresentIllness}
-                          </p>
+                      <div className="w-full h-px bg-slate-50" />
+
+                      {/* Provider Information */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-slate-800 font-semibold text-[13px]">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#3CB3DA]" />
+                          <span>Provider Information</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-slate-500 text-[12px] pl-5 leading-[1.6]">
+                          <EmrField label="Provider Name" value={`Dr. ${selectedVisit.doctorName}`} />
+                          <EmrField label="Date of Encounter" value={formatDateTime(selectedVisit.scheduledAt)} />
+                        </div>
+                      </div>
+
+                      {/* Visit Information */}
+                      {selectedVisit.emr.visitInfo && (selectedVisit.emr.visitInfo.visitType || selectedVisit.emr.visitInfo.accompaniedBy || selectedVisit.emr.visitInfo.sourceOfHistory || selectedVisit.emr.visitInfo.referralSource || selectedVisit.emr.visitInfo.historyLimitation) && (
+                        <>
+                          <div className="w-full h-px bg-slate-50" />
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2 text-slate-800 font-semibold text-[13px]">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#8AA0FF]" />
+                              <span>Visit Information</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-slate-500 text-[12px] pl-5 leading-[1.6]">
+                              <EmrField label="Visit Type" value={selectedVisit.emr.visitInfo.visitType} />
+                              <EmrField label="Accompanied By" value={selectedVisit.emr.visitInfo.accompaniedBy} />
+                              <EmrField label="Source of History" value={selectedVisit.emr.visitInfo.sourceOfHistory} />
+                              <EmrField label="Referral Source" value={selectedVisit.emr.visitInfo.referralSource} />
+                              <EmrField label="History Limitation" value={selectedVisit.emr.visitInfo.historyLimitation} />
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Reason for visit */}
+                      {(selectedVisit.emr.sections?.reasonForVisit || selectedVisit.reason) && (
+                        <>
+                          <div className="w-full h-px bg-slate-50" />
+                          <div className="flex flex-col gap-2">
+                            <span className="text-slate-800 text-[12px] font-medium">Reason for visit</span>
+                            <div className="bg-slate-50 rounded-[1rem] px-4 py-4 flex items-start gap-2">
+                              <span className="px-[10px] py-[5px] rounded-full bg-[#E2EAFE] text-[#213159] text-[11px] font-medium shrink-0">
+                                Visit
+                              </span>
+                              <span className="text-slate-500 text-[12px] leading-[1.5]">
+                                {selectedVisit.emr.sections?.reasonForVisit || selectedVisit.reason}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* History of Present Illness */}
+                      {selectedVisit.emr.sections?.historyOfPresentIllness && (
+                        <>
+                          <div className="w-full h-px bg-slate-50" />
+                          <div className="flex flex-col gap-2">
+                            <span className="text-slate-800 text-[12px] font-medium">History of Present Illness</span>
+                            <div className="bg-slate-50 rounded-[1rem] px-4 py-4">
+                              <p className="text-slate-500 text-[12px] leading-[1.6] whitespace-pre-line">
+                                {selectedVisit.emr.sections.historyOfPresentIllness}
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Medicines */}
+                      <div className="w-full h-px bg-slate-50" />
+                      <div className="flex flex-col gap-2">
+                        <span className="text-slate-800 text-[12px] font-medium">Medicines</span>
+                        {!selectedVisit.emr.medicines || selectedVisit.emr.medicines.length === 0 ? (
+                          <p className="text-[12px] font-medium text-slate-400 pl-1">No medicines prescribed for this consultation.</p>
+                        ) : (
+                          <div className="bg-slate-50 rounded-[1rem] px-4 py-4 flex flex-col gap-4">
+                            {selectedVisit.emr.medicines.map((med, i) => (
+                              <div key={`${med.name}-${i}`} className={i < selectedVisit.emr!.medicines!.length - 1 ? "pb-4 border-b border-white" : ""}>
+                                <h5 className="text-[12px] font-semibold text-slate-800">
+                                  {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
+                                </h5>
+                                {(med.timing || med.frequency) && (
+                                  <p className="text-[12px] mt-0.5">
+                                    <span className="text-[#5476FC]">{med.timing}</span>
+                                    {med.frequency && <span className="text-slate-500"> · {med.frequency}</span>}
+                                  </p>
+                                )}
+                                {med.instructions && (
+                                  <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: {med.instructions}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         )}
-                        {[
-                          { title: "Review System", text: selectedVisit.emr?.sections?.reviewSystem },
-                          { title: "Health Status", text: selectedVisit.emr?.sections?.healthStatus },
-                          { title: "Histories", text: selectedVisit.emr?.sections?.histories },
-                          { title: "Physical Examination", text: selectedVisit.emr?.sections?.physicalExamination },
-                          { title: "Medical Decision Making", text: selectedVisit.emr?.sections?.medicalDecisionMaking },
-                          { title: "Procedure", text: selectedVisit.emr?.sections?.procedure },
-                          { title: "Impression and Plan", text: selectedVisit.emr?.sections?.impressionAndPlan },
-                          { title: "Professional Services", text: selectedVisit.emr?.sections?.professionalServices },
-                          // Legacy SOAP fields from older appointments saved before this format change
-                          { title: "Subjective", text: selectedVisit.emr?.sections?.subjective },
-                          { title: "Objective", text: selectedVisit.emr?.sections?.objective },
-                          { title: "Assessment", text: selectedVisit.emr?.sections?.assessment },
-                          { title: "Plan", text: selectedVisit.emr?.sections?.plan },
-                        ].filter(({ text }) => !!text).map(({ title, text }) => (
-                          <div key={title} className="pt-2">
+                      </div>
+
+                      {/* Lab Tests */}
+                      <div className="w-full h-px bg-slate-50" />
+                      <div className="flex flex-col gap-2">
+                        <span className="text-slate-800 text-[12px] font-medium">Lab Tests</span>
+                        {!selectedVisit.emr.labs || selectedVisit.emr.labs.length === 0 ? (
+                          <p className="text-[12px] font-medium text-slate-400 pl-1">No lab tests recommended for this consultation.</p>
+                        ) : (
+                          <div className="bg-slate-50 rounded-[1rem] px-4 py-4 flex flex-col gap-4">
+                            {selectedVisit.emr.labs.map((lab, i) => (
+                              <div key={`${lab.name}-${i}`} className={i < selectedVisit.emr!.labs!.length - 1 ? "pb-4 border-b border-white" : ""}>
+                                <h5 className="text-[12px] font-semibold text-slate-800">{lab.name}</h5>
+                                {lab.notes && <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: {lab.notes}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sub-column 2: Clinical notes + Addenda */}
+                    <div className="flex-1 bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm flex flex-col gap-6">
+                      {([
+                        { title: "Review System", text: selectedVisit.emr.sections?.reviewSystem },
+                        { title: "Health Status", text: selectedVisit.emr.sections?.healthStatus },
+                        { title: "Histories", text: selectedVisit.emr.sections?.histories },
+                        { title: "Physical Examination", text: selectedVisit.emr.sections?.physicalExamination },
+                        { title: "Medical Decision Making", text: selectedVisit.emr.sections?.medicalDecisionMaking },
+                        { title: "Procedure", text: selectedVisit.emr.sections?.procedure },
+                        { title: "Impression and Plan", text: selectedVisit.emr.sections?.impressionAndPlan },
+                        { title: "Professional Services", text: selectedVisit.emr.sections?.professionalServices },
+                        // Legacy SOAP fields from older appointments saved before this format change
+                        { title: "Subjective", text: selectedVisit.emr.sections?.subjective },
+                        { title: "Objective", text: selectedVisit.emr.sections?.objective },
+                        { title: "Assessment", text: selectedVisit.emr.sections?.assessment },
+                        { title: "Plan", text: selectedVisit.emr.sections?.plan },
+                      ] as { title: string; text?: string }[])
+                        .filter(({ text }) => !!text)
+                        .map(({ title, text }, i, arr) => (
+                          <div key={title} className={i < arr.length - 1 ? "pb-4 border-b border-slate-50" : ""}>
                             <div className="flex items-center gap-2 mb-2">
                               <div className="w-2 h-2 bg-[#6A8BFF] rotate-45 shrink-0" />
                               <span className="text-[12px] font-medium text-slate-800">{title}</span>
                             </div>
-                            <p className="text-[12px] font-medium text-slate-500 leading-relaxed pl-4 border-l-2 border-slate-50 ml-1">{text}</p>
+                            <p className="text-[12px] font-medium text-slate-500 leading-relaxed pl-4 border-l-2 border-slate-50 ml-1 whitespace-pre-line">{text}</p>
                           </div>
                         ))}
-                        {!selectedVisit.emr?.sections?.historyOfPresentIllness &&
-                          !selectedVisit.emr?.sections?.reviewSystem &&
-                          !selectedVisit.emr?.sections?.healthStatus &&
-                          !selectedVisit.emr?.sections?.histories &&
-                          !selectedVisit.emr?.sections?.physicalExamination &&
-                          !selectedVisit.emr?.sections?.medicalDecisionMaking &&
-                          !selectedVisit.emr?.sections?.procedure &&
-                          !selectedVisit.emr?.sections?.impressionAndPlan &&
-                          !selectedVisit.emr?.sections?.professionalServices &&
-                          !selectedVisit.emr?.sections?.subjective &&
-                          !selectedVisit.emr?.sections?.objective &&
-                          !selectedVisit.emr?.sections?.assessment &&
-                          !selectedVisit.emr?.sections?.plan && (
-                            <p className="text-[12px] font-medium text-slate-400">No clinical notes recorded for this consultation.</p>
-                          )}
-                      </div>
+                      {!selectedVisit.emr.sections?.reviewSystem &&
+                        !selectedVisit.emr.sections?.healthStatus &&
+                        !selectedVisit.emr.sections?.histories &&
+                        !selectedVisit.emr.sections?.physicalExamination &&
+                        !selectedVisit.emr.sections?.medicalDecisionMaking &&
+                        !selectedVisit.emr.sections?.procedure &&
+                        !selectedVisit.emr.sections?.impressionAndPlan &&
+                        !selectedVisit.emr.sections?.professionalServices &&
+                        !selectedVisit.emr.sections?.subjective &&
+                        !selectedVisit.emr.sections?.objective &&
+                        !selectedVisit.emr.sections?.assessment &&
+                        !selectedVisit.emr.sections?.plan && (
+                          <p className="text-[12px] font-medium text-slate-400 text-center py-4">No clinical notes recorded for this consultation.</p>
+                        )}
+
+                      {selectedVisit.emr.addenda && selectedVisit.emr.addenda.length > 0 && (
+                        <>
+                          <div className="w-full h-px bg-slate-50" />
+                          <div className="flex flex-col gap-3">
+                            <span className="text-[12px] font-medium text-slate-800">Addenda</span>
+                            {selectedVisit.emr.addenda.map((a, i) => (
+                              <div key={i} className="bg-slate-50 rounded-[1rem] px-4 py-3">
+                                <p className="text-[12px] font-medium text-slate-500 leading-relaxed whitespace-pre-line">{a.text}</p>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                  Dr. {a.doctorName} &middot; {formatDateTime(a.createdAt)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    {/* Medicines */}
-                    <div className="mb-8">
-                      <div className="flex items-center justify-between mb-4 px-1">
-                        <h4 className="text-[12px] font-medium text-slate-800">Medicines</h4>
-                      </div>
-                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
-                        {!selectedVisit.emr?.medicines || selectedVisit.emr.medicines.length === 0 ? (
-                          <p className="text-[12px] font-medium text-slate-400">No medicines prescribed for this consultation.</p>
-                        ) : (
-                          selectedVisit.emr.medicines.map((med, i) => (
-                            <div key={`${med.name}-${i}`} className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-50 last:border-0 last:pb-0">
-                              <div className="flex items-start gap-3">
-                                <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0 mt-0.5">
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <h5 className="text-[13px] font-medium text-slate-800">
-                                    {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
-                                  </h5>
-                                  <p className="text-[12px] font-medium text-slate-500 mt-1">
-                                    {med.instructions ? `Notes: ${med.instructions}` : "Notes: —"}
-                                  </p>
-                                </div>
-                              </div>
-                              {(med.timing || med.frequency) && (
-                                <div className="text-[11px] font-medium text-slate-500 text-right shrink-0">
-                                  {med.timing}{med.timing && med.frequency ? " · " : ""}{med.frequency}
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Lab Tests */}
-                    <div>
-                      <h4 className="text-[12px] font-medium text-slate-800 mb-4 px-1">Lab Tests</h4>
-                      <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm space-y-6">
-                        {!selectedVisit.emr?.labs || selectedVisit.emr.labs.length === 0 ? (
-                          <p className="text-[12px] font-medium text-slate-400">No lab tests recommended for this consultation.</p>
-                        ) : (
-                          selectedVisit.emr.labs.map((lab, i) => (
-                            <div key={`${lab.name}-${i}`} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${i < selectedVisit.emr!.labs!.length - 1 ? "pb-6 border-b border-slate-50" : ""}`}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-6 h-6 rounded-full bg-[#6A8BFF] text-white flex items-center justify-center shrink-0">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <h5 className="text-[13px] font-medium text-slate-800">{lab.name}</h5>
-                                  {lab.notes && <p className="text-[12px] font-medium text-slate-500 mt-0.5">Notes: {lab.notes}</p>}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>

@@ -3,52 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-
-interface EmergencyRecord {
-  patientName: string;
-  age: number;
-  gender: string;
-  bloodGroup: string;
-  allergies: string[];
-  chronicConditions: string[];
-  medications: string[];
-  emergencyContact: {
-    name: string;
-    relation: string;
-    phone: string;
-  };
-  specialInstructions: string;
-}
-
-const SIMULATED_RECORD: EmergencyRecord = {
-  patientName: "Floyd Miles",
-  age: 32,
-  gender: "Male",
-  bloodGroup: "O Positive (O+)",
-  allergies: [
-    "Penicillin (Severe - risk of anaphylaxis)",
-    "Peanuts (Moderate - causes hives & swelling)",
-    "Aspirin (Mild - triggers asthma symptoms)"
-  ],
-  chronicConditions: [
-    "Bronchial Asthma (Diagnosed 2018, managed via daily inhaler)",
-    "Mild Hypertension (Stage 1, diagnosed 2023)"
-  ],
-  medications: [
-    "Albuterol HFA 90 mcg (Inhaler) - 2 puffs as needed for shortness of breath",
-    "Lisinopril 10 mg (Oral Tablet) - Once daily in the morning"
-  ],
-  emergencyContact: {
-    name: "Jane Miles",
-    relation: "Wife",
-    phone: "+1 (555) 019-2834"
-  },
-  specialInstructions: "Always carry an active epinephrine auto-injector if severe allergic reaction symptoms are detected. Patient has a history of asthma flare-ups during respiratory infections."
-};
+import { apiFetch } from "@/lib/apiFetch";
+import EhrPanel from "@/components/video-call/EhrPanel";
 
 export default function SOSPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"license" | "otp" | "sosCode">("license");
+  const [step, setStep] = useState<"license" | "otp" | "sosCode" | "records">("license");
+  const [verifying, setVerifying] = useState(false);
+  const [ehrData, setEhrData] = useState<any | null>(null);
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseError, setLicenseError] = useState("");
   
@@ -156,19 +118,35 @@ export default function SOSPage() {
     }
   };
 
-  const handleSosCodeSubmit = (e: React.FormEvent) => {
+  const handleSosCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullCode = sosCode.join("");
     if (fullCode.length < 6) {
       setSosCodeError("Please enter all 6 digits of the SOS code.");
       return;
     }
-    // Simulate verification
-    if (fullCode === "123456" || fullCode.length === 6) {
-      setSosCodeError("");
-      router.push("/appointments/patient-details?id=all-20");
-    } else {
-      setSosCodeError("Invalid SOS code. Please try again.");
+    setVerifying(true);
+    setSosCodeError("");
+    try {
+      const res = await apiFetch("/api/sos/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: fullCode }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEhrData(data);
+        setStep("records");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSosCodeError(err.error ?? "Wrong code. Please try again.");
+        setSosCode(Array(6).fill(""));
+        sosInputsRef.current[0]?.focus();
+      }
+    } catch {
+      setSosCodeError("Could not verify the code. Please try again.");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -186,6 +164,9 @@ export default function SOSPage() {
   const handleResetFlow = () => {
     setLicenseNumber("");
     setOtp(Array(6).fill(""));
+    setSosCode(Array(6).fill(""));
+    setSosCodeError("");
+    setEhrData(null);
     setStep("license");
   };
 
@@ -392,18 +373,23 @@ export default function SOSPage() {
                   <path d="M10 18.3327C5.39765 18.3327 1.66669 14.6017 1.66669 9.99935C1.66669 5.39697 5.39765 1.66602 10 1.66602C14.6024 1.66602 18.3334 5.39697 18.3334 9.99935C18.3334 14.6017 14.6024 18.3327 10 18.3327ZM10 16.666C13.6819 16.666 16.6667 13.6813 16.6667 9.99935C16.6667 6.31745 13.6819 3.33268 10 3.33268C6.31812 3.33268 3.33335 6.31745 3.33335 9.99935C3.33335 13.6813 6.31812 16.666 10 16.666ZM9.16669 5.83268H10.8334V7.49935H9.16669V5.83268ZM9.16669 9.16602H10.8334V14.166H9.16669V9.16602Z" fill="#E84949"/>
                 </svg>
                 <p className="text-[#24292E] text-xs font-normal leading-[18px] tracking-[-0.24px]">
-                  Please note that these records are available for access for <span className="text-[#E84949] font-semibold">only 1 hour</span> from the time of entry. Ensure timely retrieval of the necessary information.
+                  This code is valid for <span className="text-[#E84949] font-semibold">only 15 minutes</span> from when the patient generated it, and can only be used once. Ensure timely retrieval of the necessary information.
                 </p>
               </div>
 
               <button
                 type="submit"
-                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all"
+                disabled={verifying}
+                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all disabled:opacity-60"
               >
-                Access SOS Records
+                {verifying ? "Verifying..." : "Access SOS Records"}
               </button>
             </form>
           </div>
+        )}
+
+        {step === "records" && ehrData && (
+          <EhrPanel open={true} onClose={handleResetFlow} loading={false} data={{ ...ehrData, preVisitData: null }} />
         )}
       </div>
     </ProtectedRoute>

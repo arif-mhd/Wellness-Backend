@@ -108,4 +108,31 @@ router.get("/:patientId/ehr", requireRole("admin"), async (req: Request, res: Re
   }
 });
 
+// ── PATCH /api/admin/patients/:patientId/status ─────────────────────────────
+// Toggle a patient's account between "active" and "deactivated". Deactivated
+// patients are blocked from signing in (enforced in config/supertokens.ts).
+router.patch("/:patientId/status", requireRole("admin"), async (req: Request, res: Response) => {
+  const { patientId } = req.params;
+  const { status } = req.body as { status?: string };
+
+  if (status !== "active" && status !== "deactivated") {
+    res.status(400).json({ error: "status must be 'active' or 'deactivated'." });
+    return;
+  }
+
+  try {
+    const { resource: patient } = await patientsContainer.item(patientId, patientId).read();
+    if (!patient) { res.status(404).json({ error: "Patient not found" }); return; }
+
+    patient.status = status;
+    patient.updatedAt = new Date().toISOString();
+    await patientsContainer.item(patientId, patientId).replace(patient);
+
+    res.json({ patient });
+  } catch (err) {
+    console.error("Admin patient status update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

@@ -166,6 +166,8 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
     slots,
     // Documents
     degreeFileUrl, specFileUrl, otherFileUrl,
+    // Payment/bank details
+    bankDetails,
   } = req.body;
 
   try {
@@ -199,6 +201,7 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
       degreeFileUrl:    degreeFileUrl    ?? doctor.degreeFileUrl,
       specFileUrl:      specFileUrl      ?? doctor.specFileUrl,
       otherFileUrl:     otherFileUrl     ?? doctor.otherFileUrl,
+      bankDetails:      bankDetails      ?? doctor.bankDetails,
       profileCompletedAt: new Date().toISOString(),
       updatedAt:        new Date().toISOString(),
     };

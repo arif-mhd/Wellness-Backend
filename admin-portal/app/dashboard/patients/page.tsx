@@ -242,16 +242,23 @@ export default function ManagePatientsPage() {
                           <tr
                             key={patient.id}
                             onClick={() => setSelectedId(patient.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
+                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
+                              patient.status === "deactivated" ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-slate-50/50"
+                            }`}
                           >
                             <td className="py-3 px-2">
                               <div className="flex items-center gap-3">
                                 <Avatar patient={patient} size="md" />
                                 <div className="min-w-0">
-                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">
+                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
                                     {patient.fullName}
                                     {age(patient.dateOfBirth) && (
                                       <span className="font-normal text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
+                                    )}
+                                    {patient.status === "deactivated" && (
+                                      <span className="px-2 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full text-[10px] font-semibold shrink-0">
+                                        Deactivated
+                                      </span>
                                     )}
                                   </p>
                                   <p className="text-[11px] font-normal text-slate-400 truncate">{patient.email}</p>

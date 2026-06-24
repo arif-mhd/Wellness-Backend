@@ -4,6 +4,7 @@ import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
+import { patientsContainer } from "./cosmos";
 
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
@@ -115,6 +116,33 @@ export function initSuperTokens(): void {
                    ON CONFLICT (supertokens_id) DO NOTHING`,
                   [userId, name, role]
                 );
+              }
+
+              return response;
+            },
+
+            // Block sign-in for patients whose account has been deactivated by an admin.
+            signInPOST: async (input) => {
+              if (originalImplementation.signInPOST === undefined) {
+                throw new Error("signInPOST not defined");
+              }
+
+              const response = await originalImplementation.signInPOST(input);
+
+              if (response.status === "OK") {
+                const userId = response.user.id;
+                try {
+                  const { resource: patient } = await patientsContainer.item(userId, userId).read();
+                  if (patient && patient.status === "deactivated") {
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "Your account has been deactivated. Please contact support.",
+                    } as any;
+                  }
+                } catch {
+                  // Not a patient (doctor/admin/pharmacy) or no profile doc yet — allow sign-in.
+                }
               }
 
               return response;

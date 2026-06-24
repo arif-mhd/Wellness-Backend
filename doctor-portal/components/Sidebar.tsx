@@ -62,12 +62,6 @@ const HelpIcon = () => (
     <path d="M3.287 3.287 6.114 6.113M9.887 9.887l2.826 2.826M9.887 6.113l2.353-2.353M3.287 12.713l2.827-2.826" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-const SettingsIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="2" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M12.934 10a1 1 0 0 0 .2 1.107l.04.04a1.414 1.414 0 1 1-2 2l-.04-.04A1 1 0 0 0 10 13.267v.066a1.333 1.333 0 0 1-2.667 0v-.04A1 1 0 0 0 6.12 12.48l-.04.04a1.414 1.414 0 1 1-2-2l.04-.04A1 1 0 0 0 2.733 9.333H2.667a1.333 1.333 0 0 1 0-2.666h.04A1 1 0 0 0 3.52 5.52l-.04-.04a1.414 1.414 0 1 1 2-2l.04.04A1 1 0 0 0 6.667 2.733V2.667a1.333 1.333 0 0 1 2.666 0v.04A1 1 0 0 0 10.48 3.52l.04-.04a1.414 1.414 0 1 1 2 2l-.04.04A1 1 0 0 0 13.267 6.667h.066a1.333 1.333 0 0 1 0 2.666h-.04A1 1 0 0 0 12.934 10Z" stroke="#3D4B5A" strokeWidth="1.5" />
-  </svg>
-);
 const LogoutIcon = () => (
   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
@@ -210,10 +204,9 @@ export default function Sidebar() {
       {/* ── BOTTOM FOOTER ────────────────────────────────────────────────── */}
       <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 ${open ? "px-5" : "px-3 items-center"}`}>
 
-        {/* Help & Settings */}
+        {/* Help & Support */}
         {[
           { href: "/dashboard/help", label: "Help & Support", Icon: HelpIcon },
-          { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
         ].map(({ href, label, Icon }) => (
           <Link
             key={href}

@@ -9,6 +9,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        outfit: ["var(--font-sans)", "sans-serif"],
+        marcellus: ["var(--font-marcellus)", "serif"],
       },
       colors: {
         brand: {

@@ -96,6 +96,12 @@ export const notificationsContainer: Container = db.container("notifications");
 /** Activity logs — partition key: /source (admin | doctor | patient | pharmacy | lab) */
 export const activityLogsContainer: Container = db.container("activityLogs");
 
+/** Chat messages — partition key: /conversationId (format: chat:{patientId}:{doctorId}) */
+export const messagesContainer: Container = db.container("messages");
+
+/** SOS emergency codes — partition key: /patientId (short-lived, single-use access codes) */
+export const sosCodesContainer: Container = db.container("sosCodes");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -132,6 +138,8 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "feedback",               partitionKey: { paths: ["/id"] } },
     { id: "notifications",          partitionKey: { paths: ["/patientId"] } },
     { id: "activityLogs",           partitionKey: { paths: ["/source"] } },
+    { id: "messages",               partitionKey: { paths: ["/conversationId"] } },
+    { id: "sosCodes",               partitionKey: { paths: ["/patientId"] } },
   ];
 
   for (const spec of required) {
