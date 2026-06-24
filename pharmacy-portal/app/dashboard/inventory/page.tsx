@@ -51,7 +51,7 @@ export default function InventoryPage() {
   const router = useRouter();
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [filter, setFilter]         = useState<"all" | Product["status"]>("all");
+  const [filter, setFilter]         = useState<"all" | "flagged" | Product["status"]>("all");
   const [search, setSearch]         = useState("");
 
   const load = useCallback(async () => {
