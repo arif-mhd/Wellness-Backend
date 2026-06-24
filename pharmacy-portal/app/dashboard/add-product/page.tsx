@@ -23,6 +23,12 @@ export default function AddProductPage() {
   const [reorderLevel, setReorderLevel] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [strength, setStrength]       = useState("");
+  const [numberOfTablets, setNumberOfTablets] = useState("");
+  const [productSummary, setProductSummary] = useState("");
+  const [recommendedFor, setRecommendedFor] = useState("");
+  const [benefits, setBenefits] = useState("");
+  const [sideEffects, setSideEffects] = useState("");
+  const [howToUse, setHowToUse] = useState("");
   const [requiresPrescription, setRequiresPrescription] = useState(false);
   const [imageFile, setImageFile]     = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -58,6 +64,12 @@ export default function AddProductPage() {
       if (reorderLevel) form.append("reorderLevel", reorderLevel);
       if (manufacturer) form.append("manufacturer", manufacturer);
       if (strength)     form.append("strength", strength);
+      if (numberOfTablets) form.append("numberOfTablets", numberOfTablets);
+      if (productSummary) form.append("productSummary", productSummary);
+      if (recommendedFor) form.append("recommendedFor", recommendedFor);
+      if (benefits) form.append("benefits", benefits);
+      if (sideEffects) form.append("sideEffects", sideEffects);
+      if (howToUse) form.append("howToUse", howToUse);
       if (imageFile)    form.append("image", imageFile);
 
       const res = await fetch(`${API_URL}/api/pharmacy/products`, {
@@ -163,6 +175,50 @@ export default function AddProductPage() {
             <textarea value={description} onChange={e => setDescription(e.target.value)}
               placeholder="Brief description of the product, dosage, indications…"
               rows={3}
+              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+          </div>
+
+          <div>
+            <label className={labelCls}>Product Summary</label>
+            <textarea value={productSummary} onChange={e => setProductSummary(e.target.value)}
+              placeholder="Detailed product summary..."
+              rows={3}
+              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Recommended For (Tags)</label>
+              <input value={recommendedFor} onChange={e => setRecommendedFor(e.target.value)} placeholder="e.g. Age: 8-64, Kids" className={inputCls} />
+              <p className="text-[11px] font-outfit text-slate-400 mt-1">Comma-separated values</p>
+            </div>
+            <div>
+              <label className={labelCls}>Number of Tablets / Quantity</label>
+              <input value={numberOfTablets} onChange={e => setNumberOfTablets(e.target.value)} placeholder="e.g. 15 Tablets" className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Benefits</label>
+            <textarea value={benefits} onChange={e => setBenefits(e.target.value)}
+              placeholder="Product benefits..."
+              rows={2}
+              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+          </div>
+
+          <div>
+            <label className={labelCls}>Side Effects</label>
+            <textarea value={sideEffects} onChange={e => setSideEffects(e.target.value)}
+              placeholder="Potential side effects..."
+              rows={2}
+              className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+          </div>
+
+          <div>
+            <label className={labelCls}>How to use</label>
+            <textarea value={howToUse} onChange={e => setHowToUse(e.target.value)}
+              placeholder="Usage instructions..."
+              rows={2}
               className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
           </div>
 

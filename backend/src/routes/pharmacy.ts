@@ -205,6 +205,7 @@ router.post(
       const {
         name, description, category, price, stock, requiresPrescription,
         batchNumber, expiryDate, reorderLevel, manufacturer, strength,
+        numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
       if (!name || !category || !price) {
@@ -240,6 +241,12 @@ router.post(
         reorderLevel:         reorderLevel ? parseInt(reorderLevel, 10) : null,
         manufacturer:         manufacturer || null,
         strength:             strength || null,
+        numberOfTablets:      numberOfTablets || null,
+        productSummary:       productSummary || null,
+        recommendedFor:       recommendedFor || null,
+        benefits:             benefits || null,
+        sideEffects:          sideEffects || null,
+        howToUse:             howToUse || null,
         imageUrl,
         status:               isOnboarded ? "approved" as const : "pending_approval" as const,
         flagged:              false,
@@ -276,6 +283,7 @@ router.put(
       const {
         name, description, category, price, stock, requiresPrescription,
         batchNumber, expiryDate, reorderLevel, manufacturer, strength,
+        numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
       const { resource: existing } = await pharmacyProductsContainer.item(productId, pharmacyId).read();
@@ -312,6 +320,12 @@ router.put(
         ...(reorderLevel !== undefined && { reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : null }),
         ...(manufacturer !== undefined && { manufacturer: manufacturer || null }),
         ...(strength     !== undefined && { strength: strength || null }),
+        ...(numberOfTablets !== undefined && { numberOfTablets: numberOfTablets || null }),
+        ...(productSummary  !== undefined && { productSummary: productSummary || null }),
+        ...(recommendedFor  !== undefined && { recommendedFor: recommendedFor || null }),
+        ...(benefits        !== undefined && { benefits: benefits || null }),
+        ...(sideEffects     !== undefined && { sideEffects: sideEffects || null }),
+        ...(howToUse        !== undefined && { howToUse: howToUse || null }),
         imageUrl,
         status:        isOnboarded ? "approved" as const : "pending_approval" as const,
         updatedAt:     now,

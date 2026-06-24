@@ -35,6 +35,12 @@ interface Product {
   reorderLevel?: number;
   manufacturer?: string;
   strength?: string;
+  numberOfTablets?: string;
+  productSummary?: string;
+  recommendedFor?: string;
+  benefits?: string;
+  sideEffects?: string;
+  howToUse?: string;
   flagged?: boolean;
   flagReason?: string | null;
 }
@@ -137,6 +143,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       form.append("reorderLevel", editing.reorderLevel != null ? String(editing.reorderLevel) : "");
       form.append("manufacturer", editing.manufacturer ?? "");
       form.append("strength", editing.strength ?? "");
+      form.append("numberOfTablets", editing.numberOfTablets ?? "");
+      form.append("productSummary", editing.productSummary ?? "");
+      form.append("recommendedFor", editing.recommendedFor ?? "");
+      form.append("benefits", editing.benefits ?? "");
+      form.append("sideEffects", editing.sideEffects ?? "");
+      form.append("howToUse", editing.howToUse ?? "");
       if (editImage) form.append("image", editImage);
 
       const res = await fetch(`${API_URL}/api/pharmacy/products/${editing.id}`, {
@@ -395,6 +407,45 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Description</label>
                 <textarea value={editing.description ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, description: e.target.value } : prev)}
                   rows={3} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Product Summary</label>
+                <textarea value={editing.productSummary ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, productSummary: e.target.value } : prev)}
+                  rows={3} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Recommended For (Tags)</label>
+                  <input value={editing.recommendedFor ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, recommendedFor: e.target.value } : prev)}
+                    placeholder="e.g. Age: 8-64, Kids"
+                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                </div>
+                <div>
+                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Number of Tablets / Quantity</label>
+                  <input value={editing.numberOfTablets ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, numberOfTablets: e.target.value } : prev)}
+                    placeholder="e.g. 15 Tablets"
+                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Benefits</label>
+                <textarea value={editing.benefits ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, benefits: e.target.value } : prev)}
+                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Side Effects</label>
+                <textarea value={editing.sideEffects ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, sideEffects: e.target.value } : prev)}
+                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">How to use</label>
+                <textarea value={editing.howToUse ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, howToUse: e.target.value } : prev)}
+                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
               </div>
 
               <div>
