@@ -46,6 +46,8 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
         quantity:     item.quantity,
         unit_price:   product.price,
         pharmacyId:   product.pharmacyId,
+        image_url:    product.imageUrl ?? null,
+        numberOfTablets: product.numberOfTablets ?? null,
       });
       total_amount += product.price * item.quantity;
     }
@@ -72,14 +74,24 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
     // Decrement stock for each ordered product
     for (const item of validatedItems) {
       try {
-        const { resources: prodDocs } = await pharmacyProductsContainer.items.query({
-          query: "SELECT * FROM c WHERE c.id = @id",
-          parameters: [{ name: "@id", value: item.medicine_id }],
-        }).fetchAll();
-        if (prodDocs.length) {
-          const prod = prodDocs[0];
+        const { resource: prod } = await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).read();
+        if (prod) {
           const newStock = Math.max(0, (prod.stock ?? 0) - item.quantity);
-          await pharmacyProductsContainer.items.upsert({ ...prod, stock: newStock, updatedAt: new Date().toISOString() });
+          let newNumberOfTablets = prod.numberOfTablets;
+          
+          if (newNumberOfTablets) {
+             const num = parseInt(newNumberOfTablets.toString(), 10);
+             if (!isNaN(num)) {
+                 newNumberOfTablets = Math.max(0, num - item.quantity).toString();
+             }
+          }
+
+          await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).replace({ 
+            ...prod, 
+            stock: newStock, 
+            numberOfTablets: newNumberOfTablets,
+            updatedAt: new Date().toISOString() 
+          });
         }
       } catch (stockErr) {
         console.warn(`Stock decrement failed for ${item.medicine_id}:`, stockErr);

@@ -51,6 +51,12 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
         image_url:            p.imageUrl ?? null,
         is_active:            (p.stock ?? 0) > 0,
+        numberOfTablets:      p.numberOfTablets ?? null,
+        productSummary:       p.productSummary ?? null,
+        recommendedFor:       p.recommendedFor ?? null,
+        benefits:             p.benefits ?? null,
+        sideEffects:          p.sideEffects ?? null,
+        howToUse:             p.howToUse ?? null,
       }));
 
     res.json(medicines);
@@ -78,6 +84,12 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
       price: p.price, stock_quantity: p.stock ?? 0,
       requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
       image_url: p.imageUrl ?? null, is_active: (p.stock ?? 0) > 0,
+      numberOfTablets: p.numberOfTablets ?? null,
+      productSummary: p.productSummary ?? null,
+      recommendedFor: p.recommendedFor ?? null,
+      benefits: p.benefits ?? null,
+      sideEffects: p.sideEffects ?? null,
+      howToUse: p.howToUse ?? null,
     });
   } catch (err) {
     console.error("Catalogue single fetch error:", err);
