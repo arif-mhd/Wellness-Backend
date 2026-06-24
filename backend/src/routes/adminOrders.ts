@@ -10,8 +10,10 @@ router.use(requireRole("admin"));
 // Returns all medicine orders with enriched patient + pharmacy info.
 router.get("/", async (_req: SessionRequest, res: Response) => {
   try {
+    // medicineOrders is partitioned by /patientId — no partition key = cross-partition scan
     const { resources: orders } = await medicineOrdersContainer.items.query(
-      "SELECT * FROM c ORDER BY c.createdAt DESC"
+      "SELECT * FROM c ORDER BY c.createdAt DESC",
+      { maxItemCount: 200 }
     ).fetchAll();
 
     if (!orders.length) { res.json({ orders: [] }); return; }
@@ -72,7 +74,7 @@ router.get("/:orderId", async (req: SessionRequest, res: Response) => {
     const { resources } = await medicineOrdersContainer.items.query({
       query: "SELECT * FROM c WHERE c.id = @id",
       parameters: [{ name: "@id", value: orderId }],
-    }).fetchAll();
+    }, { maxItemCount: 10 }).fetchAll();
 
     if (!resources.length) { res.status(404).json({ error: "Order not found" }); return; }
     const order = resources[0] as any;
@@ -124,7 +126,7 @@ router.patch("/:orderId/status", async (req: SessionRequest, res: Response) => {
     const { resources } = await medicineOrdersContainer.items.query({
       query: "SELECT * FROM c WHERE c.id = @id",
       parameters: [{ name: "@id", value: orderId }],
-    }).fetchAll();
+    }, { maxItemCount: 10 }).fetchAll();
 
     if (!resources.length) { res.status(404).json({ error: "Order not found" }); return; }
     const order = resources[0] as any;

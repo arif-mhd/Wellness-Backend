@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface OrderItem {
   medicine_id: string;
@@ -30,14 +31,6 @@ interface Order {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
-async function adminFetch(path: string, options?: RequestInit) {
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
-  });
-}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -99,7 +92,7 @@ export default function OrdersPage() {
     (async () => {
       try {
         setLoading(true);
-        const r = await adminFetch("/api/admin/orders");
+        const r = await apiFetch("/api/admin/orders");
         if (!r.ok) throw new Error(await r.text());
         const data = await r.json();
         setOrders(data.orders ?? []);
@@ -127,9 +120,10 @@ export default function OrdersPage() {
   const handleStatusChange = useCallback(async (orderId: string, status: string) => {
     setUpdatingStatus(true);
     try {
-      const r = await adminFetch(`/api/admin/orders/${orderId}/status`, {
+      const r = await apiFetch(`/api/admin/orders/${orderId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
+        headers: { "Content-Type": "application/json" },
       });
       if (!r.ok) throw new Error();
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as Order["status"] } : o));
