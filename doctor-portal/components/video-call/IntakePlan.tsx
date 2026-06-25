@@ -392,6 +392,7 @@ interface ConsultationNotesProps {
   } | null;
   visitInfo: VisitInfo;
   onVisitInfoChange: (v: VisitInfo) => void;
+  onScheduleFollowUp?: () => void;
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
@@ -424,12 +425,14 @@ function SubFieldsTab({
   value,
   onChange,
   hint,
+  onScheduleFollowUp,
 }: {
   title: string;
   subFields: SubField[];
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  onScheduleFollowUp?: () => void;
 }) {
   const values = parseSubFields(value, subFields);
 
@@ -451,7 +454,19 @@ function SubFieldsTab({
       )}
       {subFields.map((f) => (
         <div key={f.label} className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-semibold text-slate-700">{f.label}</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-slate-700">{f.label}</span>
+            {f.label === "Follow-up" && (
+              <button
+                type="button"
+                onClick={onScheduleFollowUp}
+                className="h-7 px-3 rounded-lg border border-[#5476FC] text-[#5476FC] bg-[#5476FC]/5 hover:bg-[#5476FC]/10 text-[10px] font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                Schedule Follow-up
+              </button>
+            )}
+          </div>
           <textarea
             value={values[f.label] ?? ""}
             onChange={(e) => updateField(f.label, e.target.value)}
@@ -475,6 +490,7 @@ export default function IntakePlan({
   patientProfile,
   visitInfo,
   onVisitInfoChange,
+  onScheduleFollowUp,
 }: ConsultationNotesProps) {
   const activeTab = openSection ?? "reasonForVisit";
 
@@ -590,6 +606,7 @@ export default function IntakePlan({
               value={sections[activeTab as keyof EmrSections] ?? ""}
               onChange={(v) => updateSection(activeTab as keyof EmrSections, v)}
               hint={activeTab === "historyOfPresentIllness" && sections.historyOfPresentIllness.trim() ? "Pre-filled from past visit — edit as needed" : undefined}
+              onScheduleFollowUp={onScheduleFollowUp}
             />
           ) : activeTabDef ? (
             <div className="flex flex-col gap-3">
