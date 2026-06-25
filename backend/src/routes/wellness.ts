@@ -324,26 +324,39 @@ router.delete("/workout-log/:entryId", async (req: SessionRequest, res: Response
   }
 });
 
-// ── GET /api/wellness/daily-summary?date=YYYY-MM-DD ─────────────────────────
-// Returns aggregated food + workout stats for a given date.
+// ── GET /api/wellness/daily-summary?date=YYYY-MM-DD&profileId=xxx ───────────
+// Returns aggregated food + workout stats for a given date, scoped to the
+// active profile. If ?profileId is omitted the full account-owner summary is
+// returned (backwards-compatible).
 router.get("/daily-summary", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    // Build profile-scoped queries — mirrors the pattern used in /food-log and /workout-log
+    const foodQuery = profileId
+      ? "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date AND c.profileId = @profileId"
+      : "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
+    const workoutQuery = profileId
+      ? "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date AND c.profileId = @profileId"
+      : "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
+
+    const baseParams = [
+      { name: "@pid",  value: patientId },
+      { name: "@date", value: date },
+    ];
+    const profileParams = profileId
+      ? [...baseParams, { name: "@profileId", value: profileId }]
+      : baseParams;
 
     const [{ resources: foodEntries }, { resources: workoutEntries }] = await Promise.all([
       foodLogsContainer.items.query(
-        {
-          query: "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date",
-          parameters: [{ name: "@pid", value: patientId }, { name: "@date", value: date }],
-        },
+        { query: foodQuery, parameters: profileParams },
         { partitionKey: patientId }
       ).fetchAll(),
       workoutLogsContainer.items.query(
-        {
-          query: "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date",
-          parameters: [{ name: "@pid", value: patientId }, { name: "@date", value: date }],
-        },
+        { query: workoutQuery, parameters: profileParams },
         { partitionKey: patientId }
       ).fetchAll(),
     ]);
