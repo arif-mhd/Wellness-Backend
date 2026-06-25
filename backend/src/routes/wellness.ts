@@ -6,11 +6,99 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = Router();
 
 // All wellness routes require a valid patient session
 router.use(requireRole("patient"));
+
+// ── POST /api/wellness/analyze-food-image ────────────────────────────────────
+// Body: { imageBase64: string, mimeType: string }
+// Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
+router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
+  const { imageBase64, mimeType } = req.body;
+  if (!imageBase64) {
+    res.status(400).json({ error: "imageBase64 is required" });
+    return;
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "your_gemini_api_key_here") {
+    res.status(503).json({ error: "AI food analysis is not configured. Please set GEMINI_API_KEY in your .env file." });
+    return;
+  }
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
+{
+  "foodName": "Detected food name (be specific, e.g. 'Grilled Chicken Breast' not just 'Chicken')",
+  "confidence": "high|medium|low",
+  "description": "Short 1-sentence description of the food",
+  "per100g": {
+    "calories": <number>,
+    "protein": <number in grams>,
+    "fat": <number in grams>,
+    "carbs": <number in grams>,
+    "fiber": <number in grams>
+  }
+}
+Rules:
+- confidence = "high" if you can clearly identify the specific food
+- confidence = "medium" if you can identify the food type but not the exact preparation
+- confidence = "low" if the image is unclear or you are guessing
+- All nutrition values must be realistic per 100 grams
+- If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
+
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
+    ]);
+
+    const text = result.response.text().trim();
+
+    // Strip markdown code fences if present
+    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    let parsed: {
+      foodName: string;
+      confidence: "high" | "medium" | "low";
+      description: string;
+      per100g: { calories: number; protein: number; fat: number; carbs: number; fiber: number };
+    };
+
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      console.error("[analyze-food-image] Failed to parse Gemini response:", text);
+      res.status(500).json({ error: "AI returned an unexpected response. Please try again." });
+      return;
+    }
+
+    // Sanitize / validate numeric fields
+    const clean = (v: any, fallback: number) => (typeof v === "number" && !isNaN(v) ? Math.round(v * 10) / 10 : fallback);
+    const response = {
+      foodName: String(parsed.foodName || "Unknown food").trim(),
+      confidence: (["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low") as "high" | "medium" | "low",
+      description: String(parsed.description || "").trim(),
+      per100g: {
+        calories: clean(parsed.per100g?.calories, 0),
+        protein:  clean(parsed.per100g?.protein,  0),
+        fat:      clean(parsed.per100g?.fat,       0),
+        carbs:    clean(parsed.per100g?.carbs,     0),
+        fiber:    clean(parsed.per100g?.fiber,     0),
+      },
+    };
+
+    res.json(response);
+  } catch (err: any) {
+    console.error("[analyze-food-image] error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
+});
+
+
 
 // ── Open Food Facts fallback ─────────────────────────────────────────────────
 async function searchOpenFoodFacts(query: string): Promise<Food[]> {
