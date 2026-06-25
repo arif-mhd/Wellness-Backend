@@ -1358,4 +1358,189 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
   }
 });
 
+// ─── POST /api/appointments/:id/send-followup ────────────────────────────────
+// Doctor (primary only) sends a follow-up consultation proposal to the patient
+// in the current call via the LiveKit data channel. A pendingFollowUp field is
+// also written to the appointment so the patient can respond via REST if the
+// LiveKit message is missed.
+router.post("/:id/send-followup", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id }   = req.params;
+  const { followUpDate, followUpTime, reason } = req.body;
+  // followUpDate: "YYYY-MM-DD", followUpTime: "HH:MM", reason: string
+
+  if (!followUpDate || !followUpTime) {
+    res.status(400).json({ error: "followUpDate and followUpTime are required." });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.doctorId !== doctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    let doctorName = "Doctor";
+    try {
+      const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
+      doctorName = doc?.fullName ?? doctorName;
+    } catch { /* use default */ }
+
+    const followUpScheduledAt = `${followUpDate}T${followUpTime}:00.000`;
+
+    // Store the pending follow-up on the appointment
+    const updated = {
+      ...apt,
+      pendingFollowUp: {
+        followUpDate,
+        followUpTime,
+        followUpScheduledAt,
+        reason: reason ?? "Follow-up consultation",
+        status: "pending",
+        sentAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await appointmentsContainer.items.upsert(updated);
+
+    // Send real-time notification to the patient via LiveKit data channel
+    await sendLivekitData(apt.livekitRoom, {
+      type: "followup_request",
+      followUpDate,
+      followUpTime,
+      followUpScheduledAt,
+      reason: reason ?? "Follow-up consultation",
+      doctorName,
+    });
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("send-followup error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/:id/followup-respond ─────────────────────────────
+// Patient accepts or declines a follow-up consultation proposal.
+// If accepted: creates a new scheduled appointment, notifies the patient,
+// and sends a LiveKit data message back to the doctor.
+router.post("/:id/followup-respond", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id }    = req.params;
+  const { decision } = req.body; // "accepted" | "declined"
+
+  if (decision !== "accepted" && decision !== "declined") {
+    res.status(400).json({ error: "decision must be 'accepted' or 'declined'." });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+    if (!apt.pendingFollowUp) { res.status(400).json({ error: "No pending follow-up on this appointment." }); return; }
+
+    const now = new Date().toISOString();
+    let newAppointmentId: string | null = null;
+
+    if (decision === "accepted") {
+      // Create the follow-up appointment
+      newAppointmentId = generateId();
+      const followUpApt = {
+        id: newAppointmentId,
+        patientId,
+        doctorId: apt.doctorId,
+        scheduledAt: apt.pendingFollowUp.followUpScheduledAt,
+        durationMins: apt.durationMins ?? 30,
+        reason: apt.pendingFollowUp.reason ?? "Follow-up consultation",
+        shareMedicalHistory: apt.shareMedicalHistory ?? false,
+        status: "scheduled",
+        paymentStatus: "paid",
+        paymentAmount: apt.paymentAmount ?? 250,
+        livekitRoom: newAppointmentId,
+        isFollowUp: true,
+        sourceAppointmentId: id,
+        familyMemberId: apt.familyMemberId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await appointmentsContainer.items.create(followUpApt);
+
+      // Resolve doctor name for the notification message
+      let doctorName = "Doctor";
+      try {
+        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+        doctorName = doc?.fullName ?? doctorName;
+      } catch { /* use default */ }
+
+      const followUpDate = apt.pendingFollowUp.followUpDate;
+      const followUpTime = apt.pendingFollowUp.followUpTime;
+      const dateText = new Date(`${followUpDate}T12:00:00Z`).toLocaleDateString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+      });
+      const [h, m] = followUpTime.split(":");
+      const hr = parseInt(h, 10);
+      const ampm = hr >= 12 ? "PM" : "AM";
+      const hr12 = hr % 12 || 12;
+      const timeText = `${hr12}:${m} ${ampm}`;
+
+      // Notify the patient
+      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const notification = {
+        id: notifId,
+        patientId,
+        profileId: apt.familyMemberId ?? patientId,
+        title: "Follow-up Appointment Booked",
+        body: `Your follow-up with Dr. ${doctorName} has been scheduled for ${dateText} at ${timeText}.`,
+        type: "followup_booked",
+        referenceId: newAppointmentId,
+        isRead: false,
+        sentAt: now,
+      };
+      await notificationsContainer.items.create(notification);
+
+      // Notify doctor via LiveKit that the patient accepted
+      await sendLivekitData(apt.livekitRoom, {
+        type: "followup_accepted",
+        newAppointmentId,
+        followUpDate,
+        followUpTime,
+      });
+
+      logActivity({
+        source: "patient",
+        action: "Follow-up Appointment Booked",
+        details: `Patient accepted follow-up — new appointment ${newAppointmentId} created from ${id}`,
+        performedBy: "Patient",
+        performedById: patientId,
+        entityType: "appointment",
+        entityId: newAppointmentId,
+      });
+    } else {
+      // Notify doctor via LiveKit that the patient declined
+      await sendLivekitData(apt.livekitRoom, {
+        type: "followup_declined",
+      });
+    }
+
+    // Update the source appointment's pendingFollowUp status
+    const updatedApt = {
+      ...apt,
+      pendingFollowUp: {
+        ...apt.pendingFollowUp,
+        status: decision,
+        decidedAt: now,
+        ...(newAppointmentId ? { newAppointmentId } : {}),
+      },
+      updatedAt: now,
+    };
+    await appointmentsContainer.items.upsert(updatedApt);
+
+    res.json({ ok: true, newAppointmentId });
+  } catch (err) {
+    console.error("followup-respond error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;
+

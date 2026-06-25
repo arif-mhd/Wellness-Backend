@@ -98,6 +98,14 @@ function ConsultRoom() {
   const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "waiting" | "accepted" | "declined">("idle");
   const patientPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Follow-up scheduling
+  const [showFollowUpModal,   setShowFollowUpModal]   = useState(false);
+  const [followUpDate,        setFollowUpDate]        = useState("");
+  const [followUpTime,        setFollowUpTime]        = useState("");
+  const [followUpReason,      setFollowUpReason]      = useState("Follow-up consultation");
+  const [followUpStatus,      setFollowUpStatus]      = useState<"idle" | "sending" | "waiting" | "accepted" | "declined">("idle");
+  const [followUpToast,       setFollowUpToast]       = useState<string | null>(null);
+
   // Video
   const roomRef       = useRef<Room | null>(null);
   const localVideoEl  = useRef<HTMLVideoElement>(null);
@@ -352,6 +360,26 @@ function ConsultRoom() {
 
   useEffect(() => { return () => { if (patientPollRef.current) clearInterval(patientPollRef.current); }; }, []);
 
+  const handleSendFollowUp = async () => {
+    if (!followUpDate || !followUpTime || !appointmentId) return;
+    setFollowUpStatus("sending");
+    try {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/send-followup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followUpDate, followUpTime, reason: followUpReason }),
+      });
+      if (res.ok) {
+        setFollowUpStatus("waiting");
+        setShowFollowUpModal(false);
+      } else {
+        setFollowUpStatus("idle");
+      }
+    } catch {
+      setFollowUpStatus("idle");
+    }
+  };
+
   // Restore any previously saved EMR for this appointment (e.g. doctor reloaded the page)
   useEffect(() => {
     if (!appointmentId) return;
@@ -426,6 +454,78 @@ function ConsultRoom() {
 
   return (
     <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 96px)" }}>
+
+      {/* ── Follow-up scheduling modal ── */}
+      {showFollowUpModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowFollowUpModal(false)}/>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[440px] mx-4 p-8 animate-[zoomIn_0.2s_ease-out]">
+            <style dangerouslySetInnerHTML={{__html:`@keyframes zoomIn{from{transform:scale(0.94);opacity:0}to{transform:scale(1);opacity:1}}`}}/>
+            <button onClick={() => setShowFollowUpModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-600">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-[#5476FC]/10 flex items-center justify-center flex-shrink-0">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#5476FC" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-[#24292e] font-semibold text-base">Schedule Follow-up</h3>
+                <p className="text-gray-400 text-[11px]">Propose a follow-up appointment to the patient</p>
+              </div>
+            </div>
+
+            {/* Date */}
+            <div className="mb-4">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Follow-up Date</label>
+              <input
+                type="date"
+                value={followUpDate}
+                onChange={e => setFollowUpDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm text-[#24292e] outline-none focus:border-[#5476FC] focus:ring-1 focus:ring-[#5476FC]/30 transition-colors"
+              />
+            </div>
+
+            {/* Time */}
+            <div className="mb-4">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Follow-up Time</label>
+              <input
+                type="time"
+                value={followUpTime}
+                onChange={e => setFollowUpTime(e.target.value)}
+                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm text-[#24292e] outline-none focus:border-[#5476FC] focus:ring-1 focus:ring-[#5476FC]/30 transition-colors"
+              />
+            </div>
+
+            {/* Reason */}
+            <div className="mb-6">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Reason</label>
+              <input
+                type="text"
+                value={followUpReason}
+                onChange={e => setFollowUpReason(e.target.value)}
+                placeholder="Follow-up consultation"
+                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm text-[#24292e] outline-none focus:border-[#059669] focus:ring-1 focus:ring-[#059669]/30 transition-colors"
+              />
+            </div>
+
+            <button
+              onClick={handleSendFollowUp}
+              disabled={!followUpDate || !followUpTime || followUpStatus === "sending"}
+              className="w-full h-10 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {followUpStatus === "sending" ? "Sending…" : "Send to Patient"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Specialist selection drawer ── */}
       {showSpecialistList && (
@@ -613,6 +713,16 @@ function ConsultRoom() {
           {inviteStatus === "declined" && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full text-red-600 text-[10px] font-semibold">
               Patient declined
+            </div>
+          )}
+          {followUpStatus === "waiting" && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full text-amber-700 text-[10px] font-semibold animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"/>Awaiting follow-up response…
+            </div>
+          )}
+          {followUpToast && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full text-emerald-700 text-[10px] font-semibold animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"/>{followUpToast}
             </div>
           )}
           <button onClick={openEhrPanel}
@@ -817,6 +927,7 @@ function ConsultRoom() {
                   onToggleSection={setExpandedSection}
                   visitInfo={visitInfo}
                   onVisitInfoChange={setVisitInfo}
+                  onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
                 />
 
                 <div className="grid grid-cols-2 gap-4">
