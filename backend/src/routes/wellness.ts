@@ -29,7 +29,6 @@ router.post("/analyze-food-image", async (req: SessionRequest, res: Response) =>
   }
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-preview" });
 
     const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
@@ -51,10 +50,28 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
-    ]);
+    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-vision"];
+    let result = null;
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([
+          prompt,
+          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
+        ]);
+        break; // Success, exit the loop
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[analyze-food-image] Model ${modelName} failed:`, err?.message);
+        // Continue to the next model
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error("All Gemini models failed to process the request.");
+    }
 
     const text = result.response.text().trim();
 
