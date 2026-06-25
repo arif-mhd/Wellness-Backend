@@ -536,4 +536,57 @@ router.put("/family/:memberId/chronic-diseases", requireRole("patient"), async (
   }
 });
 
+// ── PUT /api/patients/family/:memberId/fitness-profile ───────────────────────
+// Saves a computed fitness profile into the family member's object, mirroring
+// the top-level PUT /api/patients/fitness-profile endpoint for the account owner.
+// Body: { goal, activityLevel, heightStr, weightKg, goalWeightKg, weeklyRateKg,
+//          targetCalories, tdee, macros: { protein, fat, carbs } }
+router.put("/family/:memberId/fitness-profile", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { memberId } = req.params;
+    const {
+      goal, activityLevel, heightStr, weightKg, goalWeightKg,
+      weeklyRateKg, targetCalories, tdee, macros,
+    } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      m.id === memberId
+        ? {
+            ...m,
+            fitnessProfile: {
+              goal, activityLevel, heightStr, weightKg, goalWeightKg,
+              weeklyRateKg, targetCalories, tdee, macros,
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        : m
+    );
+
+    // Verify the member actually exists
+    const memberExists = familyMembers.some((m: any) => m.id === memberId);
+    if (!memberExists) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    await patientsContainer.items.upsert({
+      ...existing,
+      familyMembers,
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Family member fitness profile save error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
