@@ -163,9 +163,12 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
         const res = await apiFetch("/api/appointments/doctor");
         if (res.ok) {
           const { appointments } = await res.json();
-          // Filter to this patient's appointments, most-recent first
+          // Filter to this specific profile's appointments (the account owner's
+          // own visits, OR — when patient.id is a family member's id — only that
+          // family member's visits). a.patientId is always the account owner, so
+          // it alone can't distinguish between profiles under the same account.
           const patientApts: any[] = (appointments ?? [])
-            .filter((a: any) => a.patientId === patient.id)
+            .filter((a: any) => (a.familyMemberId || a.patientId) === patient.id)
             .sort((a: any, b: any) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
 
           const mapped: RealConsultation[] = patientApts.map((a: any) => {
@@ -389,6 +392,11 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
               <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px]">
                 {patient.email}
               </span>
+              {patient.accountOwnerName && (
+                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-[#EEF2FF] text-[#5476FC] text-[11px] font-medium w-fit">
+                  For: {patient.profileRelationship ?? "Family Member"} of {patient.accountOwnerName}
+                </span>
+              )}
             </div>
           </div>
 

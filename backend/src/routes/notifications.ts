@@ -10,6 +10,7 @@ const router = Router();
 router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = (req.query.user_id as string) || req.session!.getUserId();
   const unreadOnly = req.query.unread_only === "true";
+  const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
 
   try {
     let query = "SELECT * FROM c WHERE c.patientId = @patientId";
@@ -17,6 +18,10 @@ router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
 
     if (unreadOnly) {
       query += " AND c.isRead = false";
+    }
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
     }
 
     query += " ORDER BY c.sentAt DESC";
@@ -28,6 +33,7 @@ router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
     const mapped = resources.map((doc: any) => ({
       id: doc.id,
       user_id: doc.patientId,
+      profile_id: doc.profileId ?? doc.patientId,
       title: doc.title,
       body: doc.body,
       type: doc.type,

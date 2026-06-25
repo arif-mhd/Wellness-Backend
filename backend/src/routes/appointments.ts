@@ -11,6 +11,7 @@ import {
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
+import { resolveProfileDisplay } from "../utils/profile";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -123,15 +124,24 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
 });
 
 // ─── GET /api/appointments ───────────────────────────────────────────────────
-// Patient's own appointments list.
+// Patient's own appointments list. Optional ?profileId= filters to just the
+// active profile (the account owner or one family member); omitted/absent
+// means "all profiles" so the account owner retains full transparency.
 router.get("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
+  const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
 
   try {
-    const appointments = await queryDocuments<any>(appointmentsContainer, {
+    let appointments = await queryDocuments<any>(appointmentsContainer, {
       query: "SELECT * FROM c WHERE c.patientId = @patientId ORDER BY c.scheduledAt DESC",
       parameters: [{ name: "@patientId", value: patientId }],
     });
+
+    if (profileId) {
+      appointments = appointments.filter((apt) =>
+        profileId === patientId ? !apt.familyMemberId : apt.familyMemberId === profileId
+      );
+    }
 
     // Enrich with doctor name
     const enriched = await Promise.all(
@@ -206,6 +216,8 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
           }
 
           // Check if appointment is for a family member
+          let profileLabel = patientName;
+          let profileRelationship = "Self";
           if (apt.familyMemberId && patient?.familyMembers) {
             const member = patient.familyMembers.find((m: any) => m.id === apt.familyMemberId);
             if (member) {
@@ -219,8 +231,8 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
               if (member.height) patientHeight = member.height;
               if (member.weight) patientWeight = member.weight;
 
-              chronicIllnesses = Array.isArray(member.chronicDiseases) 
-                ? member.chronicDiseases.join(", ") 
+              chronicIllnesses = Array.isArray(member.chronicDiseases)
+                ? member.chronicDiseases.join(", ")
                 : (member.chronicDiseases || "None reported");
 
               currentMedications = "None";
@@ -241,6 +253,9 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
                     }).join("\n")
                   : String(member.allergies);
               }
+
+              profileRelationship = member.relationship ?? "Family Member";
+              profileLabel = `${patientName} (${profileRelationship} of ${patient.fullName})`;
             }
           }
 
@@ -258,6 +273,9 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
             patientChronicIllnesses: chronicIllnesses,
             patientCurrentMedications: currentMedications,
             patientAllergies: allergies,
+            accountOwnerName: patient?.fullName ?? "Unknown",
+            profileRelationship,
+            profileLabel,
           };
         } catch {
           return {
@@ -663,6 +681,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       const patientNotification = {
         id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
         patientId: apt.patientId,
+        profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Cancelled",
         body: `Your appointment with Dr. ${doctorName} on ${dateText} at ${timeText} has been cancelled by the doctor.`,
         type: "appointment_cancelled",
@@ -847,6 +866,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const patientNotification = {
         id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
         patientId: apt.patientId,
+        profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Rescheduled",
         body: `Your appointment with Dr. ${doctorName} has been rescheduled to ${dateText} at ${timeText}.`,
         type: "appointment_rescheduled",
@@ -1004,6 +1024,7 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
     const patientNotification = {
       id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
       patientId: apt.patientId,
+      profileId: apt.familyMemberId ?? apt.patientId,
       title: "Appointment Reminder",
       body: `Dr. ${doctorName} sent you a reminder about your appointment on ${dateText} at ${timeText}.`,
       type: "appointment_reminder",

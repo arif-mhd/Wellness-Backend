@@ -12,7 +12,7 @@ const router = Router();
 router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { items, delivery_address, prescription_id, notes } = req.body;
+    const { items, delivery_address, prescription_id, notes, profileId } = req.body;
 
     if (!items?.length || !delivery_address) {
       res.status(400).json({ error: "items and delivery_address are required" });
@@ -55,6 +55,7 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
       id:               uuidv4(),
       patientId,
       patient_id:       patientId,
+      profileId:        profileId ?? patientId,
       items:            validatedItems,
       delivery_address,
       prescription_id:  prescription_id ?? null,
@@ -108,9 +109,18 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
 router.get("/orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.createdAt DESC";
+
     const { resources } = await medicineOrdersContainer.items.query({
-      query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-      parameters: [{ name: "@pid", value: patientId }],
+      query, parameters,
     }, { partitionKey: patientId }).fetchAll();
     res.json(resources);
   } catch (err) {
@@ -164,7 +174,7 @@ router.patch("/orders/:orderId/cancel", requireRole("patient"), async (req: Sess
 router.post("/prescriptions", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { image_url, pdf_url, source } = req.body;
+    const { image_url, pdf_url, source, profileId } = req.body;
 
     if (!source) { res.status(400).json({ error: "source is required" }); return; }
 
@@ -173,6 +183,7 @@ router.post("/prescriptions", requireRole("patient"), async (req: SessionRequest
       id:                  uuidv4(),
       patientId,
       patient_id:          patientId,
+      profileId:           profileId ?? patientId,
       image_url:           image_url ?? null,
       pdf_url:             pdf_url ?? null,
       source:              source as "uploaded" | "doctor_issued",
@@ -193,9 +204,18 @@ router.post("/prescriptions", requireRole("patient"), async (req: SessionRequest
 router.get("/prescriptions", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.createdAt DESC";
+
     const { resources } = await prescriptionsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-      parameters: [{ name: "@pid", value: patientId }],
+      query, parameters,
     }, { partitionKey: patientId }).fetchAll();
     res.json(resources);
   } catch (err) {

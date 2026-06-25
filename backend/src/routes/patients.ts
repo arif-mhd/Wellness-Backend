@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/requireRole";
 import { patientsContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { getAllProfiles } from "../utils/profile";
 
 // multer stores the uploaded file in memory as a Buffer
 const upload = multer({
@@ -192,6 +193,24 @@ router.put("/chronic-diseases", requireRole("patient"), async (req: SessionReque
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Chronic diseases update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/patients/profiles ───────────────────────────────────────────────
+// Returns a normalized list of switchable profiles: the account owner ("Self")
+// plus every family member, for the Netflix-style profile switcher.
+router.get("/profiles", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { resource } = await patientsContainer.item(userId, userId).read();
+    if (!resource) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+    res.json({ profiles: getAllProfiles(resource) });
+  } catch (err) {
+    console.error("Profiles fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

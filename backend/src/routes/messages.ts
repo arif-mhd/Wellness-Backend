@@ -26,29 +26,55 @@ function generateId(): string {
   return `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** conversationId is always "chat:{patientId}:{doctorId}" — deterministic regardless of who initiates */
-function makeConversationId(patientId: string, doctorId: string): string {
-  return `chat:${patientId}:${doctorId}`;
+/** conversationId is always "chat:{profileId}:{doctorId}" — deterministic regardless of who initiates */
+function makeConversationId(profileId: string, doctorId: string): string {
+  return `chat:${profileId}:${doctorId}`;
 }
 
 /** Parse a conversationId back into parts */
-function parseConversationId(conversationId: string): { patientId: string; doctorId: string } | null {
+function parseConversationId(conversationId: string): { profileId: string; doctorId: string } | null {
   const parts = conversationId.split(":");
   if (parts.length !== 3 || parts[0] !== "chat") return null;
-  return { patientId: parts[1], doctorId: parts[2] };
+  return { profileId: parts[1], doctorId: parts[2] };
 }
 
-/** Check if the caller has an appointment with the other party */
-async function hasAppointment(patientId: string, doctorId: string): Promise<boolean> {
+/**
+ * Resolve which account (real patientId / session owner) a profileId belongs
+ * to. profileId === patientId for the account owner; for a family member,
+ * profileId is NOT a session/login id, so we look up which patient document
+ * lists it in familyMembers. Returns null if no patient owns this profileId.
+ */
+async function resolveAccountOwner(profileId: string): Promise<string | null> {
+  try {
+    const results = await queryDocuments<any>(patientsContainer, {
+      query: `SELECT VALUE c.id FROM c
+              WHERE c.id = @pid
+                 OR EXISTS(SELECT VALUE m FROM m IN c.familyMembers WHERE m.id = @pid)`,
+      parameters: [{ name: "@pid", value: profileId }],
+    });
+    return results.length > 0 ? results[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if a profile has a non-cancelled appointment with the given doctor */
+async function hasAppointment(accountOwnerId: string, profileId: string, doctorId: string): Promise<boolean> {
   try {
     const results = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT TOP 1 c.id FROM c
               WHERE c.patientId = @patientId
                 AND c.doctorId = @doctorId
-                AND c.status != 'cancelled'`,
+                AND c.status != 'cancelled'
+                AND (
+                  (@isSelf = true AND (NOT IS_DEFINED(c.familyMemberId) OR c.familyMemberId = null))
+                  OR (@isSelf = false AND c.familyMemberId = @profileId)
+                )`,
       parameters: [
-        { name: "@patientId", value: patientId },
+        { name: "@patientId", value: accountOwnerId },
         { name: "@doctorId",  value: doctorId  },
+        { name: "@isSelf",    value: profileId === accountOwnerId },
+        { name: "@profileId", value: profileId },
       ],
     });
     return results.length > 0;
@@ -72,21 +98,23 @@ router.get("/token", verifySession(), async (req: SessionRequest, res: Response)
 
   const parsed = parseConversationId(channel);
   if (!parsed) {
-    res.status(400).json({ error: "Invalid channel format. Expected: chat:patientId:doctorId" });
+    res.status(400).json({ error: "Invalid channel format. Expected: chat:profileId:doctorId" });
     return;
   }
 
-  const { patientId, doctorId } = parsed;
+  const { profileId, doctorId } = parsed;
+  const accountOwnerId = await resolveAccountOwner(profileId);
 
-  // Caller must be one of the two parties
-  if (userId !== patientId && userId !== doctorId) {
+  // Caller must be the account that owns this profile, or the doctor
+  const isPatientSide = accountOwnerId !== null && userId === accountOwnerId;
+  if (!isPatientSide && userId !== doctorId) {
     res.status(403).json({ error: "Not authorized for this channel." });
     return;
   }
 
-  // Patient-initiated: check they have an appointment with the doctor
-  if (userId === patientId) {
-    const allowed = await hasAppointment(patientId, doctorId);
+  // Patient-initiated: check the profile has an appointment with the doctor
+  if (isPatientSide) {
+    const allowed = await hasAppointment(accountOwnerId!, profileId, doctorId);
     if (!allowed) {
       res.status(403).json({ error: "No appointment found with this doctor. Please book an appointment first." });
       return;
@@ -96,9 +124,14 @@ router.get("/token", verifySession(), async (req: SessionRequest, res: Response)
   try {
     let displayName: string | undefined;
     try {
-      if (userId === patientId) {
-        const { resource: p } = await patientsContainer.item(userId, userId).read();
-        displayName = p?.fullName;
+      if (isPatientSide) {
+        const { resource: p } = await patientsContainer.item(accountOwnerId!, accountOwnerId!).read();
+        if (profileId === accountOwnerId) {
+          displayName = p?.fullName;
+        } else {
+          const member = p?.familyMembers?.find((m: any) => m.id === profileId);
+          displayName = member?.fullName ?? p?.fullName;
+        }
       } else {
         const { resource: d } = await doctorsContainer.item(userId, userId).read();
         displayName = d?.fullName;
@@ -147,17 +180,30 @@ router.get("/conversations", verifySession(), async (req: SessionRequest, res: R
     }
 
     if (isPatient) {
-      // Get all doctors this patient has appointments with
+      // Get all of this account's appointments (self + family members), then
+      // group by profile so we can enumerate every profile's conversations.
       const appointments = await queryDocuments<any>(appointmentsContainer, {
-        query: `SELECT DISTINCT c.doctorId FROM c WHERE c.patientId = @patientId AND c.status != 'cancelled'`,
+        query: `SELECT c.doctorId, c.familyMemberId FROM c WHERE c.patientId = @patientId AND c.status != 'cancelled'`,
         parameters: [{ name: "@patientId", value: userId }],
       });
 
-      const uniqueDoctorIds = Array.from(new Set(appointments.map((a: any) => a.doctorId)));
+      const patientDoc = await patientsContainer.item(userId, userId).read().then(r => r.resource).catch(() => null);
+
+      // Unique (profileId, doctorId) pairs across all profiles on this account
+      const pairKeys = new Set<string>();
+      const pairs: { profileId: string; doctorId: string }[] = [];
+      for (const apt of appointments) {
+        const profileId = apt.familyMemberId ?? userId;
+        const key = `${profileId}::${apt.doctorId}`;
+        if (!pairKeys.has(key)) {
+          pairKeys.add(key);
+          pairs.push({ profileId, doctorId: apt.doctorId });
+        }
+      }
 
       const conversations = await Promise.all(
-        uniqueDoctorIds.map(async (doctorId: string) => {
-          const conversationId = makeConversationId(userId, doctorId);
+        pairs.map(async ({ profileId, doctorId }) => {
+          const conversationId = makeConversationId(profileId, doctorId);
 
           // Get last message for this conversation
           let lastMessage: any = null;
@@ -193,8 +239,17 @@ router.get("/conversations", verifySession(), async (req: SessionRequest, res: R
             doctorAvatarUrl = doc?.avatarUrl ?? null;
           } catch { /* use defaults */ }
 
+          // Resolve which profile (self or which family member) this thread belongs to
+          let profileName = patientDoc?.fullName ?? "Me";
+          if (profileId !== userId) {
+            const member = patientDoc?.familyMembers?.find((m: any) => m.id === profileId);
+            profileName = member?.fullName ?? "Family Member";
+          }
+
           return {
             conversationId,
+            profileId,
+            profileName,
             otherPartyId:   doctorId,
             otherPartyName: doctorName,
             otherPartyRole: "doctor",
@@ -216,17 +271,27 @@ router.get("/conversations", verifySession(), async (req: SessionRequest, res: R
       res.json({ conversations });
 
     } else {
-      // Doctor: get all patients they have appointments with
+      // Doctor: get all profiles (account owner or family member) they have
+      // appointments with, across every patient account.
       const appointments = await queryDocuments<any>(appointmentsContainer, {
-        query: `SELECT DISTINCT c.patientId FROM c WHERE c.doctorId = @doctorId AND c.status != 'cancelled'`,
+        query: `SELECT c.patientId, c.familyMemberId FROM c WHERE c.doctorId = @doctorId AND c.status != 'cancelled'`,
         parameters: [{ name: "@doctorId", value: userId }],
       });
 
-      const uniquePatientIds = Array.from(new Set(appointments.map((a: any) => a.patientId)));
+      const pairKeys = new Set<string>();
+      const pairs: { patientId: string; profileId: string }[] = [];
+      for (const apt of appointments) {
+        const profileId = apt.familyMemberId ?? apt.patientId;
+        const key = `${apt.patientId}::${profileId}`;
+        if (!pairKeys.has(key)) {
+          pairKeys.add(key);
+          pairs.push({ patientId: apt.patientId, profileId });
+        }
+      }
 
       const conversations = await Promise.all(
-        uniquePatientIds.map(async (patientId: string) => {
-          const conversationId = makeConversationId(patientId, userId);
+        pairs.map(async ({ patientId, profileId }) => {
+          const conversationId = makeConversationId(profileId, userId);
 
           let lastMessage: any = null;
           try {
@@ -253,13 +318,21 @@ router.get("/conversations", verifySession(), async (req: SessionRequest, res: R
           let patientAvatarUrl: string | null = null;
           try {
             const { resource: pat } = await patientsContainer.item(patientId, patientId).read();
-            patientName     = pat?.fullName ?? patientName;
-            patientAvatarUrl = pat?.avatarUrl ?? null;
+            if (profileId === patientId) {
+              patientName     = pat?.fullName ?? patientName;
+              patientAvatarUrl = pat?.avatarUrl ?? null;
+            } else {
+              const member = pat?.familyMembers?.find((m: any) => m.id === profileId);
+              patientName     = member?.fullName ?? patientName;
+              patientAvatarUrl = member?.avatarUrl ?? null;
+            }
           } catch { /* use defaults */ }
 
           return {
             conversationId,
-            otherPartyId:       patientId,
+            profileId,
+            profileName:        patientName,
+            otherPartyId:       profileId,
             otherPartyName:     patientName,
             otherPartyRole:     "patient",
             otherPartyAvatarUrl: patientAvatarUrl,
@@ -296,8 +369,10 @@ router.get("/:conversationId(*)", verifySession(), async (req: SessionRequest, r
     return;
   }
 
-  const { patientId, doctorId } = parsed;
-  if (userId !== patientId && userId !== doctorId) {
+  const { profileId, doctorId } = parsed;
+  const accountOwnerId = await resolveAccountOwner(profileId);
+  const isPatientSide = accountOwnerId !== null && userId === accountOwnerId;
+  if (!isPatientSide && userId !== doctorId) {
     res.status(403).json({ error: "Not authorized." });
     return;
   }
@@ -342,15 +417,17 @@ router.post("/:conversationId(*)", verifySession(), async (req: SessionRequest, 
     return;
   }
 
-  const { patientId, doctorId } = parsed;
-  if (userId !== patientId && userId !== doctorId) {
+  const { profileId, doctorId } = parsed;
+  const accountOwnerId = await resolveAccountOwner(profileId);
+  const isPatientSide = accountOwnerId !== null && userId === accountOwnerId;
+  if (!isPatientSide && userId !== doctorId) {
     res.status(403).json({ error: "Not authorized." });
     return;
   }
 
   // Patient needs an appointment to message the doctor
-  if (userId === patientId) {
-    const allowed = await hasAppointment(patientId, doctorId);
+  if (isPatientSide) {
+    const allowed = await hasAppointment(accountOwnerId!, profileId, doctorId);
     if (!allowed) {
       res.status(403).json({ error: "No appointment found with this doctor." });
       return;
@@ -358,13 +435,28 @@ router.post("/:conversationId(*)", verifySession(), async (req: SessionRequest, 
   }
 
   try {
-    const senderRole = userId === patientId ? "patient" : "doctor";
+    const senderRole = isPatientSide ? "patient" : "doctor";
+
+    let profileName: string | undefined;
+    if (isPatientSide) {
+      try {
+        const { resource: p } = await patientsContainer.item(accountOwnerId!, accountOwnerId!).read();
+        if (profileId === accountOwnerId) {
+          profileName = p?.fullName;
+        } else {
+          const member = p?.familyMembers?.find((m: any) => m.id === profileId);
+          profileName = member?.fullName ?? p?.fullName;
+        }
+      } catch { /* use undefined */ }
+    }
 
     const message = {
       id:             generateId(),
       conversationId,
-      patientId,
+      patientId:      accountOwnerId ?? profileId,
       doctorId,
+      profileId,
+      profileName:    profileName ?? null,
       senderId:       userId,
       senderRole,
       text:           text.trim(),

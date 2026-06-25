@@ -32,6 +32,9 @@ interface SlotAppointment {
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   patientWaitingSince: string | null;
   preVisitData: any | null;
+  familyMemberId?: string | null;
+  accountOwnerName?: string;
+  profileRelationship?: string;
 }
 
 function ageFromDob(dob?: string): number | null {
@@ -65,6 +68,9 @@ function buildSlotAppointment(a: any): SlotAppointment {
     status: a.status,
     patientWaitingSince: a.patientWaitingSince ?? null,
     preVisitData: a.preVisitData ?? null,
+    familyMemberId: a.familyMemberId ?? null,
+    accountOwnerName: a.accountOwnerName,
+    profileRelationship: a.profileRelationship,
   };
 }
 
@@ -279,6 +285,11 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
               <span className="text-[#9EA5AD] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
                 {apt.patientEmail}
               </span>
+              {apt.familyMemberId && apt.accountOwnerName && (
+                <span className="text-[#5476FC] text-[11px] leading-[1.4] truncate">
+                  For: {apt.profileRelationship ?? "Family Member"} of {apt.accountOwnerName}
+                </span>
+              )}
             </div>
           </div>
 

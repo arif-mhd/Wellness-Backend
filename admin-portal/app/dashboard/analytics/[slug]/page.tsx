@@ -1,8 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useState } from "react";
+import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+async function adminFetch(path: string, options: RequestInit = {}) {
+  const token = await Session.getAccessToken();
+  return fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token ?? ""}`,
+      ...(options.headers ?? {}),
+    },
+  });
+}
 
 const slugToTitle: Record<string, string> = {
   "appointment-booking-trends": "Appointment Booking Trends",
@@ -19,8 +34,58 @@ const slugToTitle: Record<string, string> = {
 export default function ReportConfigPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter();
   const { slug } = use(params);
-  
+
   const title = slugToTitle[slug] || slug.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [status, setStatus] = useState("");
+  const [specialty, setSpecialty] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [gender, setGender] = useState("");
+  const [durationMins, setDurationMins] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+
+  async function handleGenerate() {
+    setGenerating(true);
+    setGenError("");
+    try {
+      const res = await adminFetch("/api/admin/reports/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          reportType: slug,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+          status: status || undefined,
+          specialty: specialty || undefined,
+          paymentStatus: paymentStatus || undefined,
+          gender: gender || undefined,
+          durationMins: durationMins || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setGenError(body.error ?? `Failed to generate report (${res.status}).`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${slug}-${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setGenError(e?.message ?? "Network error.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <ProtectedRoute>
@@ -48,16 +113,22 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Date Range</h3>
              <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
-                  <input type="text" placeholder="From date" className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition" />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  </div>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    placeholder="From date"
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition"
+                  />
                 </div>
                 <div className="relative">
-                  <input type="text" placeholder="To Date" className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition" />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  </div>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    placeholder="To Date"
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition"
+                  />
                 </div>
              </div>
           </div>
@@ -66,20 +137,29 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Appointment Status</h3>
              <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Scheduled</option>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer"
+                  >
+                     <option value="">Any status</option>
+                     <option value="scheduled">Scheduled</option>
+                     <option value="in_progress">In progress</option>
+                     <option value="completed">Completed</option>
+                     <option value="cancelled">Cancelled</option>
                   </select>
                   <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </div>
                 <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Specialization</option>
-                  </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                  <input
+                    type="text"
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value)}
+                    placeholder="Specialization"
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 placeholder-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition"
+                  />
                 </div>
              </div>
           </div>
@@ -89,40 +169,30 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Payment Status</h3>
              <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Paid</option>
+                  <select
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer"
+                  >
+                     <option value="">Any payment status</option>
+                     <option value="paid">Paid</option>
+                     <option value="unpaid">Unpaid</option>
+                     <option value="refunded">Refunded</option>
                   </select>
                   <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </div>
                 <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Insurance Provider</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
-                     <svg className="w-3 h-3 text-slate-400 -mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                     <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                </div>
-             </div>
-          </div>
-
-          <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
-             <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Patient Demographics</h3>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Age</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
-                     <svg className="w-3 h-3 text-slate-400 -mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                     <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                </div>
-                <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Gender</option>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer"
+                  >
+                     <option value="">Any gender</option>
+                     <option value="Male">Male</option>
+                     <option value="Female">Female</option>
+                     <option value="Other">Other</option>
                   </select>
                   <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -131,21 +201,20 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
              </div>
           </div>
 
-          {/* Row 3: Appointment Duration */}
           <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Appointment Duration</h3>
              <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>15 minutes</option>
-                  </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                </div>
-                <div className="relative">
-                  <select className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-400 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer">
-                     <option value="" disabled selected>Time Slot</option>
+                  <select
+                    value={durationMins}
+                    onChange={(e) => setDurationMins(e.target.value)}
+                    className="w-full bg-[#f8fafd] rounded-[1rem] px-5 py-4 text-[13px] font-medium text-slate-800 outline-none border border-slate-50/50 focus:border-[#6A8BFF] focus:bg-white transition appearance-none cursor-pointer"
+                  >
+                     <option value="">Any duration</option>
+                     <option value="15">15 minutes</option>
+                     <option value="30">30 minutes</option>
+                     <option value="45">45 minutes</option>
+                     <option value="60">60 minutes</option>
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center">
                      <svg className="w-3 h-3 text-slate-400 -mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
@@ -157,6 +226,12 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
 
         </div>
 
+        {genError && (
+          <div className="mt-6 px-5 py-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
+            {genError}
+          </div>
+        )}
+
         {/* Bottom Action Footer */}
         <div className="mt-16 flex items-center gap-6 w-full">
            <button 
@@ -165,10 +240,12 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
            >
              Cancel
            </button>
-           <button 
-             className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white py-4 rounded-[1.25rem] text-[13px] font-medium transition-colors shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
+           <button
+             onClick={handleGenerate}
+             disabled={generating}
+             className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] disabled:opacity-60 text-white py-4 rounded-[1.25rem] text-[13px] font-medium transition-colors shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
            >
-             Generate report
+             {generating ? "Generating…" : "Generate report"}
            </button>
         </div>
 

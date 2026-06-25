@@ -1,42 +1,44 @@
 "use client";
 
 import Pagination from "@/components/Pagination";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-type Priority = "High" | "Medium" | "Low";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-interface Emergency {
-  id: number;
-  name: string;
-  email: string;
-  avatar: string;
-  address: string;
-  contactNumber: string;
-  priority: Priority;
-  gender: string;
-  location: string;
-  emailId: string;
-  date: string;
+async function adminFetch(path: string, options: RequestInit = {}) {
+  const token = await Session.getAccessToken();
+  return fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token ?? ""}`,
+      ...(options.headers ?? {}),
+    },
+  });
 }
 
-const mockEmergencies: Emergency[] = [
-  { id: 1, name: "Kristin Watson", email: "yelena@example...", avatar: "KW", address: "3891 Ranchview Dr. Richar...", contactNumber: "(209) 555-0104", priority: "Medium", gender: "Female", location: "3891 Ranchview\nDr. Richardson, California 62639", emailId: "john@example.com", date: "2024-01-15" },
-  { id: 2, name: "Cody Fisher", email: "yelena@example...", avatar: "CF", address: "6391 Elgin St. Celina, Delaw...", contactNumber: "(808) 555-0111", priority: "High", gender: "Male", location: "6391 Elgin St, Celina, Delaware", emailId: "cody@example.com", date: "2024-01-15" },
-  { id: 3, name: "Wade Warren", email: "yelena@example...", avatar: "WW", address: "2464 Royal Ln. Mesa, New...", contactNumber: "(702) 555-0122", priority: "High", gender: "Male", location: "2464 Royal Ln, Mesa, New Mexico", emailId: "wade@example.com", date: "2024-01-14" },
-  { id: 4, name: "Esther Howard", email: "yelena@example...", avatar: "EH", address: "4140 Parker Rd. Allentown...", contactNumber: "(671) 555-0110", priority: "Medium", gender: "Female", location: "4140 Parker Rd, Allentown", emailId: "esther@example.com", date: "2024-01-14" },
-  { id: 5, name: "Arlene McCoy", email: "yelena@example...", avatar: "AM", address: "2715 Ash Dr. San Jose, Sout...", contactNumber: "(480) 555-0103", priority: "Low", gender: "Female", location: "2715 Ash Dr, San Jose", emailId: "arlene@example.com", date: "2024-01-13" },
-  { id: 6, name: "Brooklyn Sim...", email: "yelena@example...", avatar: "BS", address: "3517 W. Gray St. Utica, Pen...", contactNumber: "(907) 555-0101", priority: "High", gender: "Female", location: "3517 W. Gray St, Utica, Pennsylvania", emailId: "brooklyn@example.com", date: "2024-01-13" },
-  { id: 7, name: "Dianne Russell", email: "yelena@example...", avatar: "DR", address: "8502 Preston Rd. Inglewood...", contactNumber: "(207) 555-0119", priority: "Low", gender: "Female", location: "8502 Preston Rd, Inglewood", emailId: "dianne@example.com", date: "2024-01-12" },
-  { id: 8, name: "Cameron Willi...", email: "yelena@example...", avatar: "CW", address: "1901 Thornridge Cir. Shiloh...", contactNumber: "(319) 555-0115", priority: "Low", gender: "Male", location: "1901 Thornridge Cir, Shiloh", emailId: "cameron@example.com", date: "2024-01-12" },
-];
+type Priority = "High" | "Medium" | "Low";
+type SosStatus = "Active" | "Expired" | "Used";
 
-const avatarColors: Record<string, string> = {
-  KW: "bg-rose-400", CF: "bg-blue-400", WW: "bg-teal-400",
-  EH: "bg-purple-400", AM: "bg-orange-400", BS: "bg-pink-400",
-  DR: "bg-indigo-400", CW: "bg-green-400",
-};
+interface Emergency {
+  id: string;
+  patientId: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  gender: string;
+  bio: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  usedByDoctorName: string | null;
+  status: SosStatus;
+  priority: Priority;
+}
 
 const priorityColor: Record<Priority, string> = {
   High: "text-red-500",
@@ -56,20 +58,51 @@ export default function ManageEmergenciesPage() {
   const [activeTab, setActiveTab] = useState<"SOS" | "Past">("SOS");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
-  const [selectedId, setSelectedId] = useState<number | null>(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch]         = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const selected = mockEmergencies.find(e => e.id === selectedId);
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
 
-  const filteredEmergencies = mockEmergencies.filter(em => {
+  const fetchEmergencies = useCallback(async () => {
+    setLoading(true);
+    setFetchError("");
+    try {
+      const res = await adminFetch("/api/sos/admin/all");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setFetchError(body.error ?? `Error ${res.status}`);
+        return;
+      }
+      const data = await res.json();
+      const list: Emergency[] = data.emergencies ?? [];
+      setEmergencies(list);
+      setSelectedId((prev) => prev ?? list[0]?.id ?? null);
+    } catch (e: any) {
+      setFetchError(e?.message ?? "Network error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchEmergencies(); }, [fetchEmergencies]);
+
+  const tabFiltered = emergencies.filter((em) =>
+    activeTab === "SOS" ? em.status !== "Used" : em.status === "Used"
+  );
+
+  const selected = emergencies.find(e => e.id === selectedId);
+
+  const filteredEmergencies = tabFiltered.filter(em => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
       em.name.toLowerCase().includes(q) ||
       em.email.toLowerCase().includes(q) ||
       em.address.toLowerCase().includes(q) ||
-      em.contactNumber.toLowerCase().includes(q) ||
+      em.phone.toLowerCase().includes(q) ||
       em.priority.toLowerCase().includes(q)
     );
   });
@@ -162,8 +195,13 @@ export default function ManageEmergenciesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                      {filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
-                    const isSelected = selectedId === em.id;
+                  {loading ? (
+                    <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">Loading emergencies…</td></tr>
+                  ) : fetchError ? (
+                    <tr><td colSpan={5} className="py-16 text-center text-red-500 text-sm font-medium">{fetchError}</td></tr>
+                  ) : filteredEmergencies.length === 0 ? (
+                    <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">No emergencies found.</td></tr>
+                  ) : filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
                     return (
                       <tr
                         key={em.id}
@@ -181,11 +219,14 @@ export default function ManageEmergenciesPage() {
                             <p className="text-[11px] text-slate-400 font-medium">{em.email}</p>
                           </div>
                         </td>
-                        <td className="py-4 text-[12px] text-slate-500 font-medium max-w-[180px] truncate pr-4">{em.address}</td>
-                        <td className="py-4 text-[12px] text-slate-500 font-medium">{em.contactNumber}</td>
+                        <td className="py-4 text-[12px] text-slate-500 font-medium max-w-[180px] truncate pr-4">{em.address || "—"}</td>
+                        <td className="py-4 text-[12px] text-slate-500 font-medium">{em.phone || "—"}</td>
                         <td className={`py-4 text-[12px] font-semibold ${priorityColor[em.priority]}`}>{em.priority}</td>
                         <td className="py-4 pr-2 text-right">
-                          <button className="text-[12px] font-semibold px-5 py-2 rounded-xl transition-all text-slate-700 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)] whitespace-nowrap">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedId(em.id); }}
+                            className="text-[12px] font-semibold px-5 py-2 rounded-xl transition-all text-slate-700 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)] whitespace-nowrap"
+                          >
                             View Details
                           </button>
                         </td>
@@ -196,7 +237,7 @@ export default function ManageEmergenciesPage() {
               </table>
 
               {/* Pagination */}
-              {filteredEmergencies.length > 0 && (
+              {!loading && filteredEmergencies.length > 0 && (
                 <Pagination 
                   currentPage={currentPage} 
                   totalPages={Math.ceil(filteredEmergencies.length / itemsPerPage)} 
@@ -227,13 +268,19 @@ export default function ManageEmergenciesPage() {
                 </div>
                 <div>
                   <p className="text-[15px] font-medium text-slate-800">{selected.name}</p>
-                  <p className="text-[12px] text-slate-400 font-medium">{selected.emailId}</p>
+                  <p className="text-[12px] text-slate-400 font-medium">{selected.email}</p>
                 </div>
               </div>
 
               {/* Description */}
               <p className="text-[12px] text-slate-500 font-medium leading-relaxed mb-6 px-1">
-                A board-certified physician specializing in internal medicine. I completed my medical degree at Harvard Medical School and my residency at Johns Hopkins Hospital, where I gained extensive experience in patient care and clinical research. I...
+                {selected.bio || (
+                  selected.status === "Used"
+                    ? `SOS code verified${selected.usedByDoctorName ? ` by Dr. ${selected.usedByDoctorName}` : ""} on ${new Date(selected.usedAt!).toLocaleString()}.`
+                    : selected.status === "Expired"
+                    ? `SOS code expired unverified on ${new Date(selected.expiresAt).toLocaleString()}.`
+                    : `SOS code generated on ${new Date(selected.createdAt).toLocaleString()}, active until ${new Date(selected.expiresAt).toLocaleString()}.`
+                )}
               </p>
 
               {/* Details */}
@@ -244,27 +291,30 @@ export default function ManageEmergenciesPage() {
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-[11px] text-slate-400 font-semibold shrink-0">Gender</span>
-                  <span className="text-[11px] text-slate-800 font-semibold">{selected.gender}</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.gender || "—"}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-[11px] text-slate-400 font-semibold shrink-0">Location</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right leading-relaxed whitespace-pre-line">{selected.location}</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right leading-relaxed whitespace-pre-line">{selected.address || "—"}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-[11px] text-slate-400 font-semibold shrink-0">Address</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">California</span>
+                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selected.address || "—"}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-[11px] text-slate-400 font-semibold shrink-0">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-semibold">{selected.contactNumber}</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.phone || "—"}</span>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-[11px] text-slate-400 font-semibold shrink-0">Email ID</span>
-                  <span className="text-[11px] text-slate-800 font-semibold">{selected.emailId}</span>
+                  <span className="text-[11px] text-slate-800 font-semibold">{selected.email}</span>
                 </div>
               </div>
 
-              <button className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-xl text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]">
+              <button
+                onClick={() => router.push(`/dashboard/patients/${selected.patientId}`)}
+                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-xl text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
+              >
                 View Detailed Profile
               </button>
             </div>

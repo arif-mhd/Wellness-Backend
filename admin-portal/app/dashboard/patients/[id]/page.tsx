@@ -102,6 +102,9 @@ interface VisitHistoryEntry {
     visitInfo?: EmrVisitInfo | null;
     addenda?: EmrAddendum[];
   } | null;
+  profileId?: string;
+  profileName?: string;
+  profileRelationship?: string;
 }
 
 type Tab = "about" | "consultations" | "diagnostics" | "surgeries" | "medications" | "vaccinations" | "allergies";
@@ -431,6 +434,11 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                           <div>
                             <h4 className="text-[13px] font-medium text-slate-800">Dr. {visit.doctorName}</h4>
                             <p className="text-[11px] font-medium text-slate-500 mt-1">{formatDateTime(visit.scheduledAt)}</p>
+                            {visit.profileId && visit.profileId !== patient?.id && (
+                              <p className="text-[11px] font-medium text-[#5476FC] mt-1">
+                                For: {visit.profileName} ({visit.profileRelationship ?? "Family Member"})
+                              </p>
+                            )}
                           </div>
                           <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />

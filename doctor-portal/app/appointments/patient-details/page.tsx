@@ -57,6 +57,8 @@ function PatientDetailsContent() {
               weight: match.patientWeight || "N/A",
               dob: dob,
               preVisitFormDate: dob,
+              accountOwnerName: match.familyMemberId ? match.accountOwnerName : undefined,
+              profileRelationship: match.familyMemberId ? match.profileRelationship : undefined,
               preVisitForm: {
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
                 currentMedications: match.patientCurrentMedications || "None",

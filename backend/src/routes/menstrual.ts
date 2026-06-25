@@ -214,30 +214,33 @@ function detectOvulationFromBBT(
 
 // ─── DB helpers ──────────────────────────────────────────────────────────────
 
-async function getProfile(patientId: string): Promise<Record<string, unknown>> {
+async function getProfile(patientId: string, profileId: string): Promise<Record<string, unknown>> {
   try {
-    const { resource } = await menstrualProfilesContainer.item(patientId, patientId).read();
-    return resource ?? { id: patientId, patientId };
+    const { resource } = await menstrualProfilesContainer.item(profileId, patientId).read();
+    return resource ?? { id: profileId, patientId, profileId };
   } catch {
-    return { id: patientId, patientId };
+    return { id: profileId, patientId, profileId };
   }
 }
 
-async function getDaily(patientId: string, date: string): Promise<Record<string, unknown>> {
-  const docId = `${patientId}_${date}`;
+async function getDaily(patientId: string, profileId: string, date: string): Promise<Record<string, unknown>> {
+  const docId = `${profileId}_${date}`;
   try {
     const { resource } = await menstrualDailyContainer.item(docId, patientId).read();
-    return resource ?? { id: docId, patientId, date };
+    return resource ?? { id: docId, patientId, profileId, date };
   } catch {
-    return { id: docId, patientId, date };
+    return { id: docId, patientId, profileId, date };
   }
 }
 
-async function getAllPeriods(patientId: string) {
+async function getAllPeriods(patientId: string, profileId: string) {
   const { resources } = await menstrualLogsContainer.items.query(
     {
-      query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.startDate ASC",
-      parameters: [{ name: "@pid", value: patientId }],
+      query: "SELECT * FROM c WHERE c.patientId = @pid AND c.profileId = @profileId ORDER BY c.startDate ASC",
+      parameters: [
+        { name: "@pid", value: patientId },
+        { name: "@profileId", value: profileId },
+      ],
     },
     { partitionKey: patientId }
   ).fetchAll();
@@ -249,9 +252,10 @@ async function getAllPeriods(patientId: string) {
 
 async function recomputeAndSaveProfile(
   patientId: string,
+  profileId: string,
   existing: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const periods = await getAllPeriods(patientId);
+  const periods = await getAllPeriods(patientId, profileId);
 
   const detectedCycleLength = learnCycleLength(periods);
   const detectedPeriodLength = learnPeriodLength(periods);
@@ -270,6 +274,9 @@ async function recomputeAndSaveProfile(
 
   const updated = {
     ...existing,
+    id: profileId,
+    patientId,
+    profileId,
     lastPeriodStart:  lastPeriod?.startDate ?? existing.lastPeriodStart,
     lastPeriodEnd:    lastPeriod?.endDate   ?? existing.lastPeriodEnd,
     cycleLength,
@@ -287,10 +294,11 @@ async function recomputeAndSaveProfile(
 router.get("/profile", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const profile = await getProfile(patientId);
+    const profileId = (req.query.profileId as string) || patientId;
+    const profile = await getProfile(patientId, profileId);
 
     // Always recompute fresh — use most recent period from history as anchor
-    const periods = await getAllPeriods(patientId);
+    const periods = await getAllPeriods(patientId, profileId);
     if (periods.length > 0) {
       const sorted = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
       const lastPeriod = sorted[sorted.length - 1];
@@ -316,8 +324,9 @@ router.get("/profile", async (req: SessionRequest, res: Response) => {
 router.put("/profile", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const existing = await getProfile(patientId);
-    const { cycleLength, waterTarget, waterContainerVolume, waterReminderEnabled } = req.body;
+    const { cycleLength, waterTarget, waterContainerVolume, waterReminderEnabled, profileId: bodyProfileId } = req.body;
+    const profileId = bodyProfileId ?? patientId;
+    const existing = await getProfile(patientId, profileId);
 
     const patched = {
       ...existing,
@@ -327,7 +336,7 @@ router.put("/profile", async (req: SessionRequest, res: Response) => {
       ...(waterReminderEnabled   !== undefined && { waterReminderEnabled }),
     };
 
-    const updated = await recomputeAndSaveProfile(patientId, patched);
+    const updated = await recomputeAndSaveProfile(patientId, profileId, patched);
     res.json({ status: "OK", profile: updated });
   } catch (err) {
     console.error("Menstrual profile update error:", err);
@@ -339,19 +348,20 @@ router.put("/profile", async (req: SessionRequest, res: Response) => {
 router.post("/period", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { startDate, endDate } = req.body;
+    const { startDate, endDate, profileId: bodyProfileId } = req.body;
     if (!startDate) { res.status(400).json({ error: "startDate is required" }); return; }
+    const profileId = bodyProfileId ?? patientId;
 
-    const docId = `${patientId}_${startDate}`;
+    const docId = `${profileId}_${startDate}`;
     const periodDoc = {
-      id: docId, patientId, startDate,
+      id: docId, patientId, profileId, startDate,
       endDate: endDate ?? null,
       loggedAt: new Date().toISOString(),
     };
     await menstrualLogsContainer.items.upsert(periodDoc);
 
-    const existing = await getProfile(patientId);
-    const updatedProfile = await recomputeAndSaveProfile(patientId, existing);
+    const existing = await getProfile(patientId, profileId);
+    const updatedProfile = await recomputeAndSaveProfile(patientId, profileId, existing);
 
     res.json({ status: "OK", period: periodDoc, profile: updatedProfile });
   } catch (err) {
@@ -365,20 +375,21 @@ router.patch("/period/:startDate", async (req: SessionRequest, res: Response) =>
   try {
     const patientId = req.session!.getUserId();
     const { startDate } = req.params;
-    const { endDate } = req.body;
+    const { endDate, profileId: bodyProfileId } = req.body;
+    const profileId = bodyProfileId ?? patientId;
 
-    const docId = `${patientId}_${startDate}`;
+    const docId = `${profileId}_${startDate}`;
     let existing: any = {};
     try {
       const { resource } = await menstrualLogsContainer.item(docId, patientId).read();
       existing = resource ?? {};
     } catch { /* new */ }
 
-    const updated = { ...existing, id: docId, patientId, startDate, endDate, updatedAt: new Date().toISOString() };
+    const updated = { ...existing, id: docId, patientId, profileId, startDate, endDate, updatedAt: new Date().toISOString() };
     await menstrualLogsContainer.items.upsert(updated);
 
-    const profile = await getProfile(patientId);
-    const updatedProfile = await recomputeAndSaveProfile(patientId, profile);
+    const profile = await getProfile(patientId, profileId);
+    const updatedProfile = await recomputeAndSaveProfile(patientId, profileId, profile);
 
     res.json({ status: "OK", period: updated, profile: updatedProfile });
   } catch (err) {
@@ -392,12 +403,13 @@ router.delete("/period/:startDate", async (req: SessionRequest, res: Response) =
   try {
     const patientId = req.session!.getUserId();
     const { startDate } = req.params;
-    const docId = `${patientId}_${startDate}`;
+    const profileId = (req.query.profileId as string) || patientId;
+    const docId = `${profileId}_${startDate}`;
     try {
       await menstrualLogsContainer.item(docId, patientId).delete();
     } catch { /* already gone */ }
-    const existing = await getProfile(patientId);
-    const updatedProfile = await recomputeAndSaveProfile(patientId, existing);
+    const existing = await getProfile(patientId, profileId);
+    const updatedProfile = await recomputeAndSaveProfile(patientId, profileId, existing);
     res.json({ status: "OK", profile: updatedProfile });
   } catch (err) {
     console.error("Period delete error:", err);
@@ -410,12 +422,13 @@ router.delete("/period/:startDate", async (req: SessionRequest, res: Response) =
 router.delete("/all", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const periods = await getAllPeriods(patientId);
+    const profileId = (req.query.profileId as string) || patientId;
+    const periods = await getAllPeriods(patientId, profileId);
     for (const p of periods) {
-      const docId = `${patientId}_${p.startDate}`;
+      const docId = `${profileId}_${p.startDate}`;
       try { await menstrualLogsContainer.item(docId, patientId).delete(); } catch { /* ignore */ }
     }
-    try { await menstrualProfilesContainer.item(patientId, patientId).delete(); } catch { /* ignore */ }
+    try { await menstrualProfilesContainer.item(profileId, patientId).delete(); } catch { /* ignore */ }
     res.json({ status: "OK", deleted: periods.length });
   } catch (err) {
     console.error("Menstrual delete all error:", err);
@@ -427,11 +440,18 @@ router.delete("/all", async (req: SessionRequest, res: Response) => {
 router.get("/periods", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.startDate DESC";
+
     const { resources } = await menstrualLogsContainer.items.query(
-      {
-        query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.startDate DESC",
-        parameters: [{ name: "@pid", value: patientId }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
     res.json({ periods: resources });
@@ -445,8 +465,9 @@ router.get("/periods", async (req: SessionRequest, res: Response) => {
 router.get("/daily", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = (req.query.profileId as string) || patientId;
     const date = (req.query.date as string) || localTodayStr();
-    const log = await getDaily(patientId, date);
+    const log = await getDaily(patientId, profileId, date);
     res.json({ log });
   } catch (err) {
     console.error("Menstrual daily fetch error:", err);
@@ -460,12 +481,15 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = req.body.date || localTodayStr();
-    const existing = await getDaily(patientId, date);
+    const profileId = req.body.profileId ?? patientId;
+    const existing = await getDaily(patientId, profileId, date);
 
     const { moods, topSymptom, symptoms, pregnancyTest, waterIntakeLiters, weightKg, basalTempC } = req.body;
 
     const updated = {
       ...existing,
+      patientId,
+      profileId,
       ...(moods             !== undefined && { moods }),
       ...(topSymptom        !== undefined && { topSymptom }),
       ...(symptoms          !== undefined && { symptoms }),
@@ -481,14 +505,18 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
     // If BBT was logged, attempt ovulation detection and update profile
     if (basalTempC !== undefined) {
       try {
-        const profile = await getProfile(patientId) as any;
+        const profile = await getProfile(patientId, profileId) as any;
         if (profile.lastPeriodStart) {
           // Fetch recent daily logs for BBT analysis
           const sinceStr = addDays(profile.lastPeriodStart, -7);
           const { resources: recentLogs } = await menstrualDailyContainer.items.query(
             {
-              query: "SELECT c.date, c.basalTempC FROM c WHERE c.patientId = @pid AND c.date >= @since ORDER BY c.date ASC",
-              parameters: [{ name: "@pid", value: patientId }, { name: "@since", value: sinceStr }],
+              query: "SELECT c.date, c.basalTempC FROM c WHERE c.patientId = @pid AND c.profileId = @profileId AND c.date >= @since ORDER BY c.date ASC",
+              parameters: [
+                { name: "@pid", value: patientId },
+                { name: "@profileId", value: profileId },
+                { name: "@since", value: sinceStr },
+              ],
             },
             { partitionKey: patientId }
           ).fetchAll();
@@ -517,16 +545,22 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
 router.get("/daily/history", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
     const days = parseInt((req.query.days as string) || "90", 10);
     const since = new Date();
     since.setDate(since.getDate() - days);
     const sinceStr = `${since.getFullYear()}-${String(since.getMonth()+1).padStart(2,"0")}-${String(since.getDate()).padStart(2,"0")}`;
 
+    let query = "SELECT c.id, c.date, c.profileId, c.waterIntakeLiters, c.weightKg, c.basalTempC, c.symptoms, c.moods, c.pregnancyTest, c.updatedAt FROM c WHERE c.patientId = @pid AND c.date >= @since";
+    const parameters = [{ name: "@pid", value: patientId }, { name: "@since", value: sinceStr }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.date ASC";
+
     const { resources } = await menstrualDailyContainer.items.query(
-      {
-        query: "SELECT c.id, c.date, c.waterIntakeLiters, c.weightKg, c.basalTempC, c.symptoms, c.moods, c.pregnancyTest, c.updatedAt FROM c WHERE c.patientId = @pid AND c.date >= @since ORDER BY c.date ASC",
-        parameters: [{ name: "@pid", value: patientId }, { name: "@since", value: sinceStr }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
 
@@ -542,7 +576,8 @@ router.get("/daily/history", async (req: SessionRequest, res: Response) => {
 router.get("/insights", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const periods   = await getAllPeriods(patientId);
+    const profileId = (req.query.profileId as string) || patientId;
+    const periods   = await getAllPeriods(patientId, profileId);
 
     if (periods.length === 0) {
       res.json({ insights: null, message: "No period logged yet" });
@@ -555,7 +590,7 @@ router.get("/insights", async (req: SessionRequest, res: Response) => {
 
     const detectedCycleLen  = learnCycleLength(periods);
     const detectedPeriodLen = learnPeriodLength(periods);
-    const profile = await getProfile(patientId) as any;
+    const profile = await getProfile(patientId, profileId) as any;
     const cycleLen  = detectedCycleLen ?? profile.cycleLength ?? 28;
     const periodLen = detectedPeriodLen;
 

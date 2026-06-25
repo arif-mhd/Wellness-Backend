@@ -86,6 +86,8 @@ function mapToPatient(apt: any, index: number): Patient {
     medicines: Array.isArray(apt.emr?.medicines)
       ? apt.emr.medicines.map((m: any) => ({ name: m.name, dosage: m.dosage }))
       : undefined,
+    accountOwnerName: apt.familyMemberId ? apt.accountOwnerName : undefined,
+    profileRelationship: apt.familyMemberId ? apt.profileRelationship : undefined,
   };
 }
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";

@@ -106,6 +106,11 @@ export default function AppointmentDetailsCard({
             <span className="text-[#676E76] font-bold text-[12px] leading-[1.5] tracking-[-0.24px] mt-0.5">
               {patient.age} Year Old
             </span>
+            {patient.accountOwnerName && (
+              <span className="text-[#5476FC] text-[11px] leading-[1.4] mt-0.5">
+                For: {patient.profileRelationship ?? "Family Member"} of {patient.accountOwnerName}
+              </span>
+            )}
           </div>
         </div>
 

@@ -34,4 +34,7 @@ export interface Patient {
   patientUserId?: string;
   /** Medicines prescribed in this encounter's EMR, if any was saved. */
   medicines?: { name: string; dosage?: string }[];
+  /** Set when this appointment/record belongs to a family member profile rather than the account owner. */
+  accountOwnerName?: string;
+  profileRelationship?: string;
 }

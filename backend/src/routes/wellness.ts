@@ -119,7 +119,8 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
-            foodName: clientFoodName, image: clientImage, per100g: clientPer100g } = req.body;
+            foodName: clientFoodName, image: clientImage, per100g: clientPer100g,
+            profileId } = req.body;
 
     if (!date || !meal || !foodId || quantity == null) {
       res.status(400).json({ error: "date, meal, foodId and quantity are required" });
@@ -149,6 +150,7 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
     const entry = {
       id:        crypto.randomUUID(),
       patientId,
+      profileId: profileId ?? patientId,
       date,
       meal,
       foodId,
@@ -176,15 +178,21 @@ router.get("/food-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
+    const parameters = [
+      { name: "@pid",  value: patientId },
+      { name: "@date", value: date },
+    ];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.loggedAt ASC";
 
     const { resources } = await foodLogsContainer.items.query(
-      {
-        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date ORDER BY c.loggedAt ASC",
-        parameters: [
-          { name: "@pid",  value: patientId },
-          { name: "@date", value: date },
-        ],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
 
@@ -219,7 +227,7 @@ router.get("/exercises", (req: SessionRequest, res: Response) => {
 router.post("/workout-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { date, exerciseId, sets, durationMinutes } = req.body;
+    const { date, exerciseId, sets, durationMinutes, profileId } = req.body;
 
     if (!date || !exerciseId) {
       res.status(400).json({ error: "date and exerciseId are required" });
@@ -251,6 +259,7 @@ router.post("/workout-log", async (req: SessionRequest, res: Response) => {
     const entry = {
       id:              crypto.randomUUID(),
       patientId,
+      profileId:       profileId ?? patientId,
       date,
       exerciseId,
       exerciseName:    exercise.name,
@@ -277,15 +286,21 @@ router.get("/workout-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
+    const parameters = [
+      { name: "@pid",  value: patientId },
+      { name: "@date", value: date },
+    ];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.loggedAt ASC";
 
     const { resources } = await workoutLogsContainer.items.query(
-      {
-        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date ORDER BY c.loggedAt ASC",
-        parameters: [
-          { name: "@pid",  value: patientId },
-          { name: "@date", value: date },
-        ],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
 
@@ -387,7 +402,7 @@ router.get("/assessments/:assessmentId", (req: SessionRequest, res: Response) =>
 router.post("/assessments/submit", async (req: SessionRequest, res: Response) => {
   try {
     const patientId    = req.session!.getUserId();
-    const { assessmentId, answers } = req.body;
+    const { assessmentId, answers, profileId } = req.body;
     if (!assessmentId || !answers) {
       res.status(400).json({ error: "assessmentId and answers are required" }); return;
     }
@@ -400,6 +415,7 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
     const resultDoc = {
       id:              crypto.randomUUID(),
       patientId,
+      profileId:       profileId ?? patientId,
       assessmentId,
       assessmentTitle: assessment.title,
       category:        assessment.category,
@@ -421,11 +437,18 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
 router.get("/assessments/history", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.takenAt DESC";
+
     const { resources } = await assessmentResultsContainer.items.query(
-      {
-        query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.takenAt DESC",
-        parameters: [{ name: "@pid", value: patientId }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
     res.json({ history: resources });
@@ -522,7 +545,7 @@ router.delete("/routines/:routineId", async (req: SessionRequest, res: Response)
 router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { date, exercises, sessionTitle } = req.body;
+    const { date, exercises, sessionTitle, profileId } = req.body;
     if (!Array.isArray(exercises) || exercises.length === 0) {
       res.status(400).json({ error: "exercises array is required" });
       return;
@@ -554,6 +577,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
       const entry = {
         id:              crypto.randomUUID(),
         patientId,
+        profileId:       profileId ?? patientId,
         date:            logDate,
         sessionId,
         sessionTitle:    sessionTitle ?? null,
@@ -584,7 +608,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
 router.post("/weight-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { weightKg, date } = req.body;
+    const { weightKg, date, profileId } = req.body;
 
     if (!weightKg || isNaN(Number(weightKg))) {
       res.status(400).json({ error: "weightKg is required and must be a number" });
@@ -594,6 +618,7 @@ router.post("/weight-log", async (req: SessionRequest, res: Response) => {
     const entry = {
       id:        crypto.randomUUID(),
       patientId,
+      profileId: profileId ?? patientId,
       date:      date ?? new Date().toISOString().slice(0, 10),
       weightKg:  parseFloat(weightKg),
       loggedAt:  new Date().toISOString(),
@@ -601,17 +626,21 @@ router.post("/weight-log", async (req: SessionRequest, res: Response) => {
 
     await weightLogsContainer.items.upsert(entry);
 
-    // Keep patient profile current weight in sync
-    try {
-      const { resource } = await patientsContainer.item(patientId, patientId).read();
-      if (resource) {
-        await patientsContainer.items.upsert({
-          ...resource,
-          currentWeightKg: parseFloat(weightKg),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    } catch { /* non-fatal */ }
+    // Keep patient profile current weight in sync — only for the account
+    // owner's own profile; family members' weight isn't tracked on the
+    // patient document itself.
+    if (!profileId || profileId === patientId) {
+      try {
+        const { resource } = await patientsContainer.item(patientId, patientId).read();
+        if (resource) {
+          await patientsContainer.items.upsert({
+            ...resource,
+            currentWeightKg: parseFloat(weightKg),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch { /* non-fatal */ }
+    }
 
     res.json({ entry });
   } catch (err) {
@@ -626,12 +655,18 @@ router.get("/weight-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const limit = parseInt((req.query.limit as string) ?? "7", 10) || 7;
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = `SELECT TOP ${limit} * FROM c WHERE c.patientId = @pid`;
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.date DESC";
 
     const { resources } = await weightLogsContainer.items.query(
-      {
-        query: `SELECT TOP ${limit} * FROM c WHERE c.patientId = @pid ORDER BY c.date DESC`,
-        parameters: [{ name: "@pid", value: patientId }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
 

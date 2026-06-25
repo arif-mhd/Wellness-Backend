@@ -24,22 +24,22 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function getProfile(patientId: string): Promise<Record<string, unknown>> {
+async function getProfile(patientId: string, profileId: string): Promise<Record<string, unknown>> {
   try {
-    const { resource } = await pregnancyProfilesContainer.item(patientId, patientId).read();
-    return resource ?? { id: patientId, patientId };
+    const { resource } = await pregnancyProfilesContainer.item(profileId, patientId).read();
+    return resource ?? { id: profileId, patientId, profileId };
   } catch {
-    return { id: patientId, patientId };
+    return { id: profileId, patientId, profileId };
   }
 }
 
-async function getLog(patientId: string, date: string): Promise<Record<string, unknown>> {
-  const docId = `${patientId}_${date}`;
+async function getLog(patientId: string, profileId: string, date: string): Promise<Record<string, unknown>> {
+  const docId = `${profileId}_${date}`;
   try {
     const { resource } = await pregnancyLogsContainer.item(docId, patientId).read();
-    return resource ?? { id: docId, patientId, date };
+    return resource ?? { id: docId, patientId, profileId, date };
   } catch {
-    return { id: docId, patientId, date };
+    return { id: docId, patientId, profileId, date };
   }
 }
 
@@ -47,7 +47,8 @@ async function getLog(patientId: string, date: string): Promise<Record<string, u
 router.get("/profile", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const profile = await getProfile(patientId);
+    const profileId = (req.query.profileId as string) || patientId;
+    const profile = await getProfile(patientId, profileId);
     res.json({ profile });
   } catch (err) {
     console.error("Pregnancy profile fetch error:", err);
@@ -60,11 +61,14 @@ router.get("/profile", async (req: SessionRequest, res: Response) => {
 router.put("/profile", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const existing = await getProfile(patientId);
-    const { weeksPregnant, daysPregnant, numberOfChildren, dueDate, isActive } = req.body;
+    const { weeksPregnant, daysPregnant, numberOfChildren, dueDate, isActive, profileId: bodyProfileId } = req.body;
+    const profileId = bodyProfileId ?? patientId;
+    const existing = await getProfile(patientId, profileId);
 
     const updated = {
       ...existing,
+      patientId,
+      profileId,
       ...(weeksPregnant     !== undefined && { weeksPregnant }),
       ...(daysPregnant      !== undefined && { daysPregnant }),
       ...(numberOfChildren  !== undefined && { numberOfChildren }),
@@ -83,20 +87,28 @@ router.put("/profile", async (req: SessionRequest, res: Response) => {
 
 // ─── DELETE /api/pregnancy/profile ───────────────────────────────────────────
 // Deletes the pregnancy profile and all logs for this patient
+// Deletes the pregnancy profile and logs for one profile (the account owner,
+// or one family member if ?profileId= is given). Omitting profileId deletes
+// only the account owner's own profile — it does NOT wipe family members'
+// pregnancy data, since this is a destructive operation.
 router.delete("/profile", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = (req.query.profileId as string) || patientId;
 
     // Delete profile
     try {
-      await pregnancyProfilesContainer.item(patientId, patientId).delete();
+      await pregnancyProfilesContainer.item(profileId, patientId).delete();
     } catch { /* already gone */ }
 
-    // Delete all logs
+    // Delete all logs for this profile
     const { resources: logs } = await pregnancyLogsContainer.items.query(
       {
-        query: "SELECT c.id FROM c WHERE c.patientId = @pid",
-        parameters: [{ name: "@pid", value: patientId }],
+        query: "SELECT c.id FROM c WHERE c.patientId = @pid AND c.profileId = @profileId",
+        parameters: [
+          { name: "@pid", value: patientId },
+          { name: "@profileId", value: profileId },
+        ],
       },
       { partitionKey: patientId }
     ).fetchAll();
@@ -118,8 +130,9 @@ router.delete("/profile", async (req: SessionRequest, res: Response) => {
 router.get("/log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = (req.query.profileId as string) || patientId;
     const date = (req.query.date as string) || todayStr();
-    const log = await getLog(patientId, date);
+    const log = await getLog(patientId, profileId, date);
     res.json({ log });
   } catch (err) {
     console.error("Pregnancy log fetch error:", err);
@@ -145,7 +158,8 @@ router.put("/log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = req.body.date || todayStr();
-    const existing = await getLog(patientId, date);
+    const profileId = req.body.profileId ?? patientId;
+    const existing = await getLog(patientId, profileId, date);
 
     const {
       moods, topSymptom, symptoms,
@@ -156,6 +170,8 @@ router.put("/log", async (req: SessionRequest, res: Response) => {
 
     const updated = {
       ...existing,
+      patientId,
+      profileId,
       ...(moods              !== undefined && { moods }),
       ...(topSymptom         !== undefined && { topSymptom }),
       ...(symptoms           !== undefined && { symptoms }),
@@ -182,11 +198,18 @@ router.put("/log", async (req: SessionRequest, res: Response) => {
 router.get("/log/history", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT c.id, c.date, c.profileId, c.moods, c.symptoms, c.topSymptom, c.weightKg, c.waterIntakeLiters, c.updatedAt FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.date DESC";
+
     const { resources } = await pregnancyLogsContainer.items.query(
-      {
-        query: "SELECT c.id, c.date, c.moods, c.symptoms, c.topSymptom, c.weightKg, c.waterIntakeLiters, c.updatedAt FROM c WHERE c.patientId = @pid ORDER BY c.date DESC",
-        parameters: [{ name: "@pid", value: patientId }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
 
@@ -210,13 +233,14 @@ router.post(
         return;
       }
       const patientId = req.session!.getUserId();
+      const profileId = (req.query.profileId as string) || patientId;
       const date = (req.query.date as string) || todayStr();
       const ext = req.file.mimetype === "application/pdf" ? "pdf"
         : req.file.mimetype.split("/")[1] ?? "jpg";
-      const blobPath = `patients/${patientId}/scans/scan_${date}.${ext}`;
+      const blobPath = `patients/${patientId}/scans/scan_${profileId}_${date}.${ext}`;
 
       // Delete old scan for that date if it exists
-      const existing = await getLog(patientId, date);
+      const existing = await getLog(patientId, profileId, date);
       if ((existing as any).scanReportPath) {
         try { await deleteBlob((existing as any).scanReportPath); } catch { /* ignore */ }
       }
@@ -227,6 +251,8 @@ router.post(
       // Persist URL back into the log
       const updated = {
         ...existing,
+        patientId,
+        profileId,
         scanReportUrl,
         scanReportPath: blobPath,
         scanReportDate: date,
@@ -256,7 +282,8 @@ router.put("/diabetes", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const date = req.body.date || todayStr();
-    const existing = await getLog(patientId, date);
+    const profileId = req.body.profileId ?? patientId;
+    const existing = await getLog(patientId, profileId, date);
 
     const {
       bloodSugarMgDl, testingTime, testType,
@@ -276,6 +303,8 @@ router.put("/diabetes", async (req: SessionRequest, res: Response) => {
 
     const updated = {
       ...existing,
+      patientId,
+      profileId,
       diabetes,
       updatedAt: new Date().toISOString(),
     };
@@ -292,10 +321,11 @@ router.put("/diabetes", async (req: SessionRequest, res: Response) => {
 router.delete("/diabetes", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = (req.query.profileId as string) || patientId;
     const date = (req.query.date as string) || todayStr();
-    const existing = await getLog(patientId, date);
+    const existing = await getLog(patientId, profileId, date);
 
-    const updated = { ...existing, diabetes: null, updatedAt: new Date().toISOString() };
+    const updated = { ...existing, patientId, profileId, diabetes: null, updatedAt: new Date().toISOString() };
     await pregnancyLogsContainer.items.upsert(updated);
     res.json({ status: "OK" });
   } catch (err) {

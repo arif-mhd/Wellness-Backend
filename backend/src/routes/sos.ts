@@ -17,6 +17,21 @@ function generateSixDigitCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// Derives a priority from the real lifecycle of the SOS code, since no
+// explicit priority is collected anywhere in the SOS flow:
+//   - expired, never verified by a doctor → High  (emergency went unanswered)
+//   - still active / not yet expired      → Medium (unresolved, in progress)
+//   - verified by a doctor before expiry  → Low    (already responded to)
+function deriveSosStatusAndPriority(sosCode: { usedAt: string | null; expiresAt: string }) {
+  if (sosCode.usedAt) {
+    return { status: "Used" as const, priority: "Low" as const };
+  }
+  if (new Date(sosCode.expiresAt).getTime() <= Date.now()) {
+    return { status: "Expired" as const, priority: "High" as const };
+  }
+  return { status: "Active" as const, priority: "Medium" as const };
+}
+
 // ─── POST /api/sos/generate ───────────────────────────────────────────────────
 // Patient taps the SOS button. Generates a fresh 6-digit code valid for 15
 // minutes, single-use. Any previously unused code for this patient is left in
@@ -144,6 +159,70 @@ router.post("/verify", requireRole("doctor"), async (req: SessionRequest, res: R
     res.json({ patientId: validMatch.patientId, profile, visitHistory });
   } catch (err) {
     console.error("Verify SOS code error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/sos/admin/all ─────────────────────────────────────────────────
+// Admin-scoped view of every SOS code ever generated, joined with the
+// requesting patient's profile info, newest first. Used by the admin-portal
+// Emergencies tab in place of hardcoded mock data.
+router.get("/admin/all", requireRole("admin"), async (_req: SessionRequest, res: Response) => {
+  try {
+    const sosCodes = await queryDocuments<any>(sosCodesContainer, {
+      query: "SELECT * FROM c ORDER BY c.createdAt DESC",
+      parameters: [],
+    });
+
+    const patientIds = Array.from(new Set(sosCodes.map((s) => s.patientId).filter(Boolean)));
+    const patients: Record<string, any> = {};
+    await Promise.all(patientIds.map(async (pid) => {
+      try {
+        const { resource: patient } = await patientsContainer.item(pid, pid).read();
+        if (patient) patients[pid] = patient;
+      } catch {
+        // patient may have been deleted — skip
+      }
+    }));
+
+    const doctorIds = Array.from(new Set(sosCodes.map((s) => s.usedByDoctorId).filter(Boolean)));
+    const doctorNames: Record<string, string> = {};
+    await Promise.all(doctorIds.map(async (did) => {
+      try {
+        const { resource: doc } = await doctorsContainer.item(did, did).read();
+        doctorNames[did] = doc?.fullName ?? "Unknown Doctor";
+      } catch {
+        doctorNames[did] = "Unknown Doctor";
+      }
+    }));
+
+    const emergencies = sosCodes
+      .filter((s) => patients[s.patientId])
+      .map((s) => {
+        const patient = patients[s.patientId];
+        const { status, priority } = deriveSosStatusAndPriority(s);
+        return {
+          id: s.id,
+          patientId: s.patientId,
+          name: patient.fullName ?? "",
+          email: patient.email ?? "",
+          phone: patient.phone ?? "",
+          address: patient.location ?? "",
+          gender: patient.gender ?? "",
+          bio: patient.bio ?? "",
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          usedAt: s.usedAt,
+          usedByDoctorId: s.usedByDoctorId,
+          usedByDoctorName: s.usedByDoctorId ? (doctorNames[s.usedByDoctorId] ?? "Unknown Doctor") : null,
+          status,
+          priority,
+        };
+      });
+
+    res.json({ emergencies });
+  } catch (err) {
+    console.error("Admin SOS list error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

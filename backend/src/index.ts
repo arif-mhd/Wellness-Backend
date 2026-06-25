@@ -33,6 +33,9 @@ import feedbackRouter from "./routes/feedback";
 import notificationsRouter from "./routes/notifications";
 import adminActivityLogRouter from "./routes/adminActivityLog";
 import adminDashboardRouter from "./routes/adminDashboard";
+import adminNotificationsRouter from "./routes/adminNotifications";
+import doctorNotificationsRouter from "./routes/doctorNotifications";
+import adminReportsRouter from "./routes/adminReports";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
 
@@ -68,6 +71,7 @@ app.use("/auth", authRouter);
 
 // Doctor self-registration (public)
 app.use("/api/doctors", doctorsRouter);
+app.use("/api/doctors/notifications", doctorNotificationsRouter);
 
 // Admin doctor management (requires admin role)
 app.use("/api/admin/doctors", adminDoctorsRouter);
@@ -108,6 +112,8 @@ app.use("/api/feedback",       feedbackRouter);
 app.use("/api/notifications",  notificationsRouter);
 app.use("/api/admin/activity-logs", adminActivityLogRouter);
 app.use("/api/admin/dashboard", adminDashboardRouter);
+app.use("/api/admin/notifications", adminNotificationsRouter);
+app.use("/api/admin/reports", adminReportsRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
 

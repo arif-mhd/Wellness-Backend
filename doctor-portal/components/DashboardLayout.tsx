@@ -29,7 +29,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifTab, setNotifTab] = useState<"Unread" | "All">("Unread");
+  const [notifLoading, setNotifLoading] = useState(false);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
   const [showChat, setShowChat] = useState(false);
   const [waitingCount, setWaitingCount] = useState(0);
 
@@ -55,15 +57,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [fetchWaitingCount]);
   const fetchNotifications = useCallback(async () => {
+    setNotifLoading(true);
     try {
-      const res = await apiFetch("/api/notifications");
+      const res = await apiFetch("/api/doctors/notifications");
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data ?? []);
-        setUnreadCount(data.filter((n: any) => !n.is_read).length);
+        setNotifications(data.notifications ?? []);
       }
     } catch (err) {
       console.error("Fetch notifications error:", err);
+    } finally {
+      setNotifLoading(false);
     }
   }, []);
 
@@ -74,17 +78,104 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }, [fetchNotifications]);
 
   const handleMarkAsRead = async (notifId: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)));
     try {
-      const res = await apiFetch(`/api/notifications/${notifId}/read`, {
-        method: "PATCH",
-      });
-      if (res.ok) {
-        fetchNotifications();
-      }
+      await apiFetch(`/api/doctors/notifications/${notifId}/read`, { method: "PATCH" });
     } catch (err) {
       console.error("Mark read error:", err);
     }
   };
+
+  const handleMarkAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      await apiFetch("/api/doctors/notifications/read-all", { method: "PATCH" });
+    } catch (err) {
+      console.error("Mark all read error:", err);
+    }
+  };
+
+  function handleNotificationClick(notif: any) {
+    if (!notif.isRead) handleMarkAsRead(notif.id);
+    setShowDropdown(false);
+    if (notif.link) router.push(notif.link);
+  }
+
+  function timeAgo(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}hr`;
+    return `${Math.floor(hrs / 24)}d`;
+  }
+
+  function notificationIcon(type: string) {
+    if (type === "new_message") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-blue-50 flex items-center justify-center text-blue-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "patient_waiting") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-amber-50 flex items-center justify-center text-amber-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "appointment_booked") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-emerald-50 flex items-center justify-center text-emerald-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "support_reply") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-rose-50 flex items-center justify-center text-rose-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "doctor_approved" || type === "slots_verified") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-emerald-50 flex items-center justify-center text-emerald-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "doctor_rejected") {
+      return (
+        <div className="w-9 h-9 rounded-full shrink-0 bg-red-50 flex items-center justify-center text-red-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </div>
+      );
+    }
+    return (
+      <div className="w-9 h-9 rounded-full shrink-0 bg-slate-100 flex items-center justify-center text-slate-400">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      </div>
+    );
+  }
+
+  const visibleNotifications = notifTab === "Unread" ? notifications.filter((n) => !n.isRead) : notifications;
 
   return (
     <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
@@ -194,39 +285,94 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </button>
 
               {showDropdown && (
-                <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-2xl shadow-xl w-80 py-4 z-50 text-left">
-                  <div className="flex items-center justify-between px-4 pb-3 border-b border-[#EBEEF5]">
-                    <span className="font-semibold text-sm text-[#24292E]">Notifications</span>
-                    {unreadCount > 0 && (
-                      <span className="text-xs text-[#5476FC] font-medium">{unreadCount} unread</span>
-                    )}
-                  </div>
-                  <div className="max-h-64 overflow-y-auto mt-2">
-                    {notifications.filter((n: any) => !n.is_read).length === 0 ? (
-                      <div className="py-8 text-center text-xs text-[#9EA5AD]">
-                        No notifications
+                <>
+                  <div
+                    className="fixed inset-0 bg-slate-900/40 z-40 animate-in fade-in duration-200"
+                    aria-hidden="true"
+                    onClick={() => setShowDropdown(false)}
+                  />
+                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[17px] font-black text-[#24292E]">Notifications</h3>
+                      <button
+                        onClick={() => setShowDropdown(false)}
+                        className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex items-center justify-between border-b border-slate-100 mb-4 px-1">
+                      <div className="flex items-center gap-6">
+                        {(["Unread", "All"] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => setNotifTab(tab)}
+                            className={`pb-3 text-[13px] font-bold transition-colors relative ${
+                              notifTab === tab ? "text-slate-800" : "text-slate-400 hover:text-slate-600"
+                            }`}
+                          >
+                            {tab}
+                            {notifTab === tab && (
+                              <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[#5476FC] rounded-t-full" />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    ) : (
-                      notifications.filter((n: any) => !n.is_read).slice(0, 5).map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => handleMarkAsRead(notif.id)}
-                          className="flex flex-col gap-1 px-4 py-3 border-b border-[#F7F9FC] last:border-0 hover:bg-[#F7F9FC] transition-colors cursor-pointer text-left bg-[#8AA0FF]/5"
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-[11px] font-bold text-[#5476FC] hover:text-[#3d5fe0] transition mb-3"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-[#5476FC]">
-                              {notif.title}
-                            </span>
-                            <span className="text-[9px] text-[#9EA5AD]">
-                              {notif.sent_at ? new Date(notif.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
-                            </span>
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    {/* List */}
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                      {notifLoading && notifications.length === 0 ? (
+                        <p className="text-center text-[12px] text-slate-400 font-medium py-8">Loading notifications…</p>
+                      ) : visibleNotifications.length === 0 ? (
+                        <p className="text-center text-[12px] text-slate-400 font-medium py-8">
+                          {notifTab === "Unread" ? "You're all caught up." : "No notifications yet."}
+                        </p>
+                      ) : (
+                        visibleNotifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={`p-4 rounded-[1.25rem] border shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer ${
+                              notif.isRead ? "bg-white border-slate-50" : "bg-[#5476FC]/5 border-[#5476FC]/10"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex items-center gap-3">
+                                {notificationIcon(notif.type)}
+                                <p className="text-[12px] font-bold text-[#24292E] leading-tight">{notif.title}</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[11px] font-bold text-[#9EA5AD] whitespace-nowrap mt-1">{timeAgo(notif.createdAt)}</span>
+                                {!notif.isRead && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notif.id); }}
+                                    title="Mark as read"
+                                    className="w-4 h-4 rounded-full bg-[#5476FC] hover:bg-[#3d5fe0] transition shrink-0 mt-1"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-[#676E76] leading-relaxed font-medium line-clamp-2">{notif.body}</p>
                           </div>
-                          <span className="text-[11px] text-[#676E76] leading-normal">{notif.body}</span>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 

@@ -108,6 +108,11 @@ export default function AllConsultationsTable({
                   <span className="text-[#9EA5AD] text-[12px] leading-[1.5] tracking-[-0.24px] truncate">
                     {patient.email}
                   </span>
+                  {patient.accountOwnerName && (
+                    <span className="text-[#5476FC] text-[11px] leading-[1.4] truncate">
+                      For: {patient.profileRelationship ?? "Family Member"} of {patient.accountOwnerName}
+                    </span>
+                  )}
                 </div>
               </div>
 

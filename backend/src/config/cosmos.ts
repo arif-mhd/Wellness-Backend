@@ -102,6 +102,9 @@ export const messagesContainer: Container = db.container("messages");
 /** SOS emergency codes — partition key: /patientId (short-lived, single-use access codes) */
 export const sosCodesContainer: Container = db.container("sosCodes");
 
+/** Admin notifications — partition key: /id (synced from real platform events, read-state tracked here) */
+export const adminNotificationsContainer: Container = db.container("adminNotifications");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -140,6 +143,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "activityLogs",           partitionKey: { paths: ["/source"] } },
     { id: "messages",               partitionKey: { paths: ["/conversationId"] } },
     { id: "sosCodes",               partitionKey: { paths: ["/patientId"] } },
+    { id: "adminNotifications",     partitionKey: { paths: ["/id"] } },
   ];
 
   for (const spec of required) {

@@ -6,6 +6,7 @@ import {
   doctorsContainer,
   queryDocuments,
 } from "../config/cosmos";
+import { resolveProfileDisplay, getAllProfiles } from "../utils/profile";
 
 const router = Router();
 
@@ -91,17 +92,23 @@ router.get("/:patientId/ehr", requireRole("admin"), async (req: Request, res: Re
 
     const visitHistory = allAppointments
       .filter((a) => a.emr || a.status === "completed")
-      .map((a) => ({
-        appointmentId: a.id,
-        scheduledAt:   a.scheduledAt,
-        status:        a.status,
-        reason:        a.reason ?? "",
-        doctorId:      a.doctorId,
-        doctorName:    doctorNames[a.doctorId] ?? "Unknown Doctor",
-        emr:           a.emr ?? null,
-      }));
+      .map((a) => {
+        const resolved = resolveProfileDisplay(patient, a.familyMemberId ?? patient.id);
+        return {
+          appointmentId: a.id,
+          scheduledAt:   a.scheduledAt,
+          status:        a.status,
+          reason:        a.reason ?? "",
+          doctorId:      a.doctorId,
+          doctorName:    doctorNames[a.doctorId] ?? "Unknown Doctor",
+          emr:           a.emr ?? null,
+          profileId:        resolved.profileId,
+          profileName:      resolved.fullName,
+          profileRelationship: resolved.relationship,
+        };
+      });
 
-    res.json({ profile, visitHistory });
+    res.json({ profile, visitHistory, profiles: getAllProfiles(patient) });
   } catch (err) {
     console.error("Admin patient EHR fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
