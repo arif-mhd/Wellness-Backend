@@ -167,6 +167,38 @@ router.get("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
   }
 });
 
+// ─── PUT /api/pharmacy/me ─────────────────────────────────────────────────────
+// Updates the authenticated pharmacy's profile
+router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { ownerName, pharmacyName, licenseNumber, email, phone, location } = req.body;
+
+    const { resource: existing } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!existing) {
+      res.status(404).json({ error: "Pharmacy not found" });
+      return;
+    }
+
+    const updated = {
+      ...existing,
+      ...(ownerName && { ownerName }),
+      ...(pharmacyName && { pharmacyName }),
+      ...(licenseNumber && { licenseNumber }),
+      ...(email && { email }),
+      ...(phone && { phone }),
+      ...(location !== undefined && { location }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await pharmaciesContainer.items.upsert(updated);
+    res.json({ status: "OK", pharmacy: updated });
+  } catch (err) {
+    console.error("Pharmacy update me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── GET /api/pharmacy/products ───────────────────────────────────────────────
 // Returns all products for the authenticated pharmacy
 router.get("/products", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
