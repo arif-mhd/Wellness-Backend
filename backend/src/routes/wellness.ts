@@ -6,7 +6,8 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
-import { GoogleGenAI } from "@google/genai";
+// Note: We use the Gemini REST API directly (not the @google/genai SDK) to avoid
+// Cloud Run's Application Default Credentials (ADC) overriding our API key.
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.use(requireRole("patient"));
 // ── POST /api/wellness/analyze-food-image ────────────────────────────────────
 // Body: { imageBase64: string, mimeType: string }
 // Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
+// Uses the Gemini REST API directly with ?key=API_KEY to avoid Cloud Run ADC interference.
 router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
@@ -28,8 +30,6 @@ router.post("/analyze-food-image", async (req: SessionRequest, res: Response) =>
     return;
   }
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
   "foodName": "Detected food name (be specific, e.g. 'Grilled Chicken Breast' not just 'Chicken')",
@@ -50,28 +50,36 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-    const modelsToTry = [
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-flash",
-    ];
+    const modelsToTry = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"];
     let responseText: string | null = null;
     let lastError: any = null;
 
     for (const modelName of modelsToTry) {
       try {
-        const result = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            {
+        // Use REST API directly with key as URL param — avoids Cloud Run ADC credential interference
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const geminiRes = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
               parts: [
                 { text: prompt },
                 { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
               ],
-            },
-          ],
+            }],
+          }),
         });
-        responseText = result.text ?? null;
+
+        if (!geminiRes.ok) {
+          const errBody = await geminiRes.text();
+          throw new Error(`HTTP ${geminiRes.status}: ${errBody}`);
+        }
+
+        const geminiData = await geminiRes.json() as any;
+        const candidate = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!candidate) throw new Error("No text in Gemini response");
+        responseText = candidate;
         console.log(`[analyze-food-image] Success with model: ${modelName}`);
         break;
       } catch (err: any) {
@@ -125,6 +133,7 @@ Rules:
     res.status(500).json({ error: err?.message || "Internal server error" });
   }
 });
+
 
 
 
