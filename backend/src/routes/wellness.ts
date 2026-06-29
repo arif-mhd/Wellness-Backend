@@ -6,7 +6,7 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const router = Router();
 
@@ -23,12 +23,12 @@ router.post("/analyze-food-image", async (req: SessionRequest, res: Response) =>
     return;
   }
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "your_gemini_api_key_here") {
-    res.status(503).json({ error: "AI food analysis is not configured. Please set GEMINI_API_KEY in your .env file." });
+  if (!apiKey || apiKey.length < 20) {
+    res.status(503).json({ error: "AI food analysis is not configured. Please set a valid GEMINI_API_KEY." });
     return;
   }
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
@@ -50,30 +50,41 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-vision"];
-    let result = null;
-    let lastError = null;
+    const modelsToTry = [
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-flash",
+    ];
+    let responseText: string | null = null;
+    let lastError: any = null;
 
     for (const modelName of modelsToTry) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        result = await model.generateContent([
-          prompt,
-          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
-        ]);
-        break; // Success, exit the loop
+        const result = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
+              ],
+            },
+          ],
+        });
+        responseText = result.text ?? null;
+        console.log(`[analyze-food-image] Success with model: ${modelName}`);
+        break;
       } catch (err: any) {
         lastError = err;
         console.warn(`[analyze-food-image] Model ${modelName} failed:`, err?.message);
-        // Continue to the next model
       }
     }
 
-    if (!result) {
-      throw lastError || new Error("All Gemini models failed to process the request.");
+    if (!responseText) {
+      throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
     }
 
-    const text = result.response.text().trim();
+    const text = responseText.trim();
 
     // Strip markdown code fences if present
     const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
