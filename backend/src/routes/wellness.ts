@@ -89,22 +89,33 @@ Rules:
     const models   = ["gemini-2.0-flash", "gemini-1.5-flash"];
     const project  = process.env.GOOGLE_CLOUD_PROJECT || "wellness-498910";
     const location = process.env.CLOUD_RUN_REGION    || "asia-south1";
+    const baseUrl  = "https://generativelanguage.googleapis.com/v1beta/models";
 
     let responseText: string | null = null;
     let lastError:    any           = null;
 
     for (const model of models) {
-      // ── Strategy 1: Google AI Studio API key ────────────────────────────
       if (hasKey) {
+        // ── Strategy 1a: x-goog-api-key header (new AQ-format keys) ────────
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          responseText = await callGemini(url);
-          console.log(`[analyze-food-image] ✓ AI Studio key · model=${model}`);
+          const url = `${baseUrl}/${model}:generateContent`;
+          responseText = await callGemini(url, { "x-goog-api-key": apiKey });
+          console.log(`[analyze-food-image] ✓ x-goog-api-key header · model=${model}`);
           break;
         } catch (err: any) {
-          console.warn(`[analyze-food-image] AI Studio key failed for ${model}:`, err?.message);
+          console.warn(`[analyze-food-image] x-goog-api-key failed for ${model}:`, err?.message);
           lastError = err;
-          // Fall through to Vertex AI below
+        }
+
+        // ── Strategy 1b: ?key= URL param (old AIzaSy-format keys) ──────────
+        try {
+          const url = `${baseUrl}/${model}:generateContent?key=${apiKey}`;
+          responseText = await callGemini(url);
+          console.log(`[analyze-food-image] ✓ ?key= param · model=${model}`);
+          break;
+        } catch (err: any) {
+          console.warn(`[analyze-food-image] ?key= param failed for ${model}:`, err?.message);
+          lastError = err;
         }
       }
 
