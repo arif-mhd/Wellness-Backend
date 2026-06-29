@@ -6,11 +6,116 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = Router();
 
 // All wellness routes require a valid patient session
 router.use(requireRole("patient"));
+
+// ── POST /api/wellness/analyze-food-image ────────────────────────────────────
+// Body: { imageBase64: string, mimeType: string }
+// Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
+router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
+  const { imageBase64, mimeType } = req.body;
+  if (!imageBase64) {
+    res.status(400).json({ error: "imageBase64 is required" });
+    return;
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "your_gemini_api_key_here") {
+    res.status(503).json({ error: "AI food analysis is not configured. Please set GEMINI_API_KEY in your .env file." });
+    return;
+  }
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
+{
+  "foodName": "Detected food name (be specific, e.g. 'Grilled Chicken Breast' not just 'Chicken')",
+  "confidence": "high|medium|low",
+  "description": "Short 1-sentence description of the food",
+  "per100g": {
+    "calories": <number>,
+    "protein": <number in grams>,
+    "fat": <number in grams>,
+    "carbs": <number in grams>,
+    "fiber": <number in grams>
+  }
+}
+Rules:
+- confidence = "high" if you can clearly identify the specific food
+- confidence = "medium" if you can identify the food type but not the exact preparation
+- confidence = "low" if the image is unclear or you are guessing
+- All nutrition values must be realistic per 100 grams
+- If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
+
+    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-vision"];
+    let result = null;
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([
+          prompt,
+          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
+        ]);
+        break; // Success, exit the loop
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[analyze-food-image] Model ${modelName} failed:`, err?.message);
+        // Continue to the next model
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error("All Gemini models failed to process the request.");
+    }
+
+    const text = result.response.text().trim();
+
+    // Strip markdown code fences if present
+    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    let parsed: {
+      foodName: string;
+      confidence: "high" | "medium" | "low";
+      description: string;
+      per100g: { calories: number; protein: number; fat: number; carbs: number; fiber: number };
+    };
+
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      console.error("[analyze-food-image] Failed to parse Gemini response:", text);
+      res.status(500).json({ error: "AI returned an unexpected response. Please try again." });
+      return;
+    }
+
+    // Sanitize / validate numeric fields
+    const clean = (v: any, fallback: number) => (typeof v === "number" && !isNaN(v) ? Math.round(v * 10) / 10 : fallback);
+    const response = {
+      foodName: String(parsed.foodName || "Unknown food").trim(),
+      confidence: (["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low") as "high" | "medium" | "low",
+      description: String(parsed.description || "").trim(),
+      per100g: {
+        calories: clean(parsed.per100g?.calories, 0),
+        protein: clean(parsed.per100g?.protein, 0),
+        fat: clean(parsed.per100g?.fat, 0),
+        carbs: clean(parsed.per100g?.carbs, 0),
+        fiber: clean(parsed.per100g?.fiber, 0),
+      },
+    };
+
+    res.json(response);
+  } catch (err: any) {
+    console.error("[analyze-food-image] error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
+});
+
+
 
 // ── Open Food Facts fallback ─────────────────────────────────────────────────
 async function searchOpenFoodFacts(query: string): Promise<Food[]> {
@@ -60,10 +165,10 @@ async function searchOpenFoodFacts(query: string): Promise<Food[]> {
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=100",
       per100g: {
         calories,
-        protein: Math.round((Number(n["proteins_100g"])      || 0) * 10) / 10,
-        fat:     Math.round((Number(n["fat_100g"])           || 0) * 10) / 10,
-        carbs:   Math.round((Number(n["carbohydrates_100g"]) || 0) * 10) / 10,
-        fiber:   Math.round((Number(n["fiber_100g"])         || 0) * 10) / 10,
+        protein: Math.round((Number(n["proteins_100g"]) || 0) * 10) / 10,
+        fat: Math.round((Number(n["fat_100g"]) || 0) * 10) / 10,
+        carbs: Math.round((Number(n["carbohydrates_100g"]) || 0) * 10) / 10,
+        fiber: Math.round((Number(n["fiber_100g"]) || 0) * 10) / 10,
       },
       defaultServing: 100,
     });
@@ -78,11 +183,11 @@ function mapOffCategory(tag: string): string {
   const t = tag.toLowerCase();
   if (t.includes("meat") || t.includes("poultry") || t.includes("fish") || t.includes("seafood")) return "Protein";
   if (t.includes("dairy") || t.includes("milk") || t.includes("cheese") || t.includes("yogurt")) return "Dairy";
-  if (t.includes("fruit"))      return "Fruits";
+  if (t.includes("fruit")) return "Fruits";
   if (t.includes("vegetable") || t.includes("veggie")) return "Vegetables";
   if (t.includes("cereal") || t.includes("grain") || t.includes("bread") || t.includes("pasta") || t.includes("rice")) return "Grains";
   if (t.includes("nut") || t.includes("seed")) return "Nuts";
-  if (t.includes("oil"))        return "Oils";
+  if (t.includes("oil")) return "Oils";
   return "Other";
 }
 
@@ -119,8 +224,8 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
-            foodName: clientFoodName, image: clientImage, per100g: clientPer100g,
-            profileId } = req.body;
+      foodName: clientFoodName, image: clientImage, per100g: clientPer100g,
+      profileId } = req.body;
 
     if (!date || !meal || !foodId || quantity == null) {
       res.status(400).json({ error: "date, meal, foodId and quantity are required" });
@@ -148,21 +253,21 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
     const nutrition = calcNutrition(food, grams);
 
     const entry = {
-      id:        crypto.randomUUID(),
+      id: crypto.randomUUID(),
       patientId,
       profileId: profileId ?? patientId,
       date,
       meal,
       foodId,
-      foodName:  food.name,
-      image:     food.image,
-      quantity:  grams,
+      foodName: food.name,
+      image: food.image,
+      quantity: grams,
       unit,
-      calories:  nutrition.calories,
-      protein:   nutrition.protein,
-      fat:       nutrition.fat,
-      carbs:     nutrition.carbs,
-      loggedAt:  new Date().toISOString(),
+      calories: nutrition.calories,
+      protein: nutrition.protein,
+      fat: nutrition.fat,
+      carbs: nutrition.carbs,
+      loggedAt: new Date().toISOString(),
     };
 
     await foodLogsContainer.items.upsert(entry);
@@ -182,7 +287,7 @@ router.get("/food-log", async (req: SessionRequest, res: Response) => {
 
     let query = "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
     const parameters = [
-      { name: "@pid",  value: patientId },
+      { name: "@pid", value: patientId },
       { name: "@date", value: date },
     ];
     if (profileId) {
@@ -257,20 +362,20 @@ router.post("/workout-log", async (req: SessionRequest, res: Response) => {
     }
 
     const entry = {
-      id:              crypto.randomUUID(),
+      id: crypto.randomUUID(),
       patientId,
-      profileId:       profileId ?? patientId,
+      profileId: profileId ?? patientId,
       date,
       exerciseId,
-      exerciseName:    exercise.name,
-      category:        exercise.category,
-      type:            exercise.type,
-      image:           exercise.image,
-      sets:            sets ?? null,
+      exerciseName: exercise.name,
+      category: exercise.category,
+      type: exercise.type,
+      image: exercise.image,
+      sets: sets ?? null,
       durationMinutes: durationMinutes ?? null,
-      totalVolumeKg:   totalVolumeKg ?? null,
+      totalVolumeKg: totalVolumeKg ?? null,
       caloriesBurned,
-      loggedAt:        new Date().toISOString(),
+      loggedAt: new Date().toISOString(),
     };
 
     await workoutLogsContainer.items.upsert(entry);
@@ -290,7 +395,7 @@ router.get("/workout-log", async (req: SessionRequest, res: Response) => {
 
     let query = "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
     const parameters = [
-      { name: "@pid",  value: patientId },
+      { name: "@pid", value: patientId },
       { name: "@date", value: date },
     ];
     if (profileId) {
@@ -343,7 +448,7 @@ router.get("/daily-summary", async (req: SessionRequest, res: Response) => {
       : "SELECT * FROM c WHERE c.patientId = @pid AND c.date = @date";
 
     const baseParams = [
-      { name: "@pid",  value: patientId },
+      { name: "@pid", value: patientId },
       { name: "@date", value: date },
     ];
     const profileParams = profileId
@@ -361,12 +466,12 @@ router.get("/daily-summary", async (req: SessionRequest, res: Response) => {
       ).fetchAll(),
     ]);
 
-    const totalFoodCalories    = foodEntries.reduce((s: number, e: any) => s + (e.calories ?? 0), 0);
+    const totalFoodCalories = foodEntries.reduce((s: number, e: any) => s + (e.calories ?? 0), 0);
     const totalExerciseCalories = workoutEntries.reduce((s: number, e: any) => s + (e.caloriesBurned ?? 0), 0);
     const macros = {
       protein: Math.round(foodEntries.reduce((s: number, e: any) => s + (e.protein ?? 0), 0) * 10) / 10,
-      fat:     Math.round(foodEntries.reduce((s: number, e: any) => s + (e.fat     ?? 0), 0) * 10) / 10,
-      carbs:   Math.round(foodEntries.reduce((s: number, e: any) => s + (e.carbs   ?? 0), 0) * 10) / 10,
+      fat: Math.round(foodEntries.reduce((s: number, e: any) => s + (e.fat ?? 0), 0) * 10) / 10,
+      carbs: Math.round(foodEntries.reduce((s: number, e: any) => s + (e.carbs ?? 0), 0) * 10) / 10,
     };
 
     // Group food entries by meal
@@ -414,7 +519,7 @@ router.get("/assessments/:assessmentId", (req: SessionRequest, res: Response) =>
 // Computes result, saves to Cosmos, returns the result.
 router.post("/assessments/submit", async (req: SessionRequest, res: Response) => {
   try {
-    const patientId    = req.session!.getUserId();
+    const patientId = req.session!.getUserId();
     const { assessmentId, answers, profileId } = req.body;
     if (!assessmentId || !answers) {
       res.status(400).json({ error: "assessmentId and answers are required" }); return;
@@ -426,15 +531,15 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
     if (!computed) { res.status(400).json({ error: "Could not compute result" }); return; }
 
     const resultDoc = {
-      id:              crypto.randomUUID(),
+      id: crypto.randomUUID(),
       patientId,
-      profileId:       profileId ?? patientId,
+      profileId: profileId ?? patientId,
       assessmentId,
       assessmentTitle: assessment.title,
-      category:        assessment.category,
+      category: assessment.category,
       answers,
       ...computed,
-      takenAt:         new Date().toISOString(),
+      takenAt: new Date().toISOString(),
     };
 
     await assessmentResultsContainer.items.upsert(resultDoc);
@@ -522,7 +627,7 @@ router.post("/routines", async (req: SessionRequest, res: Response) => {
       return;
     }
     const routine = {
-      id:        crypto.randomUUID(),
+      id: crypto.randomUUID(),
       patientId,
       title,
       exercises,
@@ -588,22 +693,22 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
           a + (s.weight ?? 0) * (s.reps ?? 0), 0);
       }
       const entry = {
-        id:              crypto.randomUUID(),
+        id: crypto.randomUUID(),
         patientId,
-        profileId:       profileId ?? patientId,
-        date:            logDate,
+        profileId: profileId ?? patientId,
+        date: logDate,
         sessionId,
-        sessionTitle:    sessionTitle ?? null,
-        exerciseId:      ex.exerciseId,
-        exerciseName:    exercise.name,
-        category:        exercise.category,
-        type:            exercise.type,
-        image:           exercise.image,
-        sets:            ex.sets ?? null,
+        sessionTitle: sessionTitle ?? null,
+        exerciseId: ex.exerciseId,
+        exerciseName: exercise.name,
+        category: exercise.category,
+        type: exercise.type,
+        image: exercise.image,
+        sets: ex.sets ?? null,
         durationMinutes: ex.durationMinutes ?? null,
-        totalVolumeKg:   totalVolumeKg ?? null,
+        totalVolumeKg: totalVolumeKg ?? null,
         caloriesBurned,
-        loggedAt:        new Date().toISOString(),
+        loggedAt: new Date().toISOString(),
       };
       await workoutLogsContainer.items.upsert(entry);
       saved.push(entry);
@@ -629,12 +734,12 @@ router.post("/weight-log", async (req: SessionRequest, res: Response) => {
     }
 
     const entry = {
-      id:        crypto.randomUUID(),
+      id: crypto.randomUUID(),
       patientId,
       profileId: profileId ?? patientId,
-      date:      date ?? new Date().toISOString().slice(0, 10),
-      weightKg:  parseFloat(weightKg),
-      loggedAt:  new Date().toISOString(),
+      date: date ?? new Date().toISOString().slice(0, 10),
+      weightKg: parseFloat(weightKg),
+      loggedAt: new Date().toISOString(),
     };
 
     await weightLogsContainer.items.upsert(entry);

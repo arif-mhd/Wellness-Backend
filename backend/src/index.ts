@@ -61,7 +61,7 @@ app.use(
 );
 
 // MUST be before SuperTokens middleware so /auth/* routes can read the body
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
 // SuperTokens middleware handles all /auth/* routes automatically
 app.use(middleware());
