@@ -6,7 +6,8 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// Note: We use the Gemini REST API directly (not the @google/genai SDK) to avoid
+// Cloud Run's Application Default Credentials (ADC) overriding our API key.
 
 const router = Router();
 
@@ -16,21 +17,23 @@ router.use(requireRole("patient"));
 // ── POST /api/wellness/analyze-food-image ────────────────────────────────────
 // Body: { imageBase64: string, mimeType: string }
 // Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
+//
+// Strategy:
+//   1. If GEMINI_API_KEY is set → try Google AI Studio endpoint (?key=KEY)
+//   2. Automatically falls back to Vertex AI using Cloud Run's built-in service account
+//      (no API key needed — uses the Cloud Run instance's identity token)
 router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
     res.status(400).json({ error: "imageBase64 is required" });
     return;
   }
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "your_gemini_api_key_here") {
-    res.status(503).json({ error: "AI food analysis is not configured. Please set GEMINI_API_KEY in your .env file." });
-    return;
-  }
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
 
-    const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
+  const safeMime = mimeType || "image/jpeg";
+  const apiKey   = process.env.GEMINI_API_KEY ?? "";
+  const hasKey   = apiKey.length >= 20;
+
+  const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
   "foodName": "Detected food name (be specific, e.g. 'Grilled Chicken Breast' not just 'Chicken')",
   "confidence": "high|medium|low",
@@ -50,39 +53,97 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-vision"];
-    let result = null;
-    let lastError = null;
+  const requestBody = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: safeMime, data: imageBase64 } }] }],
+  });
 
-    for (const modelName of modelsToTry) {
+  // ── Helper: call a Gemini URL and return the text response ─────────────────
+  async function callGemini(url: string, extraHeaders: Record<string, string> = {}): Promise<string> {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...extraHeaders },
+      body: requestBody,
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      throw new Error(`HTTP ${r.status}: ${body}`);
+    }
+    const data = await r.json() as any;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("No text in Gemini response");
+    return text;
+  }
+
+  // ── Helper: get Cloud Run service account token from metadata server ────────
+  async function getCloudRunToken(): Promise<string> {
+    const r = await fetch(
+      "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+      { headers: { "Metadata-Flavor": "Google" } }
+    );
+    if (!r.ok) throw new Error("Metadata server unavailable — not running on Cloud Run?");
+    const { access_token } = await r.json() as { access_token: string };
+    return access_token;
+  }
+
+  try {
+    const models   = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    const project  = process.env.GOOGLE_CLOUD_PROJECT || "wellness-498910";
+    const location = process.env.CLOUD_RUN_REGION    || "asia-south1";
+    const baseUrl  = "https://generativelanguage.googleapis.com/v1beta/models";
+
+    let responseText: string | null = null;
+    let lastError:    any           = null;
+
+    for (const model of models) {
+      if (hasKey) {
+        // ── Strategy 1a: x-goog-api-key header (new AQ-format keys) ────────
+        try {
+          const url = `${baseUrl}/${model}:generateContent`;
+          responseText = await callGemini(url, { "x-goog-api-key": apiKey });
+          console.log(`[analyze-food-image] ✓ x-goog-api-key header · model=${model}`);
+          break;
+        } catch (err: any) {
+          console.warn(`[analyze-food-image] x-goog-api-key failed for ${model}:`, err?.message);
+          lastError = err;
+        }
+
+        // ── Strategy 1b: ?key= URL param (old AIzaSy-format keys) ──────────
+        try {
+          const url = `${baseUrl}/${model}:generateContent?key=${apiKey}`;
+          responseText = await callGemini(url);
+          console.log(`[analyze-food-image] ✓ ?key= param · model=${model}`);
+          break;
+        } catch (err: any) {
+          console.warn(`[analyze-food-image] ?key= param failed for ${model}:`, err?.message);
+          lastError = err;
+        }
+      }
+
+      // ── Strategy 2: Vertex AI via Cloud Run service account ─────────────
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        result = await model.generateContent([
-          prompt,
-          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } },
-        ]);
-        break; // Success, exit the loop
+        const token = await getCloudRunToken();
+        const url   = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
+        responseText = await callGemini(url, { Authorization: `Bearer ${token}` });
+        console.log(`[analyze-food-image] ✓ Vertex AI ADC · model=${model}`);
+        break;
       } catch (err: any) {
+        console.warn(`[analyze-food-image] Vertex AI failed for ${model}:`, err?.message);
         lastError = err;
-        console.warn(`[analyze-food-image] Model ${modelName} failed:`, err?.message);
-        // Continue to the next model
       }
     }
 
-    if (!result) {
-      throw lastError || new Error("All Gemini models failed to process the request.");
+    if (!responseText) {
+      throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
     }
 
-    const text = result.response.text().trim();
-
-    // Strip markdown code fences if present
+    const text     = responseText.trim();
     const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
     let parsed: {
-      foodName: string;
-      confidence: "high" | "medium" | "low";
+      foodName:    string;
+      confidence:  "high" | "medium" | "low";
       description: string;
-      per100g: { calories: number; protein: number; fat: number; carbs: number; fiber: number };
+      per100g:     { calories: number; protein: number; fat: number; carbs: number; fiber: number };
     };
 
     try {
@@ -93,27 +154,25 @@ Rules:
       return;
     }
 
-    // Sanitize / validate numeric fields
     const clean = (v: any, fallback: number) => (typeof v === "number" && !isNaN(v) ? Math.round(v * 10) / 10 : fallback);
-    const response = {
-      foodName: String(parsed.foodName || "Unknown food").trim(),
-      confidence: (["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low") as "high" | "medium" | "low",
+    res.json({
+      foodName:    String(parsed.foodName    || "Unknown food").trim(),
+      confidence:  (["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low") as "high" | "medium" | "low",
       description: String(parsed.description || "").trim(),
       per100g: {
         calories: clean(parsed.per100g?.calories, 0),
-        protein: clean(parsed.per100g?.protein, 0),
-        fat: clean(parsed.per100g?.fat, 0),
-        carbs: clean(parsed.per100g?.carbs, 0),
-        fiber: clean(parsed.per100g?.fiber, 0),
+        protein:  clean(parsed.per100g?.protein,  0),
+        fat:      clean(parsed.per100g?.fat,       0),
+        carbs:    clean(parsed.per100g?.carbs,     0),
+        fiber:    clean(parsed.per100g?.fiber,     0),
       },
-    };
-
-    res.json(response);
+    });
   } catch (err: any) {
     console.error("[analyze-food-image] error:", err);
     res.status(500).json({ error: err?.message || "Internal server error" });
   }
 });
+
 
 
 
