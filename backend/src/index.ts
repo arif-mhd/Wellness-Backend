@@ -38,6 +38,7 @@ import doctorNotificationsRouter from "./routes/doctorNotifications";
 import adminReportsRouter from "./routes/adminReports";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
+import servicesRouter from "./routes/services";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -116,6 +117,7 @@ app.use("/api/admin/notifications", adminNotificationsRouter);
 app.use("/api/admin/reports", adminReportsRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
+app.use("/api/services", servicesRouter); // unified patient service history
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
