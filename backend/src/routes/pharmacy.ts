@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer } from "../config/cosmos";
+import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -421,4 +421,69 @@ router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: 
   }
 });
 
+// ─── PATCH /api/pharmacy/orders/:orderId/status ───────────────────────────────
+router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const allowed = ["shipped", "delivered"];
+    if (!allowed.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${allowed.join(", ")}` });
+      return;
+    }
+
+    // Cross-partition query to find the order by ID
+    const { resources } = await medicineOrdersContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: orderId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
+
+    if (!resources.length) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+
+    const order = resources[0];
+
+    // Verify this pharmacy owns at least one item in the order
+    const hasItem = order.items?.some((i: any) => i.pharmacyId === pharmacyId);
+    if (!hasItem) {
+      res.status(403).json({ error: "Not authorized to update this order" });
+      return;
+    }
+
+    const updated = { ...order, status, updatedAt: new Date().toISOString() };
+    await medicineOrdersContainer.items.upsert(updated);
+
+    // Create notification for the patient
+    try {
+      const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+      const pName = pharmacy?.pharmacyName ?? "A pharmacy";
+
+      await notificationsContainer.items.upsert({
+        id: crypto.randomUUID(),
+        patientId: order.patientId,
+        title: `Medicine Order ${status === 'shipped' ? 'Shipped' : 'Delivered'}`,
+        body: `Your order from ${pName} has been marked as ${status}.`,
+        type: "system",
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    } catch (notifErr) {
+      console.warn("Failed to create notification for order status update:", notifErr);
+    }
+
+    res.json({ status: "OK", order: updated });
+  } catch (err) {
+    console.error("Update pharmacy order status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
+

@@ -3,7 +3,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
-import { supportContainer, patientsContainer, doctorsContainer } from "../config/cosmos";
+import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer } from "../config/cosmos";
 
 const router = Router();
 
@@ -41,6 +41,17 @@ async function getDoctorName(doctorId: string): Promise<string> {
   }
 }
 
+async function getPharmacyName(pharmacyId: string): Promise<string> {
+  try {
+    const { resource } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    console.log(`[support] getPharmacyName(${pharmacyId}) →`, resource?.pharmacyName, resource?.id);
+    return resource?.pharmacyName || "Unknown Pharmacy";
+  } catch (err) {
+    console.error(`[support] getPharmacyName(${pharmacyId}) error:`, err);
+    return "Unknown Pharmacy";
+  }
+}
+
 // ── Patient routes ────────────────────────────────────────────────────────────
 
 // POST /api/support — patient or doctor creates a ticket
@@ -53,7 +64,7 @@ router.post("/", verifySession(), async (req: SessionRequest, res: Response) => 
     return res.status(400).json({ error: "subject and description are required" });
   }
 
-  const submitterRole = role === "doctor" ? "doctor" : "patient";
+  const submitterRole = role === "doctor" ? "doctor" : role === "pharmacy" ? "pharmacy" : "patient";
 
   const ticket = {
     id: uuidv4(),
@@ -135,7 +146,7 @@ router.post("/:ticketId/comments", verifySession(), async (req: SessionRequest, 
   const ticket = resources[0] as any;
   const comment = {
     id: uuidv4(),
-    authorRole: ticket.submitterRole === "doctor" ? "doctor" : "patient",
+    authorRole: ticket.submitterRole === "doctor" ? "doctor" : ticket.submitterRole === "pharmacy" ? "pharmacy" : "patient",
     message: message.trim(),
     createdAt: new Date().toISOString(),
   };
@@ -179,10 +190,10 @@ router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Respo
   // Enrich with submitter name
   const enriched = await Promise.all(
     resources.map(async (t: any) => {
-      const isDoctor = t.submitterRole === "doctor";
-      const submitterName = isDoctor
-        ? await getDoctorName(t.patientId)
-        : await getPatientName(t.patientId);
+      let submitterName = "Unknown";
+      if (t.submitterRole === "doctor") submitterName = await getDoctorName(t.patientId);
+      else if (t.submitterRole === "pharmacy") submitterName = await getPharmacyName(t.patientId);
+      else submitterName = await getPatientName(t.patientId);
       return { ...t, patientName: submitterName, submitterName };
     })
   );
@@ -205,8 +216,11 @@ router.get("/admin/:ticketId", verifySession(), async (req: SessionRequest, res:
   if (!resources[0]) return res.status(404).json({ error: "Ticket not found" });
 
   const ticket = resources[0] as any;
-  const isDoctor = ticket.submitterRole === "doctor";
-  const submitterName = isDoctor ? await getDoctorName(ticket.patientId) : await getPatientName(ticket.patientId);
+  let submitterName = "Unknown";
+  if (ticket.submitterRole === "doctor") submitterName = await getDoctorName(ticket.patientId);
+  else if (ticket.submitterRole === "pharmacy") submitterName = await getPharmacyName(ticket.patientId);
+  else submitterName = await getPatientName(ticket.patientId);
+  
   ticket.patientName = submitterName;
   ticket.submitterName = submitterName;
   return res.json(ticket);

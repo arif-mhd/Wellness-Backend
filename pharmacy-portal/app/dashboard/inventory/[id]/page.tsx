@@ -55,9 +55,9 @@ const CATEGORIES = ["OTC", "Prescription", "Supplement", "Medical Device", "Pers
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between py-3 border-b border-slate-50 last:border-0 gap-4">
-      <span className="text-xs font-outfit font-semibold text-slate-400 uppercase tracking-wide shrink-0 w-36">{label}</span>
-      <span className="text-sm font-outfit text-slate-800 text-right">{value ?? "—"}</span>
+    <div className="flex items-start justify-between py-3 border-b border-[#EBEEF5] last:border-0 gap-4">
+      <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider shrink-0 w-36">{label}</span>
+      <span className="text-[13px] text-[#24292E] font-medium text-right">{value ?? "—"}</span>
     </div>
   );
 }
@@ -187,23 +187,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     product.category === "Medical Device" ? "🩺" : "📦";
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-8 pb-12 font-outfit select-none animate-fade-in">
       {/* Header nav */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-4 mb-8 mt-2">
         <button
           onClick={() => router.back()}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm hover:shadow-md transition"
+          className="w-10 h-10 rounded-xl bg-white border border-[#EBEEF5] flex items-center justify-center shadow-sm hover:shadow-md transition-all group"
         >
-          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <svg className="w-4 h-4 text-[#676E76] group-hover:text-[#5476FC] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
-          <h1 className="text-2xl font-marcellus text-[#1a2332]">Product Details</h1>
-          <p className="text-sm font-outfit text-slate-500 mt-0.5">
-            <Link href="/dashboard/inventory" className="hover:underline">Inventory</Link>
-            <span className="mx-1.5 text-slate-300">/</span>
-            <span className="text-slate-600">{product.name}</span>
+          <h1 className="text-[28px] text-[#383F45] font-normal tracking-[-0.56px] leading-none">Product Details</h1>
+          <p className="text-sm text-[#676E76] mt-1.5 tracking-[-0.28px]">
+            <Link href="/dashboard/inventory" className="hover:text-[#5476FC] transition-colors">Inventory</Link>
+            <span className="mx-2 text-[#EBEEF5]">/</span>
+            <span className="text-[#383F45] font-medium">{product.name}</span>
           </p>
         </div>
       </div>
@@ -211,68 +211,68 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Left — image + status card */}
-        <div className="lg:col-span-1 flex flex-col gap-4">
+        <div className="lg:col-span-1 flex flex-col gap-5">
 
           {/* Image */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col items-center gap-4">
-            <div className="w-full h-48 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl flex items-center justify-center overflow-hidden">
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 flex flex-col items-center gap-5 transition-all hover:border-gray-300">
+            <div className="w-full h-48 bg-[#F8FAFC] rounded-xl flex items-center justify-center overflow-hidden border border-[#EBEEF5]">
               {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-4" />
+                <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-4 hover:scale-105 transition-transform duration-300" />
               ) : (
-                <span className="text-6xl">{categoryEmoji}</span>
+                <span className="text-6xl opacity-50">{categoryEmoji}</span>
               )}
             </div>
             <div className="w-full text-center">
-              <h2 className="font-bricolage font-bold text-[#1a2332] text-lg leading-snug">{product.name}</h2>
+              <h2 className="font-semibold text-[#24292E] text-[20px] tracking-[-0.4px] leading-snug">{product.name}</h2>
               {product.strength && (
-                <p className="text-xs font-outfit text-slate-400 mt-0.5">{product.strength}</p>
+                <p className="text-xs text-[#A0A8B0] mt-1">{product.strength}</p>
               )}
               {product.manufacturer && (
-                <p className="text-xs font-outfit text-slate-500 mt-1">{product.manufacturer}</p>
+                <p className="text-[13px] text-[#676E76] mt-1.5">{product.manufacturer}</p>
               )}
             </div>
 
             {/* Status badge */}
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-outfit font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium tracking-[-0.22px] border ${statusCfg.bg} ${statusCfg.text} border-transparent`}>
               <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
               {statusCfg.label}
             </span>
 
             {product.flagged && (
-              <div className="w-full bg-orange-50 border border-orange-100 rounded-xl px-3 py-2 text-xs font-outfit text-orange-700 flex items-start gap-2">
-                <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <div className="w-full bg-[#FFF4E5] border border-[#FDE68A] rounded-xl px-3 py-2 text-xs text-[#D97706] flex items-start gap-2">
+                <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M3 21V4l1-1h10l1 2h6v12H14l-1-2H5v8H3z" />
                 </svg>
                 <span>
-                  <span className="font-bold">Flagged by admin.</span>
-                  {product.flagReason && <span> {product.flagReason}</span>}
+                  <span className="font-semibold">Flagged by admin.</span>
+                  {product.flagReason && <span className="block mt-0.5"> {product.flagReason}</span>}
                 </span>
               </div>
             )}
 
             {product.status === "rejected" && product.rejectedReason && (
-              <div className="w-full bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-xs font-outfit text-red-600">
-                ❌ {product.rejectedReason}
+              <div className="w-full bg-[#FEE2E2] border border-[#FCA5A5] rounded-xl px-3 py-2 text-xs text-[#F25252]">
+                <span className="font-semibold mr-1">Rejected:</span> {product.rejectedReason}
               </div>
             )}
           </div>
 
           {/* Price & stock summary */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-4 transition-all hover:border-gray-300">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-outfit font-semibold text-slate-400 uppercase tracking-wide">Price</span>
-              <span className="text-xl font-bricolage font-bold text-[#5476FC]">AED {product.price.toFixed(2)}</span>
+              <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">Price</span>
+              <span className="text-[22px] font-semibold text-[#5476FC] tracking-[-0.44px]">AED {product.price.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-outfit font-semibold text-slate-400 uppercase tracking-wide">In Stock</span>
-              <span className={`text-sm font-outfit font-bold ${isLowStock ? "text-red-500" : "text-slate-800"}`}>
-                {product.stock} units {isLowStock && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full ml-1">Low</span>}
+              <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">In Stock</span>
+              <span className={`text-[15px] font-medium ${isLowStock ? "text-[#F25252]" : "text-[#24292E]"}`}>
+                {product.stock} units {isLowStock && <span className="text-[10px] bg-[#FEE2E2] text-[#F25252] px-2 py-0.5 rounded-full ml-1.5 font-bold">Low</span>}
               </span>
             </div>
             {product.reorderLevel != null && (
               <div className="flex items-center justify-between">
-                <span className="text-xs font-outfit font-semibold text-slate-400 uppercase tracking-wide">Reorder At</span>
-                <span className="text-sm font-outfit text-slate-600">{product.reorderLevel} units</span>
+                <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">Reorder At</span>
+                <span className="text-[13px] text-[#A0A8B0] font-medium">{product.reorderLevel} units</span>
               </div>
             )}
           </div>
@@ -281,14 +281,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex flex-col gap-3">
             <button
               onClick={openEdit}
-              className="w-full py-3 text-center rounded-xl border border-slate-200 text-sm font-outfit font-semibold text-slate-600 hover:bg-slate-50 transition bg-white shadow-sm"
+              className="w-full py-3 text-center rounded-xl border border-[#EBEEF5] text-[13px] font-medium text-[#383F45] hover:bg-[#F8FAFC] hover:border-gray-300 transition-all bg-white shadow-sm"
             >
               Edit Product
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting !== null}
-              className="w-full py-3 text-center rounded-xl border border-red-100 text-sm font-outfit font-semibold text-red-600 hover:bg-red-50 transition bg-white shadow-sm disabled:opacity-50"
+              className="w-full py-3 text-center rounded-xl border border-[#FCA5A5] text-[13px] font-medium text-[#F25252] hover:bg-[#FEE2E2] transition-all bg-white shadow-sm disabled:opacity-50"
             >
               {deleting ? "Deleting..." : "Delete Product"}
             </button>
@@ -296,233 +296,241 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Right — details */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
+        <div className="lg:col-span-2 flex flex-col gap-5">
 
           {/* Product details */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bricolage font-bold text-[#1a2332] mb-4">Product Details</h3>
-            <DetailRow label="Category" value={product.category} />
-            {product.requiresPrescription != null && (
-              <DetailRow
-                label="Prescription"
-                value={
-                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-outfit font-semibold ${product.requiresPrescription ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
-                    {product.requiresPrescription ? "Required" : "Not required"}
-                  </span>
-                }
-              />
-            )}
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
+            <h3 className="font-semibold text-[#24292E] text-[18px] tracking-[-0.36px] mb-5 border-b border-[#EBEEF5] pb-3">Product Details</h3>
+            <div className="space-y-1">
+              <DetailRow label="Category" value={product.category} />
+              {product.requiresPrescription != null && (
+                <DetailRow
+                  label="Prescription"
+                  value={
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide ${product.requiresPrescription ? "bg-[#FFF4E5] text-[#D97706]" : "bg-[#E2F8EB] text-[#179353]"}`}>
+                      {product.requiresPrescription ? "REQUIRED" : "NOT REQUIRED"}
+                    </span>
+                  }
+                />
+              )}
+            </div>
             {product.description && (
-              <div className="py-3 border-b border-slate-50">
-                <span className="text-xs font-outfit font-semibold text-slate-400 uppercase tracking-wide block mb-1.5">Description</span>
-                <p className="text-sm font-outfit text-slate-700 leading-relaxed">{product.description}</p>
+              <div className="py-4 mt-2">
+                <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider block mb-2">Description</span>
+                <p className="text-[13px] text-[#383F45] leading-relaxed">{product.description}</p>
               </div>
             )}
           </div>
 
           {/* Batch & stock details */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bricolage font-bold text-[#1a2332] mb-4">Stock & Batch</h3>
-            <DetailRow label="Batch Number" value={product.batchNumber} />
-            <DetailRow
-              label="Expiry Date"
-              value={
-                product.expiryDate
-                  ? new Date(product.expiryDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                  : undefined
-              }
-            />
-            <DetailRow label="Reorder Level" value={product.reorderLevel != null ? `${product.reorderLevel} units` : undefined} />
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
+            <h3 className="font-semibold text-[#24292E] text-[18px] tracking-[-0.36px] mb-5 border-b border-[#EBEEF5] pb-3">Stock & Batch</h3>
+            <div className="space-y-1">
+              <DetailRow label="Batch Number" value={product.batchNumber} />
+              <DetailRow
+                label="Expiry Date"
+                value={
+                  product.expiryDate
+                    ? new Date(product.expiryDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                    : undefined
+                }
+              />
+              <DetailRow label="Reorder Level" value={product.reorderLevel != null ? `${product.reorderLevel} units` : undefined} />
+            </div>
           </div>
 
           {/* Timestamps */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bricolage font-bold text-[#1a2332] mb-4">Activity</h3>
-            <DetailRow
-              label="Added"
-              value={new Date(product.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-            />
-            {product.approvedAt && (
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
+            <h3 className="font-semibold text-[#24292E] text-[18px] tracking-[-0.36px] mb-5 border-b border-[#EBEEF5] pb-3">Activity</h3>
+            <div className="space-y-1">
               <DetailRow
-                label="Approved"
-                value={new Date(product.approvedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                label="Added"
+                value={new Date(product.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               />
-            )}
-            {product.updatedAt && (
-              <DetailRow
-                label="Last Updated"
-                value={new Date(product.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-              />
-            )}
+              {product.approvedAt && (
+                <DetailRow
+                  label="Approved"
+                  value={new Date(product.approvedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                />
+              )}
+              {product.updatedAt && (
+                <DetailRow
+                  label="Last Updated"
+                  value={new Date(product.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Edit modal */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-              <h2 className="font-bricolage font-bold text-[#1a2332] text-lg">Edit Product</h2>
-              <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition">✕</button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#1C2126]/60 backdrop-blur-sm animate-fade-in font-outfit">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-slide-up border border-[#EBEEF5]">
+            <div className="px-6 py-5 border-b border-[#EBEEF5] flex items-center justify-between bg-white shrink-0">
+              <h2 className="font-semibold text-[#24292E] text-[18px] tracking-[-0.36px]">Edit Product</h2>
+              <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-full hover:bg-[#F8FAFC] flex items-center justify-center text-[#A0A8B0] hover:text-[#24292E] transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              {editError && <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600 font-outfit">{editError}</div>}
+            <div className="p-6 space-y-5 overflow-y-auto">
+              {editError && <div className="px-4 py-3 bg-[#FEE2E2] border border-[#FCA5A5] rounded-xl text-[13px] text-[#F25252] font-medium">{editError}</div>}
 
               {/* Image */}
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-2">Image</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-2">Image</label>
                 <div onClick={() => fileRef.current?.click()}
-                  className="border-2 border-dashed border-slate-200 rounded-xl h-32 flex items-center justify-center cursor-pointer hover:border-[#5476FC]/50 hover:bg-blue-50/20 transition">
+                  className="border-2 border-dashed border-[#EBEEF5] rounded-xl h-32 flex items-center justify-center cursor-pointer hover:border-[#5476FC]/50 hover:bg-[#EEF2FF]/50 transition-all group">
                   {editPreview ? <img src={editPreview} alt="" className="h-full w-full object-contain rounded-xl p-2" />
-                    : <p className="text-sm font-outfit text-slate-400">Click to change image</p>}
+                    : <p className="text-[13px] text-[#A0A8B0] group-hover:text-[#5476FC] transition-colors">Click to change image</p>}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Product Name *</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Product Name *</label>
                 <input value={editing.name} onChange={e => setEditing(prev => prev ? { ...prev, name: e.target.value } : prev)}
-                  className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Manufacturer</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Manufacturer</label>
                   <input value={editing.manufacturer ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, manufacturer: e.target.value } : prev)}
                     placeholder="e.g. GSK"
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Strength</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Strength</label>
                   <input value={editing.strength ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, strength: e.target.value } : prev)}
                     placeholder="e.g. 500mg"
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Description</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Description</label>
                 <textarea value={editing.description ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                  rows={3} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+                  rows={3} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Product Summary</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Product Summary</label>
                 <textarea value={editing.productSummary ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, productSummary: e.target.value } : prev)}
-                  rows={3} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+                  rows={3} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Recommended For (Tags)</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Recommended For (Tags)</label>
                   <input value={editing.recommendedFor ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, recommendedFor: e.target.value } : prev)}
                     placeholder="e.g. Age: 8-64, Kids"
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Number of Tablets / Quantity</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Number of Tablets / Quantity</label>
                   <input value={editing.numberOfTablets ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, numberOfTablets: e.target.value } : prev)}
                     placeholder="e.g. 15 Tablets"
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Benefits</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Benefits</label>
                 <textarea value={editing.benefits ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, benefits: e.target.value } : prev)}
-                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+                  rows={2} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Side Effects</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Side Effects</label>
                 <textarea value={editing.sideEffects ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, sideEffects: e.target.value } : prev)}
-                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+                  rows={2} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">How to use</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">How to use</label>
                 <textarea value={editing.howToUse ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, howToUse: e.target.value } : prev)}
-                  rows={2} className="w-full px-4 py-3 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition resize-none" />
+                  rows={2} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Category *</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Category *</label>
                 <select value={editing.category} onChange={e => setEditing(prev => prev ? { ...prev, category: e.target.value } : prev)}
-                  className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition appearance-none">
+                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all appearance-none">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Price (AED) *</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price (AED) *</label>
                   <input type="number" min="0" step="0.01" value={editing.price}
                     onChange={e => setEditing(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : prev)}
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Stock</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Stock</label>
                   <input type="number" min="0" value={editing.stock}
                     onChange={e => setEditing(prev => prev ? { ...prev, stock: parseInt(e.target.value) } : prev)}
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
               </div>
 
               {/* Batch & stock */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Batch Number</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Batch Number</label>
                   <input value={editing.batchNumber ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, batchNumber: e.target.value } : prev)}
                     placeholder="BATCH-001"
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Expiry Date</label>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Expiry Date</label>
                   <input type="date" value={editing.expiryDate ?? ""}
                     onChange={e => setEditing(prev => prev ? { ...prev, expiryDate: e.target.value } : prev)}
-                    className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Reorder Level</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Reorder Level</label>
                 <input type="number" min="0"
                   value={editing.reorderLevel ?? ""}
                   onChange={e => setEditing(prev => prev ? { ...prev, reorderLevel: parseInt(e.target.value) || undefined } : prev)}
                   placeholder="e.g. 50"
-                  className="w-full h-11 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#5476FC]/40 transition" />
+                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
               </div>
 
               {/* Prescription toggle */}
-              <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+              <div className="flex items-center justify-between bg-[#F8FAFC] rounded-xl p-4 border border-[#EBEEF5]">
                 <div>
-                  <p className="text-sm font-outfit font-semibold text-slate-700">Prescription Required</p>
-                  <p className="text-xs font-outfit text-slate-400 mt-0.5">Patients must upload a prescription</p>
+                  <p className="text-[13px] font-semibold text-[#24292E]">Prescription Required</p>
+                  <p className="text-[11px] text-[#A0A8B0] mt-1">Patients must upload a prescription</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditing(prev => prev ? { ...prev, requiresPrescription: !prev.requiresPrescription } : prev)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${editing.requiresPrescription ? "bg-[#5476FC]" : "bg-slate-200"}`}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${editing.requiresPrescription ? "bg-[#5476FC]" : "bg-[#EBEEF5]"}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${editing.requiresPrescription ? "translate-x-6" : ""}`} />
                 </button>
               </div>
 
-              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs font-outfit text-blue-700">
+              <div className="bg-[#EEF2FF] border border-[#C7D2FE] rounded-xl px-4 py-3 text-xs text-[#4F46E5]">
                 As an onboarded pharmacy, edits go live immediately. The admin can flag a product at any time.
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-50 flex gap-3">
+            <div className="p-5 border-t border-[#EBEEF5] flex gap-3 bg-white shrink-0">
               <button onClick={() => setEditing(null)}
-                className="flex-1 h-11 rounded-xl border border-slate-200 text-slate-600 font-outfit font-semibold text-sm hover:bg-slate-50 transition">
+                className="flex-1 h-11 rounded-xl border border-[#EBEEF5] text-[#676E76] font-medium text-[13px] hover:bg-[#F8FAFC] transition-colors">
                 Cancel
               </button>
               <button onClick={handleSaveEdit} disabled={saving}
-                className="flex-1 h-11 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white font-outfit font-semibold text-sm shadow-md shadow-blue-200/40 hover:shadow-blue-300/50 transition disabled:opacity-60">
+                className="flex-1 h-11 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
                 {saving ? "Saving…" : "Save Changes"}
               </button>
             </div>

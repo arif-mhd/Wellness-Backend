@@ -24,15 +24,24 @@ const ShieldIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
   </svg>
 );
+const CreditCardIcon = () => (
+  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+  </svg>
+);
 const CheckIcon = () => (
   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
   </svg>
 );
 
+const inputCls = "w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all";
+const labelCls = "block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5";
+
 const TABS = [
   { id: "general", label: "General Info", icon: UserIcon },
   { id: "hours", label: "Operating Hours", icon: ClockIcon },
+  { id: "payout", label: "Payout Details", icon: CreditCardIcon },
   { id: "notifications", label: "Notifications", icon: BellIcon },
   { id: "security", label: "Security", icon: ShieldIcon },
 ];
@@ -41,13 +50,13 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
 
   return (
-    <div className="p-8 max-w-5xl mx-auto w-full">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#24292E] tracking-tight">Settings</h1>
-        <p className="text-[#9EA5AD] mt-1">Manage your pharmacy portal preferences and configuration.</p>
+    <div className="px-8 pb-12 pt-6 max-w-6xl mx-auto w-full font-outfit animate-fade-in">
+      <div className="mb-8 mt-2">
+        <h1 className="text-[28px] text-[#383F45] font-normal tracking-[-0.56px] leading-none mb-2">Settings</h1>
+        <p className="text-sm text-[#676E76] tracking-[-0.28px]">Manage your pharmacy portal preferences and configuration.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8 bg-white p-6 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[#EBEEF5]">
+      <div className="flex flex-col md:flex-row gap-8 bg-white p-6 rounded-2xl border border-[#EBEEF5] shadow-sm">
         {/* Sidebar Tabs */}
         <div className="md:w-64 shrink-0 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-[#EBEEF5] pb-6 md:pb-0 md:pr-6">
           {TABS.map((tab) => {
@@ -56,13 +65,13 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-[14px] font-medium tracking-wide ${
                   isActive 
-                    ? "bg-[#ECEFFE] text-[#5476FC]" 
-                    : "text-[#3D4B5A] hover:bg-gray-50 hover:text-[#24292E]"
+                    ? "bg-[#EEF2FF] text-[#5476FC] shadow-sm border border-[#C7D2FE]/50" 
+                    : "text-[#676E76] hover:bg-[#F8FAFC] hover:text-[#383F45] border border-transparent"
                 }`}
               >
-                <span className={`${isActive ? "text-[#5476FC]" : "text-[#9EA5AD]"}`}>
+                <span className={`${isActive ? "text-[#5476FC]" : "text-[#A0A8B0]"}`}>
                   <tab.icon />
                 </span>
                 {tab.label}
@@ -72,9 +81,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 md:px-4">
           {activeTab === "general" && <GeneralSettings />}
           {activeTab === "hours" && <OperatingHoursSettings />}
+          {activeTab === "payout" && <PayoutSettings />}
           {activeTab === "notifications" && <NotificationSettings />}
           {activeTab === "security" && <SecuritySettings />}
         </div>
@@ -86,13 +96,17 @@ export default function SettingsPage() {
 function GeneralSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success'|'error', text: string } | null>(null);
   const [formData, setFormData] = useState({
     pharmacyName: "",
+    ownerName: "",
     licenseNumber: "",
+    emiratesId: "",
     email: "",
     phone: "",
-    location: ""
+    location: "",
+    manager: ""
   });
 
   useEffect(() => {
@@ -109,10 +123,13 @@ function GeneralSettings() {
           if (data.pharmacy) {
             setFormData({
               pharmacyName: data.pharmacy.pharmacyName ?? "",
+              ownerName: data.pharmacy.ownerName ?? "",
               licenseNumber: data.pharmacy.licenseNumber ?? "",
+              emiratesId: data.pharmacy.emiratesId ?? "",
               email: data.pharmacy.email ?? "",
               phone: data.pharmacy.phone ?? "",
-              location: data.pharmacy.location ?? ""
+              location: data.pharmacy.location ?? "",
+              manager: data.pharmacy.manager ?? ""
             });
           }
         }
@@ -144,6 +161,7 @@ function GeneralSettings() {
       });
       if (!res.ok) throw new Error("Failed to save");
       setMessage({ type: 'success', text: 'Pharmacy information updated successfully!' });
+      setIsEditing(false);
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: 'Failed to update information. Please try again.' });
@@ -151,6 +169,8 @@ function GeneralSettings() {
       setSaving(false);
     }
   };
+
+  const activeInputCls = `${inputCls} disabled:bg-[#F9FAFC] disabled:text-[#676E76] disabled:border-transparent disabled:cursor-not-allowed disabled:pointer-events-none`;
 
   if (loading) {
     return (
@@ -162,46 +182,86 @@ function GeneralSettings() {
 
   return (
     <div className="animate-in fade-in duration-300">
-      <h2 className="text-xl font-semibold text-[#24292E] mb-6">General Information</h2>
+      <div className="flex items-center justify-between mb-6 border-b border-[#EBEEF5] pb-3">
+        <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px]">General Information</h2>
+        {!isEditing && (
+          <button 
+            onClick={() => setIsEditing(true)} 
+            className="text-[#5476FC] text-[13px] font-medium hover:underline flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-[#F5F7FB] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Edit Info
+          </button>
+        )}
+      </div>
       
       {message && (
-        <div className={`p-4 rounded-lg mb-6 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`p-4 rounded-xl mb-6 text-[13px] font-medium flex items-center gap-3 ${message.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
           {message.text}
         </div>
       )}
 
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-5 max-w-2xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#3D4B5A]">Pharmacy Name</label>
-            <input type="text" name="pharmacyName" value={formData.pharmacyName} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+            <label className={labelCls}>Pharmacy Name</label>
+            <input type="text" name="pharmacyName" value={formData.pharmacyName} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#3D4B5A]">License Number</label>
-            <input type="text" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+            <label className={labelCls}>Owner Name</label>
+            <input type="text" name="ownerName" value={formData.ownerName} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="space-y-2">
+            <label className={labelCls}>License Number</label>
+            <input type="text" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+          </div>
+          <div className="space-y-2">
+            <label className={labelCls}>Emirates ID</label>
+            <input type="text" name="emiratesId" value={formData.emiratesId} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="space-y-2">
+            <label className={labelCls}>Email Address</label>
+            <input type="email" name="email" value={formData.email} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+          </div>
+          <div className="space-y-2">
+            <label className={labelCls}>Phone Number</label>
+            <input type="tel" name="phone" value={formData.phone} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#3D4B5A]">Email Address</label>
-          <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+          <label className={labelCls}>Manager Name</label>
+          <input type="text" name="manager" value={formData.manager} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#3D4B5A]">Phone Number</label>
-          <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+          <label className={labelCls}>Location (Address)</label>
+          <textarea name="location" rows={3} value={formData.location} onChange={handleChange} disabled={!isEditing} className={`${activeInputCls} h-auto py-3 resize-none`}></textarea>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-[#3D4B5A]">Location (Address)</label>
-          <textarea name="location" rows={3} value={formData.location} onChange={handleChange} className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all resize-none"></textarea>
-        </div>
-
-        <div className="pt-4 flex justify-end">
-          <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-[#5476FC] hover:bg-[#4362EA] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors shadow-[0_4px_12px_rgba(84,118,252,0.25)] flex items-center gap-2">
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
+        {isEditing && (
+          <div className="pt-4 flex justify-end gap-3">
+            <button 
+              onClick={() => {
+                setIsEditing(false);
+                setMessage(null);
+              }} 
+              disabled={saving} 
+              className="px-6 py-3 rounded-xl bg-[#F8FAFC] border border-[#EBEEF5] text-[#383F45] font-medium text-[13px] hover:bg-white hover:border-[#D1D9E6] transition-all"
+            >
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving} className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60 flex items-center gap-2">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -212,30 +272,66 @@ function OperatingHoursSettings() {
   
   return (
     <div className="animate-in fade-in duration-300">
-      <h2 className="text-xl font-semibold text-[#24292E] mb-6">Operating Hours</h2>
+      <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Operating Hours</h2>
       
-      <div className="space-y-4">
+      <div className="space-y-3 max-w-2xl">
         {days.map((day, idx) => (
-          <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#EBEEF5] hover:border-[#D1D9E6] transition-colors bg-[#F9FAFC]">
-            <div className="w-32 font-medium text-[#3D4B5A] mb-3 sm:mb-0">{day}</div>
+          <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#EBEEF5] hover:border-gray-300 transition-colors bg-white shadow-sm">
+            <div className="w-32 font-semibold text-[#383F45] text-sm mb-3 sm:mb-0">{day}</div>
             <div className="flex items-center gap-3 mb-3 sm:mb-0">
-              <input type="time" defaultValue={idx > 4 ? "10:00" : "08:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none text-[#3D4B5A]" />
-              <span className="text-[#9EA5AD]">to</span>
-              <input type="time" defaultValue={idx > 4 ? "16:00" : "20:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none text-[#3D4B5A]" />
+              <input type="time" defaultValue={idx > 4 ? "10:00" : "08:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC]" />
+              <span className="text-[#9EA5AD] text-[11px] uppercase font-bold tracking-wider">to</span>
+              <input type="time" defaultValue={idx > 4 ? "16:00" : "20:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC]" />
             </div>
             <div className="flex items-center gap-2">
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" defaultChecked={idx !== 6} className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
-                <span className="ml-3 text-sm font-medium text-[#3D4B5A] w-12">{idx === 6 ? 'Closed' : 'Open'}</span>
+                <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
+                <span className="ml-3 text-sm font-medium text-[#676E76] w-14">{idx === 6 ? 'Closed' : 'Open'}</span>
               </label>
             </div>
           </div>
         ))}
 
         <div className="pt-6 flex justify-end">
-          <button className="px-6 py-2.5 bg-[#5476FC] hover:bg-[#4362EA] text-white rounded-lg font-medium transition-colors shadow-[0_4px_12px_rgba(84,118,252,0.25)]">
+          <button className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all">
             Save Hours
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PayoutSettings() {
+  return (
+    <div className="animate-in fade-in duration-300">
+      <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Payout & Banking Details</h2>
+      
+      <div className="space-y-5 max-w-2xl">
+        <div className="space-y-2">
+          <label className={labelCls}>Bank Name</label>
+          <input type="text" placeholder="e.g. Emirates NBD" className={inputCls} />
+        </div>
+        
+        <div className="space-y-2">
+          <label className={labelCls}>Account Holder Name</label>
+          <input type="text" placeholder="e.g. Al Shifa Pharmacy LLC" className={inputCls} />
+        </div>
+        
+        <div className="space-y-2">
+          <label className={labelCls}>IBAN / Account Number</label>
+          <input type="text" placeholder="AE00000000000000000000" className={inputCls} />
+        </div>
+        
+        <div className="space-y-2">
+          <label className={labelCls}>SWIFT / BIC Code</label>
+          <input type="text" placeholder="EBIZAEAD" className={inputCls} />
+        </div>
+
+        <div className="pt-4 flex justify-end">
+          <button className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all">
+            Update Banking Details
           </button>
         </div>
       </div>
@@ -253,34 +349,34 @@ function NotificationSettings() {
 
   return (
     <div className="animate-in fade-in duration-300">
-      <h2 className="text-xl font-semibold text-[#24292E] mb-6">Notification Preferences</h2>
+      <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Notification Preferences</h2>
       
-      <div className="space-y-4">
+      <div className="space-y-3 max-w-3xl">
         {notifs.map((n) => (
-          <div key={n.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#EBEEF5] bg-white hover:border-[#D1D9E6] transition-colors">
+          <div key={n.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#EBEEF5] bg-white hover:border-gray-300 transition-colors shadow-sm">
             <div>
-              <h3 className="font-medium text-[#24292E]">{n.title}</h3>
-              <p className="text-sm text-[#9EA5AD] mt-1">{n.desc}</p>
+              <h3 className="font-semibold text-[#24292E] text-sm">{n.title}</h3>
+              <p className="text-[13px] text-[#676E76] mt-1">{n.desc}</p>
             </div>
             <div className="flex items-center gap-6 shrink-0 mt-2 sm:mt-0">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${n.email ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] text-transparent group-hover:border-[#5476FC]'}`}>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${n.email ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}>
                   <CheckIcon />
                 </div>
-                <span className="text-sm text-[#3D4B5A]">Email</span>
+                <span className="text-[13px] font-medium text-[#383F45]">Email</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${n.sms ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] text-transparent group-hover:border-[#5476FC]'}`}>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${n.sms ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}>
                   <CheckIcon />
                 </div>
-                <span className="text-sm text-[#3D4B5A]">SMS</span>
+                <span className="text-[13px] font-medium text-[#383F45]">SMS</span>
               </label>
             </div>
           </div>
         ))}
 
         <div className="pt-6 flex justify-end">
-          <button className="px-6 py-2.5 bg-[#5476FC] hover:bg-[#4362EA] text-white rounded-lg font-medium transition-colors shadow-[0_4px_12px_rgba(84,118,252,0.25)]">
+          <button className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all">
             Update Preferences
           </button>
         </div>
@@ -292,39 +388,41 @@ function NotificationSettings() {
 function SecuritySettings() {
   return (
     <div className="animate-in fade-in duration-300">
-      <h2 className="text-xl font-semibold text-[#24292E] mb-6">Security & Password</h2>
+      <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Security & Password</h2>
       
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-2xl">
         <div className="space-y-6">
-          <h3 className="text-lg font-medium text-[#24292E]">Change Password</h3>
-          <div className="space-y-4 max-w-md">
+          <h3 className="text-sm font-semibold text-[#24292E]">Change Password</h3>
+          <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#3D4B5A]">Current Password</label>
-              <input type="password" placeholder="••••••••" className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+              <label className={labelCls}>Current Password</label>
+              <input type="password" placeholder="••••••••" className={inputCls} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#3D4B5A]">New Password</label>
-              <input type="password" placeholder="••••••••" className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+              <label className={labelCls}>New Password</label>
+              <input type="password" placeholder="••••••••" className={inputCls} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[#3D4B5A]">Confirm New Password</label>
-              <input type="password" placeholder="••••••••" className="w-full px-4 py-2.5 rounded-lg border border-[#EBEEF5] focus:ring-2 focus:ring-[#5476FC]/20 focus:border-[#5476FC] outline-none transition-all" />
+              <label className={labelCls}>Confirm New Password</label>
+              <input type="password" placeholder="••••••••" className={inputCls} />
             </div>
-            <button className="px-6 py-2.5 bg-[#24292E] hover:bg-[#1A1F24] text-white rounded-lg font-medium transition-colors w-full sm:w-auto">
-              Update Password
-            </button>
+            <div className="pt-2">
+              <button className="px-6 py-3 bg-[#24292E] hover:bg-[#1A1F24] text-white rounded-xl font-medium text-[13px] transition-colors w-full sm:w-auto shadow-sm">
+                Update Password
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="border-t border-[#EBEEF5] pt-8">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 p-5 border border-[#EBEEF5] rounded-xl bg-[#F8FAFC]">
             <div>
-              <h3 className="text-lg font-medium text-[#24292E]">Two-Factor Authentication (2FA)</h3>
-              <p className="text-sm text-[#9EA5AD] mt-1">Add an extra layer of security to your account by requiring a verification code upon login.</p>
+              <h3 className="text-[15px] font-semibold text-[#24292E]">Two-Factor Authentication (2FA)</h3>
+              <p className="text-[13px] text-[#676E76] mt-1">Add an extra layer of security to your account by requiring a verification code upon login.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
               <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
+              <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
             </label>
           </div>
         </div>
