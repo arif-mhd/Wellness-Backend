@@ -25,6 +25,66 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
   }
 });
 
+// GET /api/feedback/pharmacy/stats — retrieve feedback stats for currently logged-in pharmacy
+router.get("/pharmacy/stats", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resources } = await feedbackContainer.items
+      .query({
+        query: "SELECT c.rating, c.createdAt FROM c WHERE c.provider.id = @pharmacyId AND c.folder = 'pharmacy'",
+        parameters: [{ name: "@pharmacyId", value: pharmacyId }]
+      })
+      .fetchAll();
+
+    if (resources.length === 0) {
+      return res.json({ averageRating: 0, totalReviews: 0, history: [] });
+    }
+
+    const totalReviews = resources.length;
+    const sum = resources.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+    const averageRating = Number((sum / totalReviews).toFixed(1));
+
+    // Group ratings by month (YYYY-MM) for trends
+    const trendsMap: Record<string, { sum: number, count: number }> = {};
+    resources.forEach((r) => {
+      if (!r.createdAt) return;
+      const monthKey = new Date(r.createdAt).toISOString().slice(0, 7); // YYYY-MM
+      if (!trendsMap[monthKey]) trendsMap[monthKey] = { sum: 0, count: 0 };
+      trendsMap[monthKey].sum += (r.rating || 0);
+      trendsMap[monthKey].count += 1;
+    });
+
+    const history = Object.keys(trendsMap).sort().map(key => ({
+      month: key,
+      average: Number((trendsMap[key].sum / trendsMap[key].count).toFixed(1))
+    }));
+
+    return res.json({ averageRating, totalReviews, history });
+  } catch (err: any) {
+    console.error("Error fetching pharmacy feedback stats:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/feedback/pharmacy — retrieve feedback for currently logged-in pharmacy
+router.get("/pharmacy", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resources } = await feedbackContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.provider.id = @pharmacyId AND c.folder = 'pharmacy' ORDER BY c.createdAt DESC",
+        parameters: [{ name: "@pharmacyId", value: pharmacyId }]
+      })
+      .fetchAll();
+
+    return res.json(resources);
+  } catch (err: any) {
+    console.error("Error fetching pharmacy feedback:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 // POST /api/feedback — submit feedback (publicly accessible by patient app)
 router.post("/", async (req: Request, res: Response) => {
   try {

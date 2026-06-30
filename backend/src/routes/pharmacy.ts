@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer } from "../config/cosmos";
+import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer, feedbackContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -34,6 +34,34 @@ router.get("/catalogue", async (req: Request, res: Response) => {
       { query, parameters: params } as any
     ).fetchAll();
 
+    // Fetch all pharmacy feedback to compute ratings
+    const { resources: allFeedback } = await feedbackContainer.items.query(
+      "SELECT c.provider.id, c.rating FROM c WHERE c.folder = 'pharmacy'"
+    ).fetchAll();
+
+    const ratingsMap: Record<string, { sum: number; count: number }> = {};
+    allFeedback.forEach((fb) => {
+      if (!fb.id || !fb.rating) return;
+      if (!ratingsMap[fb.id]) ratingsMap[fb.id] = { sum: 0, count: 0 };
+      ratingsMap[fb.id].sum += fb.rating;
+      ratingsMap[fb.id].count += 1;
+    });
+
+    const getAverage = (pharmacyId: string) => {
+      if (!ratingsMap[pharmacyId]) return 0;
+      return ratingsMap[pharmacyId].sum / ratingsMap[pharmacyId].count;
+    };
+
+    // Sort resources by average pharmacy rating first, then by approvedAt
+    resources.sort((a, b) => {
+      const aRating = getAverage(a.pharmacyId);
+      const bRating = getAverage(b.pharmacyId);
+      if (bRating !== aRating) return bRating - aRating;
+      const aDate = a.approvedAt ? new Date(a.approvedAt).getTime() : 0;
+      const bDate = b.approvedAt ? new Date(b.approvedAt).getTime() : 0;
+      return bDate - aDate;
+    });
+
     // Adapt to the Medicine shape the patient app expects
     const medicines = resources
       .slice(parseInt(skip), parseInt(skip) + parseInt(limit))
@@ -57,6 +85,7 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         benefits:             p.benefits ?? null,
         sideEffects:          p.sideEffects ?? null,
         howToUse:             p.howToUse ?? null,
+        pharmacyRating:       getAverage(p.pharmacyId)
       }));
 
     res.json(medicines);

@@ -31,6 +31,18 @@ const OrdersIcon = ({ active }: { active: boolean }) => (
     <path d="M6.667 6h2.666M6.667 9.333h2.666" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const FeedbackIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M14.667 8c0 3.682-2.985 6.667-6.667 6.667-1.258 0-2.434-.348-3.441-.951L2 14.667l1.196-2.278A6.63 6.63 0 0 1 1.333 8c0-3.682 2.985-6.667 6.667-6.667S14.667 4.318 14.667 8z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5.333 8h.007M8 8h.007M10.667 8h.007" stroke={active ? "white" : "#3D4B5A"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const AnalyticsIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M2 13.333h12" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 10.667v-4M8 10.667V4M12 10.667V7.333" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const SettingsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="8" cy="8" r="2" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -67,6 +79,8 @@ const NAV_ITEMS = [
   { href: "/dashboard/orders", label: "Orders", Icon: OrdersIcon },
   { href: "/dashboard/inventory", label: "Inventory", Icon: InventoryIcon },
   { href: "/dashboard/add-product", label: "Add Product", Icon: AddProductIcon },
+  { href: "/dashboard/feedback", label: "Feedback", Icon: FeedbackIcon },
+  { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────

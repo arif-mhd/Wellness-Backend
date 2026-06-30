@@ -123,19 +123,22 @@ export default function DashboardPage() {
   const [pharmacy,   setPharmacy]   = useState<Pharmacy | null>(null);
   const [products,   setProducts]   = useState<Product[]>([]);
   const [orders,     setOrders]     = useState<Order[]>([]);
+  const [ratingStats, setRatingStats] = useState({ averageRating: 0, totalReviews: 0 });
   const [loading,    setLoading]    = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [pRes, prRes, orRes] = await Promise.all([
+      const [pRes, prRes, orRes, rRes] = await Promise.all([
         apiFetch("/api/pharmacy/me"),
         apiFetch("/api/pharmacy/products"),
         apiFetch("/api/pharmacy/orders"),
+        apiFetch("/api/feedback/pharmacy/stats"),
       ]);
       if (pRes.ok)  { const d = await pRes.json();  setPharmacy(d.pharmacy); }
       if (prRes.ok) { const d = await prRes.json(); setProducts(d.products ?? []); }
       if (orRes.ok) { const d = await orRes.json(); setOrders(d.orders   ?? []); }
+      if (rRes.ok)  { const d = await rRes.json();  setRatingStats(d); }
     } catch { /* silently */ } finally { setLoading(false); setDataLoaded(true); }
   }, []);
 
@@ -254,6 +257,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
+
+
         {/* Card: Quick Actions */}
         <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
           <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
@@ -321,14 +326,14 @@ export default function DashboardPage() {
                   dy={8}
                 />
                 <YAxis
-                  yAxisId="sales"
+                  yAxisId="left"
                   axisLine={false} tickLine={false}
                   tick={{ fill: "#94a3b8", fontSize: 11, fontFamily: "Outfit" }}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}
                   dx={-4}
                 />
                 <YAxis
-                  yAxisId="orders"
+                  yAxisId="right"
                   orientation="right"
                   axisLine={false} tickLine={false}
                   tick={{ fill: "#94a3b8", fontSize: 11, fontFamily: "Outfit" }}
@@ -336,7 +341,7 @@ export default function DashboardPage() {
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
-                  yAxisId="sales"
+                  yAxisId="left"
                   type="monotone"
                   dataKey="sales"
                   name="Revenue (AED)"
@@ -347,7 +352,7 @@ export default function DashboardPage() {
                   activeDot={{ r: 5, fill: "#5476FC", stroke: "white", strokeWidth: 2 }}
                 />
                 <Area
-                  yAxisId="orders"
+                  yAxisId="right"
                   type="monotone"
                   dataKey="orders"
                   name="Orders"
@@ -362,19 +367,41 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Products */}
-        <div className="bg-white rounded-xl p-6 border border-[#EBEEF5] shadow-sm hover:border-gray-100 transition-all flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[#24292E] text-[18px] font-semibold tracking-[-0.36px]">
-              Recent Products
-            </span>
-            <Link href="/dashboard/inventory" className="text-[#5476FC] text-xs font-medium hover:underline">
-              View All
-            </Link>
+        {/* Right Column: Rating + Recent Products */}
+        <div className="flex flex-col gap-6">
+          {/* Average Rating Card */}
+          <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
+                Average Rating
+              </span>
+              <span className="w-8 h-8 rounded-lg bg-[#FEF3C7] flex items-center justify-center">
+                <svg className="w-4 h-4 text-[#D97706]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </span>
+            </div>
+            <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
+              {dataLoaded ? ratingStats.averageRating.toFixed(1) : "—"}
+            </div>
+            <div className="text-[#A0A8B0] text-[11px]">
+              Based on {ratingStats.totalReviews} reviews
+            </div>
           </div>
-          <div className="h-[1px] bg-[#EBEEF5] w-full" />
 
-          <div className="flex flex-col gap-1.5">
+          {/* Recent Products */}
+          <div className="bg-white rounded-xl p-6 border border-[#EBEEF5] shadow-sm hover:border-gray-100 transition-all flex flex-col gap-4 flex-1">
+            <div className="flex justify-between items-center">
+              <span className="text-[#24292E] text-[18px] font-semibold tracking-[-0.36px]">
+                Recent Products
+              </span>
+              <Link href="/dashboard/inventory" className="text-[#5476FC] text-xs font-medium hover:underline">
+                View All
+              </Link>
+            </div>
+            <div className="h-[1px] bg-[#EBEEF5] w-full" />
+
+            <div className="flex flex-col gap-1.5">
             {recentProducts.length === 0 ? (
               <div className="py-10 flex flex-col items-center text-center">
                 <p className="font-medium text-[#24292E] mb-1 text-[15px]">No products yet</p>
@@ -405,6 +432,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+    </div>
 
       {/* ── Recent Orders ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden mb-6">
