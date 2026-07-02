@@ -115,6 +115,11 @@ function ConsultRoom() {
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
+  // Fullscreen
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fsChatOpen, setFsChatOpen] = useState(false);
+
   // Timer
   useEffect(() => {
     if (!connected) return;
@@ -122,6 +127,23 @@ function ConsultRoom() {
     return () => clearInterval(id);
   }, [connected]);
   const timerStr = `${String(Math.floor(timer / 60)).padStart(2,"0")}:${String(timer % 60).padStart(2,"0")}`;
+
+  // Track fullscreen changes (e.g. user presses Esc)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = videoContainerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -766,7 +788,11 @@ function ConsultRoom() {
         <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
 
           {/* Video area */}
-          <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "420px" }}>
+          <div
+            ref={videoContainerRef}
+            className="relative bg-[#1a2035] overflow-hidden"
+            style={{ height: "420px" }}
+          >
             {/* Remote participants */}
             {remoteTiles.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -856,6 +882,114 @@ function ConsultRoom() {
                   }
                 </svg>
               </button>
+            </div>
+            {/* Fullscreen toggle — top-right corner */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              className="absolute top-3 right-3 z-30 w-8 h-8 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 hover:scale-110 active:scale-95 border border-white/10"
+            >
+              {isFullscreen ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3"/>
+                  <path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+                  <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
+                  <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+                  <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                  <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+                  <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                </svg>
+              )}
+            </button>
+
+            {/* ── Fullscreen floating chat ── */}
+            {/* Chat toggle button — top-left, only meaningful in fullscreen */}
+            <button
+              onClick={() => { setFsChatOpen(v => !v); setUnread(0); }}
+              title={fsChatOpen ? "Close Chat" : "Open Chat"}
+              className="absolute top-3 left-3 z-30 w-8 h-8 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 hover:scale-110 active:scale-95 border border-white/10"
+            >
+              {/* chat bubble icon */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              {unread > 0 && !fsChatOpen && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-[8px] text-white flex items-center justify-center px-0.5 font-bold">
+                  {unread}
+                </span>
+              )}
+            </button>
+
+            {/* Sliding chat drawer — inside the video container so it stays in fullscreen */}
+            <div
+              className="absolute top-0 left-0 h-full z-40 flex flex-col bg-[#0f1623]/90 backdrop-blur-md border-r border-white/10 transition-all duration-300 overflow-hidden"
+              style={{ width: fsChatOpen ? "300px" : "0px", opacity: fsChatOpen ? 1 : 0, pointerEvents: fsChatOpen ? "auto" : "none" }}
+            >
+              {/* Drawer header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                  </svg>
+                  <span className="text-white text-xs font-semibold">Chat</span>
+                </div>
+                <button onClick={() => setFsChatOpen(false)} className="text-white/50 hover:text-white transition-colors">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3" onClick={() => setUnread(0)}>
+                {messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                    <p className="text-white/30 text-[11px]">No messages yet</p>
+                  </div>
+                ) : messages.map(m => (
+                  <div key={m.id} className={`flex items-start gap-2 ${m.sender === "you" ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-bold ${m.sender === "you" ? "bg-[#5476fc]/30 text-[#8aa0ff]" : "bg-white/10 text-white/60"}`}>
+                      {m.sender === "you" ? "Dr" : patientName.slice(0,2).toUpperCase()}
+                    </div>
+                    <div className={`max-w-[80%] flex flex-col gap-0.5 ${m.sender === "you" ? "items-end" : "items-start"}`}>
+                      <p className="text-[9px] text-white/40 font-medium px-1">{m.name}</p>
+                      <div className={`px-2.5 py-1.5 rounded-xl text-[11px] leading-relaxed ${
+                        m.sender === "you"
+                          ? "bg-[#5476fc] text-white rounded-tr-none"
+                          : "bg-white/10 text-white/90 rounded-tl-none"
+                      }`}>
+                        {m.text}
+                      </div>
+                      <p className="text-[9px] text-white/25 px-1">{m.time}</p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef}/>
+              </div>
+
+              {/* Input */}
+              <div className="p-3 border-t border-white/10 flex gap-2 items-center flex-shrink-0">
+                <input
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                  placeholder="Type something…"
+                  className="flex-1 bg-white/10 rounded-lg px-3 py-1.5 text-[11px] text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-[#5476fc]/50"
+                />
+                <button
+                  onClick={sendChat}
+                  disabled={!chatInput.trim()}
+                  className="w-7 h-7 rounded-full bg-[#5476fc] flex items-center justify-center disabled:opacity-30 hover:bg-[#4466ec] transition-colors flex-shrink-0"
+                >
+                  <svg width="10" height="10" fill="none" viewBox="0 0 24 24">
+                    <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 

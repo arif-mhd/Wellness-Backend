@@ -112,6 +112,10 @@ function VideoCallInner() {
   const didConnectRef = useRef(false);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [remoteTiles, setRemoteTiles] = useState<RemoteVideoTile[]>([]);
+
+  // Fullscreen
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
 
   // A stable ref to the latest "refresh medicines + labs only" function so the
@@ -125,6 +129,23 @@ function VideoCallInner() {
     return () => clearInterval(id);
   }, [connected]);
   const timerStr = `${String(Math.floor(timer / 60)).padStart(2,"0")}:${String(timer % 60).padStart(2,"0")}`;
+
+  // Track fullscreen changes (user pressing Esc, etc.)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = videoContainerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -772,7 +793,11 @@ function VideoCallInner() {
         <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
 
           {/* Video */}
-          <div className="relative bg-[#1a2035] overflow-hidden" style={{ height: "420px" }}>
+          <div
+            ref={videoContainerRef}
+            className="relative bg-[#1a2035] overflow-hidden"
+            style={{ height: isFullscreen ? "100vh" : "420px" }}
+          >
             {remoteTiles.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 {!error ? (
@@ -826,6 +851,31 @@ function VideoCallInner() {
               </div>
               <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">You</p>
             </div>
+
+            {/* Fullscreen toggle button — top-right */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              className="absolute top-3 right-3 z-30 w-8 h-8 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 hover:scale-110 active:scale-95 border border-white/10"
+            >
+              {isFullscreen ? (
+                /* Exit fullscreen icon */
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3"/>
+                  <path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+                  <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
+                  <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+                </svg>
+              ) : (
+                /* Enter fullscreen icon */
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+                  <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                  <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+                  <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                </svg>
+              )}
+            </button>
 
             {/* Controls overlay — bottom-center, offset left of PiP column */}
             <div className="absolute bottom-3 z-20 flex items-center gap-2" style={{ left: "50%", transform: "translateX(calc(-50% - 72px))" }}>
