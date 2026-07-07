@@ -888,7 +888,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
       const patientNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.patientId,
         profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Rescheduled",
@@ -903,7 +903,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
       const doctorNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.doctorId,
         title: "Appointment Rescheduled",
         body: `Your appointment with ${patientName} has been rescheduled to ${dateText} at ${timeText}.`,
@@ -1046,7 +1046,7 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
     });
 
     const patientNotification = {
-      id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       patientId: apt.patientId,
       profileId: apt.familyMemberId ?? apt.patientId,
       title: "Appointment Reminder",
@@ -1311,7 +1311,7 @@ router.post("/patient/:patientId/notes", requireRole("doctor"), async (req: Sess
     } catch { /* use default */ }
 
     const newNote = {
-      id: "note_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "note_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       text: String(text).trim(),
       doctorId,
       doctorName,
@@ -1467,8 +1467,15 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
     let newAppointmentId: string | null = null;
 
     if (decision === "accepted") {
-      // Create the follow-up appointment
-      newAppointmentId = generateId();
+      // Fetch doctor name first so we can use it in the readable appointment ID
+      let doctorName = "Doctor";
+      try {
+        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+        doctorName = doc?.fullName ?? doctorName;
+      } catch { /* use default */ }
+
+      // Create the follow-up appointment with a readable, searchable ID
+      newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? apt.pendingFollowUp.followUpDate ?? now);
       const followUpApt = {
         id: newAppointmentId,
         patientId,
@@ -1490,11 +1497,6 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       await appointmentsContainer.items.create(followUpApt);
 
       // Resolve doctor name for the notification message
-      let doctorName = "Doctor";
-      try {
-        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-        doctorName = doc?.fullName ?? doctorName;
-      } catch { /* use default */ }
 
       const followUpDate = apt.pendingFollowUp.followUpDate;
       const followUpTime = apt.pendingFollowUp.followUpTime;
@@ -1508,7 +1510,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       const timeText = `${hr12}:${m} ${ampm}`;
 
       // Notify the patient
-      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const notifId = "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex");
       const notification = {
         id: notifId,
         patientId,
