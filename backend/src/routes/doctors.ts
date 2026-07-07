@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -94,6 +94,21 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 
   try {
+    // ── 0. Confirm OTP was verified for this email ────────────────────────
+    const normalizedEmail = email.trim().toLowerCase();
+    const { resources: otpDocs } = await otpCodesContainer.items
+      .query({
+        query:
+          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!otpDocs.length) {
+      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
+      return;
+    }
+
     // ── 1. Create SuperTokens account ─────────────────────────────────────
     // We call the Node SDK directly (bypassing the signUpPOST override that
     // expects extra form fields like "name" and "role").
@@ -157,6 +172,7 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
     // Personal
     bio, businessEmail, bloodGroup, height, weight,
     maritalStatus, address, postalCode, languages,
+    phone, timezone, consultationTimeLimitMins,
     avatarUrl, emiratesIdFileUrl,
     // Medical career
     specialty, license, experience, medicalSchool, residency,
@@ -179,16 +195,19 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
 
     const updated = {
       ...doctor,
-      bio:              bio              ?? doctor.bio,
-      businessEmail:    businessEmail    ?? doctor.businessEmail,
-      bloodGroup:       bloodGroup       ?? doctor.bloodGroup,
-      height:           height           ?? doctor.height,
-      weight:           weight           ?? doctor.weight,
-      maritalStatus:    maritalStatus    ?? doctor.maritalStatus,
-      address:          address          ?? doctor.address,
-      postalCode:       postalCode       ?? doctor.postalCode,
-      languages:        languages        ?? doctor.languages,
-      avatarUrl:        avatarUrl        ?? doctor.avatarUrl,
+      bio:                      bio                      ?? doctor.bio,
+      businessEmail:            businessEmail            ?? doctor.businessEmail,
+      bloodGroup:               bloodGroup               ?? doctor.bloodGroup,
+      height:                   height                   ?? doctor.height,
+      weight:                   weight                   ?? doctor.weight,
+      maritalStatus:            maritalStatus            ?? doctor.maritalStatus,
+      address:                  address                  ?? doctor.address,
+      postalCode:               postalCode               ?? doctor.postalCode,
+      languages:                languages                ?? doctor.languages,
+      phone:                    phone                    ?? doctor.phone,
+      timezone:                 timezone                 ?? doctor.timezone,
+      consultationTimeLimitMins: consultationTimeLimitMins ?? doctor.consultationTimeLimitMins,
+      avatarUrl:                avatarUrl                ?? doctor.avatarUrl,
       emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
       specialty:        specialty        ?? doctor.specialty,
       license:          license          ?? doctor.license,
@@ -606,6 +625,168 @@ router.get("/", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/change-password ──────────────────────────────────────
+// Authenticated — lets a logged-in doctor change their password by supplying
+// their current password for verification before setting the new one.
+router.post("/change-password", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" });
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+    return;
+  }
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "USER_NOT_FOUND" });
+      return;
+    }
+
+    const signInResult = await EmailPassword.signIn("public", doctor.email, currentPassword);
+    if (signInResult.status !== "OK") {
+      res.status(403).json({ error: "WRONG_PASSWORD" });
+      return;
+    }
+
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", doctorId, doctor.email);
+    if (tokenResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_TOKEN_FAILED" });
+      return;
+    }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
+    if (resetResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_FAILED" });
+      return;
+    }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Doctor change-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /api/doctors/notifications ───────────────────────────────────────
+// Saves the doctor's notification preferences (email frequency + app toggles).
+router.patch("/notifications", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { emailFreq, appToggles } = req.body;
+
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+
+    const updated = {
+      ...doctor,
+      notificationPreferences: {
+        emailFreq:  emailFreq  ?? doctor.notificationPreferences?.emailFreq  ?? "instant",
+        appToggles: appToggles ?? doctor.notificationPreferences?.appToggles ?? {},
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", notificationPreferences: updated.notificationPreferences });
+  } catch (err) {
+    console.error("Doctor notifications update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/doctors/reset-password ───────────────────────────────────────
+// Public — called by the doctor portal after OTP verified for password reset.
+router.post("/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      res.status(400).json({ error: "email and newPassword are required" });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Require verified OTP for this email
+    const { resources: otpDocs } = await otpCodesContainer.items
+      .query({
+        query:
+          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!otpDocs.length) {
+      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
+      return;
+    }
+
+    // Look up the doctor's SuperTokens ID from Cosmos (id = supertokensId)
+    const { resources: doctorDocs } = await doctorsContainer.items
+      .query({
+        query: "SELECT c.id FROM c WHERE c.email = @email",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!doctorDocs.length) {
+      res.status(404).json({ error: "USER_NOT_FOUND" });
+      return;
+    }
+
+    const supertokensId = doctorDocs[0].id;
+
+    const tokenResult = await EmailPassword.createResetPasswordToken(
+      "public",
+      supertokensId,
+      normalizedEmail
+    );
+
+    if (tokenResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_TOKEN_FAILED" });
+      return;
+    }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken(
+      "public",
+      tokenResult.token,
+      newPassword
+    );
+
+    if (resetResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_FAILED", detail: resetResult.status });
+      return;
+    }
+
+    // Delete the used OTP doc so it can't be replayed
+    try {
+      await otpCodesContainer.item(otpDocs[0].id, otpDocs[0].email).delete();
+    } catch {
+      // ignore — TTL will clean it up
+    }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Doctor reset-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

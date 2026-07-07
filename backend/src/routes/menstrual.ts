@@ -484,19 +484,33 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
     const profileId = req.body.profileId ?? patientId;
     const existing = await getDaily(patientId, profileId, date);
 
-    const { moods, topSymptom, symptoms, pregnancyTest, waterIntakeLiters, weightKg, basalTempC } = req.body;
+    const {
+      moods, topSymptom, symptoms, pregnancyTest,
+      waterIntakeLiters, weightKg, basalTempC,
+      menstrualFlow, sexActivity, physicalActivity,
+      ovulationTest, otherFactors, oralContraceptive,
+      vaginalDischarge, digestion,
+    } = req.body;
 
     const updated = {
       ...existing,
       patientId,
       profileId,
-      ...(moods             !== undefined && { moods }),
-      ...(topSymptom        !== undefined && { topSymptom }),
-      ...(symptoms          !== undefined && { symptoms }),
-      ...(pregnancyTest     !== undefined && { pregnancyTest }),
-      ...(waterIntakeLiters !== undefined && { waterIntakeLiters }),
-      ...(weightKg          !== undefined && { weightKg }),
-      ...(basalTempC        !== undefined && { basalTempC }),
+      ...(moods               !== undefined && { moods }),
+      ...(topSymptom          !== undefined && { topSymptom }),
+      ...(symptoms            !== undefined && { symptoms }),
+      ...(pregnancyTest       !== undefined && { pregnancyTest }),
+      ...(waterIntakeLiters   !== undefined && { waterIntakeLiters }),
+      ...(weightKg            !== undefined && { weightKg }),
+      ...(basalTempC          !== undefined && { basalTempC }),
+      ...(menstrualFlow       !== undefined && { menstrualFlow }),
+      ...(sexActivity         !== undefined && { sexActivity }),
+      ...(physicalActivity    !== undefined && { physicalActivity }),
+      ...(ovulationTest       !== undefined && { ovulationTest }),
+      ...(otherFactors        !== undefined && { otherFactors }),
+      ...(oralContraceptive   !== undefined && { oralContraceptive }),
+      ...(vaginalDischarge    !== undefined && { vaginalDischarge }),
+      ...(digestion           !== undefined && { digestion }),
       updatedAt: new Date().toISOString(),
     };
 
@@ -551,7 +565,7 @@ router.get("/daily/history", async (req: SessionRequest, res: Response) => {
     since.setDate(since.getDate() - days);
     const sinceStr = `${since.getFullYear()}-${String(since.getMonth()+1).padStart(2,"0")}-${String(since.getDate()).padStart(2,"0")}`;
 
-    let query = "SELECT c.id, c.date, c.profileId, c.waterIntakeLiters, c.weightKg, c.basalTempC, c.symptoms, c.moods, c.pregnancyTest, c.updatedAt FROM c WHERE c.patientId = @pid AND c.date >= @since";
+    let query = "SELECT * FROM c WHERE c.patientId = @pid AND c.date >= @since";
     const parameters = [{ name: "@pid", value: patientId }, { name: "@since", value: sinceStr }];
     if (profileId) {
       query += " AND c.profileId = @profileId";

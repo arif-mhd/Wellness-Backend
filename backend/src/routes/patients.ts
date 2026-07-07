@@ -3,7 +3,7 @@ import multer from "multer";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { requireRole } from "../middleware/requireRole";
-import { patientsContainer } from "../config/cosmos";
+import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { getAllProfiles } from "../utils/profile";
@@ -31,6 +31,22 @@ router.post("/register", async (req: Request, res: Response) => {
 
     if (!email || !password || !fullName) {
       res.status(400).json({ error: "email, password, and fullName are required" });
+      return;
+    }
+
+    // Confirm OTP was verified for this email before creating the account.
+    // This prevents bypassing the OTP screen via direct API calls.
+    const normalizedEmail = email.trim().toLowerCase();
+    const { resources: otpDocs } = await otpCodesContainer.items
+      .query({
+        query:
+          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!otpDocs.length) {
+      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
       return;
     }
 
@@ -70,6 +86,91 @@ router.post("/register", async (req: Request, res: Response) => {
     res.json({ status: "OK", userId: supertokensId });
   } catch (err) {
     console.error("Patient registration error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/reset-password ───────────────────────────────────────
+// Public — called from the patient app after OTP verified for password reset.
+// Requires a verified OTP doc for the email before changing the password.
+router.post("/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      res.status(400).json({ error: "email and newPassword are required" });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Require verified OTP for this email
+    const { resources: otpDocs } = await otpCodesContainer.items
+      .query({
+        query:
+          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!otpDocs.length) {
+      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
+      return;
+    }
+
+    // Look up the patient's SuperTokens ID from Cosmos (id = supertokensId)
+    const { resources: patientDocs } = await patientsContainer.items
+      .query({
+        query: "SELECT c.id FROM c WHERE c.email = @email",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      })
+      .fetchAll();
+
+    if (!patientDocs.length) {
+      res.status(404).json({ error: "USER_NOT_FOUND" });
+      return;
+    }
+
+    const supertokensId = patientDocs[0].id;
+
+    // Generate a password reset token and consume it immediately
+    const tokenResult = await EmailPassword.createResetPasswordToken(
+      "public",
+      supertokensId,
+      normalizedEmail
+    );
+
+    if (tokenResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_TOKEN_FAILED" });
+      return;
+    }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken(
+      "public",
+      tokenResult.token,
+      newPassword
+    );
+
+    if (resetResult.status !== "OK") {
+      res.status(500).json({ error: "RESET_FAILED", detail: resetResult.status });
+      return;
+    }
+
+    // Delete the used OTP doc so it can't be replayed
+    try {
+      await otpCodesContainer.item(otpDocs[0].id, otpDocs[0].email).delete();
+    } catch {
+      // ignore — TTL will clean it up
+    }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Patient reset-password error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

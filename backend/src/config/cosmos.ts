@@ -105,6 +105,12 @@ export const sosCodesContainer: Container = db.container("sosCodes");
 /** Admin notifications — partition key: /id (synced from real platform events, read-state tracked here) */
 export const adminNotificationsContainer: Container = db.container("adminNotifications");
 
+/** Articles — partition key: /id (admin-managed wellness articles) */
+export const articlesContainer: Container = db.container("articles");
+
+/** OTP codes — partition key: /email (short-lived, auto-TTL 600s) */
+export const otpCodesContainer: Container = db.container("otpCodes");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -144,6 +150,8 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "messages",               partitionKey: { paths: ["/conversationId"] } },
     { id: "sosCodes",               partitionKey: { paths: ["/patientId"] } },
     { id: "adminNotifications",     partitionKey: { paths: ["/id"] } },
+    { id: "articles",               partitionKey: { paths: ["/id"] } },
+    { id: "otpCodes",               partitionKey: { paths: ["/email"] }, defaultTtl: 600 },
   ];
 
   for (const spec of required) {

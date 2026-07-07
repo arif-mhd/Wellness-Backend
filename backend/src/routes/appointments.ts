@@ -888,7 +888,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
       const patientNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.patientId,
         profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Rescheduled",
@@ -903,7 +903,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
       const doctorNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.doctorId,
         title: "Appointment Rescheduled",
         body: `Your appointment with ${patientName} has been rescheduled to ${dateText} at ${timeText}.`,
@@ -1046,7 +1046,7 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
     });
 
     const patientNotification = {
-      id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       patientId: apt.patientId,
       profileId: apt.familyMemberId ?? apt.patientId,
       title: "Appointment Reminder",
@@ -1464,11 +1464,17 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
     if (!apt.pendingFollowUp) { res.status(400).json({ error: "No pending follow-up on this appointment." }); return; }
 
     const now = new Date().toISOString();
-    let newAppointmentId: string | null = null;
+    let newAppointmentId: string | undefined = undefined;
 
     if (decision === "accepted") {
-      // Create the follow-up appointment
-      newAppointmentId = generateId();
+      // Resolve doctor name first so we can use it in the appointment ID
+      let doctorName = "Doctor";
+      try {
+        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+        doctorName = doc?.fullName ?? doctorName;
+      } catch { /* use default */ }
+
+      newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? now);
       const followUpApt = {
         id: newAppointmentId,
         patientId,
@@ -1489,13 +1495,6 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       };
       await appointmentsContainer.items.create(followUpApt);
 
-      // Resolve doctor name for the notification message
-      let doctorName = "Doctor";
-      try {
-        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-        doctorName = doc?.fullName ?? doctorName;
-      } catch { /* use default */ }
-
       const followUpDate = apt.pendingFollowUp.followUpDate;
       const followUpTime = apt.pendingFollowUp.followUpTime;
       const dateText = new Date(`${followUpDate}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -1508,7 +1507,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       const timeText = `${hr12}:${m} ${ampm}`;
 
       // Notify the patient
-      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const notifId = "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex");
       const notification = {
         id: notifId,
         patientId,
@@ -1537,7 +1536,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
         performedBy: "Patient",
         performedById: patientId,
         entityType: "appointment",
-        entityId: newAppointmentId,
+        entityId: newAppointmentId ?? "",
       });
     } else {
       // Notify doctor via LiveKit that the patient declined

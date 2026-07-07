@@ -6,8 +6,6 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
-// Note: We use the Gemini REST API directly (not the @google/genai SDK) to avoid
-// Cloud Run's Application Default Credentials (ADC) overriding our API key.
 
 const router = Router();
 
@@ -18,10 +16,8 @@ router.use(requireRole("patient"));
 // Body: { imageBase64: string, mimeType: string }
 // Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
 //
-// Strategy:
-//   1. If GEMINI_API_KEY is set → try Google AI Studio endpoint (?key=KEY)
-//   2. Automatically falls back to Vertex AI using Cloud Run's built-in service account
-//      (no API key needed — uses the Cloud Run instance's identity token)
+// Uses Gemini API key (?key= param) — set GEMINI_API_KEY in Cloud Run env vars.
+// Create the key at: GCP Console → APIs & Services → Credentials → Create API Key
 router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
@@ -29,9 +25,16 @@ router.post("/analyze-food-image", async (req: SessionRequest, res: Response) =>
     return;
   }
 
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  if (!apiKey) {
+    console.error("[analyze-food-image] GEMINI_API_KEY is not set");
+    res.status(500).json({ error: "Food image analysis is not configured. Please contact support." });
+    return;
+  }
+
+  console.log(`[analyze-food-image] key length=${apiKey.length} prefix=${apiKey.slice(0, 8)}`);
+
   const safeMime = mimeType || "image/jpeg";
-  const apiKey   = process.env.GEMINI_API_KEY ?? "";
-  const hasKey   = apiKey.length >= 20;
 
   const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
@@ -53,19 +56,19 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-  const requestBody = JSON.stringify({
+  const geminiBody = JSON.stringify({
     contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: safeMime, data: imageBase64 } }] }],
   });
 
-  // ── Helper: call a Gemini URL and return the text response ─────────────────
-  async function callGemini(url: string, extraHeaders: Record<string, string> = {}): Promise<string> {
+  async function callGemini(model: string): Promise<string> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const r = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...extraHeaders },
-      body: requestBody,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: geminiBody,
     });
     if (!r.ok) {
-      const body = await r.text();
+      const body = (await r.text()).replace(/\s+/g, " ").trim();
       throw new Error(`HTTP ${r.status}: ${body}`);
     }
     const data = await r.json() as any;
@@ -74,70 +77,28 @@ Rules:
     return text;
   }
 
-  // ── Helper: get Cloud Run service account token from metadata server ────────
-  async function getCloudRunToken(): Promise<string> {
-    const r = await fetch(
-      "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-      { headers: { "Metadata-Flavor": "Google" } }
-    );
-    if (!r.ok) throw new Error("Metadata server unavailable — not running on Cloud Run?");
-    const { access_token } = await r.json() as { access_token: string };
-    return access_token;
-  }
-
   try {
-    const models   = ["gemini-2.0-flash", "gemini-1.5-flash"];
-    const project  = process.env.GOOGLE_CLOUD_PROJECT || "wellness-498910";
-    const location = process.env.CLOUD_RUN_REGION    || "asia-south1";
-    const baseUrl  = "https://generativelanguage.googleapis.com/v1beta/models";
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
     let responseText: string | null = null;
-    let lastError:    any           = null;
+    let lastError: any = null;
 
     for (const model of models) {
-      if (hasKey) {
-        // ── Strategy 1a: x-goog-api-key header (new AQ-format keys) ────────
-        try {
-          const url = `${baseUrl}/${model}:generateContent`;
-          responseText = await callGemini(url, { "x-goog-api-key": apiKey });
-          console.log(`[analyze-food-image] ✓ x-goog-api-key header · model=${model}`);
-          break;
-        } catch (err: any) {
-          console.warn(`[analyze-food-image] x-goog-api-key failed for ${model}:`, err?.message);
-          lastError = err;
-        }
-
-        // ── Strategy 1b: ?key= URL param (old AIzaSy-format keys) ──────────
-        try {
-          const url = `${baseUrl}/${model}:generateContent?key=${apiKey}`;
-          responseText = await callGemini(url);
-          console.log(`[analyze-food-image] ✓ ?key= param · model=${model}`);
-          break;
-        } catch (err: any) {
-          console.warn(`[analyze-food-image] ?key= param failed for ${model}:`, err?.message);
-          lastError = err;
-        }
-      }
-
-      // ── Strategy 2: Vertex AI via Cloud Run service account ─────────────
       try {
-        const token = await getCloudRunToken();
-        const url   = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
-        responseText = await callGemini(url, { Authorization: `Bearer ${token}` });
-        console.log(`[analyze-food-image] ✓ Vertex AI ADC · model=${model}`);
+        responseText = await callGemini(model);
+        console.log(`[analyze-food-image] ✓ model=${model}`);
         break;
       } catch (err: any) {
-        console.warn(`[analyze-food-image] Vertex AI failed for ${model}:`, err?.message);
+        console.warn(`[analyze-food-image] ${model} failed:`, err?.message);
         lastError = err;
       }
     }
 
     if (!responseText) {
-      throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
+      throw new Error(`All models failed. Last error: ${lastError?.message}`);
     }
 
-    const text     = responseText.trim();
-    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const jsonText = responseText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
     let parsed: {
       foodName:    string;
@@ -149,7 +110,7 @@ Rules:
     try {
       parsed = JSON.parse(jsonText);
     } catch {
-      console.error("[analyze-food-image] Failed to parse Gemini response:", text);
+      console.error("[analyze-food-image] Failed to parse response:", responseText);
       res.status(500).json({ error: "AI returned an unexpected response. Please try again." });
       return;
     }
@@ -168,7 +129,7 @@ Rules:
       },
     });
   } catch (err: any) {
-    console.error("[analyze-food-image] error:", err);
+    console.error("[analyze-food-image] error:", err?.message);
     res.status(500).json({ error: err?.message || "Internal server error" });
   }
 });
@@ -249,6 +210,83 @@ function mapOffCategory(tag: string): string {
   if (t.includes("oil")) return "Oils";
   return "Other";
 }
+
+// ── POST /api/wellness/chat ──────────────────────────────────────────────────
+// Body: { message: string, history?: { role: "user"|"model", text: string }[] }
+// Returns: { reply: string, offTopic: boolean }
+router.post("/chat", async (req: SessionRequest, res: Response) => {
+  const { message, history = [] } = req.body;
+  if (!message?.trim()) {
+    res.status(400).json({ error: "message is required" });
+    return;
+  }
+
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  if (!apiKey) {
+    res.status(500).json({ error: "AI chat is not configured." });
+    return;
+  }
+
+  const systemPrompt = `You are a helpful wellness assistant for Wellness Central, a healthcare platform. Your name is Dr. Wellness.
+
+RULES:
+- Only answer questions about: health, wellness, nutrition, fitness, mental health, symptoms, medications, medical conditions, sleep, stress, hydration, vitamins, diet, exercise, pregnancy, or women's health.
+- If asked anything unrelated to health/wellness (coding, politics, sports, entertainment, math, etc.), reply with exactly: OFFTOPIC
+- Keep answers concise: 2-4 sentences max.
+- Be friendly and empathetic.
+- Never diagnose or prescribe. Always recommend consulting a doctor for serious symptoms.
+- For greetings like "hi" or "hello", respond warmly and ask how you can help with their health today.`;
+
+  try {
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+    let responseText: string | null = null;
+    let lastError: any = null;
+
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: message }] }],
+            generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
+          }),
+        });
+        if (!r.ok) {
+          const body = (await r.text()).replace(/\s+/g, " ").trim();
+          throw new Error(`HTTP ${r.status}: ${body}`);
+        }
+        const data = await r.json() as any;
+        responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        if (!responseText) throw new Error("Empty response");
+        console.log(`[wellness-chat] ✓ model=${model}`);
+        break;
+      } catch (err: any) {
+        console.warn(`[wellness-chat] ${model} failed:`, err?.message);
+        lastError = err;
+      }
+    }
+
+    if (!responseText) {
+      throw new Error(`All models failed: ${lastError?.message}`);
+    }
+
+    const trimmed = responseText.trim();
+    if (trimmed === "OFFTOPIC") {
+      res.json({
+        reply: "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
+        offTopic: true,
+      });
+    } else {
+      res.json({ reply: trimmed, offTopic: false });
+    }
+  } catch (err: any) {
+    console.error("[wellness-chat] error:", err?.message);
+    res.status(500).json({ error: "Chat is temporarily unavailable. Please try again." });
+  }
+});
 
 // ── GET /api/wellness/foods?q=rice ───────────────────────────────────────────
 // 1. Search local DB first.
