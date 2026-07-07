@@ -172,7 +172,20 @@ function GlobalSearch() {
       {/* Dropdown */}
       {showDropdown && (
         <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-2xl border border-[#EBEEF5] shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-[9999] overflow-hidden">
-          {totalResults === 0 && !loading ? (
+          {/* Loading skeleton while API is in-flight */}
+          {loading && !results ? (
+            <div className="px-5 py-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-2.5 bg-gray-100 rounded-full w-2/3" />
+                    <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !results || totalResults === 0 ? (
             <div className="px-5 py-8 text-center">
               <p className="text-xs font-semibold text-[#9EA5AD]">No results for &ldquo;{query}&rdquo;</p>
               <p className="text-[10px] text-[#C4C9D0] mt-1">Try a patient name, appointment reason, or medicine name</p>
@@ -181,10 +194,10 @@ function GlobalSearch() {
             <div className="max-h-[460px] overflow-y-auto divide-y divide-[#F4F5F7]">
 
               {/* Patients */}
-              {results!.patients.length > 0 && (
+              {results.patients.length > 0 && (
                 <div>
                   <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-[#9EA5AD] uppercase tracking-widest">Patients</p>
-                  {results!.patients.map((item) => (
+                  {results.patients.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => handleNavigate(item.href)}
@@ -202,10 +215,10 @@ function GlobalSearch() {
               )}
 
               {/* Appointments */}
-              {results!.appointments.length > 0 && (
+              {results.appointments.length > 0 && (
                 <div>
                   <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-[#9EA5AD] uppercase tracking-widest">Appointments</p>
-                  {results!.appointments.map((item) => (
+                  {results.appointments.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => handleNavigate(item.href)}
