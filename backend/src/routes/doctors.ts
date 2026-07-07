@@ -610,6 +610,117 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/search?q=<query> ──────────────────────────────────────
+// Doctor searches across their own patients, appointments, and prescriptions.
+// Returns categorised results: patients, appointments, prescriptions.
+router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const q = ((req.query.q as string) ?? "").trim().toLowerCase();
+
+  if (!q || q.length < 2) {
+    res.json({ patients: [], appointments: [], prescriptions: [] });
+    return;
+  }
+
+  try {
+    // Fetch all of this doctor's appointments (with patient info)
+    const allApts = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT * FROM c WHERE c.doctorId = @doctorId ORDER BY c.scheduledAt DESC`,
+      parameters: [{ name: "@doctorId", value: doctorId }],
+    });
+
+    // Collect unique patient IDs this doctor has seen
+    const patientIds = Array.from(new Set(allApts.map((a: any) => a.patientId).filter(Boolean)));
+
+    // Fetch patient docs in parallel (cap at 50 to avoid blowing throughput)
+    const patientDocs: Record<string, any> = {};
+    await Promise.all(
+      patientIds.slice(0, 50).map(async (pid: string) => {
+        try {
+          const { resource } = await patientsContainer.item(pid, pid).read();
+          if (resource) patientDocs[pid] = resource;
+        } catch { /* ignore missing */ }
+      })
+    );
+
+    // ── Patients section ─────────────────────────────────────────────────────
+    const matchedPatients: any[] = [];
+    const seenPatients = new Set<string>();
+    for (const pid of patientIds) {
+      if (seenPatients.has(pid)) continue;
+      seenPatients.add(pid);
+      const p = patientDocs[pid];
+      if (!p) continue;
+      const haystack = [p.fullName, p.email, p.phone, p.gender, p.dob, p.dateOfBirth]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedPatients.push({
+          type: "patient",
+          id: pid,
+          title: p.fullName ?? "Patient",
+          subtitle: p.email ?? p.phone ?? "",
+          avatarUrl: p.avatarUrl ?? null,
+          href: `/dashboard/patients?id=${pid}`,
+        });
+      }
+      if (matchedPatients.length >= 5) break;
+    }
+
+    // ── Appointments section ─────────────────────────────────────────────────
+    const matchedApts: any[] = [];
+    for (const a of allApts) {
+      if (matchedApts.length >= 5) break;
+      const patient = patientDocs[a.patientId];
+      const patientName = patient?.fullName ?? "Patient";
+      const haystack = [patientName, a.reason, a.status, a.scheduledAt]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedApts.push({
+          type: "appointment",
+          id: a.id,
+          title: patientName,
+          subtitle: `${a.reason ?? "Consultation"} · ${a.status}`,
+          date: a.scheduledAt,
+          status: a.status,
+          avatarUrl: patient?.avatarUrl ?? null,
+          href: `/appointments/complete-emr?appointmentId=${a.id}&patientName=${encodeURIComponent(patientName)}`,
+        });
+      }
+    }
+
+    // ── Prescriptions section (appointments that have EMR medicines saved) ───
+    const matchedPrescriptions: any[] = [];
+    for (const a of allApts) {
+      if (matchedPrescriptions.length >= 5) break;
+      if (!a.emr?.medicines?.length) continue;
+      const patient = patientDocs[a.patientId];
+      const patientName = patient?.fullName ?? "Patient";
+      const medNames = (a.emr.medicines as any[]).map((m: any) => m.name ?? "").join(" ");
+      const haystack = [patientName, medNames, a.reason].filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedPrescriptions.push({
+          type: "prescription",
+          id: a.id,
+          title: patientName,
+          subtitle: (a.emr.medicines as any[]).slice(0, 3).map((m: any) => m.name).filter(Boolean).join(", "),
+          date: a.emr.savedAt ?? a.scheduledAt,
+          avatarUrl: patient?.avatarUrl ?? null,
+          href: `/appointments/complete-emr?appointmentId=${a.id}&patientName=${encodeURIComponent(patientName)}`,
+        });
+      }
+    }
+
+    res.json({
+      patients: matchedPatients,
+      appointments: matchedApts,
+      prescriptions: matchedPrescriptions,
+    });
+  } catch (err) {
+    console.error("Doctor search error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors.
 router.get("/", async (_req: Request, res: Response) => {

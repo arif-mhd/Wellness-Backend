@@ -1311,7 +1311,7 @@ router.post("/patient/:patientId/notes", requireRole("doctor"), async (req: Sess
     } catch { /* use default */ }
 
     const newNote = {
-      id: "note_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "note_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       text: String(text).trim(),
       doctorId,
       doctorName,
@@ -1467,14 +1467,15 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
     let newAppointmentId: string | undefined = undefined;
 
     if (decision === "accepted") {
-      // Resolve doctor name first so we can use it in the appointment ID
+      // Fetch doctor name first so we can use it in the readable appointment ID
       let doctorName = "Doctor";
       try {
         const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
         doctorName = doc?.fullName ?? doctorName;
       } catch { /* use default */ }
 
-      newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? now);
+      // Create the follow-up appointment with a readable, searchable ID
+      newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? apt.pendingFollowUp.followUpDate ?? now);
       const followUpApt = {
         id: newAppointmentId,
         patientId,
