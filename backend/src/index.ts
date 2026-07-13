@@ -43,6 +43,7 @@ import otpRouter from "./routes/otp";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
 import servicesRouter from "./routes/services";
+import otpRouter from "./routes/otp";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -126,6 +127,7 @@ app.use("/api/otp", otpRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/services", servicesRouter); // unified patient service history
+app.use("/api/otp",      otpRouter);      // OTP send + verify (registration & 2FA)
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

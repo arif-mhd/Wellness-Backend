@@ -6,6 +6,7 @@ import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import Image from "next/image";
 import Link from "next/link";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export default function LoginPage() {
   const [email, setEmail]               = useState("");
@@ -30,6 +31,21 @@ export default function LoginPage() {
       });
 
       if (response.status === "OK") {
+        // ── Check if this admin has 2FA enabled ─────────────────────────────
+        try {
+          const twoFaRes = await fetch(`${API_URL}/api/admin/dashboard/2fa/status`, {
+            credentials: "include",
+          });
+          if (twoFaRes.ok) {
+            const twoFaData = await twoFaRes.json();
+            if (twoFaData.twoFactorEnabled === true) {
+              router.push(`/auth/two-factor?email=${encodeURIComponent(email)}`);
+              return;
+            }
+          }
+        } catch {
+          // If 2FA check fails, fall through to dashboard
+        }
         router.push("/dashboard");
       } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
         setError("Invalid email or password. Please try again.");
@@ -44,6 +60,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#f3f4fd] via-[#f8f9ff] to-[#f0f4ff] flex items-center justify-center p-6 md:p-12">

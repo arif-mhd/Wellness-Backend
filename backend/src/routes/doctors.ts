@@ -739,6 +739,7 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+<<<<<<< HEAD
 // ─── POST /api/doctors/change-password ──────────────────────────────────────
 // Authenticated — lets a logged-in doctor change their password by supplying
 // their current password for verification before setting the new one.
@@ -901,6 +902,46 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/2fa/status ─────────────────────────────────────────────
+router.get("/2fa/status", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    res.json({ twoFactorEnabled: doctor?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/enable ────────────────────────────────────────────
+router.post("/2fa/enable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/disable ───────────────────────────────────────────
+router.post("/2fa/disable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── DELETE /api/doctors/me ──────────────────────────────────────────────────
 // Marks the doctor's account as deleted in Cosmos DB and revokes all sessions.
 // Data is preserved so patients retain access to their appointment history.
@@ -908,10 +949,7 @@ router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Res
   const doctorId = req.session!.getUserId();
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) {
-      res.status(404).json({ error: "Doctor not found." });
-      return;
-    }
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
 
     await doctorsContainer.items.upsert({
       ...doctor,
@@ -919,9 +957,7 @@ router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Res
       deletedAt: new Date().toISOString(),
     });
 
-    // Revoke all sessions so the doctor is immediately logged out
     await req.session!.revokeSession();
-
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Doctor delete-account error:", err);
@@ -930,3 +966,4 @@ router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Res
 });
 
 export default router;
+

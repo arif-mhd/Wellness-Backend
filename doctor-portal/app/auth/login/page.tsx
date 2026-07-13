@@ -8,6 +8,8 @@ import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,6 +33,23 @@ export default function LoginPage() {
       });
 
       if (response.status === "OK") {
+        // ── Check if this doctor has 2FA enabled ──────────────────────────────
+        // The SuperTokens session is now active, so we can call the protected endpoint.
+        try {
+          const twoFaRes = await fetch(`${API_URL}/api/doctors/2fa/status`, {
+            credentials: "include",
+          });
+          if (twoFaRes.ok) {
+            const twoFaData = await twoFaRes.json();
+            if (twoFaData.twoFactorEnabled === true) {
+              // Redirect to the 2FA verification page — full session is held there.
+              router.push(`/auth/two-factor?email=${encodeURIComponent(email)}`);
+              return;
+            }
+          }
+        } catch {
+          // If we can't check 2FA status, let the doctor through normally.
+        }
         router.push("/dashboard");
       } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
         setError("Invalid email or password.");
@@ -160,7 +179,7 @@ export default function LoginPage() {
                   disabled={loading}
                   className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95"
                 >
-                  <span>Login</span>
+                  <span>{loading ? "Signing in…" : "Login"}</span>
                   {!loading && (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
