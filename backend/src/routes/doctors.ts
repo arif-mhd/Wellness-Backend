@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -20,11 +20,11 @@ router.post(
   "/upload",
   requireRole("doctor_pending", "doctor"),
   upload.fields([
-    { name: "avatar",     maxCount: 1 },
+    { name: "avatar", maxCount: 1 },
     { name: "emiratesId", maxCount: 1 },
-    { name: "degree",     maxCount: 1 },
-    { name: "spec",       maxCount: 1 },
-    { name: "other",      maxCount: 1 },
+    { name: "degree", maxCount: 1 },
+    { name: "spec", maxCount: 1 },
+    { name: "other", maxCount: 1 },
   ]),
   async (req: SessionRequest, res: Response) => {
     const doctorId = req.session!.getUserId();
@@ -39,7 +39,7 @@ router.post(
     try {
       for (const [field, fileArr] of Object.entries(files ?? {})) {
         const file = fileArr[0];
-        const ext  = MIME_EXT[file.mimetype] ?? "bin";
+        const ext = MIME_EXT[file.mimetype] ?? "bin";
         const filename = (field === "avatar" || field === "emiratesId" || field === "degree" || field === "spec")
           ? field
           : `${field}_${Date.now()}`;
@@ -133,25 +133,25 @@ router.post("/register", async (req: Request, res: Response) => {
     // ── 3. Save registration details to Cosmos ────────────────────────────
     const now = new Date().toISOString();
     const doctorDoc = {
-      id:             supertokensId,   // Cosmos id = ST userId
+      id: supertokensId,   // Cosmos id = ST userId
       supertokens_id: supertokensId,
-      status:         "pending_approval",
+      status: "pending_approval",
       email,
       fullName,
       phone,
-      dateOfBirth:    dateOfBirth  || null,
-      gender:         gender       || null,
-      emiratesId:     emiratesId   || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      emiratesId: emiratesId || null,
       // Fields filled in after onboarding
-      specialty:      null,
-      license:        null,
-      bio:            null,
-      fees:           null,
-      languages:      null,
+      specialty: null,
+      license: null,
+      bio: null,
+      fees: null,
+      languages: null,
       // Timestamps
-      registeredAt:   now,
-      approvedAt:     null,
-      approvedBy:     null,
+      registeredAt: now,
+      approvedAt: null,
+      approvedBy: null,
     };
 
     await doctorsContainer.items.upsert(doctorDoc);
@@ -195,34 +195,34 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
 
     const updated = {
       ...doctor,
-      bio:                      bio                      ?? doctor.bio,
-      businessEmail:            businessEmail            ?? doctor.businessEmail,
-      bloodGroup:               bloodGroup               ?? doctor.bloodGroup,
-      height:                   height                   ?? doctor.height,
-      weight:                   weight                   ?? doctor.weight,
-      maritalStatus:            maritalStatus            ?? doctor.maritalStatus,
-      address:                  address                  ?? doctor.address,
-      postalCode:               postalCode               ?? doctor.postalCode,
-      languages:                languages                ?? doctor.languages,
-      phone:                    phone                    ?? doctor.phone,
-      timezone:                 timezone                 ?? doctor.timezone,
+      bio:                       bio                       ?? doctor.bio,
+      businessEmail:             businessEmail             ?? doctor.businessEmail,
+      bloodGroup:                bloodGroup                ?? doctor.bloodGroup,
+      height:                    height                    ?? doctor.height,
+      weight:                    weight                    ?? doctor.weight,
+      maritalStatus:             maritalStatus             ?? doctor.maritalStatus,
+      address:                   address                   ?? doctor.address,
+      postalCode:                postalCode                ?? doctor.postalCode,
+      languages:                 languages                 ?? doctor.languages,
+      phone:                     phone                     ?? doctor.phone,
+      timezone:                  timezone                  ?? doctor.timezone,
       consultationTimeLimitMins: consultationTimeLimitMins ?? doctor.consultationTimeLimitMins,
-      avatarUrl:                avatarUrl                ?? doctor.avatarUrl,
+      avatarUrl:                 avatarUrl                 ?? doctor.avatarUrl,
       emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
-      specialty:        specialty        ?? doctor.specialty,
-      license:          license          ?? doctor.license,
-      experience:       experience       ?? doctor.experience,
-      medicalSchool:    medicalSchool    ?? doctor.medicalSchool,
-      residency:        residency        ?? doctor.residency,
-      fees:             fees             ?? doctor.fees,
-      feesPerEmirate:   feesPerEmirate   ?? doctor.feesPerEmirate,
-      slots:            slots            ?? doctor.slots,
-      degreeFileUrl:    degreeFileUrl    ?? doctor.degreeFileUrl,
-      specFileUrl:      specFileUrl      ?? doctor.specFileUrl,
-      otherFileUrl:     otherFileUrl     ?? doctor.otherFileUrl,
-      bankDetails:      bankDetails      ?? doctor.bankDetails,
+      specialty: specialty ?? doctor.specialty,
+      license: license ?? doctor.license,
+      experience: experience ?? doctor.experience,
+      medicalSchool: medicalSchool ?? doctor.medicalSchool,
+      residency: residency ?? doctor.residency,
+      fees: fees ?? doctor.fees,
+      feesPerEmirate: feesPerEmirate ?? doctor.feesPerEmirate,
+      slots: slots ?? doctor.slots,
+      degreeFileUrl: degreeFileUrl ?? doctor.degreeFileUrl,
+      specFileUrl: specFileUrl ?? doctor.specFileUrl,
+      otherFileUrl: otherFileUrl ?? doctor.otherFileUrl,
+      bankDetails: bankDetails ?? doctor.bankDetails,
       profileCompletedAt: new Date().toISOString(),
-      updatedAt:        new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     await doctorsContainer.items.upsert(updated);
@@ -360,7 +360,7 @@ router.post("/absences/check-conflicts", requireRole("doctor"), async (req: Sess
               }
             }
           }
-        } catch {}
+        } catch { }
 
         conflicts.push({
           id: a.id,
@@ -551,14 +551,14 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       duration = daySlot.slotDurationMins ?? 30;
       if (!daySlot.startTime || !daySlot.endTime) continue;
       const [startH, startM] = daySlot.startTime.split(":").map(Number);
-      const [endH,   endM]   = daySlot.endTime.split(":").map(Number);
+      const [endH, endM] = daySlot.endTime.split(":").map(Number);
       let cursor = startH * 60 + startM;
       const endMinutes = endH * 60 + endM;
 
       while (cursor + duration <= endMinutes) {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
-        
+
         // Check if slot falls in any scheduled absences
         const slotStart = new Date(`${date}T${h}:${m}:00.000Z`);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
@@ -580,7 +580,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     // Find booked slots for this date
     const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd   = `${date}T23:59:59.999Z`;
+    const dayEnd = `${date}T23:59:59.999Z`;
 
     const booked = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT c.scheduledAt FROM c
@@ -591,7 +591,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       parameters: [
         { name: "@doctorId", value: id },
         { name: "@dayStart", value: dayStart },
-        { name: "@dayEnd",   value: dayEnd },
+        { name: "@dayEnd", value: dayEnd },
       ],
     });
 
@@ -739,9 +739,26 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/:id/reviews ───────────────────────────────────────────
+router.get("/:id/reviews", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const reviews = await queryDocuments<any>(feedbackContainer, {
+      query: "SELECT * FROM c WHERE c.folder = 'appointment' AND c.provider.id = @doctorId ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@doctorId", value: id }],
+    });
+    const total = reviews.length;
+    const avgRating = total > 0
+      ? Math.round((reviews.reduce((s: number, r: any) => s + (r.rating ?? 0), 0) / total) * 10) / 10
+      : null;
+    res.json({ reviews, total, avgRating });
+  } catch (err) {
+    console.error("Fetch doctor reviews error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/doctors/change-password ──────────────────────────────────────
-// Authenticated — lets a logged-in doctor change their password by supplying
-// their current password for verification before setting the new one.
 router.post("/change-password", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { currentPassword, newPassword } = req.body;
@@ -750,7 +767,6 @@ router.post("/change-password", requireRole("doctor"), async (req: SessionReques
     res.status(400).json({ error: "currentPassword and newPassword are required" });
     return;
   }
-
   if (newPassword.length < 8) {
     res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
     return;
@@ -758,10 +774,7 @@ router.post("/change-password", requireRole("doctor"), async (req: SessionReques
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) {
-      res.status(404).json({ error: "USER_NOT_FOUND" });
-      return;
-    }
+    if (!doctor) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
 
     const signInResult = await EmailPassword.signIn("public", doctor.email, currentPassword);
     if (signInResult.status !== "OK") {
@@ -770,16 +783,10 @@ router.post("/change-password", requireRole("doctor"), async (req: SessionReques
     }
 
     const tokenResult = await EmailPassword.createResetPasswordToken("public", doctorId, doctor.email);
-    if (tokenResult.status !== "OK") {
-      res.status(500).json({ error: "RESET_TOKEN_FAILED" });
-      return;
-    }
+    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
 
     const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
-    if (resetResult.status !== "OK") {
-      res.status(500).json({ error: "RESET_FAILED" });
-      return;
-    }
+    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED" }); return; }
 
     res.json({ status: "OK" });
   } catch (err) {
@@ -789,17 +796,13 @@ router.post("/change-password", requireRole("doctor"), async (req: SessionReques
 });
 
 // ─── PATCH /api/doctors/notifications ───────────────────────────────────────
-// Saves the doctor's notification preferences (email frequency + app toggles).
 router.patch("/notifications", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { emailFreq, appToggles } = req.body;
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) {
-      res.status(404).json({ error: "Doctor not found." });
-      return;
-    }
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
 
     const updated = {
       ...doctor,
@@ -819,38 +822,24 @@ router.patch("/notifications", requireRole("doctor"), async (req: SessionRequest
 });
 
 // ─── POST /api/doctors/reset-password ───────────────────────────────────────
-// Public — called by the doctor portal after OTP verified for password reset.
 router.post("/reset-password", async (req: Request, res: Response) => {
   try {
     const { email, newPassword } = req.body;
 
-    if (!email || !newPassword) {
-      res.status(400).json({ error: "email and newPassword are required" });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
-      return;
-    }
+    if (!email || !newPassword) { res.status(400).json({ error: "email and newPassword are required" }); return; }
+    if (newPassword.length < 8) { res.status(400).json({ error: "PASSWORD_TOO_SHORT" }); return; }
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Require verified OTP for this email
     const { resources: otpDocs } = await otpCodesContainer.items
       .query({
-        query:
-          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
+        query: "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
         parameters: [{ name: "@email", value: normalizedEmail }],
       })
       .fetchAll();
 
-    if (!otpDocs.length) {
-      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
-      return;
-    }
+    if (!otpDocs.length) { res.status(403).json({ error: "OTP_NOT_VERIFIED" }); return; }
 
-    // Look up the doctor's SuperTokens ID from Cosmos (id = supertokensId)
     const { resources: doctorDocs } = await doctorsContainer.items
       .query({
         query: "SELECT c.id FROM c WHERE c.email = @email",
@@ -858,41 +847,16 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       })
       .fetchAll();
 
-    if (!doctorDocs.length) {
-      res.status(404).json({ error: "USER_NOT_FOUND" });
-      return;
-    }
+    if (!doctorDocs.length) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
 
     const supertokensId = doctorDocs[0].id;
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", supertokensId, normalizedEmail);
+    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
 
-    const tokenResult = await EmailPassword.createResetPasswordToken(
-      "public",
-      supertokensId,
-      normalizedEmail
-    );
+    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
+    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED", detail: resetResult.status }); return; }
 
-    if (tokenResult.status !== "OK") {
-      res.status(500).json({ error: "RESET_TOKEN_FAILED" });
-      return;
-    }
-
-    const resetResult = await EmailPassword.resetPasswordUsingToken(
-      "public",
-      tokenResult.token,
-      newPassword
-    );
-
-    if (resetResult.status !== "OK") {
-      res.status(500).json({ error: "RESET_FAILED", detail: resetResult.status });
-      return;
-    }
-
-    // Delete the used OTP doc so it can't be replayed
-    try {
-      await otpCodesContainer.item(otpDocs[0].id, otpDocs[0].email).delete();
-    } catch {
-      // ignore — TTL will clean it up
-    }
+    try { await otpCodesContainer.item(otpDocs[0].id, otpDocs[0].email).delete(); } catch {}
 
     res.json({ status: "OK" });
   } catch (err) {
