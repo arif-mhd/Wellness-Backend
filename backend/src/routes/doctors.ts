@@ -720,4 +720,57 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/2fa/status ─────────────────────────────────────────────
+// Returns whether 2FA is currently enabled for the logged-in doctor.
+router.get("/2fa/status", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    res.json({ twoFactorEnabled: doctor?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/enable ────────────────────────────────────────────
+// Called AFTER the OTP has already been verified by POST /api/otp/verify.
+// Sets twoFactorEnabled = true on the doctor's Cosmos document.
+router.post("/2fa/enable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    const updated = { ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() };
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/disable ───────────────────────────────────────────
+// Sets twoFactorEnabled = false on the doctor's Cosmos document.
+router.post("/2fa/disable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    const updated = { ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() };
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;
+

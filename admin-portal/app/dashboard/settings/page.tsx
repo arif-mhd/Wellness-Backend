@@ -1,8 +1,14 @@
 "use client";
 
 import Pagination from "@/components/Pagination";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
+
+const API_URL      = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const OTP_LENGTH   = 6;
+const COUNTDOWN_SECS  = 600;
+const RESEND_COOLDOWN = 60;
 
 type SettingsTab =
   | "Admin Profile Settings"
@@ -79,6 +85,175 @@ const navigationItems: { label: SettingsTab; icon?: React.ReactNode }[] = [
   },
 ];
 
+// ── Admin 2FA Modal ──────────────────────────────────────────────────────────
+type ModalStep = "confirm" | "otp" | "success";
+
+function AdminTwoFAModal({ adminEmail, onClose, onSuccess }: {
+  adminEmail: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [step, setStep]         = useState<ModalStep>("confirm");
+  const [otp, setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(""));
+  const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECS);
+  const [sending, setSending]   = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError]       = useState("");
+  const [mounted, setMounted]   = useState(false);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (step !== "otp" || timeLeft <= 0) return;
+    const t = setInterval(() => setTimeLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [step, timeLeft]);
+
+  const fmt = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+
+  const sendOtp = async (isResend = false) => {
+    setSending(true); setError("");
+    try {
+      const res  = await fetch(`${API_URL}/api/otp/send`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: adminEmail, purpose: "enable_2fa" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error === "TOO_SOON" ? `Wait ${data.retryAfter ?? 60}s before resending.` : "Failed to send code.");
+        return;
+      }
+      setStep("otp");
+      if (isResend) { setOtp(Array(OTP_LENGTH).fill("")); setTimeLeft(COUNTDOWN_SECS); otpRefs.current[0]?.focus(); }
+    } catch { setError("Network error. Please try again."); }
+    finally { setSending(false); }
+  };
+
+  const handleOtpChange = (el: HTMLInputElement, idx: number) => {
+    const val = el.value;
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otp]; next[idx] = val; setOtp(next);
+    if (val && idx < OTP_LENGTH - 1) otpRefs.current[idx + 1]?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace" && otp[idx] === "" && idx > 0) otpRefs.current[idx - 1]?.focus();
+  };
+
+  const handleVerify = async () => {
+    const code = otp.join("");
+    if (code.length < OTP_LENGTH) { setError("Please enter the full 6-digit code."); return; }
+    setVerifying(true); setError("");
+    try {
+      const verRes  = await fetch(`${API_URL}/api/otp/verify`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ email: adminEmail, code }),
+      });
+      const verData = await verRes.json();
+      if (!verData.verified) {
+        switch (verData.reason) {
+          case "INVALID_CODE": setError(verData.attemptsLeft > 0 ? `Incorrect code. ${verData.attemptsLeft} attempt${verData.attemptsLeft === 1 ? "" : "s"} remaining.` : "Too many attempts."); break;
+          case "EXPIRED": setError("Code expired. Request a new one."); break;
+          case "TOO_MANY_ATTEMPTS": setError("Too many attempts. Request a new code."); break;
+          default: setError("Verification failed. Please try again.");
+        }
+        return;
+      }
+      const enRes = await fetch(`${API_URL}/api/admin/dashboard/2fa/enable`, { method: "POST", credentials: "include" });
+      if (!enRes.ok) { setError("Failed to enable 2FA."); return; }
+      setStep("success");
+    } catch { setError("Network error. Please try again."); }
+    finally { setVerifying(false); }
+  };
+
+  const canResend = timeLeft <= COUNTDOWN_SECS - RESEND_COOLDOWN;
+  if (!mounted) return null;
+
+  const closeBtn = (
+    <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 10.163L3.403 15.76C3.25 15.913 3.058 15.991 2.826 15.995C2.595 15.998 2.4 15.92 2.24 15.76C2.08 15.6 2 15.407 2 15.179C2 14.951 2.08 14.757 2.24 14.597L7.837 9L2.24 3.403C2.087 3.25 2.009 3.058 2.005 2.826C2.002 2.595 2.08 2.4 2.24 2.24C2.4 2.08 2.594 2 2.821 2C3.049 2 3.243 2.08 3.403 2.24L9 7.837L14.597 2.24C14.75 2.087 14.942 2.009 15.174 2.005C15.405 2.002 15.6 2.08 15.76 2.24C15.92 2.4 16 2.59352 16 2.821C16 3.049 15.92 3.243 15.76 3.403L10.163 9L15.76 14.597C15.913 14.75 15.991 14.942 15.995 15.174C15.998 15.405 15.92 15.6 15.76 15.76C15.6 15.92 15.407 16 15.179 16C14.951 16 14.757 15.92 14.597 15.76L9 10.163Z" fill="#94a3b8"/></svg>
+    </button>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      {step === "confirm" && (
+        <div className="w-[560px] bg-white rounded-[2rem] p-8 flex flex-col gap-5 shadow-2xl">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#4F83FD]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+              </div>
+              <h3 className="text-[17px] font-semibold text-slate-800">Enable Two-Factor Authentication</h3>
+            </div>
+            {closeBtn}
+          </div>
+          <p className="text-[12px] text-slate-400 font-medium leading-relaxed">A 6-digit code will be sent to your email each time you log in.</p>
+          <div className="h-14 bg-[#f8fafc] rounded-[1.25rem] px-5 flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-medium">Code will be sent to</span>
+            <span className="text-[13px] font-semibold text-slate-800">{adminEmail}</span>
+          </div>
+          {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button onClick={onClose} className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium transition-colors">Cancel</button>
+            <button onClick={() => sendOtp(false)} disabled={sending} className="flex-1 h-11 rounded-xl bg-[#4F83FD] hover:bg-[#3d70e6] text-white text-sm font-semibold shadow-md shadow-blue-100 transition-all disabled:opacity-60">{sending ? "Sending…" : "Send Code"}</button>
+          </div>
+        </div>
+      )}
+
+      {step === "otp" && (
+        <div className="w-[560px] bg-white rounded-[2rem] p-8 flex flex-col gap-5 shadow-2xl">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => { setStep("confirm"); setOtp(Array(OTP_LENGTH).fill("")); setError(""); }} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#64748b" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <h3 className="text-[17px] font-semibold text-slate-800">Enter Verification Code</h3>
+            </div>
+            {closeBtn}
+          </div>
+          <p className="text-[12px] text-slate-400 font-medium leading-relaxed">Enter the 6-digit code sent to <span className="text-[#4F83FD] font-semibold">{adminEmail}</span>.</p>
+          <div className="flex gap-2">
+            {otp.map((digit, idx) => (
+              <input key={idx} ref={(el) => { otpRefs.current[idx] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit}
+                onChange={(e) => handleOtpChange(e.target, idx)} onKeyDown={(e) => handleKeyDown(e, idx)}
+                className={`w-full h-14 rounded-xl text-center text-xl font-bold outline-none transition-all
+                  ${digit ? "bg-blue-50 border-2 border-[#4F83FD] text-[#4F83FD]" : "bg-[#f8fafc] border-2 border-transparent text-slate-800"}
+                  ${error ? "border-red-300 bg-red-50" : ""} focus:ring-2 focus:ring-[#4F83FD]/20 focus:border-[#4F83FD]`}
+              />
+            ))}
+          </div>
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-medium">{timeLeft > 0 ? `Expires in ${fmt(timeLeft)}` : "Code expired"}</span>
+            <button onClick={() => sendOtp(true)} disabled={!canResend || sending} className={`font-semibold transition-colors ${canResend && !sending ? "text-[#4F83FD] hover:underline" : "text-slate-300 cursor-not-allowed"}`}>{sending ? "Sending…" : "Resend"}</button>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium transition-colors">Cancel</button>
+            <button onClick={handleVerify} disabled={verifying} className="flex-1 h-11 rounded-xl bg-[#4F83FD] hover:bg-[#3d70e6] text-white text-sm font-semibold shadow-md shadow-blue-100 transition-all disabled:opacity-60">{verifying ? "Verifying…" : "Verify & Enable"}</button>
+          </div>
+        </div>
+      )}
+
+      {step === "success" && (
+        <div className="w-[560px] bg-white rounded-[2rem] p-8 flex flex-col items-center gap-5 shadow-2xl text-center">
+          <div className="w-16 h-16 rounded-full bg-[#4F83FD] flex items-center justify-center shadow-lg shadow-blue-200">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <div>
+            <h3 className="text-[17px] font-semibold text-slate-800 mb-2">2FA Enabled Successfully</h3>
+            <p className="text-[12px] text-slate-400 font-medium leading-relaxed max-w-[380px]">From now on, a verification code will be sent to <span className="text-[#4F83FD] font-semibold">{adminEmail}</span> each time you log in.</p>
+          </div>
+          <button onClick={() => { onSuccess(); onClose(); }} className="px-8 h-11 rounded-xl bg-[#4F83FD] hover:bg-[#3d70e6] text-white text-sm font-semibold shadow-md shadow-blue-100 transition-all">Done</button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 const mockInsurances = [
   { id: "001", name: "Daman", date: "15 May 2020, 00:12:12", status: "Active" },
   { id: "002", name: "Takaful Emarat", date: "15 May 2020, 00:12:12", status: "Disabled" },
@@ -93,6 +268,36 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("General Settings");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
+
+  // ── 2FA State ─────────────────────────────────────────────────────────────
+  const [show2FA, setShow2FA]           = useState(false);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [adminEmail, setAdminEmail]     = useState("");
+  const [twoFaLoading, setTwoFaLoading] = useState(true);
+  const [disabling, setDisabling]       = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statusRes, meRes] = await Promise.all([
+          fetch(`${API_URL}/api/admin/dashboard/2fa/status`, { credentials: "include" }),
+          fetch(`${API_URL}/api/auth/me`, { credentials: "include" }),
+        ]);
+        if (statusRes.ok) { const s = await statusRes.json(); setIs2FAEnabled(s.twoFactorEnabled === true); }
+        if (meRes.ok) { const m = await meRes.json(); setAdminEmail(m.profile?.email ?? m.email ?? ""); }
+      } catch { /* silently ignore */ }
+      finally { setTwoFaLoading(false); }
+    })();
+  }, []);
+
+  const handleDisable2FA = async () => {
+    setDisabling(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/dashboard/2fa/disable`, { method: "POST", credentials: "include" });
+      if (res.ok) setIs2FAEnabled(false);
+    } catch { /* silently ignore */ }
+    finally { setDisabling(false); }
+  };
 
   // Dynamic States for Forms
   const [timeZone, setTimeZone] = useState("Gulf Standard Time (GST) - UTC +4:00");
@@ -597,6 +802,13 @@ export default function SettingsPage() {
 
           {activeTab === "Security Settings" && (
             <div className="animate-in fade-in duration-200">
+              {show2FA && adminEmail && (
+                <AdminTwoFAModal
+                  adminEmail={adminEmail}
+                  onClose={() => setShow2FA(false)}
+                  onSuccess={() => setIs2FAEnabled(true)}
+                />
+              )}
               <h2 className="text-[15px] font-medium text-[#1e293b] mb-6">Security Settings</h2>
               
               <div className="space-y-6">
@@ -632,6 +844,40 @@ export default function SettingsPage() {
                     </select>
                     <svg className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                   </div>
+                </div>
+
+                {/* ── Two-Factor Authentication Card ── */}
+                <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-8">
+                  <p className="text-[12px] font-medium text-slate-800 mb-2">Two-Factor Authentication (2FA)</p>
+                  <p className="text-[11px] text-slate-400 font-medium mb-6 leading-relaxed max-w-[90%]">
+                    Add an extra layer of security to your admin account. When enabled, a verification code will be sent to your registered email every time you log in — in addition to your password.
+                  </p>
+
+                  {twoFaLoading ? (
+                    <div className="w-5 h-5 border-2 border-[#4F83FD] border-t-transparent rounded-full animate-spin" />
+                  ) : is2FAEnabled ? (
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-50 text-[#4F83FD] text-[12px] font-semibold rounded-xl">
+                        <span className="w-2 h-2 rounded-full bg-[#4F83FD] animate-pulse" />
+                        2FA Enabled
+                      </div>
+                      <button
+                        onClick={handleDisable2FA}
+                        disabled={disabling}
+                        className="text-red-500 text-[12px] font-semibold hover:underline disabled:opacity-50"
+                      >
+                        {disabling ? "Disabling…" : "Disable 2FA"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShow2FA(true)}
+                      disabled={!adminEmail}
+                      className="bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4F83FD] text-[12px] font-medium px-7 py-3 rounded-full transition-transform active:scale-95 shadow-sm disabled:opacity-50"
+                    >
+                      Enable 2FA
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

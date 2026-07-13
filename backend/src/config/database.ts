@@ -35,7 +35,13 @@ export async function initDb(): Promise<void> {
         updated_at     TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Add two_factor_enabled column if it doesn't exist yet (safe on existing DBs)
+    await client.query(`
+      ALTER TABLE user_profiles
+        ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false
+    `);
     console.log("✅ Database tables ready");
+
   } catch (err) {
     console.error("❌ Database init failed:", err);
     throw err;
