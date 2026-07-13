@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { randomInt, randomBytes } from "crypto";
 import {
   sosCodesContainer,
   patientsContainer,
@@ -13,8 +14,12 @@ const router = Router();
 
 const CODE_VALIDITY_MINUTES = 15;
 
+// Uses Node's built-in crypto module (CSPRNG) — NOT Math.random() which is
+// predictable and not suitable for security-sensitive codes.
 function generateSixDigitCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // crypto.randomInt(min, max) generates a cryptographically secure integer
+  // in the range [min, max). This gives a uniform distribution over 100000–999999.
+  return String(randomInt(100000, 1000000));
 }
 
 // Derives a priority from the real lifecycle of the SOS code, since no
@@ -45,7 +50,7 @@ router.post("/generate", requireRole("patient"), async (req: SessionRequest, res
     const expiresAt = new Date(now.getTime() + CODE_VALIDITY_MINUTES * 60 * 1000);
 
     const sosCode = {
-      id: "sos_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 8),
+      id: "sos_" + Date.now().toString(36) + "_" + randomBytes(6).toString("hex"),
       patientId,
       code: generateSixDigitCode(),
       createdAt: now.toISOString(),

@@ -20,11 +20,11 @@ router.post(
   "/upload",
   requireRole("doctor_pending", "doctor"),
   upload.fields([
-    { name: "avatar",     maxCount: 1 },
+    { name: "avatar", maxCount: 1 },
     { name: "emiratesId", maxCount: 1 },
-    { name: "degree",     maxCount: 1 },
-    { name: "spec",       maxCount: 1 },
-    { name: "other",      maxCount: 1 },
+    { name: "degree", maxCount: 1 },
+    { name: "spec", maxCount: 1 },
+    { name: "other", maxCount: 1 },
   ]),
   async (req: SessionRequest, res: Response) => {
     const doctorId = req.session!.getUserId();
@@ -39,7 +39,7 @@ router.post(
     try {
       for (const [field, fileArr] of Object.entries(files ?? {})) {
         const file = fileArr[0];
-        const ext  = MIME_EXT[file.mimetype] ?? "bin";
+        const ext = MIME_EXT[file.mimetype] ?? "bin";
         const filename = (field === "avatar" || field === "emiratesId" || field === "degree" || field === "spec")
           ? field
           : `${field}_${Date.now()}`;
@@ -118,25 +118,25 @@ router.post("/register", async (req: Request, res: Response) => {
     // ── 3. Save registration details to Cosmos ────────────────────────────
     const now = new Date().toISOString();
     const doctorDoc = {
-      id:             supertokensId,   // Cosmos id = ST userId
+      id: supertokensId,   // Cosmos id = ST userId
       supertokens_id: supertokensId,
-      status:         "pending_approval",
+      status: "pending_approval",
       email,
       fullName,
       phone,
-      dateOfBirth:    dateOfBirth  || null,
-      gender:         gender       || null,
-      emiratesId:     emiratesId   || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      emiratesId: emiratesId || null,
       // Fields filled in after onboarding
-      specialty:      null,
-      license:        null,
-      bio:            null,
-      fees:           null,
-      languages:      null,
+      specialty: null,
+      license: null,
+      bio: null,
+      fees: null,
+      languages: null,
       // Timestamps
-      registeredAt:   now,
-      approvedAt:     null,
-      approvedBy:     null,
+      registeredAt: now,
+      approvedAt: null,
+      approvedBy: null,
     };
 
     await doctorsContainer.items.upsert(doctorDoc);
@@ -179,31 +179,31 @@ router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: Sess
 
     const updated = {
       ...doctor,
-      bio:              bio              ?? doctor.bio,
-      businessEmail:    businessEmail    ?? doctor.businessEmail,
-      bloodGroup:       bloodGroup       ?? doctor.bloodGroup,
-      height:           height           ?? doctor.height,
-      weight:           weight           ?? doctor.weight,
-      maritalStatus:    maritalStatus    ?? doctor.maritalStatus,
-      address:          address          ?? doctor.address,
-      postalCode:       postalCode       ?? doctor.postalCode,
-      languages:        languages        ?? doctor.languages,
-      avatarUrl:        avatarUrl        ?? doctor.avatarUrl,
+      bio: bio ?? doctor.bio,
+      businessEmail: businessEmail ?? doctor.businessEmail,
+      bloodGroup: bloodGroup ?? doctor.bloodGroup,
+      height: height ?? doctor.height,
+      weight: weight ?? doctor.weight,
+      maritalStatus: maritalStatus ?? doctor.maritalStatus,
+      address: address ?? doctor.address,
+      postalCode: postalCode ?? doctor.postalCode,
+      languages: languages ?? doctor.languages,
+      avatarUrl: avatarUrl ?? doctor.avatarUrl,
       emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
-      specialty:        specialty        ?? doctor.specialty,
-      license:          license          ?? doctor.license,
-      experience:       experience       ?? doctor.experience,
-      medicalSchool:    medicalSchool    ?? doctor.medicalSchool,
-      residency:        residency        ?? doctor.residency,
-      fees:             fees             ?? doctor.fees,
-      feesPerEmirate:   feesPerEmirate   ?? doctor.feesPerEmirate,
-      slots:            slots            ?? doctor.slots,
-      degreeFileUrl:    degreeFileUrl    ?? doctor.degreeFileUrl,
-      specFileUrl:      specFileUrl      ?? doctor.specFileUrl,
-      otherFileUrl:     otherFileUrl     ?? doctor.otherFileUrl,
-      bankDetails:      bankDetails      ?? doctor.bankDetails,
+      specialty: specialty ?? doctor.specialty,
+      license: license ?? doctor.license,
+      experience: experience ?? doctor.experience,
+      medicalSchool: medicalSchool ?? doctor.medicalSchool,
+      residency: residency ?? doctor.residency,
+      fees: fees ?? doctor.fees,
+      feesPerEmirate: feesPerEmirate ?? doctor.feesPerEmirate,
+      slots: slots ?? doctor.slots,
+      degreeFileUrl: degreeFileUrl ?? doctor.degreeFileUrl,
+      specFileUrl: specFileUrl ?? doctor.specFileUrl,
+      otherFileUrl: otherFileUrl ?? doctor.otherFileUrl,
+      bankDetails: bankDetails ?? doctor.bankDetails,
       profileCompletedAt: new Date().toISOString(),
-      updatedAt:        new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     await doctorsContainer.items.upsert(updated);
@@ -341,7 +341,7 @@ router.post("/absences/check-conflicts", requireRole("doctor"), async (req: Sess
               }
             }
           }
-        } catch {}
+        } catch { }
 
         conflicts.push({
           id: a.id,
@@ -532,14 +532,14 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       duration = daySlot.slotDurationMins ?? 30;
       if (!daySlot.startTime || !daySlot.endTime) continue;
       const [startH, startM] = daySlot.startTime.split(":").map(Number);
-      const [endH,   endM]   = daySlot.endTime.split(":").map(Number);
+      const [endH, endM] = daySlot.endTime.split(":").map(Number);
       let cursor = startH * 60 + startM;
       const endMinutes = endH * 60 + endM;
 
       while (cursor + duration <= endMinutes) {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
-        
+
         // Check if slot falls in any scheduled absences
         const slotStart = new Date(`${date}T${h}:${m}:00.000Z`);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
@@ -561,7 +561,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     // Find booked slots for this date
     const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd   = `${date}T23:59:59.999Z`;
+    const dayEnd = `${date}T23:59:59.999Z`;
 
     const booked = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT c.scheduledAt FROM c
@@ -572,7 +572,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       parameters: [
         { name: "@doctorId", value: id },
         { name: "@dayStart", value: dayStart },
-        { name: "@dayEnd",   value: dayEnd },
+        { name: "@dayEnd", value: dayEnd },
       ],
     });
 
@@ -587,6 +587,117 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
     res.json({ available, slotDurationMins: duration });
   } catch (err) {
     console.error("Available slots error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/doctors/search?q=<query> ──────────────────────────────────────
+// Doctor searches across their own patients, appointments, and prescriptions.
+// Returns categorised results: patients, appointments, prescriptions.
+router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const q = ((req.query.q as string) ?? "").trim().toLowerCase();
+
+  if (!q || q.length < 2) {
+    res.json({ patients: [], appointments: [], prescriptions: [] });
+    return;
+  }
+
+  try {
+    // Fetch all of this doctor's appointments (with patient info)
+    const allApts = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT * FROM c WHERE c.doctorId = @doctorId ORDER BY c.scheduledAt DESC`,
+      parameters: [{ name: "@doctorId", value: doctorId }],
+    });
+
+    // Collect unique patient IDs this doctor has seen
+    const patientIds = Array.from(new Set(allApts.map((a: any) => a.patientId).filter(Boolean)));
+
+    // Fetch patient docs in parallel (cap at 50 to avoid blowing throughput)
+    const patientDocs: Record<string, any> = {};
+    await Promise.all(
+      patientIds.slice(0, 50).map(async (pid: string) => {
+        try {
+          const { resource } = await patientsContainer.item(pid, pid).read();
+          if (resource) patientDocs[pid] = resource;
+        } catch { /* ignore missing */ }
+      })
+    );
+
+    // ── Patients section ─────────────────────────────────────────────────────
+    const matchedPatients: any[] = [];
+    const seenPatients = new Set<string>();
+    for (const pid of patientIds) {
+      if (seenPatients.has(pid)) continue;
+      seenPatients.add(pid);
+      const p = patientDocs[pid];
+      if (!p) continue;
+      const haystack = [p.fullName, p.email, p.phone, p.gender, p.dob, p.dateOfBirth]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedPatients.push({
+          type: "patient",
+          id: pid,
+          title: p.fullName ?? "Patient",
+          subtitle: p.email ?? p.phone ?? "",
+          avatarUrl: p.avatarUrl ?? null,
+          href: `/dashboard/patients?id=${pid}`,
+        });
+      }
+      if (matchedPatients.length >= 5) break;
+    }
+
+    // ── Appointments section ─────────────────────────────────────────────────
+    const matchedApts: any[] = [];
+    for (const a of allApts) {
+      if (matchedApts.length >= 5) break;
+      const patient = patientDocs[a.patientId];
+      const patientName = patient?.fullName ?? "Patient";
+      const haystack = [patientName, a.reason, a.status, a.scheduledAt]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedApts.push({
+          type: "appointment",
+          id: a.id,
+          title: patientName,
+          subtitle: `${a.reason ?? "Consultation"} · ${a.status}`,
+          date: a.scheduledAt,
+          status: a.status,
+          avatarUrl: patient?.avatarUrl ?? null,
+          href: `/appointments/complete-emr?appointmentId=${a.id}&patientName=${encodeURIComponent(patientName)}`,
+        });
+      }
+    }
+
+    // ── Prescriptions section (appointments that have EMR medicines saved) ───
+    const matchedPrescriptions: any[] = [];
+    for (const a of allApts) {
+      if (matchedPrescriptions.length >= 5) break;
+      if (!a.emr?.medicines?.length) continue;
+      const patient = patientDocs[a.patientId];
+      const patientName = patient?.fullName ?? "Patient";
+      const medNames = (a.emr.medicines as any[]).map((m: any) => m.name ?? "").join(" ");
+      const haystack = [patientName, medNames, a.reason].filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) {
+        matchedPrescriptions.push({
+          type: "prescription",
+          id: a.id,
+          title: patientName,
+          subtitle: (a.emr.medicines as any[]).slice(0, 3).map((m: any) => m.name).filter(Boolean).join(", "),
+          date: a.emr.savedAt ?? a.scheduledAt,
+          avatarUrl: patient?.avatarUrl ?? null,
+          href: `/appointments/complete-emr?appointmentId=${a.id}&patientName=${encodeURIComponent(patientName)}`,
+        });
+      }
+    }
+
+    res.json({
+      patients: matchedPatients,
+      appointments: matchedApts,
+      prescriptions: matchedPrescriptions,
+    });
+  } catch (err) {
+    console.error("Doctor search error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -631,4 +742,57 @@ router.get("/:id/reviews", async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/2fa/status ─────────────────────────────────────────────
+// Returns whether 2FA is currently enabled for the logged-in doctor.
+router.get("/2fa/status", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    res.json({ twoFactorEnabled: doctor?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/enable ────────────────────────────────────────────
+// Called AFTER the OTP has already been verified by POST /api/otp/verify.
+// Sets twoFactorEnabled = true on the doctor's Cosmos document.
+router.post("/2fa/enable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    const updated = { ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() };
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/doctors/2fa/disable ───────────────────────────────────────────
+// Sets twoFactorEnabled = false on the doctor's Cosmos document.
+router.post("/2fa/disable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    const updated = { ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() };
+    await doctorsContainer.items.upsert(updated);
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;
+

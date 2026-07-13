@@ -8,6 +8,8 @@ import {
   supportContainer,
   queryDocuments,
 } from "../config/cosmos";
+import { SessionRequest } from "supertokens-node/framework/express";
+import { pool } from "../config/database";
 
 const router = Router();
 
@@ -415,4 +417,50 @@ router.get("/tasks", requireRole("admin"), async (_req: Request, res: Response) 
   }
 });
 
+// ─── GET /api/admin/dashboard/2fa/status ─────────────────────────────────────
+router.get("/2fa/status", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    const result = await pool.query(
+      "SELECT two_factor_enabled FROM user_profiles WHERE supertokens_id = $1",
+      [userId]
+    );
+    res.json({ twoFactorEnabled: result.rows[0]?.two_factor_enabled === true });
+  } catch (err) {
+    console.error("Admin 2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/dashboard/2fa/enable ────────────────────────────────────
+router.post("/2fa/enable", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    await pool.query(
+      "UPDATE user_profiles SET two_factor_enabled = true WHERE supertokens_id = $1",
+      [userId]
+    );
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Admin 2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/dashboard/2fa/disable ───────────────────────────────────
+router.post("/2fa/disable", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    await pool.query(
+      "UPDATE user_profiles SET two_factor_enabled = false WHERE supertokens_id = $1",
+      [userId]
+    );
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Admin 2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;
+

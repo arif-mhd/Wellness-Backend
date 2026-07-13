@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { AccessToken, RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
+import { randomBytes } from "crypto";
 import {
   appointmentsContainer,
   patientsContainer,
@@ -54,8 +55,31 @@ async function sendLivekitData(room: string, payload: Record<string, unknown>): 
 
 const router = Router();
 
-function generateId(): string {
-  return `apt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+// Generates a human-readable, admin-searchable appointment ID.
+// Format: APT-{YYYYMMDD}-{DRNAME}-{6 hex chars}
+// Example: APT-20260703-DRSMITH-A3F9B2
+// The date and doctor name prefix make it easy to identify and search
+// without needing to look up the record first.
+function generateAppointmentId(doctorName: string, scheduledAt: string): string {
+  // Date portion — use the scheduled date (local calendar day)
+  const d = new Date(scheduledAt);
+  const yyyy = d.getUTCFullYear();
+  const mm   = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd   = String(d.getUTCDate()).padStart(2, "0");
+  const datePart = `${yyyy}${mm}${dd}`;
+
+  // Doctor name prefix — take up to the first 8 alpha chars, uppercase
+  // e.g. "Dr. Sarah Al-Mansoori" → "DRSARAHP" (stripped of punctuation/spaces)
+  const namePart = (doctorName ?? "DOC")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")   // strip spaces, dots, hyphens, etc.
+    .slice(0, 8)               // max 8 chars to keep IDs compact
+    || "DOC";
+
+  // Cryptographically random suffix for uniqueness (avoids collisions on same day + doctor)
+  const randomPart = randomBytes(3).toString("hex").toUpperCase(); // 6 hex chars
+
+  return `APT-${datePart}-${namePart}-${randomPart}`;
 }
 
 // ─── POST /api/appointments ──────────────────────────────────────────────────
@@ -76,7 +100,7 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       return;
     }
 
-    const id = generateId();
+    const id = generateAppointmentId(doctor.fullName ?? "DOC", scheduledAt);
     const now = new Date().toISOString();
 
     const appointment = {
@@ -679,7 +703,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
       const patientNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.patientId,
         profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Cancelled",
@@ -695,7 +719,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
       const doctorNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.doctorId,
         title: "Appointment Cancelled",
         body: `Your appointment with ${patientName} on ${dateText} at ${timeText} has been cancelled by the patient.`,
@@ -864,7 +888,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
       const patientNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.patientId,
         profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Rescheduled",
@@ -879,7 +903,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
       const doctorNotification = {
-        id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.doctorId,
         title: "Appointment Rescheduled",
         body: `Your appointment with ${patientName} has been rescheduled to ${dateText} at ${timeText}.`,
@@ -1022,7 +1046,7 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
     });
 
     const patientNotification = {
-      id: "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       patientId: apt.patientId,
       profileId: apt.familyMemberId ?? apt.patientId,
       title: "Appointment Reminder",
@@ -1287,7 +1311,7 @@ router.post("/patient/:patientId/notes", requireRole("doctor"), async (req: Sess
     } catch { /* use default */ }
 
     const newNote = {
-      id: "note_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: "note_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       text: String(text).trim(),
       doctorId,
       doctorName,
@@ -1443,8 +1467,15 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
     let newAppointmentId: string | null = null;
 
     if (decision === "accepted") {
-      // Create the follow-up appointment
-      newAppointmentId = generateId();
+      // Fetch doctor name first so we can use it in the readable appointment ID
+      let doctorName = "Doctor";
+      try {
+        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+        doctorName = doc?.fullName ?? doctorName;
+      } catch { /* use default */ }
+
+      // Create the follow-up appointment with a readable, searchable ID
+      newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? apt.pendingFollowUp.followUpDate ?? now);
       const followUpApt = {
         id: newAppointmentId,
         patientId,
@@ -1466,11 +1497,6 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       await appointmentsContainer.items.create(followUpApt);
 
       // Resolve doctor name for the notification message
-      let doctorName = "Doctor";
-      try {
-        const { resource: doc } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-        doctorName = doc?.fullName ?? doctorName;
-      } catch { /* use default */ }
 
       const followUpDate = apt.pendingFollowUp.followUpDate;
       const followUpTime = apt.pendingFollowUp.followUpTime;
@@ -1484,7 +1510,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
       const timeText = `${hr12}:${m} ${ampm}`;
 
       // Notify the patient
-      const notifId = "notif_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const notifId = "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex");
       const notification = {
         id: notifId,
         patientId,

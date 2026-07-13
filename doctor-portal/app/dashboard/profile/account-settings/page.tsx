@@ -3,6 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const OTP_LENGTH       = 6;
+const COUNTDOWN_SECS   = 600; // 10 minutes
+const RESEND_COOLDOWN  = 60;  // 1 minute
+
 const TIMEZONES = [
   "(UTC-12:00) International Date Line West",
   "(UTC-08:00) US/Pacific",
@@ -31,7 +36,6 @@ function SectionCard({ title, description, children }: { title: string; descript
 function FloatingInput({ label, type = "text", value, onChange, placeholder }: {
   label: string; type?: string; value: string; onChange: (v: string) => void; placeholder?: string;
 }) {
-  const [focused, setFocused] = useState(false);
   return (
     <div className="flex-1 h-[66px] px-6 rounded-xl bg-[#F5F6FA] flex flex-col justify-center gap-0.5 relative">
       <span className="text-xs font-medium leading-none text-[#9EA5AD]">{label}</span>
@@ -39,8 +43,6 @@ function FloatingInput({ label, type = "text", value, onChange, placeholder }: {
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
         placeholder={placeholder}
         className="bg-transparent text-[#383F45] text-sm font-medium outline-none placeholder-[#383F45] leading-none mt-1"
       />
@@ -48,260 +50,308 @@ function FloatingInput({ label, type = "text", value, onChange, placeholder }: {
   );
 }
 
-/* ── 2FA Modal ─────────────────────────────────────────── */
+/* ── 2FA Modal ─────────────────────────────────────────────────────────────── */
 interface TwoFAModalProps {
+  doctorEmail: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-type ModalStep = "phone" | "otp" | "success";
+type ModalStep = "confirm" | "otp" | "success";
 
-function TwoFAModal({ onClose, onSuccess }: TwoFAModalProps) {
-  const [step, setStep] = useState<ModalStep>("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
-  const [timer, setTimer] = useState(85); // 1 minute 25 seconds
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+function TwoFAModal({ doctorEmail, onClose, onSuccess }: TwoFAModalProps) {
+  const [step, setStep]       = useState<ModalStep>("confirm");
+  const [otp, setOtp]         = useState<string[]>(Array(OTP_LENGTH).fill(""));
+  const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECS);
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [enabling, setEnabling]   = useState(false);
+  const [error, setError]     = useState("");
   const [mounted, setMounted] = useState(false);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  useEffect(() => { setMounted(true); }, []);
+
+  // Countdown timer (only runs on otp step)
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (step !== "otp" || timeLeft <= 0) return;
+    const t = setInterval(() => setTimeLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [step, timeLeft]);
 
-  // Count down timer for OTP resend
-  useEffect(() => {
-    if (step !== "otp" || timer <= 0) return;
-    const interval = setInterval(() => {
-      setTimer((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [step, timer]);
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  const formatTimer = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    return `${m}:${(s % 60).toString().padStart(2, "0")}`;
   };
 
-  const handleOtpChange = (element: HTMLInputElement, index: number) => {
-    const value = element.value;
-    if (isNaN(Number(value))) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    // Auto-focus next input
-    if (value !== "" && index < 5) {
-      otpRefs.current[index + 1]?.focus();
+  // ── Send OTP ─────────────────────────────────────────────────────────────────
+  const sendOtp = async (isResend = false) => {
+    setSending(true);
+    setError("");
+    try {
+      const res  = await fetch(`${API_URL}/api/otp/send`, {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "include",
+        body:        JSON.stringify({ email: doctorEmail, purpose: "enable_2fa" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error === "TOO_SOON"
+          ? `Please wait ${data.retryAfter ?? 60}s before requesting another code.`
+          : "Failed to send code. Please try again.");
+        return;
+      }
+      setStep("otp");
+      if (isResend) {
+        setOtp(Array(OTP_LENGTH).fill(""));
+        setTimeLeft(COUNTDOWN_SECS);
+        otpRefs.current[0]?.focus();
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSending(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === "Backspace" && otp[index] === "" && index > 0) {
-      otpRefs.current[index - 1]?.focus();
+  // ── OTP input handlers ───────────────────────────────────────────────────────
+  const handleOtpChange = (el: HTMLInputElement, idx: number) => {
+    const val = el.value;
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    if (val && idx < OTP_LENGTH - 1) otpRefs.current[idx + 1]?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace" && otp[idx] === "" && idx > 0) {
+      otpRefs.current[idx - 1]?.focus();
     }
   };
 
-  const handleSendOtp = () => {
-    if (!phone) {
-      alert("Please enter a valid phone number.");
+  // ── Verify OTP → Enable 2FA ──────────────────────────────────────────────────
+  const handleVerify = async () => {
+    const code = otp.join("");
+    if (code.length < OTP_LENGTH) {
+      setError("Please enter the full 6-digit code.");
       return;
     }
-    setStep("otp");
-    setTimer(85);
-  };
+    setVerifying(true);
+    setError("");
+    try {
+      // 1. Verify the OTP
+      const verifyRes  = await fetch(`${API_URL}/api/otp/verify`, {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "include",
+        body:        JSON.stringify({ email: doctorEmail, code }),
+      });
+      const verifyData = await verifyRes.json();
 
-  const handleVerify = () => {
-    // Basic verification check: make sure 6 digits are input
-    if (otp.some(digit => digit === "")) {
-      alert("Please enter the full 6-digit OTP.");
-      return;
+      if (!verifyData.verified) {
+        switch (verifyData.reason) {
+          case "INVALID_CODE":
+            setError(verifyData.attemptsLeft > 0
+              ? `Incorrect code. ${verifyData.attemptsLeft} attempt${verifyData.attemptsLeft === 1 ? "" : "s"} remaining.`
+              : "Too many incorrect attempts. Please request a new code.");
+            break;
+          case "EXPIRED":
+            setError("Code expired. Please request a new one.");
+            break;
+          case "TOO_MANY_ATTEMPTS":
+            setError("Too many attempts. Please request a new code.");
+            break;
+          default:
+            setError("Verification failed. Please try again.");
+        }
+        return;
+      }
+
+      // 2. Persist 2FA enabled flag
+      setEnabling(true);
+      const enableRes = await fetch(`${API_URL}/api/doctors/2fa/enable`, {
+        method:      "POST",
+        credentials: "include",
+      });
+      if (!enableRes.ok) {
+        setError("Failed to enable 2FA. Please try again.");
+        return;
+      }
+
+      setStep("success");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setVerifying(false);
+      setEnabling(false);
     }
-    setStep("success");
   };
 
-  const handleDone = () => {
-    onSuccess();
-    onClose();
-  };
+  const canResend = timeLeft <= COUNTDOWN_SECS - RESEND_COOLDOWN;
 
   if (!mounted) return null;
 
+  const closeIcon = (
+    <button onClick={onClose} className="p-1 text-[#596066] hover:text-[#24292E] transition-colors">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 10.163L3.403 15.76C3.25 15.913 3.058 15.991 2.826 15.995C2.595 15.998 2.4 15.92 2.24 15.76C2.08 15.6 2 15.407 2 15.179C2 14.951 2.08 14.757 2.24 14.597L7.837 9L2.24 3.403C2.087 3.25 2.009 3.058 2.005 2.826C2.002 2.595 2.08 2.4 2.24 2.24C2.4 2.08 2.594 2 2.821 2C3.049 2 3.243 2.08 3.403 2.24L9 7.837L14.597 2.24C14.75 2.087 14.942 2.009 15.174 2.005C15.405 2.002 15.6 2.08 15.76 2.24C15.92 2.4 16 2.59352 16 2.821C16 3.049 15.92 3.243 15.76 3.403L10.163 9L15.76 14.597C15.913 14.75 15.991 14.942 15.995 15.174C15.998 15.405 15.92 15.6 15.76 15.76C15.6 15.92 15.407 16 15.179 16C14.951 16 14.757 15.92 14.597 15.76L9 10.163Z" fill="#596066"/>
+      </svg>
+    </button>
+  );
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      {step === "phone" && (
-        <div className="w-[656px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl relative">
-          {/* Header */}
+
+      {/* ── Step 1: Confirm email & send OTP ──────────────────────────────── */}
+      {step === "confirm" && (
+        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
           <div className="flex items-start justify-between">
-            <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]"
-                style={{ fontFamily: "Marcellus, serif" }}>
+            <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]" style={{ fontFamily: "Marcellus, serif" }}>
               Enable Two-Factor Authentication
             </h3>
-            <button onClick={onClose} className="p-1 text-[#596066] hover:text-[#24292E] transition-colors">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 10.163L3.403 15.76C3.25 15.913 3.058 15.991 2.826 15.995C2.595 15.998 2.4 15.92 2.24 15.76C2.08 15.6 2 15.407 2 15.179C2 14.951 2.08 14.757 2.24 14.597L7.837 9L2.24 3.403C2.087 3.25 2.009 3.058 2.005 2.826C2.002 2.595 2.08 2.4 2.24 2.24C2.4 2.08 2.594 2 2.821 2C3.049 2 3.243 2.08 3.403 2.24L9 7.837L14.597 2.24C14.75 2.087 14.942 2.009 15.174 2.005C15.405 2.002 15.6 2.08 15.76 2.24C15.92 2.4 16 2.59352 16 2.821C16 3.049 15.92 3.243 15.76 3.403L10.163 9L15.76 14.597C15.913 14.75 15.991 14.942 15.995 15.174C15.998 15.405 15.92 15.6 15.76 15.76C15.6 15.92 15.407 16 15.179 16C14.951 16 14.757 15.92 14.597 15.76L9 10.163Z" fill="#596066"/>
-              </svg>
-            </button>
+            {closeIcon}
           </div>
 
-          {/* Description */}
           <p className="text-[#676E76] text-xs leading-relaxed">
-            To enhance your account security, you&apos;ll receive a unique verification code via SMS each time you log in.
-            <br /><br />
-            Please confirm your mobile number to proceed with setup.
+            Add an extra layer of security to your account. We&apos;ll send a 6-digit verification code to your registered email address each time you log in.
           </p>
 
-          {/* Phone input */}
-          <div className="flex flex-col gap-2">
-            <div className="w-[435px] h-16 px-6 rounded-xl bg-[#F5F6FA] flex flex-col justify-center gap-0.5">
-              <span className="text-[#9EA5AD] text-sm font-medium leading-none">Phone Number*</span>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+971 50 000 0000"
-                className="bg-transparent text-[#383F45] text-sm font-medium outline-none placeholder-[#9EA5AD] leading-none mt-1"
-              />
-            </div>
+          {/* Email display (read-only) */}
+          <div className="w-full h-16 px-6 rounded-xl bg-[#F5F6FA] flex flex-col justify-center gap-0.5">
+            <span className="text-[#9EA5AD] text-xs font-medium leading-none">Verification code will be sent to</span>
+            <span className="text-[#383F45] text-sm font-medium leading-none mt-1">{doctorEmail}</span>
           </div>
 
-          {/* Divider */}
+          {error && (
+            <p className="text-red-500 text-xs text-center">{error}</p>
+          )}
+
           <div className="w-full h-px bg-[#EBEEF5]" />
 
-          {/* Actions */}
           <div className="flex gap-4">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-base font-medium hover:bg-[#D0DAFF] transition-colors"
-            >
+            <button onClick={onClose} className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-sm font-medium hover:bg-[#D0DAFF] transition-colors">
               Cancel
             </button>
             <button
-              onClick={handleSendOtp}
-              className="flex-1 py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-base font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all"
+              onClick={() => sendOtp(false)}
+              disabled={sending}
+              className="flex-1 py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60"
             >
-              Send OTP
+              {sending ? "Sending…" : "Send Verification Code"}
             </button>
           </div>
         </div>
       )}
 
+      {/* ── Step 2: Enter OTP ─────────────────────────────────────────────── */}
       {step === "otp" && (
-        <div className="w-[656px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl relative">
-          {/* Header */}
+        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              {/* Back button to phone input step */}
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setStep("phone")}
-                className="w-11 h-11 rounded-full bg-[#F5F6FA] flex items-center justify-center hover:bg-[#EBEEF5] transition-colors shrink-0"
+                onClick={() => { setStep("confirm"); setOtp(Array(OTP_LENGTH).fill("")); setError(""); }}
+                className="w-10 h-10 rounded-full bg-[#F5F6FA] flex items-center justify-center hover:bg-[#EBEEF5] transition-colors shrink-0"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="rotate-90">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]"
-                  style={{ fontFamily: "Marcellus, serif" }}>
-                Verify Your Mobile Number
+              <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]" style={{ fontFamily: "Marcellus, serif" }}>
+                Enter Verification Code
               </h3>
             </div>
-            <button onClick={onClose} className="p-1 text-[#596066] hover:text-[#24292E] transition-colors">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 10.163L3.403 15.76C3.25 15.913 3.058 15.991 2.826 15.995C2.595 15.998 2.4 15.92 2.24 15.76C2.08 15.6 2 15.407 2 15.179C2 14.951 2.08 14.757 2.24 14.597L7.837 9L2.24 3.403C2.087 3.25 2.009 3.058 2.005 2.826C2.002 2.595 2.08 2.4 2.24 2.24C2.4 2.08 2.594 2 2.821 2C3.049 2 3.243 2.08 3.403 2.24L9 7.837L14.597 2.24C14.75 2.087 14.942 2.009 15.174 2.005C15.405 2.002 15.6 2.08 15.76 2.24C15.92 2.4 16 2.59352 16 2.821C16 3.049 15.92 3.243 15.76 3.403L10.163 9L15.76 14.597C15.913 14.75 15.991 14.942 15.995 15.174C15.998 15.405 15.92 15.6 15.76 15.76C15.6 15.92 15.407 16 15.179 16C14.951 16 14.757 15.92 14.597 15.76L9 10.163Z" fill="#596066"/>
-              </svg>
-            </button>
+            {closeIcon}
           </div>
 
-          {/* Description */}
           <p className="text-[#676E76] text-xs leading-relaxed">
-            We’ve sent a verification code to your registered mobile number. Please enter the code below to complete the two-factor authentication setup.
+            We&apos;ve sent a 6-digit code to{" "}
+            <span className="text-[#5476FC] font-semibold">{doctorEmail}</span>.
+            Enter it below to complete 2FA setup.
           </p>
 
-          {/* OTP Sent Label & Inputs */}
           <div className="flex flex-col gap-3">
             <span className="text-[#24292E] text-xs font-normal">
-              Enter OTP (Sent to <span className="text-[#5476FC] font-semibold">{phone || "999 888 7771"}</span>)
+              Enter OTP
             </span>
-
-            {/* Inputs Box */}
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               {otp.map((digit, idx) => (
                 <input
                   key={idx}
                   ref={(el) => { otpRefs.current[idx] = el; }}
                   type="text"
+                  inputMode="numeric"
                   maxLength={1}
                   value={digit}
                   onChange={(e) => handleOtpChange(e.target, idx)}
                   onKeyDown={(e) => handleKeyDown(e, idx)}
-                  className="w-full h-16 rounded-xl bg-[#F5F6FA] text-[#383F45] text-center text-xl font-semibold outline-none focus:ring-2 focus:ring-[#5476FC]"
+                  className={`w-full h-14 rounded-xl text-center text-xl font-semibold outline-none transition-all
+                    ${digit ? "bg-indigo-50 border-2 border-[#5476FC] text-[#5476FC]" : "bg-[#F5F6FA] border-2 border-transparent text-[#383F45]"}
+                    ${error ? "border-red-300 bg-red-50" : ""}
+                    focus:ring-2 focus:ring-[#5476FC]/30 focus:border-[#5476FC]`}
                 />
               ))}
             </div>
 
-            {/* Resend details */}
+            {error && (
+              <p className="text-red-500 text-xs">{error}</p>
+            )}
+
             <div className="flex justify-between items-center text-xs mt-1">
-              <span className="text-[#2F2F2F]">
-                {timer > 0 ? `Try again in ${formatTimer(timer)}` : "You can now request a code again"}
+              <span className="text-[#9EA5AD]">
+                {timeLeft > 0 ? `Expires in ${formatTimer(timeLeft)}` : "Code expired"}
               </span>
               <button
-                onClick={() => { if (timer === 0) { setTimer(85); setOtp(Array(6).fill("")); } }}
-                disabled={timer > 0}
-                className={`font-semibold transition-colors ${timer > 0 ? "text-[#9EA5AD] cursor-not-allowed" : "text-[#5B7BFC] hover:text-[#3B5BFC]"}`}
+                onClick={() => sendOtp(true)}
+                disabled={!canResend || sending}
+                className={`font-semibold transition-colors ${canResend && !sending ? "text-[#5B7BFC] hover:underline" : "text-[#9EA5AD] cursor-not-allowed"}`}
               >
-                Resend OTP
+                {sending ? "Sending…" : "Resend Code"}
               </button>
             </div>
           </div>
 
-          {/* Divider */}
           <div className="w-full h-px bg-[#EBEEF5]" />
 
-          {/* Actions */}
           <div className="flex gap-4">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-base font-medium hover:bg-[#D0DAFF] transition-colors"
-            >
+            <button onClick={onClose} className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-sm font-medium hover:bg-[#D0DAFF] transition-colors">
               Cancel
             </button>
             <button
               onClick={handleVerify}
-              className="flex-1 py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-base font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all"
+              disabled={verifying || enabling}
+              className="flex-1 py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60"
             >
-              Verify
+              {verifying || enabling ? "Verifying…" : "Verify & Enable"}
             </button>
           </div>
         </div>
       )}
 
+      {/* ── Step 3: Success ───────────────────────────────────────────────── */}
       {step === "success" && (
-        <div className="w-[656px] bg-white rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl relative text-center">
-          {/* Success Asset Icon */}
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/c4532564cff88e59a58a33bbc2a031faa768bc82?width=174"
-            alt="Success"
-            className="w-[87px] h-[86px] object-contain"
-          />
+        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl text-center">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center shadow-[0_8px_24px_rgba(84,118,252,0.3)]">
+            <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
 
           <div className="flex flex-col gap-2 w-full">
-            <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]"
-                style={{ fontFamily: "Marcellus, serif" }}>
-              Success! Two-Factor Authentication Enabled
+            <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]" style={{ fontFamily: "Marcellus, serif" }}>
+              Two-Factor Authentication Enabled
             </h3>
-            <p className="text-[#676E76] text-xs leading-relaxed max-w-[480px] mx-auto mt-2">
-              Your account is now protected with Two-Factor Authentication. For each future login, you’ll receive a verification code to ensure added security.
+            <p className="text-[#676E76] text-xs leading-relaxed max-w-[420px] mx-auto mt-2">
+              Your account is now protected with 2FA. Each time you log in, a verification code will be sent to <span className="text-[#5476FC] font-semibold">{doctorEmail}</span>.
             </p>
           </div>
 
-          {/* Divider */}
           <div className="w-full h-px bg-[#EBEEF5]" />
 
-          {/* Done Button */}
           <button
-            onClick={handleDone}
-            className="w-[288px] py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-base font-medium hover:bg-[#D0DAFF] transition-colors"
+            onClick={() => { onSuccess(); onClose(); }}
+            className="w-[280px] py-3.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium shadow-[0_4px_16px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_20px_rgba(84,118,252,0.35)] transition-all"
           >
             Done
           </button>
@@ -312,24 +362,60 @@ function TwoFAModal({ onClose, onSuccess }: TwoFAModalProps) {
   );
 }
 
-/* ── Page ──────────────────────────────────────────────── */
+/* ── Page ──────────────────────────────────────────────────────────────────── */
 export default function AccountSettingsPage() {
-  const [timezone, setTimezone] = useState("(UTC-04:00) US/Eastern (EDT)");
-  const [tzOpen, setTzOpen] = useState(false);
-
+  const [timezone, setTimezone]   = useState("(UTC-04:00) US/Eastern (EDT)");
+  const [tzOpen, setTzOpen]       = useState(false);
   const [currentPwd, setCurrentPwd] = useState("***************");
-  const [newPwd, setNewPwd] = useState("");
+  const [newPwd, setNewPwd]       = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
-
   const [deleteChecked, setDeleteChecked] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
+
+  const [show2FA, setShow2FA]         = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [doctorEmail, setDoctorEmail]   = useState("");
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [disabling, setDisabling]       = useState(false);
+
+  // ── Fetch 2FA status + doctor email on mount ─────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statusRes, meRes] = await Promise.all([
+          fetch(`${API_URL}/api/doctors/2fa/status`, { credentials: "include" }),
+          fetch(`${API_URL}/api/doctors/me`, { credentials: "include" }),
+        ]);
+        if (statusRes.ok) {
+          const s = await statusRes.json();
+          setIs2FAEnabled(s.twoFactorEnabled === true);
+        }
+        if (meRes.ok) {
+          const m = await meRes.json();
+          setDoctorEmail(m.doctor?.email ?? "");
+        }
+      } catch { /* silently ignore */ }
+      finally { setStatusLoading(false); }
+    })();
+  }, []);
+
+  // ── Disable 2FA ──────────────────────────────────────────────────────────────
+  const handleDisable2FA = async () => {
+    setDisabling(true);
+    try {
+      const res = await fetch(`${API_URL}/api/doctors/2fa/disable`, {
+        method:      "POST",
+        credentials: "include",
+      });
+      if (res.ok) setIs2FAEnabled(false);
+    } catch { /* silently ignore */ }
+    finally { setDisabling(false); }
+  };
 
   return (
     <>
-      {/* 2FA Modal */}
-      {show2FA && (
+      {show2FA && doctorEmail && (
         <TwoFAModal
+          doctorEmail={doctorEmail}
           onClose={() => setShow2FA(false)}
           onSuccess={() => setIs2FAEnabled(true)}
         />
@@ -337,7 +423,7 @@ export default function AccountSettingsPage() {
 
       <h2 className="text-[#24292E] text-base font-medium tracking-tight">Account Settings</h2>
 
-      {/* ── Time Zone ─────────────────────────────────────────── */}
+      {/* ── Time Zone ──────────────────────────────────────────────────────── */}
       <SectionCard
         title="Time Zone"
         description="Selecting the correct time zone is essential for ensuring your schedule and notifications match your local time. You can update this setting anytime."
@@ -355,7 +441,6 @@ export default function AccountSettingsPage() {
               <path d="M4.8125 7.90625L11 14.0938L17.1875 7.90625" stroke="#6D7885" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-
           {tzOpen && (
             <div className="absolute top-full mt-1 w-full bg-white border border-[#EBEEF5] rounded-xl shadow-lg z-20 max-h-52 overflow-y-auto">
               {TIMEZONES.map((tz) => (
@@ -372,7 +457,7 @@ export default function AccountSettingsPage() {
         </div>
       </SectionCard>
 
-      {/* ── Change Password ───────────────────────────────────── */}
+      {/* ── Change Password ─────────────────────────────────────────────────── */}
       <SectionCard
         title="Change Password"
         description="Update your password regularly to keep your account secure. Make sure to choose a strong password that includes a mix of letters, numbers, and special characters."
@@ -395,11 +480,11 @@ export default function AccountSettingsPage() {
         </div>
       </SectionCard>
 
-      {/* ── 2FA ──────────────────────────────────────────────── */}
+      {/* ── 2FA ────────────────────────────────────────────────────────────── */}
       <SectionCard title="Secure Your Account with 2FA">
         <div className="flex flex-col gap-1">
           <p className="text-[#676E76] text-xs leading-relaxed">
-            Add an extra layer of security to your account by enabling Two-Factor Authentication (2FA). With 2FA, you&apos;ll be prompted to enter a unique verification code in addition to your password whenever you log in.
+            Add an extra layer of security to your account by enabling Two-Factor Authentication (2FA). With 2FA, you&apos;ll be prompted to enter a unique verification code sent to your registered email in addition to your password whenever you log in.
           </p>
           <p className="text-[#676E76] text-xs leading-relaxed mt-1">
             <span className="font-medium">Benefits of Enabling 2FA:</span><br />
@@ -408,31 +493,35 @@ export default function AccountSettingsPage() {
             Easy to set up and manage
           </p>
         </div>
-        
-        {is2FAEnabled ? (
+
+        {statusLoading ? (
+          <div className="w-6 h-6 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+        ) : is2FAEnabled ? (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#E8F1FF] text-[#5476FC] text-[13px] font-semibold rounded-xl">
               <span className="w-2 h-2 rounded-full bg-[#5476FC] animate-pulse" />
               2FA Enabled
             </div>
             <button
-              onClick={() => setIs2FAEnabled(false)}
-              className="text-[#E84949] text-sm font-semibold hover:underline"
+              onClick={handleDisable2FA}
+              disabled={disabling}
+              className="text-[#E84949] text-sm font-semibold hover:underline disabled:opacity-50"
             >
-              Disable 2FA
+              {disabling ? "Disabling…" : "Disable 2FA"}
             </button>
           </div>
         ) : (
           <button
             onClick={() => setShow2FA(true)}
-            className="self-start h-10 px-5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all"
+            disabled={!doctorEmail}
+            className="self-start h-10 px-5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-50"
           >
             Enable 2FA
           </button>
         )}
       </SectionCard>
 
-      {/* ── Delete Account ────────────────────────────────────── */}
+      {/* ── Delete Account ──────────────────────────────────────────────────── */}
       <SectionCard
         title="Delete your Account"
         description="If you choose to delete your account, all your data, including appointment history, messages, and account settings, will be permanently removed. This action cannot be undone."
@@ -465,7 +554,7 @@ export default function AccountSettingsPage() {
         </button>
       </SectionCard>
 
-      {/* ── Action buttons ────────────────────────────────────── */}
+      {/* ── Action buttons ──────────────────────────────────────────────────── */}
       <div className="flex gap-4">
         <button className="flex-1 py-3.5 rounded-xl bg-[#E0E7FF] text-[#383F45] text-base font-medium hover:bg-[#D0DAFF] transition-colors">
           Cancel

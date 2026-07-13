@@ -404,15 +404,26 @@ function calcAge(dob?: string): number | null {
   return new Date().getFullYear() - birth.getFullYear();
 }
 
+function stripUnit(value?: string): string {
+  if (!value) return "";
+  // Remove any trailing unit characters/strings so we don't double-append them
+  return value.replace(/\s*(cm|kg|lbs?|lb|m)\s*$/i, "").trim();
+}
+
 function fmtAllergies(allergies?: any[]): string {
   if (!allergies || allergies.length === 0) return "None";
-  return allergies
-    .map((a) =>
-      typeof a === "string"
-        ? a
-        : `${a.category ?? ""}: ${Array.isArray(a.selected) ? a.selected.join(", ") : a.selected ?? ""}`.trim()
-    )
-    .join("; ");
+  const parts = allergies
+    .map((a) => {
+      if (typeof a === "string") return a.trim();
+      const selected = Array.isArray(a.selected)
+        ? a.selected.filter((s: string) => s && String(s).trim()).join(", ")
+        : (a.selected ?? "");
+      if (!selected) return null; // skip categories with nothing selected
+      const cat = a.category ? `${a.category}: ` : "";
+      return `${cat}${selected}`.trim();
+    })
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join("; ") : "None";
 }
 
 function hasVisitInfoContent(v: VisitInfo): boolean {
@@ -529,8 +540,8 @@ export default function IntakePlan({
           <div className="grid grid-cols-3 gap-2">
             {[
               { label: "Blood Group", value: patientProfile.bloodGroup || "—" },
-              { label: "Height", value: patientProfile.height ? `${patientProfile.height} cm` : "—" },
-              { label: "Weight", value: patientProfile.weight ? `${patientProfile.weight} kg` : "—" },
+              { label: "Height", value: patientProfile.height ? `${stripUnit(String(patientProfile.height))} cm` : "—" },
+              { label: "Weight", value: patientProfile.weight ? `${stripUnit(String(patientProfile.weight))} kg` : "—" },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-0.5">
                 <span className="text-[9px] text-[#676E76] uppercase font-bold tracking-wide">{s.label}</span>
