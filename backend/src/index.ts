@@ -43,7 +43,6 @@ import otpRouter from "./routes/otp";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
 import servicesRouter from "./routes/services";
-import otpRouter from "./routes/otp";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();

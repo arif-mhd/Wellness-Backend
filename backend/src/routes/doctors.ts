@@ -739,7 +739,6 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-<<<<<<< HEAD
 // ─── POST /api/doctors/change-password ──────────────────────────────────────
 // Authenticated — lets a logged-in doctor change their password by supplying
 // their current password for verification before setting the new one.
