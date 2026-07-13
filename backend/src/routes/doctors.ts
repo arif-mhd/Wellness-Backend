@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, feedbackContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -605,6 +605,28 @@ router.get("/", async (_req: Request, res: Response) => {
     res.json({ doctors: resources });
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/doctors/:id/reviews ───────────────────────────────────────────
+// Public endpoint to get a doctor's reviews
+router.get("/:id/reviews", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const reviews = await queryDocuments<any>(feedbackContainer, {
+      query: "SELECT * FROM c WHERE c.folder = 'appointment' AND c.provider.id = @doctorId ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@doctorId", value: id }],
+    });
+
+    const total = reviews.length;
+    const avgRating = total > 0
+      ? Math.round((reviews.reduce((s: number, r: any) => s + (r.rating ?? 0), 0) / total) * 10) / 10
+      : null;
+
+    res.json({ reviews, total, avgRating });
+  } catch (err) {
+    console.error("Fetch doctor reviews error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
