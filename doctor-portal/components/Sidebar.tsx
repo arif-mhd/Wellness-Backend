@@ -96,26 +96,23 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
-  const [doctorName, setDoctorName] = useState("Dr. Jordan Anderson");
-  const [doctorEmail, setDoctorEmail] = useState("yelena@example.com");
+  const [doctorName, setDoctorName] = useState("");
+  const [doctorEmail, setDoctorEmail] = useState("");
+  const [doctorAvatar, setDoctorAvatar] = useState("");
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const res = await apiFetch("/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.profile) {
-            setDoctorName(data.profile.name ?? "Dr. Jordan Anderson");
-            setDoctorEmail(data.email ?? "yelena@example.com");
-          }
-        }
-      } catch { /* keep defaults */ }
-    }
-    loadProfile();
+    apiFetch("/api/doctors/me")
+      .then(r => r.json())
+      .then(data => {
+        const d = data.doctor ?? {};
+        setDoctorName(d.fullName ?? "");
+        setDoctorEmail(d.email ?? "");
+        setDoctorAvatar(d.avatarUrl ?? "");
+      })
+      .catch(() => {});
   }, []);
 
   async function handleSignOut() {
@@ -230,7 +227,13 @@ export default function Sidebar() {
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
           {/* Avatar — click to go to Profile */}
           <Link href="/dashboard/profile" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[#5476FC]">
-            <img src="/doctor-avatar.png" alt="Doctor Avatar" className="w-full h-full object-cover" />
+            {doctorAvatar ? (
+              <img src={doctorAvatar} alt="Doctor Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
+                {doctorName?.[0]?.toUpperCase() ?? doctorEmail?.[0]?.toUpperCase() ?? "D"}
+              </div>
+            )}
           </Link>
 
           {/* Name / email — stays in DOM */}

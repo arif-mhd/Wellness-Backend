@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 
 type EmailFreq = "instant" | "hourly" | "never";
 
 const APP_TOGGLES = [
-  { key: "appointments", label: "Appointment Updates",     defaultOn: true },
-  { key: "messages",     label: "New Messages",            defaultOn: true },
-  { key: "reminders",    label: "Reminders and Follow-ups",defaultOn: true },
-  { key: "system",       label: "System Announcements",    defaultOn: true },
+  { key: "appointments", label: "Appointment Updates" },
+  { key: "messages",     label: "New Messages" },
+  { key: "reminders",    label: "Reminders and Follow-ups" },
+  { key: "system",       label: "System Announcements" },
 ];
+
+const DEFAULT_TOGGLES: Record<string, boolean> = {
+  appointments: true,
+  messages: true,
+  reminders: true,
+  system: true,
+};
 
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
@@ -33,34 +41,90 @@ function RadioCircle({ selected }: { selected: boolean }) {
 }
 
 export default function NotificationsPage() {
-  const [emailFreq, setEmailFreq] = useState<EmailFreq>("instant");
-  const [appToggles, setAppToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(APP_TOGGLES.map((t) => [t.key, t.defaultOn]))
-  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
-  const EMAIL_OPTIONS = [
-    { 
-      value: "instant" as const, 
-      bold: "Instant ", 
-      desc: "(Receive notifications as soon as updates happen.)" 
-    },
-    { 
-      value: "hourly" as const, 
-      bold: "Once Every Hour ", 
-      desc: "(Get a summary of notifications every hour.)" 
-    },
-    { 
-      value: "never" as const, 
-      bold: "Never ", 
-      desc: "(Opt-out of receiving email notifications.)" 
-    },
+  const [emailFreq, setEmailFreq] = useState<EmailFreq>("instant");
+  const [appToggles, setAppToggles] = useState<Record<string, boolean>>(DEFAULT_TOGGLES);
+
+  // original values for cancel
+  const [origFreq, setOrigFreq] = useState<EmailFreq>("instant");
+  const [origToggles, setOrigToggles] = useState<Record<string, boolean>>(DEFAULT_TOGGLES);
+
+  useEffect(() => {
+    apiFetch("/api/doctors/me")
+      .then(r => r.json())
+      .then(data => {
+        const prefs = data.doctor?.notificationPreferences;
+        if (prefs) {
+          const freq = prefs.emailFreq ?? "instant";
+          const toggles = { ...DEFAULT_TOGGLES, ...(prefs.appToggles ?? {}) };
+          setEmailFreq(freq);
+          setAppToggles(toggles);
+          setOrigFreq(freq);
+          setOrigToggles(toggles);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    setError("");
+    try {
+      const res = await apiFetch("/api/doctors/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailFreq, appToggles }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      setOrigFreq(emailFreq);
+      setOrigToggles({ ...appToggles });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError("Failed to save preferences. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEmailFreq(origFreq);
+    setAppToggles({ ...origToggles });
+    setError("");
+  };
+
+  const EMAIL_OPTIONS: { value: EmailFreq; bold: string; desc: string }[] = [
+    { value: "instant", bold: "Instant ", desc: "(Receive notifications as soon as updates happen.)" },
+    { value: "hourly",  bold: "Once Every Hour ", desc: "(Get a summary of notifications every hour.)" },
+    { value: "never",   bold: "Never ", desc: "(Opt-out of receiving email notifications.)" },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
       <h1 className="text-[#383F45] text-[32px] font-normal leading-none tracking-[-0.64px] select-none mb-2 font-outfit">
         Notifications
       </h1>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-3">{error}</div>
+      )}
+
+      {saved && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-3">Preferences saved successfully.</div>
+      )}
 
       <div className="flex flex-col gap-6 font-outfit select-none">
         {/* Email Notifications Card */}
@@ -76,8 +140,8 @@ export default function NotificationsPage() {
           </p>
           <div className="flex flex-col gap-4">
             {EMAIL_OPTIONS.map(({ value, bold, desc }) => (
-              <label 
-                key={value} 
+              <label
+                key={value}
                 className="flex items-center gap-3 cursor-pointer group"
                 onClick={() => setEmailFreq(value)}
               >
@@ -109,8 +173,8 @@ export default function NotificationsPage() {
             {APP_TOGGLES.map(({ key, label }) => (
               <div key={key} className="flex items-center gap-3">
                 <Toggle
-                  on={appToggles[key]}
-                  onChange={() => setAppToggles((prev) => ({ ...prev, [key]: !prev[key] }))}
+                  on={appToggles[key] ?? true}
+                  onChange={() => setAppToggles(prev => ({ ...prev, [key]: !prev[key] }))}
                 />
                 <span className="text-[#24292E] text-[13px] font-medium">{label}</span>
               </div>
@@ -120,16 +184,21 @@ export default function NotificationsPage() {
 
         {/* Action buttons */}
         <div className="flex gap-6 mt-2 w-full">
-          <button 
+          <button
             type="button"
-            className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-medium tracking-tight transition-all duration-200"
+            onClick={handleCancel}
+            disabled={saving}
+            className="flex-1 py-3.5 rounded-[12px] bg-[#E8EEFF] hover:bg-[#DBE5FF] text-[#182A6F] text-[14px] font-medium tracking-tight transition-all duration-200 disabled:opacity-50"
           >
             Cancel
           </button>
-          <button 
+          <button
             type="button"
-            className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-medium tracking-tight transition-all duration-200"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-3.5 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md text-white text-[14px] font-medium tracking-tight transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
           >
+            {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             Save Changes
           </button>
         </div>

@@ -35,7 +35,30 @@
       "Read(//tmp/**)",
       "Bash(find \"C:\\\\\\\\Users\\\\\\\\Lenovo\\\\\\\\OneDrive\\\\\\\\Desktop\\\\\\\\Wellness App\\\\\\\\Wellness\\\\\\\\app\\\\\\\\\\(buy-medicines\\)\\\\\\\\\" -type f)",
       "Bash(find \"C:\\\\\\\\Users\\\\\\\\Lenovo\\\\\\\\OneDrive\\\\\\\\Desktop\\\\\\\\Wellness App\\\\\\\\Wellness\\\\\\\\components\\\\\\\\medicine\\\\\\\\\" -type f)",
-      "Bash(cd \"c:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\" && git show 9611ef7:admin-portal/app/dashboard/lab-service/add/page.tsx > /tmp/lab_add.tsx && wc -l /tmp/lab_add.tsx && head -5 /tmp/lab_add.tsx)"
+      "Bash(cd \"c:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\" && git show 9611ef7:admin-portal/app/dashboard/lab-service/add/page.tsx > /tmp/lab_add.tsx && wc -l /tmp/lab_add.tsx && head -5 /tmp/lab_add.tsx)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/components/wellness/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/assets/images/**)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\\\\app\\\\articles\")",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/context/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/components/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/onboarding/**)",
+      "Bash(find \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\" -name \"*RegistrationContext*\" -o -name \"*context*\" | head -20)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/utils/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/**)",
+      "Bash(xargs grep -l \"push\\\\|notification\\\\|websocket\\\\|realtime\\\\|firebase\\\\|onesignal\")",
+      "Bash(xargs grep -l \"setTimeout.*loading\\\\|setTimeout.*navigate\\\\|setTimeout.*redirect\")",
+      "Bash(find \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\" -name \"*.tsx\" -o -name \"*.ts\" 2>/dev/null | head -30)",
+      "Bash(grep -rn \"Simulate\\\\|simulate\\\\|Mock\\\\|mock\\\\|hardcoded\\\\|dummy\" \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\\\\app\\\\onboarding\" --include=\"*.tsx\" | head -30)",
+      "Bash(ls \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\\" 2>/dev/null | head -20)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App\" 2>/dev/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/services/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(buy-medicines\\)/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/profile/**)",
+      "Bash(find \"C:/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app\" -name \"*family*\" -o -name \"*Family*\" 2>/dev/null)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/services/**)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\\\\doctor-portal\\\\.next\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
@@ -59,7 +82,10 @@
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components\\profile",
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\hooks",
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components",
-      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app"
+      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app",
+      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\wellness\\menstrual-tracking",
+      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\articles",
+      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding"
     ]
   }
 }

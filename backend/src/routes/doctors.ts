@@ -660,7 +660,7 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
           title: p.fullName ?? "Patient",
           subtitle: p.email ?? p.phone ?? "",
           avatarUrl: p.avatarUrl ?? null,
-          href: `/dashboard/patients?id=${pid}`,
+          href: `/appointments/patient-details?id=${pid}&from=patients`,
         });
       }
       if (matchedPatients.length >= 5) break;
@@ -672,14 +672,14 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
       if (matchedApts.length >= 5) break;
       const patient = patientDocs[a.patientId];
       const patientName = patient?.fullName ?? "Patient";
-      const haystack = [patientName, a.reason, a.status, a.scheduledAt]
+      const haystack = [patientName, a.reason, a.status, a.scheduledAt, a.id]
         .filter(Boolean).join(" ").toLowerCase();
       if (haystack.includes(q)) {
         matchedApts.push({
           type: "appointment",
           id: a.id,
           title: patientName,
-          subtitle: `${a.reason ?? "Consultation"} · ${a.status}`,
+          subtitle: `${a.id} · ${a.reason ?? "Consultation"} · ${a.status}`,
           date: a.scheduledAt,
           status: a.status,
           avatarUrl: patient?.avatarUrl ?? null,
@@ -696,7 +696,7 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
       const patient = patientDocs[a.patientId];
       const patientName = patient?.fullName ?? "Patient";
       const medNames = (a.emr.medicines as any[]).map((m: any) => m.name ?? "").join(" ");
-      const haystack = [patientName, medNames, a.reason].filter(Boolean).join(" ").toLowerCase();
+      const haystack = [patientName, medNames, a.reason, a.id].filter(Boolean).join(" ").toLowerCase();
       if (haystack.includes(q)) {
         matchedPrescriptions.push({
           type: "prescription",
@@ -705,7 +705,7 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
           subtitle: (a.emr.medicines as any[]).slice(0, 3).map((m: any) => m.name).filter(Boolean).join(", "),
           date: a.emr.savedAt ?? a.scheduledAt,
           avatarUrl: patient?.avatarUrl ?? null,
-          href: `/appointments/complete-emr?appointmentId=${a.id}&patientName=${encodeURIComponent(patientName)}`,
+          href: `/appointments/patient-details?id=${a.patientId}&from=patients`,
         });
       }
     }
@@ -897,6 +897,34 @@ router.post("/reset-password", async (req: Request, res: Response) => {
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Doctor reset-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── DELETE /api/doctors/me ──────────────────────────────────────────────────
+// Marks the doctor's account as deleted in Cosmos DB and revokes all sessions.
+// Data is preserved so patients retain access to their appointment history.
+router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      status: "deleted",
+      deletedAt: new Date().toISOString(),
+    });
+
+    // Revoke all sessions so the doctor is immediately logged out
+    await req.session!.revokeSession();
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Doctor delete-account error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

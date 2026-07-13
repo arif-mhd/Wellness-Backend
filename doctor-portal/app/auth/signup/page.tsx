@@ -19,6 +19,9 @@ export default function SignupPage() {
   const [otp2, setOtp2] = useState("");
   const [otp3, setOtp3] = useState("");
   const [otp4, setOtp4] = useState("");
+  const [otp5, setOtp5] = useState("");
+  const [otp6, setOtp6] = useState("");
+  const [resending, setResending] = useState(false);
   
   // Basic Details Form States
   const [fullName, setFullName] = useState("");
@@ -35,7 +38,7 @@ export default function SignupPage() {
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(85); // Starts at 01:25 (85 seconds)
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
   
   const router = useRouter();
 
@@ -54,67 +57,127 @@ export default function SignupPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const otpSetters = [setOtp1, setOtp2, setOtp3, setOtp4, setOtp5, setOtp6];
+
   const handleOtpChange = (value: string, index: number) => {
     if (value && isNaN(Number(value))) return;
-    
-    if (index === 1) {
-      setOtp1(value);
-      if (value) document.getElementById("otp-2")?.focus();
-    } else if (index === 2) {
-      setOtp2(value);
-      if (value) document.getElementById("otp-3")?.focus();
-      else document.getElementById("otp-1")?.focus();
-    } else if (index === 3) {
-      setOtp3(value);
-      if (value) document.getElementById("otp-4")?.focus();
-      else document.getElementById("otp-2")?.focus();
-    } else if (index === 4) {
-      setOtp4(value);
-      if (!value) document.getElementById("otp-3")?.focus();
-    }
+    otpSetters[index - 1](value);
+    if (value && index < 6) document.getElementById(`otp-${index + 1}`)?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === "Backspace") {
-      if (index === 2 && !otp2) {
-        setOtp1("");
-        document.getElementById("otp-1")?.focus();
-      } else if (index === 3 && !otp3) {
-        setOtp2("");
-        document.getElementById("otp-2")?.focus();
-      } else if (index === 4 && !otp4) {
-        setOtp3("");
-        document.getElementById("otp-3")?.focus();
+    if (e.key === "Backspace" && index > 1) {
+      const current = [otp1, otp2, otp3, otp4, otp5, otp6][index - 1];
+      if (!current) {
+        otpSetters[index - 2]("");
+        document.getElementById(`otp-${index - 1}`)?.focus();
       }
     }
   };
 
-  // Step 1: Verify Contact Submission
-  const handleStep1Submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailOrPhone.trim()) {
-      setError("Please enter a valid email or phone number.");
-      return;
-    }
+  const handleResend = async () => {
+    setResending(true);
     setError("");
-    setStep(2);
-    setTimeLeft(85); // Reset timer to 01:25
-    setOtp1("");
-    setOtp2("");
-    setOtp3("");
-    setOtp4("");
+    try {
+      const res = await fetch(`${API_URL}/api/otp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailOrPhone.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTimeLeft(600);
+        setOtp1(""); setOtp2(""); setOtp3(""); setOtp4(""); setOtp5(""); setOtp6("");
+        document.getElementById("otp-1")?.focus();
+      } else if (res.status === 429) {
+        setError(`Please wait ${data.retryAfter ?? 60}s before requesting a new code.`);
+      } else {
+        setError("Failed to resend code. Please try again.");
+      }
+    } catch {
+      setError("Cannot reach the server.");
+    } finally {
+      setResending(false);
+    }
   };
 
-  // Step 2: Verify OTP Submission
-  const handleStep2Submit = (e: React.FormEvent) => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+  // Step 1: Send OTP to email
+  const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const completeOtp = otp1 + otp2 + otp3 + otp4;
-    if (completeOtp.length < 4) {
-      setError("Please enter the 4-digit verification code.");
+    const value = emailOrPhone.trim();
+    if (!value || !value.includes("@")) {
+      setError("Please enter a valid email address.");
       return;
     }
     setError("");
-    setStep(3);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/otp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: value.toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStep(2);
+        setTimeLeft(600);
+        setOtp1(""); setOtp2(""); setOtp3(""); setOtp4(""); setOtp5(""); setOtp6("");
+      } else if (res.status === 409) {
+        setError("An account with this email already exists. Please log in.");
+      } else if (res.status === 429) {
+        setError(`Please wait ${data.retryAfter ?? 60}s before requesting a new code.`);
+      } else {
+        setError("Failed to send verification code. Please try again.");
+      }
+    } catch {
+      setError("Cannot reach the server. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Verify OTP
+  const handleStep2Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const completeOtp = otp1 + otp2 + otp3 + otp4 + otp5 + otp6;
+    if (completeOtp.length < 6) {
+      setError("Please enter the 6-digit verification code.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailOrPhone.trim().toLowerCase(), code: completeOtp }),
+      });
+      const data = await res.json();
+      if (data.verified) {
+        setError("");
+        setStep(3);
+      } else {
+        switch (data.reason) {
+          case "INVALID_CODE":
+            setError(data.attemptsLeft > 0 ? `Incorrect code. ${data.attemptsLeft} attempt${data.attemptsLeft === 1 ? "" : "s"} remaining.` : "Incorrect code.");
+            break;
+          case "EXPIRED":
+            setError("Code has expired. Click Resend OTP to get a new one.");
+            break;
+          case "TOO_MANY_ATTEMPTS":
+            setError("Too many incorrect attempts. Please request a new code.");
+            break;
+          default:
+            setError("Verification failed. Please try again.");
+        }
+      }
+    } catch {
+      setError("Cannot reach the server. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 3: Basic Details Submission
@@ -147,9 +210,6 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // Call our backend register endpoint which creates the SuperTokens account,
-      // assigns doctor_pending role, and saves the profile to Cosmos.
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const res = await fetch(`${API_URL}/api/doctors/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -328,6 +388,7 @@ export default function SignupPage() {
               emailOrPhone={emailOrPhone}
               setEmailOrPhone={setEmailOrPhone}
               onSubmit={handleStep1Submit}
+              loading={loading}
             />
           )}
 
@@ -338,6 +399,8 @@ export default function SignupPage() {
               otp2={otp2}
               otp3={otp3}
               otp4={otp4}
+              otp5={otp5}
+              otp6={otp6}
               handleOtpChange={handleOtpChange}
               handleKeyDown={handleKeyDown}
               timeLeft={timeLeft}
@@ -347,8 +410,13 @@ export default function SignupPage() {
               setOtp2={setOtp2}
               setOtp3={setOtp3}
               setOtp4={setOtp4}
+              setOtp5={setOtp5}
+              setOtp6={setOtp6}
               onSubmit={handleStep2Submit}
               onGoBack={() => setStep(1)}
+              loading={loading}
+              onResend={handleResend}
+              resending={resending}
             />
           )}
 

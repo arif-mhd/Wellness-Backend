@@ -4,12 +4,14 @@ interface Step1VerifyContactProps {
   emailOrPhone: string;
   setEmailOrPhone: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  loading?: boolean;
 }
 
 export default function Step1VerifyContact({
   emailOrPhone,
   setEmailOrPhone,
   onSubmit,
+  loading = false,
 }: Step1VerifyContactProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col items-center text-center">
@@ -33,9 +35,10 @@ export default function Step1VerifyContact({
 
       <button
         type="submit"
-        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Continue
+        {loading ? "Sending code…" : "Continue"}
         <svg
           className="w-4 h-4"
           fill="none"

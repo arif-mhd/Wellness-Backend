@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { useSidebar } from "./SidebarContext";
 import WellnessCentralLogo from "./WellnessCentralLogo";
+import { useAdminProfile } from "@/context/AdminProfileContext";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const CollapseIcon = () => (
@@ -193,6 +194,20 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/articles",
+    label: "Articles",
+    icon: (active: boolean) => (
+      <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h16v2H4z" />
+        <path d="M4 9h16" />
+        <path d="M4 14h10" />
+        <path d="M4 19h7" />
+        <rect x="14" y="13" width="7" height="7" rx="1" />
+        <path d="M16 17h3M17.5 15v4" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/activity-log",
     label: "Activity Log",
     icon: (active: boolean) => (
@@ -219,6 +234,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+
+  const { profile } = useAdminProfile();
+  const adminName = profile.name;
+  const adminEmail = profile.email;
+  const adminAvatar = profile.avatarUrl;
 
   const toggle = () => setOpen(!open);
 
@@ -312,7 +332,13 @@ export default function Sidebar() {
         {/* Profile row */}
         <div className={`flex items-center ${open ? "flex-row" : "flex-col"}`}>
           <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(106,139,255,0.15)]">
-            <img src="/doctor-avatar.png" alt="Admin Avatar" className="w-full h-full object-cover" />
+            {adminAvatar ? (
+              <img src={adminAvatar} alt="Admin Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
+                {adminName?.[0]?.toUpperCase() ?? adminEmail?.[0]?.toUpperCase() ?? "A"}
+              </div>
+            )}
           </div>
 
           {/* Name / email */}
@@ -321,8 +347,8 @@ export default function Sidebar() {
               open ? "opacity-100 max-w-[140px] max-h-[100px] ml-3" : "opacity-0 max-w-0 max-h-0 ml-0 pointer-events-none"
             }`}
           >
-            <span className="text-slate-800 font-semibold text-sm truncate">Admin User</span>
-            <span className="text-slate-400 text-xs truncate">admin@wellness.com</span>
+            <span className="text-slate-800 font-semibold text-sm truncate">{adminName || adminEmail.split("@")[0] || "Admin"}</span>
+            <span className="text-slate-400 text-xs truncate">{adminEmail || ""}</span>
           </div>
 
           {/* Logout */}

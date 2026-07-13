@@ -17,10 +17,20 @@ type DoctorNotificationType =
   | "appointment_booked"
   | "patient_waiting"
   | "new_message"
+  | "followup_reminder"
   | "support_reply"
   | "doctor_approved"
   | "doctor_rejected"
   | "slots_verified";
+
+// Maps each app-toggle key to the notification types it gates.
+// patient_waiting is always shown (critical — can't be disabled).
+const TOGGLE_GATES: Record<string, DoctorNotificationType[]> = {
+  appointments: ["appointment_booked"],
+  messages:     ["new_message"],
+  reminders:    ["followup_reminder"],
+  system:       ["support_reply", "doctor_approved", "doctor_rejected", "slots_verified"],
+};
 
 interface DoctorNotification {
   id: string;
@@ -37,7 +47,7 @@ interface DoctorNotification {
 // distinguished by a doctorId field and namespaced ids, so the two sets never
 // collide even though they share storage.
 async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNotification[]> {
-  const [scheduledAppointments, waitingAppointments, doctorDoc] = await Promise.all([
+  const [scheduledAppointments, waitingAppointments, followUpAppointments, doctorDoc] = await Promise.all([
     queryDocuments<any>(appointmentsContainer, {
       query: "SELECT c.id, c.patientId, c.scheduledAt, c.reason, c.createdAt FROM c WHERE c.doctorId = @doctorId AND c.status = 'scheduled'",
       parameters: [{ name: "@doctorId", value: doctorId }],
@@ -46,8 +56,23 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
       query: "SELECT c.id, c.patientId, c.patientWaitingSince FROM c WHERE c.doctorId = @doctorId AND c.patientWaitingSince != null AND c.status != 'completed' AND c.status != 'cancelled'",
       parameters: [{ name: "@doctorId", value: doctorId }],
     }),
+    queryDocuments<any>(appointmentsContainer, {
+      query: "SELECT c.id, c.patientId, c.pendingFollowUp, c.createdAt FROM c WHERE c.doctorId = @doctorId AND IS_DEFINED(c.pendingFollowUp) AND c.pendingFollowUp.status = 'pending'",
+      parameters: [{ name: "@doctorId", value: doctorId }],
+    }),
     doctorsContainer.item(doctorId, doctorId).read().then((r) => r.resource).catch(() => null),
   ]);
+
+  // Build a set of suppressed notification types from the doctor's saved toggles.
+  // Defaults to all enabled when no prefs saved yet.
+  const savedToggles: Record<string, boolean> = doctorDoc?.notificationPreferences?.appToggles ?? {};
+  const suppressed = new Set<DoctorNotificationType>();
+  for (const [toggleKey, types] of Object.entries(TOGGLE_GATES)) {
+    if (savedToggles[toggleKey] === false) {
+      types.forEach((t) => suppressed.add(t));
+    }
+  }
+  const allowed = (type: DoctorNotificationType) => !suppressed.has(type);
 
   // Message docs don't carry a standalone doctorId field — conversationId is
   // the deterministic "chat:{patientId}:{doctorId}", so match on its suffix.
@@ -67,6 +92,7 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
   const patientIds = Array.from(new Set([
     ...scheduledAppointments.map((a) => a.patientId),
     ...waitingAppointments.map((a) => a.patientId),
+    ...followUpAppointments.map((a) => a.patientId),
     ...unreadMessages.map((m) => m.patientId),
   ].filter(Boolean)));
 
@@ -82,19 +108,22 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
 
   const notifications: DoctorNotification[] = [];
 
-  for (const a of scheduledAppointments) {
-    notifications.push({
-      id: `appointment_booked:${a.id}`,
-      doctorId,
-      type: "appointment_booked",
-      title: "New appointment booked",
-      body: `${patientNames[a.patientId] ?? "A patient"} booked a consultation${a.scheduledAt ? ` on ${new Date(a.scheduledAt).toLocaleString()}` : ""}${a.reason ? ` — ${a.reason}` : ""}`,
-      link: `/appointments`,
-      isRead: false,
-      createdAt: a.createdAt ?? new Date(0).toISOString(),
-    });
+  if (allowed("appointment_booked")) {
+    for (const a of scheduledAppointments) {
+      notifications.push({
+        id: `appointment_booked:${a.id}`,
+        doctorId,
+        type: "appointment_booked",
+        title: "New appointment booked",
+        body: `${patientNames[a.patientId] ?? "A patient"} booked a consultation${a.scheduledAt ? ` on ${new Date(a.scheduledAt).toLocaleString()}` : ""}${a.reason ? ` — ${a.reason}` : ""}`,
+        link: `/appointments`,
+        isRead: false,
+        createdAt: a.createdAt ?? new Date(0).toISOString(),
+      });
+    }
   }
 
+  // patient_waiting is always shown — critical, cannot be disabled
   for (const a of waitingAppointments) {
     notifications.push({
       id: `patient_waiting:${a.id}:${a.patientWaitingSince}`,
@@ -108,38 +137,59 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
     });
   }
 
-  for (const m of unreadMessages) {
-    notifications.push({
-      id: `new_message:${m.id}`,
-      doctorId,
-      type: "new_message",
-      title: `New message from ${patientNames[m.patientId] ?? "a patient"}`,
-      body: String(m.text ?? "").slice(0, 100),
-      link: `/dashboard/messages`,
-      isRead: false,
-      createdAt: m.createdAt ?? new Date(0).toISOString(),
-    });
-  }
-
-  for (const t of ownTickets) {
-    const comments: any[] = Array.isArray(t.comments) ? t.comments : [];
-    const lastAdminComment = [...comments].reverse().find((c) => c.authorRole === "admin");
-    if (lastAdminComment) {
+  if (allowed("new_message")) {
+    for (const m of unreadMessages) {
       notifications.push({
-        id: `support_reply:${t.id}:${lastAdminComment.id}`,
+        id: `new_message:${m.id}`,
         doctorId,
-        type: "support_reply",
-        title: `Reply on your ticket: ${t.subject ?? "Support ticket"}`,
-        body: String(lastAdminComment.message ?? "").slice(0, 100),
-        link: `/dashboard/help`,
+        type: "new_message",
+        title: `New message from ${patientNames[m.patientId] ?? "a patient"}`,
+        body: String(m.text ?? "").slice(0, 100),
+        link: `/dashboard/messages`,
         isRead: false,
-        createdAt: lastAdminComment.createdAt ?? new Date(0).toISOString(),
+        createdAt: m.createdAt ?? new Date(0).toISOString(),
       });
     }
   }
 
+  if (allowed("followup_reminder")) {
+    for (const a of followUpAppointments) {
+      const fu = a.pendingFollowUp;
+      const scheduledAt = fu?.followUpScheduledAt;
+      notifications.push({
+        id: `followup_reminder:${a.id}`,
+        doctorId,
+        type: "followup_reminder",
+        title: "Follow-up appointment pending",
+        body: `${patientNames[a.patientId] ?? "A patient"} has a follow-up${scheduledAt ? ` on ${new Date(scheduledAt).toLocaleString()}` : ""}${fu?.reason ? ` — ${fu.reason}` : ""}`,
+        link: `/appointments`,
+        isRead: false,
+        createdAt: scheduledAt ?? a.createdAt ?? new Date(0).toISOString(),
+      });
+    }
+  }
+
+  if (allowed("support_reply")) {
+    for (const t of ownTickets) {
+      const comments: any[] = Array.isArray(t.comments) ? t.comments : [];
+      const lastAdminComment = [...comments].reverse().find((c) => c.authorRole === "admin");
+      if (lastAdminComment) {
+        notifications.push({
+          id: `support_reply:${t.id}:${lastAdminComment.id}`,
+          doctorId,
+          type: "support_reply",
+          title: `Reply on your ticket: ${t.subject ?? "Support ticket"}`,
+          body: String(lastAdminComment.message ?? "").slice(0, 100),
+          link: `/dashboard/help`,
+          isRead: false,
+          createdAt: lastAdminComment.createdAt ?? new Date(0).toISOString(),
+        });
+      }
+    }
+  }
+
   if (doctorDoc) {
-    if (doctorDoc.status === "approved" && doctorDoc.approvedAt) {
+    if (allowed("doctor_approved") && doctorDoc.status === "approved" && doctorDoc.approvedAt) {
       notifications.push({
         id: `doctor_approved:${doctorId}`,
         doctorId,
@@ -151,7 +201,7 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
         createdAt: doctorDoc.approvedAt,
       });
     }
-    if (doctorDoc.status === "rejected" && doctorDoc.rejectedAt) {
+    if (allowed("doctor_rejected") && doctorDoc.status === "rejected" && doctorDoc.rejectedAt) {
       notifications.push({
         id: `doctor_rejected:${doctorId}`,
         doctorId,
@@ -163,7 +213,7 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
         createdAt: doctorDoc.rejectedAt,
       });
     }
-    if (doctorDoc.slotsVerifiedAt) {
+    if (allowed("slots_verified") && doctorDoc.slotsVerifiedAt) {
       notifications.push({
         id: `slots_verified:${doctorId}:${doctorDoc.slotsVerifiedAt}`,
         doctorId,
