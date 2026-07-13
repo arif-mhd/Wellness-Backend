@@ -367,6 +367,28 @@ router.patch("/products/:productId/flag", async (req: SessionRequest, res: Respo
   }
 });
 
+// ─── DELETE /api/admin/pharmacy/products/:productId ──────────────────────────
+// Permanently removes a product from the catalogue.
+router.delete("/products/:productId", async (req: SessionRequest, res: Response) => {
+  try {
+    const { productId } = req.params;
+
+    const { resources } = await pharmacyProductsContainer.items.query({
+      query: "SELECT c.id, c.pharmacyId FROM c WHERE c.id = @id",
+      parameters: [{ name: "@id", value: productId }],
+    }).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Product not found" }); return; }
+    const { id, pharmacyId } = resources[0];
+
+    await pharmacyProductsContainer.item(id, pharmacyId).delete();
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Admin delete product error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── GET /api/admin/pharmacy/:pharmacyId ─────────────────────────────────────
 // Must be after all /products/* routes to avoid /:pharmacyId matching "products"
 router.get("/:pharmacyId", async (req: SessionRequest, res: Response) => {

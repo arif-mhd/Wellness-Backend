@@ -58,7 +58,9 @@
       "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/profile/**)",
       "Bash(find \"C:/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app\" -name \"*family*\" -o -name \"*Family*\" 2>/dev/null)",
       "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/services/**)",
-      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\\\\doctor-portal\\\\.next\")"
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\\\\doctor-portal\\\\.next\")",
+      "Bash(git pull *)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\\\\\(buy-medicines\\\\\\)/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
@@ -85,7 +87,9 @@
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app",
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\wellness\\menstrual-tracking",
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\articles",
-      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding"
+      "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components\\medicine",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(buy-medicines)"
     ]
   }
 }

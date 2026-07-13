@@ -122,11 +122,10 @@ app.use("/api/admin/reports", adminReportsRouter);
 app.use("/api/admin/articles", adminArticlesRouter);
 app.use("/api/admin/settings", adminSettingsRouter);
 app.use("/api/articles", articlesRouter);
-app.use("/api/otp", otpRouter);
+app.use("/api/otp",      otpRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
-app.use("/api/services", servicesRouter); // unified patient service history
-app.use("/api/otp",      otpRouter);      // OTP send + verify (registration & 2FA)
+app.use("/api/services", servicesRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

@@ -117,7 +117,18 @@ router.post("/send", async (req: Request, res: Response) => {
       purpose === "reset"        ? "reset"        :
       "login";
 
-    await sendOtpEmail(normalizedEmail, code, emailPurpose);
+    try {
+      await sendOtpEmail(normalizedEmail, code, emailPurpose);
+    } catch (emailErr: any) {
+      // When using onboarding@resend.dev (sandbox), Resend only delivers to the
+      // account owner's email. Log the OTP so testing can proceed without a verified domain.
+      const isSandbox = (process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev") === "onboarding@resend.dev";
+      if (isSandbox) {
+        console.warn(`[otp/send] SANDBOX — OTP for ${normalizedEmail} is: ${code}`);
+      } else {
+        throw emailErr;
+      }
+    }
 
     res.json({ sent: true });
   } catch (err) {
