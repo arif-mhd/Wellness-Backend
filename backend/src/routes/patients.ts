@@ -690,4 +690,146 @@ router.put("/family/:memberId/fitness-profile", requireRole("patient"), async (r
   }
 });
 
+// ── GET /api/patients/2fa/status ────────────────────────────────────────────
+router.get("/2fa/status", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    const { resource: patient } = await patientsContainer.item(userId, userId).read();
+    res.json({ twoFactorEnabled: patient?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("Patient 2FA status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/2fa/enable ────────────────────────────────────────────
+router.post("/2fa/enable", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    const { resource: patient } = await patientsContainer.item(userId, userId).read();
+    if (!patient) { res.status(404).json({ error: "Patient not found." }); return; }
+    await patientsContainer.items.upsert({ ...patient, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Patient 2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/2fa/disable ───────────────────────────────────────────
+router.post("/2fa/disable", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    const { resource: patient } = await patientsContainer.item(userId, userId).read();
+    if (!patient) { res.status(404).json({ error: "Patient not found." }); return; }
+    await patientsContainer.items.upsert({ ...patient, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Patient 2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/change-password ──────────────────────────────────────
+router.post("/change-password", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+    return;
+  }
+
+  try {
+    const { resource: patient } = await patientsContainer.item(userId, userId).read();
+    if (!patient) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+
+    const signInResult = await EmailPassword.signIn("public", patient.email, currentPassword);
+    if (signInResult.status !== "OK") {
+      res.status(403).json({ error: "WRONG_PASSWORD" });
+      return;
+    }
+
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", userId, patient.email);
+    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
+    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED" }); return; }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Patient change-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/patients/me ──────────────────────────────────────────────────
+// Marks the patient's account as deleted and revokes the current session.
+// Data is preserved so appointment and order history remains intact.
+router.delete("/me", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  try {
+    const { resource: patient } = await patientsContainer.item(userId, userId).read();
+    if (!patient) { res.status(404).json({ error: "Patient not found." }); return; }
+
+    await patientsContainer.items.upsert({
+      ...patient,
+      status: "deleted",
+      deletedAt: new Date().toISOString(),
+    });
+
+    await req.session!.revokeSession();
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Patient delete account error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PUT /api/patients/notification-preferences ───────────────────────────────
+// Stores push notification toggle states and the device's Expo push token so
+// the backend can respect per-type opt-outs when sending notifications.
+// Body: { preferences: { appointments, messages, health, orders, system }, expoPushToken? }
+router.put("/notification-preferences", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { preferences, expoPushToken } = req.body;
+
+    if (!preferences || typeof preferences !== "object") {
+      res.status(400).json({ error: "preferences object is required" });
+      return;
+    }
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const updated = {
+      ...existing,
+      notificationPreferences: {
+        appointments: Boolean(preferences.appointments ?? true),
+        messages:     Boolean(preferences.messages     ?? true),
+        health:       Boolean(preferences.health       ?? true),
+        orders:       Boolean(preferences.orders       ?? true),
+        system:       Boolean(preferences.system       ?? false),
+        updatedAt:    new Date().toISOString(),
+      },
+      ...(expoPushToken !== undefined && { expoPushToken }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await patientsContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Notification preferences update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

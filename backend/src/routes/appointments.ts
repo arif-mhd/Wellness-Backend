@@ -167,6 +167,32 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       );
     }
 
+    // Auto-cancel scheduled appointments whose date has fully passed (before today midnight UTC).
+    // This runs lazily on each fetch rather than requiring a cron job.
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+    const stale = appointments.filter(
+      (apt) => apt.status === "scheduled" && new Date(apt.scheduledAt) < startOfToday
+    );
+    if (stale.length > 0) {
+      const cancelledAt = new Date().toISOString();
+      await Promise.all(
+        stale.map((apt) =>
+          appointmentsContainer.items.upsert({
+            ...apt,
+            status: "cancelled",
+            cancelledReason: "auto_expired",
+            updatedAt: cancelledAt,
+          })
+        )
+      );
+      stale.forEach((apt) => {
+        apt.status = "cancelled";
+        apt.cancelledReason = "auto_expired";
+        apt.updatedAt = cancelledAt;
+      });
+    }
+
     // Enrich with doctor name
     const enriched = await Promise.all(
       appointments.map(async (apt) => {

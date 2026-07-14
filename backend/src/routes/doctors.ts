@@ -721,6 +721,26 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
   }
 });
 
+// ─── PATCH /api/doctors/online-status ───────────────────────────────────────
+// Doctor toggles their online/offline visibility in the patient app.
+router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { isOnline } = req.body;
+  if (typeof isOnline !== "boolean") {
+    res.status(400).json({ error: "isOnline must be a boolean." });
+    return;
+  }
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
+    await doctorsContainer.items.upsert({ ...doctor, isOnline, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", isOnline });
+  } catch (err) {
+    console.error("Update online status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors.
 router.get("/", async (_req: Request, res: Response) => {

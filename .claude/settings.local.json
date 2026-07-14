@@ -60,7 +60,13 @@
       "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\(tabs\\)/services/**)",
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\\\\doctor-portal\\\\.next\")",
       "Bash(git pull *)",
-      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\\\\\(buy-medicines\\\\\\)/**)"
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\\\\\(buy-medicines\\\\\\)/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\\\\\(tabs\\\\\\)/profile/**)",
+      "Bash(gcloud run *)",
+      "PowerShell($proc = Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($proc\\) { Stop-Process -Id $proc.OwningProcess -Force; Write-Output \"Killed PID $\\($proc.OwningProcess\\)\" } else { Write-Output \"Nothing on 8081\" })",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "Bash(xargs grep -l \"appointment\\\\|Appointment\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
@@ -89,7 +95,11 @@
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\articles",
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding",
       "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components\\medicine",
-      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(buy-medicines)"
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(buy-medicines)",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components"
     ]
   }
 }

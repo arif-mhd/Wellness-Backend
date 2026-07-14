@@ -99,6 +99,8 @@ export default function Sidebar() {
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
+  const [isOnline, setIsOnline] = useState(true);
+  const [togglingOnline, setTogglingOnline] = useState(false);
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);
@@ -111,9 +113,24 @@ export default function Sidebar() {
         setDoctorName(d.fullName ?? "");
         setDoctorEmail(d.email ?? "");
         setDoctorAvatar(d.avatarUrl ?? "");
+        setIsOnline(d.isOnline !== false); // default true if not set
       })
       .catch(() => {});
   }, []);
+
+  async function handleOnlineToggle() {
+    const next = !isOnline;
+    setTogglingOnline(true);
+    try {
+      await apiFetch("/api/doctors/online-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOnline: next }),
+      });
+      setIsOnline(next);
+    } catch { /* keep current state on error */ }
+    setTogglingOnline(false);
+  }
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }
@@ -222,6 +239,27 @@ export default function Sidebar() {
             </span>
           </Link>
         ))}
+
+        {/* Online / Offline toggle */}
+        <button
+          onClick={handleOnlineToggle}
+          disabled={togglingOnline}
+          title={isOnline ? "Go Offline" : "Go Online"}
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 w-full transition-colors ${
+            isOnline
+              ? "bg-[#ECFDF5] hover:bg-[#D1FAE5]"
+              : "bg-[#F1F5F9] hover:bg-[#E2E8F0]"
+          } ${open ? "" : "justify-center"} ${togglingOnline ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-[#22C55E]" : "bg-[#94A3B8]"}`} />
+          <span
+            className={`text-xs font-semibold whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${
+              open ? "opacity-100 max-w-[160px]" : "opacity-0 max-w-0 pointer-events-none"
+            } ${isOnline ? "text-[#16A34A]" : "text-[#64748B]"}`}
+          >
+            {togglingOnline ? "Updating…" : isOnline ? "Online" : "Offline"}
+          </span>
+        </button>
 
         {/* Profile row */}
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
