@@ -27,23 +27,6 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// ─── GET /api/vaccines/:vaccineId ─────────────────────────────────────────────
-router.get("/:vaccineId", async (req: Request, res: Response) => {
-  try {
-    const { vaccineId } = req.params;
-    const { resources } = await vaccinesContainer.items
-      .query({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
-        parameters: [{ name: "@id", value: vaccineId }],
-      })
-      .fetchAll();
-    if (!resources.length) { res.status(404).json({ error: "Vaccine not found" }); return; }
-    res.json(resources[0]);
-  } catch (err) {
-    console.error("Get vaccine error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 // ─── POST /api/vaccines/bookings ──────────────────────────────────────────────
 // Patient creates a vaccination booking
@@ -186,6 +169,24 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
     res.json(updated);
   } catch (err) {
     console.error("Cancel vaccination booking error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/vaccines/:vaccineId ─────────────────────────────────────────────
+router.get("/:vaccineId", async (req: Request, res: Response) => {
+  try {
+    const { vaccineId } = req.params;
+    const { resources } = await vaccinesContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
+        parameters: [{ name: "@id", value: vaccineId }],
+      })
+      .fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Vaccine not found" }); return; }
+    res.json(resources[0]);
+  } catch (err) {
+    console.error("Get vaccine error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
