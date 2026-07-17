@@ -603,8 +603,52 @@ router.get("/assessments", (_req: SessionRequest, res: Response) => {
   res.json({ assessments: list });
 });
 
+// ── GET /api/wellness/assessments/history ─────────────────────────────────────
+// Returns all past assessment results for the authenticated patient (newest first).
+// NOTE: must be registered BEFORE /assessments/:assessmentId so Express does not
+// treat "history" as an assessmentId parameter.
+router.get("/assessments/history", async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.takenAt DESC";
+
+    const { resources } = await assessmentResultsContainer.items.query(
+      { query, parameters },
+      { partitionKey: patientId }
+    ).fetchAll();
+    res.json({ history: resources });
+  } catch (err) {
+    console.error("Assessment history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/wellness/assessments/history/:resultId ───────────────────────────
+// Returns one specific past assessment result.
+router.get("/assessments/history/:resultId", async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const { resource } = await assessmentResultsContainer.item(req.params.resultId, patientId).read();
+    if (!resource) { res.status(404).json({ error: "Result not found" }); return; }
+    res.json({ result: resource });
+  } catch (err: any) {
+    if (err?.code === 404) { res.status(404).json({ error: "Result not found" }); return; }
+    console.error("Assessment result fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /api/wellness/assessments/:assessmentId ───────────────────────────────
 // Returns full assessment definition with questions.
+// NOTE: registered AFTER /assessments/history so "history" is not treated as an id.
 router.get("/assessments/:assessmentId", (req: SessionRequest, res: Response) => {
   const assessment = getAssessmentById(req.params.assessmentId);
   if (!assessment) { res.status(404).json({ error: "Assessment not found" }); return; }
@@ -643,47 +687,6 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
     res.json({ result: resultDoc });
   } catch (err) {
     console.error("Assessment submit error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ── GET /api/wellness/assessments/history ─────────────────────────────────────
-// Returns all past assessment results for the authenticated patient (newest first).
-router.get("/assessments/history", async (req: SessionRequest, res: Response) => {
-  try {
-    const patientId = req.session!.getUserId();
-    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
-
-    let query = "SELECT * FROM c WHERE c.patientId = @pid";
-    const parameters = [{ name: "@pid", value: patientId }];
-    if (profileId) {
-      query += " AND c.profileId = @profileId";
-      parameters.push({ name: "@profileId", value: profileId });
-    }
-    query += " ORDER BY c.takenAt DESC";
-
-    const { resources } = await assessmentResultsContainer.items.query(
-      { query, parameters },
-      { partitionKey: patientId }
-    ).fetchAll();
-    res.json({ history: resources });
-  } catch (err) {
-    console.error("Assessment history error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ── GET /api/wellness/assessments/history/:resultId ───────────────────────────
-// Returns one specific past assessment result.
-router.get("/assessments/history/:resultId", async (req: SessionRequest, res: Response) => {
-  try {
-    const patientId = req.session!.getUserId();
-    const { resource } = await assessmentResultsContainer.item(req.params.resultId, patientId).read();
-    if (!resource) { res.status(404).json({ error: "Result not found" }); return; }
-    res.json({ result: resource });
-  } catch (err: any) {
-    if (err?.code === 404) { res.status(404).json({ error: "Result not found" }); return; }
-    console.error("Assessment result fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
