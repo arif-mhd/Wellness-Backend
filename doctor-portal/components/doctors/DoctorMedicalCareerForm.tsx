@@ -21,7 +21,7 @@ interface DoctorMedicalCareerFormProps {
 }
 
 const inputCls =
-  "w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-3.5 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit";
+  "w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors bg-white placeholder-[#A7AAB4]";
 
 export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMedicalCareerFormProps) {
   const [licenseNumber, setLicenseNumber] = useState("");
@@ -95,15 +95,8 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
   };
 
   return (
-    <div className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 p-8 md:p-10 font-outfit select-none">
-      <div className="mb-8">
-        <h3 className="text-xl md:text-[1.4rem] font-normal tracking-tight text-gray-800 font-marcellus leading-tight">
-          Medical / Career Information
-        </h3>
-        <p className="text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
-          Their professional credentials and consultation setup.
-        </p>
-      </div>
+    <div className="w-full bg-white rounded-3xl shadow-sm border border-[#E4E8F0] p-8 md:p-12 font-outfit animate-fade-in select-none">
+      <h2 className="text-[20px] font-bold text-[#24292E] mb-8">Medical / Career Information</h2>
 
       {formError && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center animate-fadeIn">
@@ -113,24 +106,25 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* License */}
-        <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
-          <input
-            type="text"
-            placeholder="License Number*"
-            value={licenseNumber}
-            onChange={(e) => { setLicenseNumber(e.target.value); setLicenseVerified(false); }}
-            className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit pr-20"
-          />
-          <div className="absolute right-5 top-1/2 -translate-y-1/2 select-none">
+        <div className="flex flex-col gap-1.5 w-full md:w-2/3">
+          <label className="text-[12px] font-semibold text-[#24292E]">Licence Number</label>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={licenseNumber}
+              onChange={(e) => { setLicenseNumber(e.target.value); setLicenseVerified(false); }}
+              className={inputCls}
+            />
             {licenseVerified ? (
-              <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-[#5476FC]">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+              <div className="h-11 px-8 rounded-xl bg-white border border-[#5476FC] text-[#5476FC] text-[12px] font-bold tracking-widest flex items-center shadow-sm">
                 VERIFIED
-              </span>
+              </div>
             ) : (
-              <button type="button" onClick={handleVerifyLicense} className="text-[0.72rem] font-semibold text-[#5476FC] hover:text-[#3B59E3] tracking-wider transition-colors">
+              <button
+                type="button"
+                onClick={handleVerifyLicense}
+                className="shrink-0 h-11 px-8 rounded-xl bg-[#24292E] text-white text-[12px] font-bold tracking-widest hover:bg-black transition-colors shadow-sm"
+              >
                 VERIFY
               </button>
             )}
@@ -138,23 +132,23 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
         </div>
 
         {/* Specializations */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-3 w-full md:w-2/3">
           <div className="flex items-center justify-between">
-            <h4 className="text-base font-semibold text-gray-700">Specializations*</h4>
-            <button type="button" onClick={addSpecialization} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors">
+            <label className="text-[12px] font-semibold text-[#24292E]">Specialisations</label>
+            <button type="button" onClick={addSpecialization} className="flex items-center gap-1.5 text-xs font-semibold text-[#5476FC] hover:text-[#24292E] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Add Specialization
             </button>
           </div>
           <div className="space-y-3">
             {specializations.map((spec, idx) => (
-              <div key={spec.id} className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+              <div key={spec.id} className="flex gap-3 items-center">
                 <input
                   type="text"
-                  placeholder={`Specialization ${idx + 1}`}
+                  placeholder={`Specialisation ${idx + 1}`}
                   value={spec.name}
                   onChange={(e) => updateSpecializationName(spec.id, e.target.value)}
-                  className={`${inputCls} lg:col-span-7`}
+                  className={`${inputCls} flex-1`}
                 />
                 <input
                   type="file"
@@ -166,12 +160,12 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
                 <button
                   type="button"
                   onClick={() => specFileRefs.current[spec.id]?.click()}
-                  className="lg:col-span-4 bg-[#1E293B] hover:bg-[#0f172a] text-white text-xs font-semibold px-4 py-3.5 rounded-xl transition-colors truncate"
+                  className="shrink-0 h-11 px-5 rounded-xl bg-white border border-[#E4E8F0] text-[#24292E] text-[10px] font-bold tracking-widest hover:bg-gray-50 transition-colors shadow-sm max-w-[150px] truncate"
                 >
-                  {spec.certFile ? spec.certFile.name : "Upload Certificate"}
+                  {spec.certFile ? spec.certFile.name : "UPLOAD CERTIFICATE"}
                 </button>
                 {specializations.length > 1 && (
-                  <button type="button" onClick={() => removeSpecialization(spec.id)} className="lg:col-span-1 text-gray-300 hover:text-red-400 transition-colors justify-self-center" aria-label="Remove specialization">
+                  <button type="button" onClick={() => removeSpecialization(spec.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0" aria-label="Remove specialization">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
@@ -181,96 +175,99 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
         </div>
 
         {/* Consultation Rates */}
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3 w-full md:w-2/3">
           <div className="flex justify-between items-center">
-            <h4 className="text-base font-semibold text-gray-700">Consultation Rates</h4>
-            <button type="button" onClick={addRateRow} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors">
+            <label className="text-[12px] font-semibold text-[#24292E]">Consultation Rates</label>
+            <button type="button" onClick={addRateRow} className="flex items-center gap-1.5 text-xs font-semibold text-[#5476FC] hover:text-[#24292E] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Add Category
             </button>
           </div>
           <div className="space-y-3">
             {rates.map((row) => (
-              <div key={row.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                <input type="text" placeholder="Category" value={row.category} onChange={(e) => updateRateRow(row.id, "category", e.target.value)} className={inputCls} />
-                <div className="flex items-center gap-2">
-                  <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-4 py-3.5 border border-transparent">
-                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">AED</span>
-                    <input type="text" placeholder="Add Price" value={row.price} onChange={(e) => updateRateRow(row.id, "price", e.target.value)} className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit" />
-                  </div>
-                  {rates.length > 1 && (
-                    <button type="button" onClick={() => removeRateRow(row.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0" aria-label="Remove category">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  )}
-                </div>
+              <div key={row.id} className="flex gap-3 items-center">
+                <input type="text" placeholder="Category" value={row.category} onChange={(e) => updateRateRow(row.id, "category", e.target.value)} className={`${inputCls} flex-1`} />
+                <input type="text" placeholder="Add Price" value={row.price} onChange={(e) => updateRateRow(row.id, "price", e.target.value)} className={`${inputCls} flex-1`} />
+                {rates.length > 1 && (
+                  <button type="button" onClick={() => removeRateRow(row.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0" aria-label="Remove category">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Payment settings */}
-        <div className="space-y-2">
-          <h4 className="text-base font-semibold text-gray-700">Payment Settings</h4>
-          <input type="text" placeholder="e.g. Cash, Card, Insurance" value={paymentSettings} onChange={(e) => setPaymentSettings(e.target.value)} className={inputCls} />
-        </div>
+        {/* Grid for Payment & Resume */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-semibold text-[#24292E]">Payment Settings</label>
+            <select value={paymentSettings} onChange={(e) => setPaymentSettings(e.target.value)} className={`${inputCls} cursor-pointer appearance-none`}>
+              <option value="">Cash / Insurance</option>
+              <option value="Cash Only">Cash Only</option>
+              <option value="Insurance Only">Insurance Only</option>
+            </select>
+          </div>
 
-        {/* Resume */}
-        <div className="space-y-2">
-          <h4 className="text-base font-semibold text-gray-700">Upload Resume</h4>
-          <div
-            onClick={() => resumeInputRef.current?.click()}
-            className="border-2 border-dashed border-[#C5D3FF] bg-[#F4F7FF]/50 hover:bg-[#EBEEFF] rounded-2xl px-5 py-4 flex items-center gap-3 cursor-pointer transition-colors"
-          >
-            <input type="file" ref={resumeInputRef} onChange={handleResumeChange} accept=".pdf, image/jpeg, image/png, image/jpg" className="hidden" />
-            <svg className="w-6 h-6 text-[#5476FC] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span className="text-sm font-semibold text-[#5476FC] truncate">
-              {resumeFile ? resumeFile.name : "Upload Resume (PDF, JPEG, PNG — max 5 MB)"}
-            </span>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-semibold text-[#24292E]">Upload Resume</label>
+            <div
+              onClick={() => resumeInputRef.current?.click()}
+              className="flex h-11 border border-[#D6DEFF] rounded-xl px-4 items-center justify-between text-[13px] text-[#A7AAB4] cursor-pointer hover:border-[#5476FC] transition-colors bg-white shadow-sm"
+            >
+              <input type="file" ref={resumeInputRef} onChange={handleResumeChange} accept=".pdf, image/jpeg, image/png, image/jpg" className="hidden" />
+              <span className="truncate flex-1 text-left">
+                {resumeFile?.name || "Choose file..."}
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#A7AAB4]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            </div>
           </div>
         </div>
 
         {/* Bio */}
-        <div className="space-y-2">
-          <h4 className="text-base font-semibold text-gray-700">Bio</h4>
+        <div className="flex flex-col gap-1.5 mt-2">
+          <label className="text-[12px] font-semibold text-[#24292E]">Write Bio</label>
           <textarea
-            placeholder="Type your bio here"
+            placeholder="Type your bio here..."
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            rows={3}
-            className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit resize-none"
+            rows={4}
+            className="w-full border border-[#D6DEFF] rounded-xl p-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors resize-none bg-white placeholder-[#A7AAB4]"
           />
         </div>
 
         {/* Profile photo */}
-        <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#F7F8FC] border border-transparent select-none">
-          <input type="file" ref={profilePicRef} onChange={handleProfilePicChange} accept="image/jpeg, image/png, image/jpg" className="hidden" />
-          <button
-            type="button"
-            onClick={() => profilePicRef.current?.click()}
-            className="w-14 h-14 rounded-full bg-[#E5ECFF] hover:bg-[#D5E1FF] text-[#5476FC] flex items-center justify-center flex-shrink-0 transition-colors duration-150 outline-none relative overflow-hidden"
-          >
-            {profilePicPreview ? (
-              <img src={profilePicPreview} alt="Profile preview" className="w-full h-full object-cover" />
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            )}
-          </button>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-gray-700">Profile Photo</span>
-            <span className="text-[0.68rem] text-gray-400 font-light mt-0.5 leading-snug">
-              A clear photo helps patients recognize their doctor.
-            </span>
+        <div className="flex flex-col gap-1.5 mt-2">
+          <label className="text-[12px] font-semibold text-[#24292E]">Profile photo</label>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <input type="file" ref={profilePicRef} onChange={handleProfilePicChange} accept="image/jpeg, image/png, image/jpg" className="hidden" />
+            <button
+              type="button"
+              onClick={() => profilePicRef.current?.click()}
+              className="w-24 h-24 rounded-2xl bg-[#F3F6FF] border border-[#D6DEFF] border-dashed flex items-center justify-center cursor-pointer hover:border-[#5476FC] transition-colors group shrink-0 overflow-hidden relative"
+            >
+              {profilePicPreview ? (
+                <img src={profilePicPreview || undefined} alt="Profile preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#24292E] text-white flex items-center justify-center group-hover:bg-[#5476FC] transition-colors shadow-sm">
+                  <span className="text-[18px] font-medium mt-[-2px]">+</span>
+                </div>
+              )}
+            </button>
+            <p className="text-[11px] text-[#676E76] leading-relaxed">
+              Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been
+              the industry's standard dummy text ever since the 1500s.
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 items-center">
-          <button type="button" onClick={onGoBack} className="w-full bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] rounded-[0.8rem] font-medium font-outfit text-sm py-4 flex items-center justify-center transition-colors duration-150 cursor-pointer outline-none text-center">
-            Go Back
+        <div className="flex justify-between mt-12 pt-4 border-t border-[#E4E8F0]">
+          <button type="button" onClick={onGoBack} className="px-10 py-3.5 rounded-xl bg-white border border-[#E4E8F0] text-[#676E76] text-[13px] font-bold tracking-widest hover:bg-gray-50 transition-colors shadow-sm">
+            BACK
           </button>
-          <DoctorLoginButton type="submit" label="Continue" className="w-full py-4 text-center justify-center flex" />
+          <button type="submit" className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all">
+            CONTINUE
+          </button>
         </div>
       </form>
     </div>

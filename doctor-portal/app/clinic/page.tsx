@@ -16,9 +16,36 @@ const MOCK_APPOINTMENTS = [
 ];
 
 const MOCK_DOCTORS = [
-  { id: "1", name: "Helena", email: "email@figma...", timing: "9.00 am to 2.00 pm", specialty: "General Physician", online: true },
-  { id: "2", name: "Helena", email: "email@figma...", timing: "9.00 am to 2.00 pm", specialty: "General Physician", online: true },
-  { id: "3", name: "Helena", email: "email@figma...", timing: "9.00 am to 2.00 pm", specialty: "General Physician", online: true },
+  { 
+    id: "1", 
+    fullName: "Helena", 
+    email: "email@figma.com", 
+    specialty: "General Physician", 
+    isOnline: true, 
+    availableFrom: "09:00", 
+    availableTo: "14:00", 
+    avatarUrl: null 
+  },
+  { 
+    id: "2", 
+    fullName: "Helena", 
+    email: "email@figma.com", 
+    specialty: "General Physician", 
+    isOnline: true, 
+    availableFrom: "09:00", 
+    availableTo: "14:00", 
+    avatarUrl: null 
+  },
+  { 
+    id: "3", 
+    fullName: "Helena", 
+    email: "email@figma.com", 
+    specialty: "General Physician", 
+    isOnline: true, 
+    availableFrom: "09:00", 
+    availableTo: "14:00", 
+    avatarUrl: null 
+  },
 ];
 
 const MOCK_AVAILABILITY = [
@@ -56,157 +83,300 @@ export default function ClinicHomePage() {
       .catch(() => setClinicName("Your Clinic"));
   }, []);
 
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good Morning!";
+    if (h < 17) return "Good Afternoon!";
+    return "Good Evening!";
+  })();
+
   return (
-    <div className="px-10 lg:px-[40px] py-8 max-w-[1600px] mx-auto">
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 items-start">
-        {/* ── Main column ── */}
-        <div className="flex flex-col gap-6 min-w-0">
-          {/* Header row: clinic identity + waiting patients */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="px-8 pb-12 select-none">
+      {/* Top Greeting Row */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
+        <div className="flex flex-col justify-center items-flex-start gap-1">
+          <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            {greeting}
+          </span>
+          <div className="flex items-center gap-3">
+            {clinicAvatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={clinicAvatar} alt={clinicName} className="w-11 h-11 rounded-full object-cover border border-gray-100" />
+            ) : (
+              <Avatar name={clinicName || "C"} size="w-11 h-11" />
+            )}
+            <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {clinicName || "Your Clinic"}
+            </h1>
+          </div>
+        </div>
+
+        {/* Patients Waiting Online Widget */}
+        <div className="flex items-center gap-8">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[#707070] text-xs font-semibold tracking-[-0.24px]" style={{ fontFamily: "Inter, sans-serif" }}>
+              Patients Waiting Online
+            </span>
             <div className="flex items-center gap-3">
-              {clinicAvatar ? (
-                <img src={clinicAvatar} alt={clinicName} className="w-11 h-11 rounded-full object-cover border border-gray-100" />
-              ) : (
-                <Avatar name={clinicName || "C"} size="w-11 h-11" />
-              )}
-              <h1 className="text-lg font-semibold text-[#24292E]">{clinicName || "Your Clinic"}</h1>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-3 flex items-center gap-4">
-              <span className="text-xs font-medium text-gray-500">Patients Waiting Online</span>
-              <div className="flex items-center -space-x-2">
-                {["A", "B", "C"].map((l) => <Avatar key={l} name={l} size="w-7 h-7" />)}
+              <div className="flex items-center -space-x-3.5">
+                {["A", "B", "C"].map((l, i) => (
+                  <div key={l} className={`w-[34px] h-[34px] rounded-full overflow-hidden border-2 border-[#F4F7FC] shadow-sm relative`} style={{ zIndex: 30 - i * 10 }}>
+                    <Avatar name={l} size="w-full h-full" />
+                  </div>
+                ))}
               </div>
-              <span className="text-sm font-bold text-[#24292E]">10+</span>
+              <span className="text-[#383F45] font-normal text-[36px] leading-none tracking-[-0.72px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                10+
+              </span>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Stat cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl p-6 flex flex-col gap-2 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
-              <span className="text-xs font-medium text-gray-500">Consultations Today</span>
-              <span className="text-2xl font-bold text-[#24292E]">24 <span className="text-sm font-medium text-gray-400">Consultations</span></span>
-              <span className="text-[11px] font-semibold text-emerald-500">↗ 20% Increase from yesterday</span>
-            </div>
-            <div className="bg-white rounded-xl p-6 flex flex-col gap-2 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
-              <span className="text-xs font-medium text-gray-500">Tasks to be Completed</span>
-              <span className="text-2xl font-bold text-[#24292E]">24 <span className="text-sm font-medium text-gray-400">Tasks</span></span>
-              <span className="text-[11px] font-semibold text-[#5476FC]">12 Tasks Completed</span>
-            </div>
-            <div className="bg-white rounded-xl p-6 flex flex-col gap-2 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">Revenue</span>
-                <span className="text-[11px] font-semibold text-gray-400">July ▾</span>
-              </div>
-              <span className="text-2xl font-bold text-[#24292E]">$56,565</span>
-              <span className="text-[11px] font-semibold text-red-400">↘ 8% Decrease from last month</span>
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        {/* Card 1: Consultations Today */}
+        <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
+          <div className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Consultations Today
+          </div>
+          <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            24 Consultations
+          </div>
+          <div className="flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M4.08301 9.91671L9.91634 4.08337" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4.08301 4.08337H9.91634V9.91671" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#179353] font-medium mr-1">20% Increase</span>
+              <span className="text-[#707070]">from yesterday</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Tasks to be Completed */}
+        <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
+          <div className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Tasks to be Completed
+          </div>
+          <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            24 Tasks
+          </div>
+          <div className="text-xs font-normal tracking-[-0.24px] text-[#5476FC]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            12 Tasks Completed
+          </div>
+        </div>
+
+        {/* Card 3: Revenue */}
+        <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
+          <div className="flex justify-between items-center w-full">
+            <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Revenue
+            </span>
+            <div className="flex items-center gap-1 cursor-pointer">
+              <span className="text-[#707070] text-[11px] font-medium tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>July</span>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6L8 10L12 6" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
           </div>
+          <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            $56,565
+          </div>
+          <div className="flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M4.08366 4.08337L9.91699 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M9.91699 4.08337L9.91699 9.91671L4.08366 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="text-[#F25252] font-medium mr-1">8% Decrease</span>
+              <span className="text-[#707070]">from last month</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
+      {/* Dashboard split content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left Column */}
+        <div className="lg:col-span-2 flex flex-col gap-8">
           {/* New Appointments */}
-          <div className="bg-white rounded-xl shadow-sm border border-transparent p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-[#24292E]">New Appointments</h2>
+          <div className="bg-white rounded-xl shadow-sm p-8 flex flex-col gap-5 border border-transparent hover:border-gray-100 transition-all">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-[#24292E] text-[23px] font-normal tracking-[-0.46px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                New Appointments
+              </h2>
               <button onClick={() => router.push("/clinic/appointments")} className="text-[#5476FC] text-xs font-semibold hover:underline">View all</button>
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-1">
+
+            <div className="h-[1px] bg-[#EBEEF5] w-full" />
+
+            <div className="flex flex-col gap-2">
               {MOCK_APPOINTMENTS.map((a) => (
-                <div key={a.id} className="min-w-[220px] bg-[#F7F8FC] rounded-xl p-4 flex flex-col gap-3 shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar name={a.patientName} size="w-9 h-9" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#24292E] truncate">{a.patientName}</p>
-                      <p className="text-[11px] text-gray-400 truncate">{a.patientEmail}</p>
+                <div
+                  key={a.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded-lg transition-all border bg-white hover:bg-gray-50/50 border-transparent"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+                      <Avatar name={a.patientName} size="w-full h-full" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[#24292E] font-normal text-[14px] leading-tight tracking-[-0.28px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        {a.patientName} <span className="text-[#A0A8B0] text-xs ml-1 font-light">{a.patientEmail}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="px-2.5 py-1 rounded-full bg-[#E2EAFE] flex items-center justify-center">
+                          <span className="text-[#213159] font-light text-[12px] leading-none tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {a.reason}
+                          </span>
+                        </div>
+                        <div className="px-2.5 py-1 rounded-full bg-[#F0F2F2] flex items-center justify-center">
+                          <span className="text-[#213159] font-light text-[12px] leading-none tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            Doctor: {a.doctor}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-600">{a.reason}</p>
-                  <p className="text-[11px] text-gray-400">Doctor - {a.doctor}</p>
-                  <p className="text-[11px] text-gray-400">Time : {a.time}, Date: {a.date}</p>
-                  <button className="mt-1 bg-[#1E293B] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#0f172a] transition-colors">
-                    Consult Now
-                  </button>
+                  <div className="flex items-center justify-between sm:justify-end gap-6 mt-3 sm:mt-0">
+                    <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      Time : {a.time}, Date: {a.date}
+                    </span>
+                    <button
+                      className="h-[32px] px-[13px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98]"
+                      style={{ fontFamily: "Outfit, sans-serif" }}
+                    >
+                      Consult Now
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Doctors Available */}
-          <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-bold text-[#24292E]">Doctors Available</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {MOCK_DOCTORS.map((d) => (
-                <div key={d.id} className="bg-[#F7F8FC] rounded-xl p-4 flex items-center gap-3">
-                  <Avatar name={d.name} size="w-10 h-10" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#24292E] truncate">{d.name}</p>
-                    <p className="text-[11px] text-gray-400 truncate">{d.email}</p>
-                    <p className="text-[11px] text-gray-400 mt-1">Timing : {d.timing}</p>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[11px] font-medium text-gray-500">{d.specialty}</span>
-                      {d.online && <span className="text-[11px] font-semibold text-emerald-500">Online</span>}
+          <div className="bg-white rounded-xl shadow-sm p-8 flex flex-col gap-5 border border-transparent hover:border-gray-100 transition-all">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[#24292E] text-[23px] font-normal tracking-[-0.46px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Doctors Available
+              </h2>
+            </div>
+            
+            <div className="h-[1px] bg-[#EBEEF5] w-full" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {MOCK_DOCTORS.map((d) => {
+                const formatTime = (t: string) => {
+                  const [h, m] = t.split(':').map(Number);
+                  const ampm = h >= 12 ? 'pm' : 'am';
+                  const hr12 = h % 12 || 12;
+                  return `${hr12}.${String(m).padStart(2, '0')} ${ampm}`;
+                };
+                const timing = `${formatTime(d.availableFrom)} to ${formatTime(d.availableTo)}`;
+                return (
+                  <div key={d.id} className="p-4 rounded-xl border border-gray-100 bg-[#F9FAFB] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        {d.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={d.avatarUrl} alt={d.fullName} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <Avatar name={d.fullName} size="w-10 h-10" />
+                        )}
+                        {d.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#1FAF65] border-2 border-white rounded-full"></span>}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[#24292E] text-sm font-medium tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>{d.fullName}</span>
+                        <span className="text-[#676E76] text-[13px] font-normal" style={{ fontFamily: "Outfit, sans-serif" }}>{d.specialty}</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex flex-col">
+                      <span className="text-[#676E76] text-[13px] font-normal" style={{ fontFamily: "Outfit, sans-serif" }}>{timing}</span>
+                      <span className={`text-[12px] font-medium mt-0.5 ${d.isOnline ? 'text-[#1FAF65]' : 'text-gray-400'}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                        {d.isOnline ? 'Online' : 'Offline'}
+                      </span>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
-
-          {/* Manage Clinic's Availability */}
-          <div className="flex items-center justify-between flex-wrap gap-4 bg-white rounded-xl shadow-sm border border-transparent p-6">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-sm font-bold text-[#24292E] mb-1">Manage Clinic&apos;s Availability</h2>
-              <div className="flex flex-wrap gap-x-8 gap-y-1.5">
-                {MOCK_AVAILABILITY.slice(0, 5).map((row) => (
-                  <span key={row.day} className="text-[11px] text-gray-400">
-                    <span className="font-semibold text-gray-500">{row.day.slice(0, 3)} :</span> {row.hours}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => router.push("/clinic/schedules")}
-              className="bg-[#1E293B] text-white text-xs font-semibold px-6 py-3 rounded-lg hover:bg-[#0f172a] transition-colors shrink-0"
-            >
-              Edit Timeslots
-            </button>
           </div>
         </div>
 
-        {/* ── Right column ── */}
+        {/* Right Column */}
         <div className="flex flex-col gap-6">
-          <div className="bg-[#EAEBFB] rounded-2xl p-6">
-            <h3 className="text-sm font-bold text-[#24292E] mb-4">Tasks Pending</h3>
-            <p className="text-xs text-gray-500">No pending tasks — wired up soon.</p>
-          </div>
-
-          <div className="bg-[#EAEBFB] rounded-2xl p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#24292E]">Clinic&apos;s Availability</h3>
-              <span className="text-[11px] font-semibold text-gray-400">This Week ▾</span>
-            </div>
-            <div className="bg-white rounded-xl p-4 flex flex-col gap-2.5">
-              <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wide pb-1 border-b border-gray-50">
-                <span>Availability</span>
+          {/* Availability Panel */}
+          <div className="bg-white rounded-xl p-6 border border-white shadow-sm flex flex-col gap-5">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-[#24292E] text-[20px] font-normal tracking-[-0.4px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Clinic&apos;s Availability
+              </span>
+              <div className="flex items-center gap-1.5 px-2 py-1 cursor-pointer">
+                <span className="text-[#707070] text-xs font-medium tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>This Week</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 6L8 10L12 6" stroke="#707070" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
+            </div>
+
+            <div className="h-[1px] bg-[#EBEEF5] w-full" />
+
+            <div className="flex flex-col gap-3">
               {MOCK_AVAILABILITY.map((row) => (
-                <div key={row.day} className="flex justify-between text-[11px]">
-                  <span className="text-gray-500">{row.day}</span>
-                  <span className="font-medium text-gray-700">{row.hours}</span>
+                <div key={row.day} className="flex justify-between items-center text-xs">
+                  <span className="text-[#596066] font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>{row.day}</span>
+                  <span className="text-[#24292E] font-normal tracking-[-0.24px] text-right" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {row.hours}
+                  </span>
                 </div>
               ))}
+            </div>
+            
+            <div className="mt-2 flex items-center justify-center">
               <button
-                onClick={() => setIsAvailable((v) => !v)}
-                className={`mt-2 flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${isAvailable ? "bg-[#E2F8EB]" : "bg-gray-50"}`}
+                onClick={() => router.push("/clinic/schedules")}
+                className="w-full bg-[#1E293B] text-white text-xs font-semibold px-6 py-3 rounded-lg hover:bg-[#0f172a] transition-colors shrink-0"
               >
-                <span className={`text-[11px] font-semibold ${isAvailable ? "text-emerald-600" : "text-gray-400"}`}>
-                  {isAvailable ? "You are available now" : "You are unavailable"}
-                </span>
-                <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${isAvailable ? "bg-emerald-400 justify-end" : "bg-gray-300 justify-start"}`}>
-                  <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
-                </span>
+                Edit Timeslots
+              </button>
+            </div>
+
+            <div className={`flex items-center justify-between p-4 rounded-[8px] w-full ${isAvailable ? "bg-[#E2F8EB]" : "bg-[#F5F5F5]"}`}>
+              <span className={`font-medium text-[14px] tracking-[-0.28px] ${isAvailable ? "text-[#179353]" : "text-[#707070]"}`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                {isAvailable ? "You are available now" : "You are offline"}
+              </span>
+              <button
+                onClick={() => setIsAvailable(v => !v)}
+                className="w-[33px] h-[17px] rounded-full p-[2px] flex items-center justify-end transition-all select-none"
+                style={{ backgroundColor: isAvailable ? "#1FAF65" : "#D1D5EB" }}
+              >
+                <div className={`bg-white w-[13px] h-[13px] rounded-full shadow-sm transform transition-transform duration-200 ${isAvailable ? "translate-x-0" : "-translate-x-[16px]"}`} />
               </button>
             </div>
           </div>
+
+          {/* Tasks Pending Panel */}
+          <div className="p-2 rounded-[24px] bg-[#F0F2F2] flex flex-col gap-2 shadow-sm border border-transparent hover:border-gray-200 transition-all">
+            <div className="flex justify-between items-center w-full pl-2.5 pr-1 py-1">
+              <span className="text-[#2B2B2B] text-[16px] font-medium leading-[1.5] font-bricolage">
+                Tasks Pending
+              </span>
+            </div>
+
+            <div className="p-5 flex flex-col gap-3 rounded-[12px] bg-[#CDE48C] w-full">
+              <div className="flex flex-col gap-2">
+                <div className="text-[#2B2B2B] text-[24px] font-medium leading-[1.5] font-bricolage">
+                  No Tasks
+                </div>
+              </div>
+              <div className="text-[#504E61] text-xs font-normal leading-[1.5]" style={{ fontFamily: "Inter, sans-serif" }}>
+                No pending tasks — wired up soon.
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

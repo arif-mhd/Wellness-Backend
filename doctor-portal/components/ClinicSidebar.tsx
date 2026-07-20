@@ -222,20 +222,23 @@ export default function ClinicSidebar() {
         ))}
 
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
-          <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)]">
-            {clinicAvatar ? (
-              <img src={clinicAvatar} alt="Clinic logo" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
-                {clinicName?.[0]?.toUpperCase() ?? clinicEmail?.[0]?.toUpperCase() ?? "C"}
-              </div>
-            )}
-          </div>
+          <Link href="/clinic/profile" className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:shadow-[0_0_0_4px_rgba(84,118,252,0.25)] transition-shadow">
+              {clinicAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={clinicAvatar} alt="Clinic logo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
+                  {clinicName?.[0]?.toUpperCase() ?? clinicEmail?.[0]?.toUpperCase() ?? "C"}
+                </div>
+              )}
+            </div>
 
-          <div className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"}`}>
-            <span className="text-[#24292E] font-medium text-sm truncate">{clinicName || "Clinic"}</span>
-            <span className="text-[#9EA5AD] text-xs truncate">{clinicEmail}</span>
-          </div>
+            <div className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"}`}>
+              <span className="text-[#24292E] font-medium text-sm truncate hover:text-[#5476FC] transition-colors">{clinicName || "Clinic"}</span>
+              <span className="text-[#9EA5AD] text-xs truncate">{clinicEmail}</span>
+            </div>
+          </Link>
 
           <button
             onClick={handleSignOut}

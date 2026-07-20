@@ -42,41 +42,41 @@ export default function Step4CreatePassword({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col">
-      <h2 className="text-2xl md:text-[1.65rem] font-normal tracking-tight text-gray-800 font-marcellus mb-2 text-center">
-        Create Your Password
-      </h2>
-      <p className="text-gray-500 text-[0.8rem] md:text-[0.85rem] leading-relaxed mb-8 font-outfit font-light text-center">
+      <h2 className="text-[20px] font-bold text-[#24292E] mb-2">Create Your Password</h2>
+      <p className="text-[12px] text-[#676E76] leading-relaxed mb-8">
         Choose a strong password to secure your account and keep your information safe.
       </p>
       
-      <div className="w-full space-y-4 mb-6">
+      <div className="w-full flex flex-col gap-6 mb-8">
         {/* Username field (read-only — this is the email from the earlier step) */}
         {usernameValue !== undefined && (
-          <div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-semibold text-[#24292E]">Username</label>
             <input
               type="text"
               readOnly
               value={usernameValue}
               placeholder="Username"
-              className="w-full bg-[#EEF0F8] border-0 rounded-xl px-5 py-4 text-sm text-gray-500 placeholder-gray-400 font-outfit cursor-not-allowed select-text"
+              className="w-full h-11 border border-[#D6DEFF] bg-[#F9FAFB] rounded-xl px-4 text-[13px] text-[#A7AAB4] outline-none cursor-not-allowed select-text"
             />
           </div>
         )}
 
         {/* Password field */}
-        <div className="relative">
+        <div className="flex flex-col gap-1.5 relative">
+          <label className="text-[12px] font-semibold text-[#24292E]">Password</label>
           <input
             type={showPassword ? "text" : "password"}
             required
-            placeholder="Password"
+            placeholder="••••••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-[#f3f4fd] border-0 rounded-xl pl-5 pr-12 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit"
+            className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 pr-12 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors placeholder-[#A7AAB4]"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors focus:outline-none"
+            className="absolute right-4 bottom-[10px] text-[#A7AAB4] hover:text-[#5476FC] transition-colors focus:outline-none"
           >
             {showPassword ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -92,19 +92,20 @@ export default function Step4CreatePassword({
         </div>
 
         {/* Confirm Password field */}
-        <div className="relative">
+        <div className="flex flex-col gap-1.5 relative">
+          <label className="text-[12px] font-semibold text-[#24292E]">Re-enter Password</label>
           <input
             type={showConfirmPassword ? "text" : "password"}
             required
-            placeholder="Confirm Password"
+            placeholder="••••••••••••"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full bg-[#f3f4fd] border-0 rounded-xl pl-5 pr-12 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit"
+            className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 pr-12 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors placeholder-[#A7AAB4]"
           />
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors focus:outline-none"
+            className="absolute right-4 bottom-[10px] text-[#A7AAB4] hover:text-[#5476FC] transition-colors focus:outline-none"
           >
             {showConfirmPassword ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -121,57 +122,32 @@ export default function Step4CreatePassword({
       </div>
 
       {/* Validation Checklist Grid */}
-      <div className="w-full space-y-2 mb-8 px-1 text-left select-none">
-        {/* Rule 1: Min Length */}
-        <div className="flex items-start gap-2">
-          {isMinLength ? (
-            <svg className="w-4 h-4 text-[#5476FC] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <circle cx="12" cy="12" r="10" />
-            </svg>
-          )}
-          <span className={`text-[0.7rem] font-light font-outfit leading-relaxed ${isMinLength ? "text-gray-600" : "text-gray-400"}`}>
-            Minimum Length: At least 8 characters.
-          </span>
-        </div>
+      <ul className="w-full flex flex-col gap-1.5 text-[11px] text-[#676E76] list-disc pl-5 marker:text-[#8AA0FF] mb-12">
+        <li className={`${isMinLength ? "text-[#5476FC]" : ""}`}>
+          Minimum Length: At least 8 characters.
+        </li>
+        <li className={`${isComplex ? "text-[#5476FC]" : ""}`}>
+          Must include uppercase, lowercase, number, and special character.
+        </li>
+      </ul>
 
-        {/* Rule 2: Complexity */}
-        <div className="flex items-start gap-2">
-          {isComplex ? (
-            <svg className="w-4 h-4 text-[#5476FC] flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <circle cx="12" cy="12" r="10" />
-            </svg>
-          )}
-          <span className={`text-[0.7rem] font-light font-outfit leading-relaxed ${isComplex ? "text-gray-600" : "text-gray-400"}`}>
-            Your password must include at least one uppercase letter (A-Z), one lowercase letter (a-z), one number (0-9), and one special character (e.g., !@#$%^&*).
-          </span>
-        </div>
+      <div className="flex justify-between w-full pt-4 border-t border-[#E4E8F0]">
+        <button
+          type="button"
+          onClick={onGoBack}
+          className="px-10 py-3.5 rounded-xl bg-white border border-[#E4E8F0] text-[#676E76] text-[13px] font-bold tracking-widest hover:bg-gray-50 transition-colors shadow-sm"
+        >
+          BACK
+        </button>
+        
+        <button
+          type="submit"
+          disabled={loading || !isMinLength || !isComplex}
+          className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? loadingLabel : submitLabel}
+        </button>
       </div>
-
-      {/* Main Submit Action */}
-      <button
-        type="submit"
-        disabled={loading || !isMinLength || !isComplex}
-        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? loadingLabel : submitLabel}
-      </button>
-
-      {/* Centered Go Back Button */}
-      <button
-        type="button"
-        onClick={onGoBack}
-        className="mt-6 text-gray-700 font-semibold font-outfit text-sm hover:underline focus:outline-none text-center"
-      >
-        Go Back
-      </button>
     </form>
   );
 }

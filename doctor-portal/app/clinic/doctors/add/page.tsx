@@ -128,37 +128,40 @@ export default function AddDoctorPage() {
   };
 
   return (
-    <div className="px-10 lg:px-[40px] py-8 max-w-[1100px] mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+      
+      {/* ── Page Header ── */}
+      <div className="flex items-center gap-3 mb-10 max-w-4xl mx-auto">
         <button
           onClick={() => router.push("/clinic/doctors")}
-          className="w-[38px] h-[38px] rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition shadow-sm shrink-0"
+          className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm border border-[#E4E8F0] hover:bg-gray-50 transition-all"
           aria-label="Go back"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M8.75 3.5L5.25 7L8.75 10.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight font-outfit">Add Doctor</h1>
+        <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
+          Add Doctor
+        </h1>
       </div>
 
-      <div className="flex items-center justify-between px-2 w-full pt-2 mb-6 flex-wrap gap-y-3">
-        {STEPS.map((s) => {
-          const isActive = step === s.key;
-          const isDone = step > s.key;
-          return (
-            <div key={s.key} className={`flex items-center gap-3 ${isActive ? "" : "opacity-60"}`}>
-              <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center text-[12px] font-medium shadow-sm ${
-                isActive ? "bg-[#5476FC] shadow-blue-200" : isDone ? "bg-[#5476FC]" : "bg-slate-300"
-              }`}>
-                {isDone ? "✓" : s.key}
-              </div>
-              <span className={`text-[13px] font-medium tracking-tight font-outfit ${isActive ? "text-slate-800" : "text-slate-500"}`}>
-                {s.label}
-              </span>
+      {/* ── Wizard Progress ── */}
+      <div className="flex items-center justify-between max-w-2xl mx-auto mb-12 relative px-4">
+        <div className="absolute top-1/2 left-4 right-4 h-[2px] bg-[#E4E8F0] -z-10 -translate-y-1/2" />
+        <div 
+          className="absolute top-1/2 left-4 h-[2px] bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] -z-10 -translate-y-1/2 transition-all duration-500 ease-out" 
+          style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : 'calc(100% - 32px)' }} 
+        />
+        
+        {STEPS.map(s => (
+          <div key={s.key} className="flex flex-col items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold transition-all duration-300 ${step >= s.key ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-110" : "bg-white border-2 border-[#E4E8F0] text-[#A7AAB4]"}`}>
+              {step > s.key ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg> : s.key}
             </div>
-          );
-        })}
+            <span className={`text-[12px] font-bold whitespace-nowrap absolute top-12 transition-colors ${step >= s.key ? "text-[#24292E]" : "text-[#A7AAB4]"}`}>{s.label}</span>
+          </div>
+        ))}
       </div>
 
       {submitError && (
@@ -174,10 +177,11 @@ export default function AddDoctorPage() {
         </div>
       )}
 
-      {step === 1 && <DoctorPersonalInfoForm onSubmit={handleStep1Submit} />}
-      {step === 2 && <DoctorMedicalCareerForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />}
-      {step === 3 && (
-        <div className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 p-8 md:p-10 font-outfit max-w-xl mx-auto">
+      <div className="max-w-4xl mx-auto">
+        {step === 1 && <DoctorPersonalInfoForm onSubmit={handleStep1Submit} />}
+        {step === 2 && <DoctorMedicalCareerForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />}
+        {step === 3 && (
+          <div className="w-full bg-white rounded-3xl shadow-sm border border-[#E4E8F0] p-8 md:p-12 font-outfit animate-fade-in max-w-xl mx-auto">
           <p className="text-center text-gray-500 text-sm mb-6 -mt-2">
             Create credentials for <span className="font-semibold text-gray-700">Dr. {personalInfo?.fullName}</span>
           </p>
@@ -193,8 +197,9 @@ export default function AddDoctorPage() {
             submitLabel="Save Credentials"
             loadingLabel="Saving…"
           />
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
