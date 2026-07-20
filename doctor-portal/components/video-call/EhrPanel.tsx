@@ -18,6 +18,40 @@ interface EhrProfile {
   medications: { current: any[]; past: any[] };
   chronicDiseases: string[];
   insurance: any[];
+  fhirPatientId?: string | null;
+}
+
+interface FhirEncounter {
+  fhirId: string;
+  status: string;
+  type: string | null;
+  reason: string | null;
+  start: string | null;
+  end: string | null;
+  practitioner: string | null;
+}
+
+interface FhirNote {
+  fhirId: string;
+  resourceType: "DocumentReference" | "Composition";
+  title: string;
+  date: string | null;
+  status: string;
+  text: string;
+}
+
+interface FhirObservation {
+  fhirId: string;
+  status: string;
+  code: string;
+  value: string;
+  date: string | null;
+}
+
+interface FhirData {
+  encounters: FhirEncounter[];
+  notes: FhirNote[];
+  observations: FhirObservation[];
 }
 
 interface EhrVisit {
@@ -41,6 +75,8 @@ interface EhrPanelProps {
   onClose: () => void;
   loading: boolean;
   data: EhrData | null;
+  fhirLoading?: boolean;
+  fhirData?: FhirData | null;
 }
 
 function fmtDate(iso?: string) {
@@ -183,7 +219,84 @@ function VisitDetail({ emr }: { emr: any }) {
   );
 }
 
-export default function EhrPanel({ open, onClose, loading, data }: EhrPanelProps) {
+/** External EMR (FHIR) records — read-only, fetched live from the outside EMR (Cortex/HAPI sandbox). */
+function ExternalRecords({ fhirPatientId, loading, fhirData }: { fhirPatientId?: string | null; loading?: boolean; fhirData?: FhirData | null }) {
+  if (!fhirPatientId) return null;
+
+  return (
+    <div className="px-6 py-4 border-b border-gray-100 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <p className="text-[#24292e] font-bold text-xs uppercase tracking-wide text-gray-400">External EMR Records</p>
+        <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Live · FHIR</span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-2">
+          <div className="w-3.5 h-3.5 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[11px] text-gray-400">Fetching from external EMR…</p>
+        </div>
+      ) : !fhirData ? (
+        <p className="text-[11px] text-gray-400 italic">Could not reach external EMR.</p>
+      ) : (
+        <>
+          {/* Encounters */}
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Prior Encounters ({fhirData.encounters.length})</p>
+            {fhirData.encounters.length === 0 ? (
+              <p className="text-[11px] text-gray-400 italic">None found.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {fhirData.encounters.map((e) => (
+                  <div key={e.fhirId} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
+                    <p className="text-[11px] font-semibold text-[#24292e]">{fmtDate(e.start ?? undefined)} — {e.reason || e.type || "Encounter"}</p>
+                    <p className="text-[10px] text-gray-400">{e.practitioner ? `${e.practitioner} · ` : ""}{e.status}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Notes (DocumentReference / Composition) */}
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Doctor Notes ({fhirData.notes.length})</p>
+            {fhirData.notes.length === 0 ? (
+              <p className="text-[11px] text-gray-400 italic">None found.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {fhirData.notes.map((n) => (
+                  <div key={n.fhirId} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
+                    <p className="text-[11px] font-semibold text-[#24292e]">{n.title}</p>
+                    <p className="text-[10px] text-gray-400 mb-1">{fmtDate(n.date ?? undefined)} · {n.resourceType}</p>
+                    {n.text && <p className="text-[11px] text-gray-600 leading-relaxed whitespace-pre-line">{n.text}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Observations */}
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Observations ({fhirData.observations.length})</p>
+            {fhirData.observations.length === 0 ? (
+              <p className="text-[11px] text-gray-400 italic">None found.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5">
+                {fhirData.observations.map((o) => (
+                  <div key={o.fhirId} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
+                    <p className="text-[10px] text-gray-400">{o.code}</p>
+                    <p className="text-[11px] font-semibold text-[#24292e]">{o.value || "—"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function EhrPanel({ open, onClose, loading, data, fhirLoading, fhirData }: EhrPanelProps) {
   const [expandedVisitId, setExpandedVisitId] = useState<string | null>(null);
 
   if (!open) return null;
@@ -244,6 +357,9 @@ export default function EhrPanel({ open, onClose, loading, data }: EhrPanelProps
                   <p className="text-xs text-[#24292e]">{formatMedications(data.profile.medications?.current ?? [])}</p>
                 </div>
               </div>
+
+              {/* External EMR (FHIR) records — only shown if this patient is linked to an external EMR record */}
+              <ExternalRecords fhirPatientId={data.profile.fhirPatientId} loading={fhirLoading} fhirData={fhirData} />
 
               {/* Pre-visit questionnaire for this appointment */}
               {data.preVisitData && (

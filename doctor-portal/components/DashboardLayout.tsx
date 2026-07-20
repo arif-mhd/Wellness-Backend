@@ -6,7 +6,6 @@ import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ChatBox from "@/components/ChatBox";
 
 export default function SharedDashboardLayout({
   children,
@@ -295,7 +294,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [notifTab, setNotifTab] = useState<"Unread" | "All">("Unread");
   const [notifLoading, setNotifLoading] = useState(false);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
-  const [showChat, setShowChat] = useState(false);
   const [waitingCount, setWaitingCount] = useState(0);
 
   const fetchWaitingCount = useCallback(async () => {
@@ -614,10 +612,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            {/* Chat */}
+            {/* Chat — navigates to the real messages page rather than a popup */}
             <div className="relative">
               <button
-                onClick={() => setShowChat(!showChat)}
+                onClick={() => router.push("/dashboard/messages")}
                 className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -627,7 +625,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <path d="M13.333 9.16675H13.4163" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              {showChat && <ChatBox onClose={() => setShowChat(false)} />}
             </div>
           </div>
         </header>

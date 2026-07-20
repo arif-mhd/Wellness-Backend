@@ -1040,6 +1040,54 @@ router.patch("/:id/waiting", requireRole("patient"), async (req: SessionRequest,
   }
 });
 
+// ─── POST /api/appointments/:id/pre-visit ───────────────────────────────────
+// Patient submits the pre-visit questionnaire (reason, symptoms, conditions,
+// medications, notes) before joining the waiting room. Read back by the
+// doctor-portal's EhrPanel and WaitingRoom via apt.preVisitData.
+router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+    if (apt.patientId !== patientId) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const {
+      primaryReason, symptoms, severity, duration,
+      conditions, medications, allergies, additionalNotes,
+    } = req.body;
+
+    const updated = {
+      ...apt,
+      preVisitData: {
+        primaryReason:    primaryReason    ?? null,
+        symptoms:         Array.isArray(symptoms) ? symptoms : [],
+        severity:         severity         ?? "",
+        duration:         duration         ?? "",
+        conditions:       conditions       ?? "",
+        medications:      medications      ?? "",
+        allergies:        allergies        ?? "",
+        additionalNotes:  additionalNotes  ?? "",
+        submittedAt:      new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await appointmentsContainer.items.upsert(updated);
+
+    res.json({ status: "OK", preVisitData: updated.preVisitData });
+  } catch (err) {
+    console.error("Save pre-visit data error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/appointments/:id/remind ──────────────────────────────────────
 // Doctor sends the patient a manual reminder notification about an upcoming
 // appointment.
@@ -1255,6 +1303,7 @@ router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: R
       medications:     patient.medications    ?? { current: [], past: [] },
       chronicDiseases: patient.chronicDiseases ?? [],
       insurance:       patient.insurance      ?? [],
+      fhirPatientId:   patient.fhirPatientId  ?? null,
     };
 
     // All of this patient's appointments across every doctor, most recent first.

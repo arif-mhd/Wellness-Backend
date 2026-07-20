@@ -66,7 +66,23 @@
       "PowerShell($proc = Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($proc\\) { Stop-Process -Id $proc.OwningProcess -Force; Write-Output \"Killed PID $\\($proc.OwningProcess\\)\" } else { Write-Output \"Nothing on 8081\" })",
       "Skill(artifact-design)",
       "Skill(artifact-design:*)",
-      "Bash(xargs grep -l \"appointment\\\\|Appointment\")"
+      "Bash(xargs grep -l \"appointment\\\\|Appointment\")",
+      "Bash(echo \"=== Wellness App top ===\" && ls \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\" 2>/dev/null)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/types/**)",
+      "Bash(cat /tmp/backend.log 2>&1 | tail -60)",
+      "Bash(curl -s \"https://hapi.fhir.org/baseR4/DocumentReference?patient=137183740\")",
+      "Bash(curl -s \"https://hapi.fhir.org/baseR4/Composition?patient=137183740\")",
+      "Bash(curl -s \"https://hapi.fhir.org/baseR4/Observation?patient=137183740\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(curl.exe -s \"https://hapi.fhir.org/baseR4/Observation/137183841\")",
+      "Bash(npx ts-node-dev *)",
+      "Bash(cd \"C:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\Wellness App\\\\Wellness\" && grep -rn \"from '@/services/userService'\\\\|from '../services/userService'\\\\|from './services/userService'\\\\|userService\" app/ 2>/dev/null *)",
+      "Bash(grep -n \"adminFetch\\(\\\\|fetch\\(\\\\`\" \"app/dashboard/patients/page.tsx\" \"app/dashboard/patients/[id]/page.tsx\" \"app/dashboard/pharmacy/page.tsx\" \"app/dashboard/pharmacy/add/page.tsx\" \"app/dashboard/pharmacy/[id]/page.tsx\" \"app/dashboard/pharmacy/[id]/product/[productId]/page.tsx\" \"app/dashboard/roles/page.tsx\" \"app/dashboard/vaccination/page.tsx\" \"app/dashboard/vaccination/add/page.tsx\")",
+      "Bash(cd \"c:\\\\Users\\\\Lenovo\\\\OneDrive\\\\Desktop\\\\wellness-platform\\\\backend\\\\src\\\\routes\" && grep -n \"router\\\\.\\\\\\(get\\\\|post\\\\|put\\\\|patch\\\\|delete\\\\\\)\" fhir.ts; echo \"---\"; grep -n \"patient-profile\" ../routes/appointments.ts)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/routes/**)",
+      "Bash(grep -n \"adminFetch\\(\\\\|fetch\\(\\\\`\\\\|apiFetch\\(\" \"app/dashboard/page.tsx\" \"app/dashboard/activity-log/page.tsx\" \"app/dashboard/emergencies/page.tsx\" \"app/dashboard/feedback/page.tsx\" \"app/dashboard/orders/page.tsx\" \"app/dashboard/doctors/add/page.tsx\" \"app/dashboard/doctors/[id]/page.tsx\")",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/\\\\\\(tabs\\\\\\)/**)",
+      "Read(//c/Users/Lenovo/OneDrive/Desktop/Wellness App/Wellness/app/wellness/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
@@ -99,7 +115,9 @@
       "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)\\profile",
       "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\onboarding",
       "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app\\(tabs)",
-      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components"
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\components",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\services",
+      "c:\\Users\\Lenovo\\OneDrive\\Desktop\\Wellness App\\Wellness\\app"
     ]
   }
 }

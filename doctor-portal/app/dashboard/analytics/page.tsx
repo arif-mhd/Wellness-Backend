@@ -9,11 +9,10 @@ import PatientsOutcome from "@/components/analytics/PatientsOutcome";
 import DiagnosticsStatus from "@/components/analytics/DiagnosticsStatus";
 import ScreeningRecommendations from "@/components/analytics/ScreeningRecommendations";
 
-interface Task {
-  id: number;
-  title: string;
-  desc: string;
-  completed: boolean;
+interface TaskCounts {
+  upcomingConsultations: number;
+  pendingEmr: number;
+  total: number;
 }
 
 function pctChange(today: number, yesterday: number): { value: number; direction: "up" | "down" | "none" } {
@@ -28,7 +27,7 @@ function pctChange(today: number, yesterday: number): { value: number; direction
 export default function AnalyticsPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [feedback, setFeedback] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskCounts, setTaskCounts] = useState<TaskCounts>({ upcomingConsultations: 0, pendingEmr: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -48,6 +47,13 @@ export default function AnalyticsPage() {
         const fbData = await feedbackRes.json();
         setFeedback(fbData ?? []);
       }
+
+      // 3. Fetch Doctor's outstanding tasks (same live-derived source as the dashboard)
+      const tasksRes = await apiFetch("/api/appointments/doctor/tasks");
+      if (tasksRes.ok) {
+        const { counts } = await tasksRes.json();
+        setTaskCounts(counts ?? { upcomingConsultations: 0, pendingEmr: 0, total: 0 });
+      }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
     } finally {
@@ -57,16 +63,6 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchData();
-
-    // 3. Load tasks from localStorage
-    try {
-      const saved = localStorage.getItem("doctor_tasks");
-      if (saved) {
-        setTasks(JSON.parse(saved));
-      }
-    } catch (err) {
-      console.error("Error reading tasks from localStorage:", err);
-    }
   }, [fetchData]);
 
   // Compute Statistics:
@@ -84,9 +80,10 @@ export default function AnalyticsPage() {
   const consultationsToday = todaysApps.length;
   const consultationsChange = pctChange(todaysApps.length, yesterdaysApps.length);
 
-  // Card 2: Tasks to be Completed & Completed
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.completed).length;
+  // Card 2: Tasks to be Completed — live-derived (upcoming consultations + pending EMR),
+  // same source as the dashboard's task list. There is no "completed tasks" history:
+  // a task simply disappears once the consult happens or the EMR is saved.
+  const totalTasks = taskCounts.total;
 
   // Card 3: Revenue (Sum of paymentAmount of completed appointments this month vs last month)
   const now = new Date();
@@ -193,7 +190,7 @@ export default function AnalyticsPage() {
                   {totalTasks} {totalTasks === 1 ? "Task" : "Tasks"}
                 </div>
                 <div className="text-[#179353] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {completedTasks} {completedTasks === 1 ? "Task Completed" : "Tasks Completed"}
+                  {taskCounts.pendingEmr} pending EMR{taskCounts.pendingEmr === 1 ? "" : "s"}
                 </div>
               </div>
 

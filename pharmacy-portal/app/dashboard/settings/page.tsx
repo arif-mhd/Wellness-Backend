@@ -3,6 +3,18 @@
 import React, { useState, useEffect } from "react";
 import Session from "supertokens-web-js/recipe/session";
 
+async function pharmacyFetch(path: string, options: RequestInit = {}) {
+  const token = await Session.getAccessToken();
+  return fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token ?? ""}`,
+      ...(options.headers ?? {}),
+    },
+  });
+}
+
 // Icons (SVG)
 const UserIcon = () => (
   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -112,12 +124,7 @@ function GeneralSettings() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const token = await Session.getAccessToken();
-        if (!token) return;
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/pharmacy/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await pharmacyFetch("/api/pharmacy/me");
         if (res.ok) {
           const data = await res.json();
           if (data.pharmacy) {
@@ -150,14 +157,9 @@ function GeneralSettings() {
     setSaving(true);
     setMessage(null);
     try {
-      const token = await Session.getAccessToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/pharmacy/me`, {
+      const res = await pharmacyFetch("/api/pharmacy/me", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
       if (!res.ok) throw new Error("Failed to save");
       setMessage({ type: 'success', text: 'Pharmacy information updated successfully!' });
@@ -267,35 +269,108 @@ function GeneralSettings() {
   );
 }
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+interface DayHours { open: string; close: string; isOpen: boolean; }
+type OperatingHours = Record<string, DayHours>;
+
+function defaultHours(): OperatingHours {
+  const obj: OperatingHours = {};
+  DAYS.forEach((day, idx) => {
+    obj[day] = { open: idx > 4 ? "10:00" : "08:00", close: idx > 4 ? "16:00" : "20:00", isOpen: idx !== 6 };
+  });
+  return obj;
+}
+
 function OperatingHoursSettings() {
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  
+  const [hours, setHours] = useState<OperatingHours>(defaultHours());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success'|'error', text: string } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await pharmacyFetch("/api/pharmacy/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pharmacy?.operatingHours) {
+            setHours({ ...defaultHours(), ...data.pharmacy.operatingHours });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load operating hours", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const updateDay = (day: string, updates: Partial<DayHours>) => {
+    setHours((prev) => ({ ...prev, [day]: { ...prev[day], ...updates } }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await pharmacyFetch("/api/pharmacy/me", {
+        method: "PUT",
+        body: JSON.stringify({ operatingHours: hours }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setMessage({ type: 'success', text: 'Operating hours updated successfully!' });
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: 'Failed to update hours. Please try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-in fade-in duration-300 flex items-center justify-center h-48">
+        <div className="w-8 h-8 border-4 border-[#5476FC]/30 border-t-[#5476FC] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-in fade-in duration-300">
       <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Operating Hours</h2>
-      
+
+      {message && (
+        <div className={`p-4 rounded-xl mb-6 text-[13px] font-medium flex items-center gap-3 ${message.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
+          {message.text}
+        </div>
+      )}
+
       <div className="space-y-3 max-w-2xl">
-        {days.map((day, idx) => (
-          <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#EBEEF5] hover:border-gray-300 transition-colors bg-white shadow-sm">
-            <div className="w-32 font-semibold text-[#383F45] text-sm mb-3 sm:mb-0">{day}</div>
-            <div className="flex items-center gap-3 mb-3 sm:mb-0">
-              <input type="time" defaultValue={idx > 4 ? "10:00" : "08:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC]" />
-              <span className="text-[#9EA5AD] text-[11px] uppercase font-bold tracking-wider">to</span>
-              <input type="time" defaultValue={idx > 4 ? "16:00" : "20:00"} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC]" />
+        {DAYS.map((day) => {
+          const d = hours[day];
+          return (
+            <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#EBEEF5] hover:border-gray-300 transition-colors bg-white shadow-sm">
+              <div className="w-32 font-semibold text-[#383F45] text-sm mb-3 sm:mb-0">{day}</div>
+              <div className="flex items-center gap-3 mb-3 sm:mb-0">
+                <input type="time" value={d.open} onChange={(e) => updateDay(day, { open: e.target.value })} disabled={!d.isOpen} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC] disabled:opacity-50" />
+                <span className="text-[#9EA5AD] text-[11px] uppercase font-bold tracking-wider">to</span>
+                <input type="time" value={d.close} onChange={(e) => updateDay(day, { close: e.target.value })} disabled={!d.isOpen} className="px-3 py-2 rounded-lg border border-[#EBEEF5] text-sm text-[#383F45] focus:outline-none focus:border-[#5476FC]/50 bg-[#F8FAFC] disabled:opacity-50" />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={d.isOpen} onChange={(e) => updateDay(day, { isOpen: e.target.checked })} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
+                  <span className="ml-3 text-sm font-medium text-[#676E76] w-14">{d.isOpen ? 'Open' : 'Closed'}</span>
+                </label>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" defaultChecked={idx !== 6} className="sr-only peer" />
-                <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
-                <span className="ml-3 text-sm font-medium text-[#676E76] w-14">{idx === 6 ? 'Closed' : 'Open'}</span>
-              </label>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div className="pt-6 flex justify-end">
-          <button className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all">
-            Save Hours
+          <button onClick={handleSave} disabled={saving} className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
+            {saving ? 'Saving...' : 'Save Hours'}
           </button>
         </div>
       </div>
@@ -339,45 +414,124 @@ function PayoutSettings() {
   );
 }
 
+interface NotifPref { email: boolean; sms: boolean; }
+type NotifPreferences = Record<string, NotifPref>;
+
+const NOTIF_TYPES: { key: string; title: string; desc: string }[] = [
+  { key: "new_orders",     title: "New Orders",     desc: "Receive alerts when a new prescription order is placed." },
+  { key: "low_inventory",  title: "Low Inventory",  desc: "Get notified when stock levels fall below minimum threshold." },
+  { key: "expiring_stock", title: "Expiring Stock", desc: "Alerts for medications expiring within 30 days." },
+  { key: "daily_summary",  title: "Daily Summary",  desc: "Receive a daily email with order and revenue summaries." },
+];
+
+function defaultNotifPreferences(): NotifPreferences {
+  const obj: NotifPreferences = {};
+  NOTIF_TYPES.forEach((n) => { obj[n.key] = { email: true, sms: n.key === "new_orders" }; });
+  return obj;
+}
+
 function NotificationSettings() {
-  const notifs = [
-    { id: 1, title: "New Orders", desc: "Receive alerts when a new prescription order is placed.", email: true, sms: true },
-    { id: 2, title: "Low Inventory", desc: "Get notified when stock levels fall below minimum threshold.", email: true, sms: false },
-    { id: 3, title: "Expiring Stock", desc: "Alerts for medications expiring within 30 days.", email: true, sms: false },
-    { id: 4, title: "Daily Summary", desc: "Receive a daily email with order and revenue summaries.", email: true, sms: false },
-  ];
+  const [prefs, setPrefs] = useState<NotifPreferences>(defaultNotifPreferences());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success'|'error', text: string } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await pharmacyFetch("/api/pharmacy/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pharmacy?.notificationPreferences) {
+            setPrefs({ ...defaultNotifPreferences(), ...data.pharmacy.notificationPreferences });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load notification preferences", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const toggle = (key: string, channel: "email" | "sms") => {
+    setPrefs((prev) => ({ ...prev, [key]: { ...prev[key], [channel]: !prev[key][channel] } }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await pharmacyFetch("/api/pharmacy/notifications", {
+        method: "PATCH",
+        body: JSON.stringify({ preferences: prefs }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setMessage({ type: 'success', text: 'Notification preferences updated successfully!' });
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: 'Failed to update preferences. Please try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-in fade-in duration-300 flex items-center justify-center h-48">
+        <div className="w-8 h-8 border-4 border-[#5476FC]/30 border-t-[#5476FC] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-300">
       <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Notification Preferences</h2>
-      
+
+      {message && (
+        <div className={`p-4 rounded-xl mb-6 text-[13px] font-medium flex items-center gap-3 ${message.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
+          {message.text}
+        </div>
+      )}
+
       <div className="space-y-3 max-w-3xl">
-        {notifs.map((n) => (
-          <div key={n.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#EBEEF5] bg-white hover:border-gray-300 transition-colors shadow-sm">
-            <div>
-              <h3 className="font-semibold text-[#24292E] text-sm">{n.title}</h3>
-              <p className="text-[13px] text-[#676E76] mt-1">{n.desc}</p>
+        {NOTIF_TYPES.map((n) => {
+          const p = prefs[n.key];
+          return (
+            <div key={n.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-[#EBEEF5] bg-white hover:border-gray-300 transition-colors shadow-sm">
+              <div>
+                <h3 className="font-semibold text-[#24292E] text-sm">{n.title}</h3>
+                <p className="text-[13px] text-[#676E76] mt-1">{n.desc}</p>
+              </div>
+              <div className="flex items-center gap-6 shrink-0 mt-2 sm:mt-0">
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <button
+                    type="button"
+                    onClick={() => toggle(n.key, "email")}
+                    className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${p.email ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}
+                  >
+                    <CheckIcon />
+                  </button>
+                  <span className="text-[13px] font-medium text-[#383F45]">Email</span>
+                </label>
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <button
+                    type="button"
+                    onClick={() => toggle(n.key, "sms")}
+                    className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${p.sms ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}
+                  >
+                    <CheckIcon />
+                  </button>
+                  <span className="text-[13px] font-medium text-[#383F45]">SMS</span>
+                </label>
+              </div>
             </div>
-            <div className="flex items-center gap-6 shrink-0 mt-2 sm:mt-0">
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <div className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${n.email ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}>
-                  <CheckIcon />
-                </div>
-                <span className="text-[13px] font-medium text-[#383F45]">Email</span>
-              </label>
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <div className={`w-5 h-5 rounded-[6px] border flex items-center justify-center transition-colors ${n.sms ? 'bg-[#5476FC] border-[#5476FC] text-white' : 'border-[#EBEEF5] bg-[#F8FAFC] text-transparent group-hover:border-[#5476FC]/50'}`}>
-                  <CheckIcon />
-                </div>
-                <span className="text-[13px] font-medium text-[#383F45]">SMS</span>
-              </label>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div className="pt-6 flex justify-end">
-          <button className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all">
-            Update Preferences
+          <button onClick={handleSave} disabled={saving} className="px-6 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
+            {saving ? 'Saving...' : 'Update Preferences'}
           </button>
         </div>
       </div>
@@ -386,29 +540,112 @@ function NotificationSettings() {
 }
 
 function SecuritySettings() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success'|'error', text: string } | null>(null);
+
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [loading2fa, setLoading2fa] = useState(true);
+  const [toggling2fa, setToggling2fa] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await pharmacyFetch("/api/pharmacy/2fa/status");
+        if (res.ok) {
+          const data = await res.json();
+          setTwoFactorEnabled(!!data.twoFactorEnabled);
+        }
+      } catch (err) {
+        console.error("Failed to load 2FA status", err);
+      } finally {
+        setLoading2fa(false);
+      }
+    })();
+  }, []);
+
+  const handleChangePassword = async () => {
+    setPasswordMessage(null);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Please fill in all password fields.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'New password and confirmation do not match.' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'New password must be at least 8 characters.' });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const res = await pharmacyFetch("/api/pharmacy/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error === "WRONG_PASSWORD" ? "Current password is incorrect." : "Failed to update password. Please try again.";
+        setPasswordMessage({ type: 'error', text: msg });
+        return;
+      }
+      setPasswordMessage({ type: 'success', text: 'Password updated successfully!' });
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    } catch (err) {
+      console.error(err);
+      setPasswordMessage({ type: 'error', text: 'Failed to update password. Please try again.' });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleToggle2fa = async () => {
+    const next = !twoFactorEnabled;
+    setToggling2fa(true);
+    try {
+      const res = await pharmacyFetch(`/api/pharmacy/2fa/${next ? "enable" : "disable"}`, { method: "POST" });
+      if (res.ok) setTwoFactorEnabled(next);
+    } catch (err) {
+      console.error("Failed to toggle 2FA", err);
+    } finally {
+      setToggling2fa(false);
+    }
+  };
+
   return (
     <div className="animate-in fade-in duration-300">
       <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Security & Password</h2>
-      
+
       <div className="space-y-8 max-w-2xl">
         <div className="space-y-6">
           <h3 className="text-sm font-semibold text-[#24292E]">Change Password</h3>
+
+          {passwordMessage && (
+            <div className={`p-4 rounded-xl text-[13px] font-medium flex items-center gap-3 ${passwordMessage.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
+              {passwordMessage.text}
+            </div>
+          )}
+
           <div className="space-y-5">
             <div className="space-y-2">
               <label className={labelCls}>Current Password</label>
-              <input type="password" placeholder="••••••••" className={inputCls} />
+              <input type="password" placeholder="••••••••" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} />
             </div>
             <div className="space-y-2">
               <label className={labelCls}>New Password</label>
-              <input type="password" placeholder="••••••••" className={inputCls} />
+              <input type="password" placeholder="••••••••" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
             </div>
             <div className="space-y-2">
               <label className={labelCls}>Confirm New Password</label>
-              <input type="password" placeholder="••••••••" className={inputCls} />
+              <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputCls} />
             </div>
             <div className="pt-2">
-              <button className="px-6 py-3 bg-[#24292E] hover:bg-[#1A1F24] text-white rounded-xl font-medium text-[13px] transition-colors w-full sm:w-auto shadow-sm">
-                Update Password
+              <button onClick={handleChangePassword} disabled={changingPassword} className="px-6 py-3 bg-[#24292E] hover:bg-[#1A1F24] text-white rounded-xl font-medium text-[13px] transition-colors w-full sm:w-auto shadow-sm disabled:opacity-60">
+                {changingPassword ? 'Updating...' : 'Update Password'}
               </button>
             </div>
           </div>
@@ -421,8 +658,14 @@ function SecuritySettings() {
               <p className="text-[13px] text-[#676E76] mt-1">Add an extra layer of security to your account by requiring a verification code upon login.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
-              <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC]"></div>
+              <input
+                type="checkbox"
+                checked={twoFactorEnabled}
+                disabled={loading2fa || toggling2fa}
+                onChange={handleToggle2fa}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-[#EBEEF5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5476FC] peer-disabled:opacity-50"></div>
             </label>
           </div>
         </div>

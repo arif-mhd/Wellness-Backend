@@ -832,4 +832,44 @@ router.put("/notification-preferences", requireRole("patient"), async (req: Sess
   }
 });
 
+// ── PUT /api/patients/privacy-preferences ─────────────────────────────────────
+// Stores data-sharing/visibility toggle states from Settings > Privacy.
+// Body: { preferences: { shareWithDoctors, analyticsData, locationAccess, personalizedContent }, visibility? }
+router.put("/privacy-preferences", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { preferences, visibility } = req.body;
+
+    if (!preferences || typeof preferences !== "object") {
+      res.status(400).json({ error: "preferences object is required" });
+      return;
+    }
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    const updated = {
+      ...existing,
+      privacyPreferences: {
+        shareWithDoctors:    Boolean(preferences.shareWithDoctors    ?? true),
+        analyticsData:       Boolean(preferences.analyticsData       ?? false),
+        locationAccess:      Boolean(preferences.locationAccess      ?? true),
+        personalizedContent: Boolean(preferences.personalizedContent ?? true),
+        visibility:          visibility === "private" ? "private" : "doctors",
+        updatedAt:           new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await patientsContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Privacy preferences update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

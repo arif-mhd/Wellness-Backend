@@ -201,7 +201,7 @@ router.get("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
 router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
-    const { ownerName, pharmacyName, licenseNumber, email, phone, location } = req.body;
+    const { ownerName, pharmacyName, licenseNumber, email, phone, location, manager, operatingHours } = req.body;
 
     const { resource: existing } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!existing) {
@@ -217,6 +217,8 @@ router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
       ...(email && { email }),
       ...(phone && { phone }),
       ...(location !== undefined && { location }),
+      ...(manager !== undefined && { manager }),
+      ...(operatingHours !== undefined && { operatingHours }),
       updatedAt: new Date().toISOString(),
     };
 
@@ -593,6 +595,111 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Pharmacy reset-password error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /api/pharmacy/notifications ────────────────────────────────────────
+// Persists the pharmacy's notification preferences (per-notification-type
+// email/sms toggles, shown in Settings > Notifications).
+router.patch("/notifications", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  const pharmacyId = req.session!.getUserId();
+  const { preferences } = req.body;
+
+  try {
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found." }); return; }
+
+    const updated = {
+      ...pharmacy,
+      notificationPreferences: {
+        ...(pharmacy.notificationPreferences ?? {}),
+        ...(preferences ?? {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await pharmaciesContainer.items.upsert(updated);
+    res.json({ status: "OK", notificationPreferences: updated.notificationPreferences });
+  } catch (err) {
+    console.error("Pharmacy notifications update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/pharmacy/change-password ───────────────────────────────────────
+router.post("/change-password", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  const pharmacyId = req.session!.getUserId();
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+    return;
+  }
+
+  try {
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+
+    const signInResult = await EmailPassword.signIn("public", pharmacy.email, currentPassword);
+    if (signInResult.status !== "OK") {
+      res.status(403).json({ error: "WRONG_PASSWORD" });
+      return;
+    }
+
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", pharmacyId, pharmacy.email);
+    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
+    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED" }); return; }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Pharmacy change-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/pharmacy/2fa/status ──────────────────────────────────────────────
+router.get("/2fa/status", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  const pharmacyId = req.session!.getUserId();
+  try {
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    res.json({ twoFactorEnabled: pharmacy?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("Pharmacy 2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/pharmacy/2fa/enable ─────────────────────────────────────────────
+router.post("/2fa/enable", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  const pharmacyId = req.session!.getUserId();
+  try {
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found." }); return; }
+    await pharmaciesContainer.items.upsert({ ...pharmacy, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Pharmacy 2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/pharmacy/2fa/disable ────────────────────────────────────────────
+router.post("/2fa/disable", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  const pharmacyId = req.session!.getUserId();
+  try {
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found." }); return; }
+    await pharmaciesContainer.items.upsert({ ...pharmacy, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Pharmacy 2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 

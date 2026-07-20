@@ -93,6 +93,7 @@ export default function DashboardPage() {
   const [doctorName, setDoctorName]     = useState<string | null>(null);
   const [slots, setSlots]               = useState<SlotDef[]>([]);
   const [isAvailable, setIsAvailable]   = useState(true);
+  const [togglingAvailable, setTogglingAvailable] = useState(false);
 
   // Appointments
   const [patients, setPatients]               = useState<PatientRow[]>([]);
@@ -160,6 +161,20 @@ export default function DashboardPage() {
     return () => { setMounted(false); clearInterval(interval); };
   }, [pollForInvite]);
 
+  const handleAvailabilityToggle = useCallback(async () => {
+    const next = !isAvailable;
+    setTogglingAvailable(true);
+    try {
+      await apiFetch("/api/doctors/online-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOnline: next }),
+      });
+      setIsAvailable(next);
+    } catch { /* keep current state on error */ }
+    setTogglingAvailable(false);
+  }, [isAvailable]);
+
   const fetchData = useCallback(async () => {
     try {
       // Doctor name
@@ -167,6 +182,13 @@ export default function DashboardPage() {
       if (meRes.ok) {
         const meData = await meRes.json();
         setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
+      }
+
+      // Online/available status (same source of truth as the sidebar toggle)
+      const doctorRes = await apiFetch("/api/doctors/me");
+      if (doctorRes.ok) {
+        const { doctor } = await doctorRes.json();
+        setIsAvailable(doctor?.isOnline !== false); // default true if not set
       }
 
       // Appointments
@@ -679,8 +701,9 @@ export default function DashboardPage() {
                   {isAvailable ? "You are available Now" : "You are Offline"}
                 </span>
                 <button
-                  onClick={() => setIsAvailable(!isAvailable)}
-                  className="w-[33px] h-[17px] rounded-full p-[2px] flex items-center justify-end transition-all select-none"
+                  onClick={handleAvailabilityToggle}
+                  disabled={togglingAvailable}
+                  className="w-[33px] h-[17px] rounded-full p-[2px] flex items-center justify-end transition-all select-none disabled:opacity-60"
                   style={{ backgroundColor: isAvailable ? "#1FAF65" : "#D1D5EB" }}
                 >
                   <div className={`bg-white w-[13px] h-[13px] rounded-full shadow-sm transform transition-transform duration-200 ${isAvailable ? "translate-x-0" : "-translate-x-[16px]"}`} />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
 
@@ -49,10 +49,12 @@ function StatusBadge({ status }: { status: keyof typeof STATUS_CONFIG }) {
 
 export default function InventoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState<"all" | "flagged" | Product["status"]>("all");
-  const [search, setSearch]         = useState("");
+  // Seeded from ?search= so the header search bar can deep-link here.
+  const [search, setSearch]         = useState(() => searchParams.get("search") ?? "");
 
   const load = useCallback(async () => {
     try {

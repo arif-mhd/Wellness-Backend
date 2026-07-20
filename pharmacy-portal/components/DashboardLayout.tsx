@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
@@ -20,6 +20,12 @@ export default function SharedDashboardLayout({
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
+  const [headerSearch, setHeaderSearch] = useState("");
+
+  const runHeaderSearch = () => {
+    const q = headerSearch.trim();
+    router.push(q ? `/dashboard/inventory?search=${encodeURIComponent(q)}` : "/dashboard/inventory");
+  };
 
   return (
     <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
@@ -80,7 +86,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
             <input
               type="text"
-              placeholder="Search Inventory or Orders"
+              value={headerSearch}
+              onChange={(e) => setHeaderSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") runHeaderSearch(); }}
+              placeholder="Search Inventory"
               className="w-full bg-[rgba(0,0,0,0.03)] text-[#3D4B5A] placeholder-[rgba(61,75,90,0.6)] text-xs rounded-full pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-[#5476FC]/20 focus:bg-white transition-all border border-transparent"
             />
           </div>

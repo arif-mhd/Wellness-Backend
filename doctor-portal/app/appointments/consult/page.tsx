@@ -87,6 +87,10 @@ function ConsultRoom() {
   const [ehrLoading, setEhrLoading] = useState(false);
   const [ehrData, setEhrData] = useState<any | null>(null);
 
+  // External EMR (FHIR) records — fetched only if the patient is linked to an external EMR record
+  const [fhirLoading, setFhirLoading] = useState(false);
+  const [fhirData, setFhirData] = useState<any | null>(null);
+
   // Specialist invite
   const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
   const [doctorsLoading,     setDoctorsLoading]     = useState(false);
@@ -446,7 +450,31 @@ function ConsultRoom() {
     setEhrLoading(true);
     try {
       const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
-      if (res.ok) setEhrData(await res.json());
+      if (res.ok) {
+        const ehr = await res.json();
+        setEhrData(ehr);
+
+        const fhirId = ehr?.profile?.fhirPatientId;
+        if (fhirId) {
+          setFhirLoading(true);
+          try {
+            const [encRes, notesRes, obsRes] = await Promise.all([
+              apiFetch(`/api/fhir/patients/${fhirId}/encounters`),
+              apiFetch(`/api/fhir/patients/${fhirId}/notes`),
+              apiFetch(`/api/fhir/patients/${fhirId}/observations`),
+            ]);
+            setFhirData({
+              encounters: encRes.ok ? await encRes.json() : [],
+              notes:      notesRes.ok ? await notesRes.json() : [],
+              observations: obsRes.ok ? await obsRes.json() : [],
+            });
+          } catch {
+            setFhirData(null);
+          } finally {
+            setFhirLoading(false);
+          }
+        }
+      }
     } catch {
       // ignore
     } finally {
@@ -711,7 +739,7 @@ function ConsultRoom() {
       )}
 
       {/* ── EHR panel ── */}
-      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} />
+      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} fhirLoading={fhirLoading} fhirData={fhirData} />
 
       {/* ── Top call bar ── */}
       <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">

@@ -489,7 +489,7 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
       waterIntakeLiters, weightKg, basalTempC,
       menstrualFlow, sexActivity, physicalActivity,
       ovulationTest, otherFactors, oralContraceptive,
-      vaginalDischarge, digestion,
+      vaginalDischarge, digestion, pills,
     } = req.body;
 
     const updated = {
@@ -511,6 +511,7 @@ router.put("/daily", async (req: SessionRequest, res: Response) => {
       ...(oralContraceptive   !== undefined && { oralContraceptive }),
       ...(vaginalDischarge    !== undefined && { vaginalDischarge }),
       ...(digestion           !== undefined && { digestion }),
+      ...(pills               !== undefined && { pills }),
       updatedAt: new Date().toISOString(),
     };
 

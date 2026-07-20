@@ -86,6 +86,8 @@ function VideoCallInner() {
   const [ehrOpen, setEhrOpen] = useState(false);
   const [ehrLoading, setEhrLoading] = useState(false);
   const [ehrData, setEhrData] = useState<any | null>(null);
+  const [fhirLoading, setFhirLoading] = useState(false);
+  const [fhirData, setFhirData] = useState<any | null>(null);
 
   // Specialist invite (primary doctor only)
   const [availableDoctors,   setAvailableDoctors]   = useState<AvailableDoctor[]>([]);
@@ -308,7 +310,7 @@ function VideoCallInner() {
       try {
         // 1. Load patient profile (for the snapshot strip)
         try {
-          const profRes = await apiFetch(`/api/appointments/${appointmentId}/patient-profile`);
+          const profRes = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
           if (profRes.ok) {
             const { profile } = await profRes.json();
             setPatientProfile(profile ?? null);
@@ -424,7 +426,31 @@ function VideoCallInner() {
     setEhrLoading(true);
     try {
       const res = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
-      if (res.ok) setEhrData(await res.json());
+      if (res.ok) {
+        const ehr = await res.json();
+        setEhrData(ehr);
+
+        const fhirId = ehr?.profile?.fhirPatientId;
+        if (fhirId) {
+          setFhirLoading(true);
+          try {
+            const [encRes, notesRes, obsRes] = await Promise.all([
+              apiFetch(`/api/fhir/patients/${fhirId}/encounters`),
+              apiFetch(`/api/fhir/patients/${fhirId}/notes`),
+              apiFetch(`/api/fhir/patients/${fhirId}/observations`),
+            ]);
+            setFhirData({
+              encounters: encRes.ok ? await encRes.json() : [],
+              notes:      notesRes.ok ? await notesRes.json() : [],
+              observations: obsRes.ok ? await obsRes.json() : [],
+            });
+          } catch {
+            setFhirData(null);
+          } finally {
+            setFhirLoading(false);
+          }
+        }
+      }
     } catch {
       // ignore
     } finally {
@@ -979,7 +1005,7 @@ function VideoCallInner() {
         </div>
       </div>
 
-      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} />
+      <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} fhirLoading={fhirLoading} fhirData={fhirData} />
     </div>
   );
 }

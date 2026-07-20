@@ -763,7 +763,7 @@ router.delete("/routines/:routineId", async (req: SessionRequest, res: Response)
 router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { date, exercises, sessionTitle, profileId } = req.body;
+    const { date, exercises, sessionTitle, profileId, sessionDurationMinutes } = req.body;
     if (!Array.isArray(exercises) || exercises.length === 0) {
       res.status(400).json({ error: "exercises array is required" });
       return;
@@ -780,6 +780,13 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
     const sessionId = crypto.randomUUID();
     const saved: any[] = [];
 
+    // The overall session length (from the duration picker on Save Workout)
+    // only applies to non-cardio exercises — cardio entries already carry
+    // their own real durationMinutes. Attach it to exactly one entry in the
+    // batch (not all of them) so daily-summary time totals, which sum
+    // durationMinutes across every entry, don't double-count it.
+    let sessionDurationAssigned = false;
+
     for (const ex of exercises) {
       const exercise = getExerciseById(ex.exerciseId);
       if (!exercise) continue;
@@ -792,6 +799,13 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
         totalVolumeKg = ex.sets.reduce((a: number, s: { weight?: number; reps?: number }) =>
           a + (s.weight ?? 0) * (s.reps ?? 0), 0);
       }
+
+      let durationMinutes = ex.durationMinutes ?? null;
+      if (durationMinutes == null && !sessionDurationAssigned && sessionDurationMinutes) {
+        durationMinutes = sessionDurationMinutes;
+        sessionDurationAssigned = true;
+      }
+
       const entry = {
         id: crypto.randomUUID(),
         patientId,
@@ -805,7 +819,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
         type: exercise.type,
         image: exercise.image,
         sets: ex.sets ?? null,
-        durationMinutes: ex.durationMinutes ?? null,
+        durationMinutes,
         totalVolumeKg: totalVolumeKg ?? null,
         caloriesBurned,
         loggedAt: new Date().toISOString(),
@@ -846,13 +860,17 @@ router.post("/weight-log", async (req: SessionRequest, res: Response) => {
 
     // Keep patient profile current weight in sync — only for the account
     // owner's own profile; family members' weight isn't tracked on the
-    // patient document itself.
+    // patient document itself. `weight` (a "NN kg" string) is the field the
+    // Profile screen actually displays/edits, so that's what must be updated
+    // — currentWeightKg is kept too for any other consumer, but is not
+    // itself read anywhere in the app.
     if (!profileId || profileId === patientId) {
       try {
         const { resource } = await patientsContainer.item(patientId, patientId).read();
         if (resource) {
           await patientsContainer.items.upsert({
             ...resource,
+            weight: `${parseFloat(weightKg)} kg`,
             currentWeightKg: parseFloat(weightKg),
             updatedAt: new Date().toISOString(),
           });
