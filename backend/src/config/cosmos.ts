@@ -57,6 +57,9 @@ export const menstrualDailyContainer: Container = db.container("menstrualDaily")
 /** Pharmacy profiles — partition key: /id (one doc per pharmacy owner) */
 export const pharmaciesContainer: Container = db.container("pharmacies");
 
+/** Clinic profiles — partition key: /id (one doc per clinic account) */
+export const clinicsContainer: Container = db.container("clinics");
+
 /** Pharmacy products — partition key: /pharmacyId */
 export const pharmacyProductsContainer: Container = db.container("pharmacyProducts");
 
@@ -134,6 +137,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "menstrualLogs",      partitionKey: { paths: ["/patientId"] } },
     { id: "menstrualDaily",     partitionKey: { paths: ["/patientId"] } },
     { id: "pharmacies",         partitionKey: { paths: ["/id"] } },
+    { id: "clinics",            partitionKey: { paths: ["/id"] } },
     { id: "pharmacyProducts",   partitionKey: { paths: ["/pharmacyId"] } },
     { id: "medicineOrders",    partitionKey: { paths: ["/patientId"] } },
     { id: "prescriptions",     partitionKey: { paths: ["/patientId"] } },

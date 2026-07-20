@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
-import UserRoles from "supertokens-node/recipe/userroles";
 import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -18,7 +17,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // Returns a SAS URL for each uploaded file.
 router.post(
   "/upload",
-  requireRole("doctor_pending", "doctor"),
+  requireRole("doctor"),
   upload.fields([
     { name: "avatar", maxCount: 1 },
     { name: "emiratesId", maxCount: 1 },
@@ -57,7 +56,7 @@ router.post(
 
 // ─── GET /api/doctors/me ─────────────────────────────────────────────────────
 // Returns the currently logged-in doctor's own profile (doctor or doctor_pending role).
-router.get("/me", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+router.get("/me", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -69,104 +68,10 @@ router.get("/me", requireRole("doctor", "doctor_pending"), async (req: SessionRe
   }
 });
 
-// ─── POST /api/doctors/register ─────────────────────────────────────────────
-// Public endpoint — called by the doctor portal signup flow (step 4).
-// Creates the SuperTokens account, assigns the "doctor_pending" role,
-// and saves the full registration profile to Cosmos with status "pending_approval".
-// The doctor CANNOT log in to the dashboard until an admin approves them.
-router.post("/register", async (req: Request, res: Response) => {
-  const {
-    email,
-    password,
-    fullName,
-    phone,
-    dateOfBirth,
-    gender,
-    emiratesId,
-  } = req.body;
-
-  // ── Basic validation ──────────────────────────────────────────────────────
-  if (!email || !password || !fullName || !phone) {
-    res.status(400).json({
-      error: "email, password, fullName and phone are required.",
-    });
-    return;
-  }
-
-  try {
-    // ── 0. Confirm OTP was verified for this email ────────────────────────
-    const normalizedEmail = email.trim().toLowerCase();
-    const { resources: otpDocs } = await otpCodesContainer.items
-      .query({
-        query:
-          "SELECT * FROM c WHERE c.email = @email AND c.verified = true ORDER BY c.createdAt DESC OFFSET 0 LIMIT 1",
-        parameters: [{ name: "@email", value: normalizedEmail }],
-      })
-      .fetchAll();
-
-    if (!otpDocs.length) {
-      res.status(403).json({ error: "OTP_NOT_VERIFIED" });
-      return;
-    }
-
-    // ── 1. Create SuperTokens account ─────────────────────────────────────
-    // We call the Node SDK directly (bypassing the signUpPOST override that
-    // expects extra form fields like "name" and "role").
-    const signUpResult = await EmailPassword.signUp("public", email, password);
-
-    if (signUpResult.status === "EMAIL_ALREADY_EXISTS_ERROR") {
-      res.status(409).json({ error: "An account with this email already exists." });
-      return;
-    }
-
-    if (signUpResult.status !== "OK") {
-      res.status(400).json({ error: "Registration failed. Please try again." });
-      return;
-    }
-
-    const supertokensId = signUpResult.user.id;
-
-    // ── 2. Assign "doctor_pending" role ───────────────────────────────────
-    // This role blocks dashboard access. It is upgraded to "doctor" on approval.
-    await UserRoles.addRoleToUser("public", supertokensId, "doctor_pending");
-
-    // ── 3. Save registration details to Cosmos ────────────────────────────
-    const now = new Date().toISOString();
-    const doctorDoc = {
-      id: supertokensId,   // Cosmos id = ST userId
-      supertokens_id: supertokensId,
-      status: "pending_approval",
-      email,
-      fullName,
-      phone,
-      dateOfBirth: dateOfBirth || null,
-      gender: gender || null,
-      emiratesId: emiratesId || null,
-      // Fields filled in after onboarding
-      specialty: null,
-      license: null,
-      bio: null,
-      fees: null,
-      languages: null,
-      // Timestamps
-      registeredAt: now,
-      approvedAt: null,
-      approvedBy: null,
-    };
-
-    await doctorsContainer.items.upsert(doctorDoc);
-
-    res.status(201).json({ status: "OK", message: "Registration submitted successfully." });
-  } catch (err) {
-    console.error("Doctor registration error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
 // ─── PUT /api/doctors/profile ───────────────────────────────────────────────
 // Doctor submits their full onboarding profile after signup.
 // Called by the complete-profile wizard. Saves all details to Cosmos.
-router.put("/profile", requireRole("doctor_pending", "doctor"), async (req: SessionRequest, res: Response) => {
+router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const {
     // Personal
@@ -759,6 +664,24 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/doctors/:id/stats ─────────────────────────────────────────────
+// Public endpoint — returns completed consultation count for a doctor.
+router.get("/:id/stats", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { resources } = await appointmentsContainer.items
+      .query({
+        query: "SELECT VALUE COUNT(1) FROM c WHERE c.doctorId = @doctorId AND c.status = 'completed'",
+        parameters: [{ name: "@doctorId", value: id }],
+      })
+      .fetchAll();
+    res.json({ completedConsultations: resources[0] ?? 0 });
+  } catch (err) {
+    console.error("Fetch doctor stats error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/doctors/:id/reviews ───────────────────────────────────────────
 router.get("/:id/reviews", async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -886,7 +809,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
 });
 
 // ─── GET /api/doctors/2fa/status ─────────────────────────────────────────────
-router.get("/2fa/status", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+router.get("/2fa/status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -898,7 +821,7 @@ router.get("/2fa/status", requireRole("doctor", "doctor_pending"), async (req: S
 });
 
 // ─── POST /api/doctors/2fa/enable ────────────────────────────────────────────
-router.post("/2fa/enable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+router.post("/2fa/enable", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -912,7 +835,7 @@ router.post("/2fa/enable", requireRole("doctor", "doctor_pending"), async (req: 
 });
 
 // ─── POST /api/doctors/2fa/disable ───────────────────────────────────────────
-router.post("/2fa/disable", requireRole("doctor", "doctor_pending"), async (req: SessionRequest, res: Response) => {
+router.post("/2fa/disable", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();

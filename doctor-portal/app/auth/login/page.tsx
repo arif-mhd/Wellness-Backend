@@ -33,7 +33,29 @@ export default function LoginPage() {
       });
 
       if (response.status === "OK") {
-        // ── Check if this doctor has 2FA enabled ──────────────────────────────
+        // ── Resolve role first — clinic and doctor sessions share this one
+        // login page but land on different dashboards. ──────────────────────
+        let roles: string[] = [];
+        try {
+          const meRes = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            roles = meData.roles ?? [];
+          }
+        } catch {
+          // If we can't resolve roles, fall through to the doctor path below.
+        }
+
+        if (roles.includes("clinic_pending")) {
+          router.push("/auth/pending");
+          return;
+        }
+        if (roles.includes("clinic")) {
+          router.push("/clinic");
+          return;
+        }
+
+        // ── Doctor path — check if this doctor has 2FA enabled ──────────────
         // The SuperTokens session is now active, so we can call the protected endpoint.
         try {
           const twoFaRes = await fetch(`${API_URL}/api/doctors/2fa/status`, {
@@ -179,7 +201,7 @@ export default function LoginPage() {
                   disabled={loading}
                   className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95"
                 >
-                  <span>{loading ? "Signing in…" : "Login"}</span>
+                  <span>{loading ? "Signing in…" : "Clinic/Doctor Login"}</span>
                   {!loading && (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -191,7 +213,7 @@ export default function LoginPage() {
                   href="/auth/signup"
                   className="bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] px-8 py-3.5 rounded-[0.8rem] font-medium font-outfit text-sm flex items-center justify-center transition-all hover:translate-y-[-1px] active:translate-y-[0px] duration-150"
                 >
-                  Register Now
+                  Register Your Clinic
                 </Link>
               </div>
             </form>

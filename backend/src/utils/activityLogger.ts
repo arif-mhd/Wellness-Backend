@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { activityLogsContainer } from "../config/cosmos";
 
-export type ActivitySource = "admin" | "doctor" | "patient" | "pharmacy" | "lab";
+export type ActivitySource = "admin" | "doctor" | "patient" | "pharmacy" | "lab" | "clinic";
 
 export interface ActivityLog {
   id: string;

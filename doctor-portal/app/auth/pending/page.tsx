@@ -66,7 +66,7 @@ export default function PendingApprovalPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               <p className="text-[0.78rem] text-gray-600 font-outfit font-light">
-                You'll receive an email once your account is approved and you can start using the Doctor Portal.
+                You'll receive an email once your account is approved and you can start using the Clinic Portal.
               </p>
             </div>
           </div>

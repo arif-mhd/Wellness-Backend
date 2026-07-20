@@ -22,8 +22,8 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Wellness – Doctor Portal",
-  description: "Manage your patients, appointments, and consultations",
+  title: "Wellness – Clinic Portal",
+  description: "Manage your clinic, doctors, patients, and consultations",
 };
 
 export default function RootLayout({

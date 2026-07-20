@@ -210,7 +210,7 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/doctors/register`, {
+      const res = await fetch(`${API_URL}/api/clinics/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -220,7 +220,7 @@ export default function SignupPage() {
           phone,
           dateOfBirth,
           gender,
-          emiratesId,
+          emiratesIdOrPassport: emiratesId,
         }),
       });
 
@@ -255,7 +255,7 @@ export default function SignupPage() {
       <div className="w-full max-w-[1000px] mx-auto flex flex-col items-center flex-1 justify-start pt-8 md:pt-16 z-10">
         
         {/* Wellness Logo at Top */}
-        <div className="mb-12 select-none">
+        <div className="mb-12 flex items-center gap-3 select-none">
           <Image
             src={logoImg}
             alt="Wellness Central Logo"
@@ -264,6 +264,9 @@ export default function SignupPage() {
             className="object-contain hover:opacity-90 transition-opacity"
             priority
           />
+          <span className="text-[0.7rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
+            Clinic
+          </span>
         </div>
 
         {/* Step Progress Indicators (Hidden on step 5 / Success screen) */}
@@ -450,6 +453,9 @@ export default function SignupPage() {
               loading={loading}
               onSubmit={handleStep4Submit}
               onGoBack={() => setStep(3)}
+              usernameValue={email || emailOrPhone}
+              submitLabel="Sign Up"
+              loadingLabel="Signing Up..."
             />
           )}
 

@@ -10,6 +10,11 @@ interface Step4CreatePasswordProps {
   loading: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onGoBack: () => void;
+  /** When provided, renders a read-only "Username" field above Password — this is
+   *  just the email collected earlier in the flow, not a separate credential. */
+  usernameValue?: string;
+  submitLabel?: string;
+  loadingLabel?: string;
 }
 
 export default function Step4CreatePassword({
@@ -20,6 +25,9 @@ export default function Step4CreatePassword({
   loading,
   onSubmit,
   onGoBack,
+  usernameValue,
+  submitLabel = "Create Password",
+  loadingLabel = "Creating Account...",
 }: Step4CreatePasswordProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -42,6 +50,19 @@ export default function Step4CreatePassword({
       </p>
       
       <div className="w-full space-y-4 mb-6">
+        {/* Username field (read-only — this is the email from the earlier step) */}
+        {usernameValue !== undefined && (
+          <div>
+            <input
+              type="text"
+              readOnly
+              value={usernameValue}
+              placeholder="Username"
+              className="w-full bg-[#EEF0F8] border-0 rounded-xl px-5 py-4 text-sm text-gray-500 placeholder-gray-400 font-outfit cursor-not-allowed select-text"
+            />
+          </div>
+        )}
+
         {/* Password field */}
         <div className="relative">
           <input
@@ -140,7 +161,7 @@ export default function Step4CreatePassword({
         disabled={loading || !isMinLength || !isComplex}
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? "Creating Account..." : "Create Password"}
+        {loading ? loadingLabel : submitLabel}
       </button>
 
       {/* Centered Go Back Button */}

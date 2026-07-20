@@ -38,14 +38,14 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/doctors",
-    label: "Doctors",
+    href: "/dashboard/clinics",
+    label: "Clinics",
     icon: (active: boolean) => (
       <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 5a2 2 0 0 0-2 2v7a6 6 0 0 0 12 0V7a2 2 0 0 0-2-2h-1" />
-        <circle cx="16" cy="19" r="3" />
-        <path d="M10 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" />
-        <path d="M8 7H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h3" />
+        <path d="M3 21h18" />
+        <path d="M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-6h6v6" />
+        <path d="M9 9h1M14 9h1M9 13h1M14 13h1" />
       </svg>
     ),
   },

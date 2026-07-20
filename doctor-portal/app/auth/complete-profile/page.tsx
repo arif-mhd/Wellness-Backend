@@ -6,11 +6,11 @@ import Image from "next/image";
 import { apiFetch } from "@/lib/apiFetch";
 import logoImg from "@/assets/images/wellness_logo.png";
 import ProfileCompletionSidebar from "@/components/profile/ProfileCompletionSidebar";
-import PersonalInformationForm from "@/components/profile/PersonalInformationForm";
-import MedicalCareerForm from "@/components/profile/MedicalCareerForm";
-import CertificationDocumentsForm from "@/components/profile/CertificationDocumentsForm";
+import OwnersPersonalInfoForm from "@/components/profile/OwnersPersonalInfoForm";
+import InsurancesForm from "@/components/profile/InsurancesForm";
+import ClinicCompanyInfoForm from "@/components/profile/ClinicCompanyInfoForm";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
-import PaymentSettingsForm from "@/components/profile/PaymentSettingsForm";
+import ProfileVerificationModal from "@/components/profile/ProfileVerificationModal";
 
 // Upload files to blob via the backend and return { fieldName: sasUrl } map
 async function uploadFiles(
@@ -23,7 +23,7 @@ async function uploadFiles(
   }
   if (!hasFile) return {};
 
-  const res = await apiFetch("/api/doctors/upload", {
+  const res = await apiFetch("/api/clinics/upload", {
     method: "POST",
     body: form,
   });
@@ -33,14 +33,11 @@ async function uploadFiles(
 }
 
 // Convert the SetAvailabilityForm's selected slot keys to backend slot objects.
-// Keys look like "MON-09:00", "MON-10:00", "TUE-14:00" …
-// We group by day, find min startTime and max endTime+1h, mark each active day.
 const DAY_KEY_TO_DOW: Record<string, number> = {
   SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
 };
 
 function slotsFromKeys(selectedSlots: string[]) {
-  // Group hours by weekday
   const byDay: Record<string, number[]> = {};
   for (const key of selectedSlots) {
     const parts = key.split("-");
@@ -53,7 +50,6 @@ function slotsFromKeys(selectedSlots: string[]) {
   const result: any[] = [];
   for (const [day, hours] of Object.entries(byDay)) {
     const sorted = [...new Set(hours)].sort((a, b) => a - b);
-    // Split into contiguous blocks
     const blocks: number[][] = [];
     let current: number[] = [sorted[0]];
     for (let i = 1; i < sorted.length; i++) {
@@ -88,110 +84,86 @@ function CompleteProfileContent() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
-  const nameParam      = searchParams.get("name")       || "";
-  const emailParam     = searchParams.get("email")      || "";
-  const phoneParam     = searchParams.get("phone")      || "";
-  const dobParam       = searchParams.get("dob")        || "";
-  const genderParam    = searchParams.get("gender")     || "";
+  const nameParam       = searchParams.get("name")       || "";
+  const emailParam      = searchParams.get("email")      || "";
+  const phoneParam      = searchParams.get("phone")      || "";
+  const genderParam     = searchParams.get("gender")     || "";
+  const dobParam        = searchParams.get("dob")        || "";
   const emiratesIdParam = searchParams.get("emiratesId") || "";
 
-  const [personalInfo, setPersonalInfo] = useState<any>({
-    name: nameParam, email: emailParam, phone: phoneParam,
-    dob: dobParam, gender: genderParam, emiratesId: emiratesIdParam,
-    bio: "", businessEmail: "", bloodGroup: "", height: "", weight: "",
-    maritalStatus: "", address: "", postalCode: "", languages: [],
-    profilePic: null, emiratesIdFile: null,
-  });
-  const [medicalCareerInfo, setMedicalCareerInfo]   = useState<any>(null);
-  const [certDocumentsInfo, setCertDocumentsInfo]   = useState<any>(null);
-  const [availabilityInfo, setAvailabilityInfo]     = useState<any>(null);
+  const [ownerInfo, setOwnerInfo] = useState<any>(null);
+  const [insuranceInfo, setInsuranceInfo] = useState<any>(null);
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
+  const [availabilityInfo, setAvailabilityInfo] = useState<any>(null);
 
-  const handleStep1Submit = (formData: any) => {
-    setPersonalInfo({
-      name: nameParam,
-      email: formData.email,
-      phone: formData.contactNumber,
-      dob: formData.dob,
-      gender: formData.gender,
-      emiratesId: formData.emiratesId,
-      bio: formData.bio,
-      businessEmail: formData.businessEmail,
-      bloodGroup: formData.bloodGroup,
-      height: formData.height,
-      weight: formData.weight,
-      maritalStatus: formData.maritalStatus,
-      address: formData.address,
-      postalCode: formData.postalCode,
-      languages: formData.languages,   // now an array
-      profilePic: formData.profilePic,
-      emiratesIdFile: formData.emiratesIdFile,
-    });
-    setStep(2);
-  };
+  const handleStep1Submit = (formData: any) => { setOwnerInfo(formData); setStep(2); };
+  const handleStep2Submit = (formData: any) => { setInsuranceInfo(formData); setStep(3); };
+  const handleStep3Submit = (formData: any) => { setCompanyInfo(formData); setStep(4); };
 
-  const handleStep2Submit = (formData: any) => { setMedicalCareerInfo(formData); setStep(3); };
-  const handleStep3Submit = (formData: any) => { setCertDocumentsInfo(formData); setStep(4); };
-  const handleStep4Submit = (formData: any) => { setAvailabilityInfo(formData);  setStep(5); };
-
-  const handleStep5Submit = async (formData: any) => {
+  const handleStep4Submit = async (formData: any) => {
+    setAvailabilityInfo(formData);
     setSubmitting(true);
     setSubmitError("");
 
     try {
       // 1. Upload files to blob storage
       const fileUrls = await uploadFiles({
-        avatar:     personalInfo.profilePic    ?? null,
-        emiratesId: personalInfo.emiratesIdFile ?? null,
-        degree:     certDocumentsInfo?.degreeFile ?? null,
-        spec:       certDocumentsInfo?.specFile   ?? null,
-        other:      certDocumentsInfo?.addFile    ?? null,
+        spcContract:   insuranceInfo?.spcContractFile ?? null,
+        addressProof:  companyInfo?.addressProofFile  ?? null,
+        logo:          companyInfo?.clinicImage        ?? null,
       }).catch(() => ({} as Record<string, string>));
 
       // 2. Convert availability slot keys → backend slot objects
-      const slots = slotsFromKeys(availabilityInfo?.selectedSlots ?? []);
+      const slots = slotsFromKeys(formData?.selectedSlots ?? []);
 
-      // 3. Build profile payload
+      // 3. Merge insurance entries with the (single) uploaded SPC contract
+      const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
+        ...row,
+        spcContractFileUrl: fileUrls.spcContract || null,
+        verified: !!insuranceInfo?.spcVerified,
+      }));
+
+      // 4. Build profile payload
       const payload: Record<string, any> = {
-        bio:           personalInfo.bio           || null,
-        businessEmail: personalInfo.businessEmail || null,
-        bloodGroup:    personalInfo.bloodGroup     || null,
-        height:        personalInfo.height         || null,
-        weight:        personalInfo.weight         || null,
-        maritalStatus: personalInfo.maritalStatus  || null,
-        address:       personalInfo.address        || null,
-        postalCode:    personalInfo.postalCode      || null,
-        // Store languages as comma-separated string for backend compatibility
-        languages:     Array.isArray(personalInfo.languages)
-                         ? personalInfo.languages.join(", ")
-                         : personalInfo.languages || null,
-        avatarUrl:         fileUrls.avatar      || null,
-        emiratesIdFileUrl: fileUrls.emiratesId  || null,
-        specialty:     medicalCareerInfo?.specialty    || null,
-        license:       medicalCareerInfo?.license      || null,
-        experience:    medicalCareerInfo?.experience   || null,
-        medicalSchool: medicalCareerInfo?.medicalSchool|| null,
-        residency:     medicalCareerInfo?.residency    || null,
-        fees:          medicalCareerInfo?.fees ?? null,
-        feesPerEmirate: medicalCareerInfo?.fees ?? null,
-        bankDetails:   formData ?? null,
+        fullName:             ownerInfo?.fullName || null,
+        phone:                ownerInfo?.contactNumber || null,
+        emiratesIdOrPassport: ownerInfo?.emiratesIdOrPassport || null,
+        email:                ownerInfo?.email || null,
+        gender:               ownerInfo?.gender || null,
+        dateOfBirth:          ownerInfo?.dateOfBirth || null,
+        positionInClinic:     ownerInfo?.positionInClinic || null,
+        languages:            Array.isArray(ownerInfo?.languages) ? ownerInfo.languages.join(", ") : null,
+        otherInfo:            ownerInfo?.otherInfo ?? [],
+        insurances,
+        licenseNumber:        companyInfo?.licenseNumber || null,
+        dohLicense:           companyInfo?.dohLicense || null,
+        address:              companyInfo?.address || null,
+        addressProofFileUrl:  fileUrls.addressProof || null,
+        consultationRates:    companyInfo?.consultationRates ?? [],
+        paymentSettings:      companyInfo?.paymentSettings || null,
+        bio:                  companyInfo?.bio || null,
+        clinicImageUrl:       fileUrls.logo || null,
         slots,
-        degreeFileUrl: fileUrls.degree || null,
-        specFileUrl:   fileUrls.spec   || null,
-        otherFileUrl:  fileUrls.other  || null,
       };
 
-      // 4. Save profile
-      await apiFetch("/api/doctors/profile", {
+      // 5. Save profile
+      const res = await apiFetch("/api/clinics/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      router.push("/auth/pending");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Failed to save profile (${res.status}).`);
+      }
+
+      setShowVerificationModal(true);
     } catch (err: any) {
       console.error("Profile submit error:", err);
-      setSubmitError("Failed to save profile. Please try again.");
+      setSubmitError(err?.message ?? "Failed to save profile. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -203,8 +175,11 @@ function CompleteProfileContent() {
       <div className="absolute -top-24 -right-24 w-[350px] h-[350px] bg-blue-200/20 rounded-full blur-[100px] pointer-events-none select-none" />
 
       <div className="relative z-10 w-full max-w-[1300px] mx-auto flex flex-col items-center flex-1 justify-start pt-4">
-        <div className="mb-10 select-none">
+        <div className="mb-10 flex items-center gap-3 select-none">
           <Image src={logoImg} alt="Wellness Central Logo" width={160} height={50} className="object-contain hover:opacity-90 transition-opacity" priority />
+          <span className="text-[0.7rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
+            Clinic
+          </span>
         </div>
 
         {submitError && (
@@ -220,47 +195,37 @@ function CompleteProfileContent() {
           </div>
         )}
 
+        {showVerificationModal && (
+          <ProfileVerificationModal onClose={() => router.push("/auth/login")} />
+        )}
+
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-8">
           <div className="lg:col-span-4 h-full">
             <ProfileCompletionSidebar currentStep={step} />
           </div>
           <div className="lg:col-span-8">
             {step === 1 && (
-              <PersonalInformationForm
-                initialName={personalInfo.name}
-                initialEmail={personalInfo.email}
-                initialPhone={personalInfo.phone}
-                initialDob={personalInfo.dob}
-                initialGender={personalInfo.gender}
-                initialEmiratesId={personalInfo.emiratesId}
-                initialLanguages={personalInfo.languages}
+              <OwnersPersonalInfoForm
+                initialFullName={nameParam}
+                initialEmail={emailParam}
+                initialPhone={phoneParam}
+                initialGender={genderParam}
+                initialDob={dobParam}
+                initialEmiratesIdOrPassport={emiratesIdParam}
                 onSubmit={handleStep1Submit}
               />
             )}
             {step === 2 && (
-              <MedicalCareerForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />
+              <InsurancesForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />
             )}
             {step === 3 && (
-              <CertificationDocumentsForm
-                initialDegreeFile={certDocumentsInfo?.degreeFile}
-                initialSpecFile={certDocumentsInfo?.specFile}
-                initialAddFile={certDocumentsInfo?.addFile}
-                onSubmit={handleStep3Submit}
-                onGoBack={() => setStep(2)}
-              />
+              <ClinicCompanyInfoForm onSubmit={handleStep3Submit} onGoBack={() => setStep(2)} />
             )}
             {step === 4 && (
               <SetAvailabilityForm
                 initialAvailability={availabilityInfo?.selectedSlots}
                 onSubmit={handleStep4Submit}
                 onGoBack={() => setStep(3)}
-              />
-            )}
-            {step === 5 && (
-              <PaymentSettingsForm
-                initialBankData={undefined}
-                onSubmit={handleStep5Submit}
-                onGoBack={() => setStep(4)}
               />
             )}
           </div>

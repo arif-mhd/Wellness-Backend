@@ -15,7 +15,7 @@ import EmailPassword from "supertokens-web-js/recipe/emailpassword";
 if (typeof window !== "undefined") {
   SuperTokens.init({
     appInfo: {
-      appName: "Wellness Doctor Portal",
+      appName: "Wellness Clinic Portal",
       apiDomain: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
       apiBasePath: "/auth",
     },

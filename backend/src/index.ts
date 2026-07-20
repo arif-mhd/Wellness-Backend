@@ -12,6 +12,8 @@ import { initCosmosContainers } from "./config/cosmos";
 import authRouter from "./routes/auth";
 import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
+import clinicsRouter from "./routes/clinics";
+import adminClinicsRouter from "./routes/adminClinics";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
 import appointmentsRouter from "./routes/appointments";
@@ -43,6 +45,7 @@ import otpRouter from "./routes/otp";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
 import servicesRouter from "./routes/services";
+import fhirRouter from "./routes/fhir";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -78,8 +81,15 @@ app.use("/auth", authRouter);
 app.use("/api/doctors", doctorsRouter);
 app.use("/api/doctors/notifications", doctorNotificationsRouter);
 
-// Admin doctor management (requires admin role)
+// Admin doctor management (requires admin role) — legacy/independent doctors,
+// no longer linked from the admin nav (clinics own doctor management now).
 app.use("/api/admin/doctors", adminDoctorsRouter);
+
+// Clinic self-registration (public) + own profile
+app.use("/api/clinics", clinicsRouter);
+
+// Admin clinic management (requires admin role)
+app.use("/api/admin/clinics", adminClinicsRouter);
 
 // Patient self-registration + profile updates (public register, rest require patient role)
 app.use("/api/patients", patientsRouter);
@@ -127,6 +137,9 @@ app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/services", servicesRouter);
 
+// External EMR (FHIR) read-only integration — mock Cortex via public HAPI sandbox
+app.use("/api/fhir", fhirRouter);
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -161,10 +174,11 @@ async function main() {
   try {
     await UserRoles.createNewRoleOrAddPermissions("patient",          []);
     await UserRoles.createNewRoleOrAddPermissions("doctor",           []);
-    await UserRoles.createNewRoleOrAddPermissions("doctor_pending",   []);
     await UserRoles.createNewRoleOrAddPermissions("admin",            []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy",         []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy_pending", []);
+    await UserRoles.createNewRoleOrAddPermissions("clinic",           []);
+    await UserRoles.createNewRoleOrAddPermissions("clinic_pending",   []);
     console.log("✅ SuperTokens roles ready");
   } catch {
     console.warn("⚠️  Could not create roles — SuperTokens may not be reachable yet");

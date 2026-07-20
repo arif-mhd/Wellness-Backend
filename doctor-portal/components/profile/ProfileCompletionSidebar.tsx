@@ -13,11 +13,10 @@ export default function ProfileCompletionSidebar({
   currentStep = 1,
 }: ProfileCompletionSidebarProps) {
   const steps: StepItem[] = [
-    { id: 1, label: "Personal Information" },
-    { id: 2, label: "Medical Specialization" },
-    { id: 3, label: "Certification Documents" },
+    { id: 1, label: "Owner's Personal Information" },
+    { id: 2, label: "Insurances" },
+    { id: 3, label: "Clinic / Company Information" },
     { id: 4, label: "Set Availability" },
-    { id: 5, label: "Payment Settings" },
   ];
 
   return (

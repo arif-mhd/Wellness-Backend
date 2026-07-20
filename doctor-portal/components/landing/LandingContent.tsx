@@ -50,15 +50,15 @@ export default function LandingContent() {
         {/* Actions & Footer */}
         <div>
           <div className="flex flex-col sm:flex-row gap-4 mb-10">
-            {/* Doctor Login Button */}
-            <DoctorLoginButton />
+            {/* Clinic/Doctor Login Button */}
+            <DoctorLoginButton label="Clinic/Doctor Login" />
 
-            {/* Register Now Button */}
+            {/* Register Your Clinic Button */}
             <Link
               href="/auth/signup"
               className="bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] px-8 py-3.5 rounded-[0.8rem] font-medium font-outfit text-sm flex items-center justify-center transition-all hover:translate-y-[-1px] active:translate-y-[0px] duration-150"
             >
-              Register Now
+              Register Your Clinic
             </Link>
           </div>
 
