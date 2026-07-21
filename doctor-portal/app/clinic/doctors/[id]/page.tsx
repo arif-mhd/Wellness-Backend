@@ -20,10 +20,10 @@ function EditIcon() {
 }
 
 export default function DoctorProfilePage({ params }: { params: { id: string } }) {
-  const [activeTab, setActiveTab] = useState("ABOUT");
+  const [activeTab, setActiveTab] = useState("About");
 
   // Tab capsules
-  const tabs = ["ABOUT", "CONSULTATIONS", "SCHEDULES", "RATING AND PERFORMANCE"];
+  const tabs = ["About", "Consultations", "Schedules", "Rating and Performance"];
 
   return (
     <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -126,7 +126,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
       </div>
 
       {/* ── Tab Content ── */}
-      {activeTab === "ABOUT" && (
+      {activeTab === "About" && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-12 gap-y-10 mb-20 bg-white p-6 rounded-xl border border-[#E4E8F0] shadow-sm">
           
           {/* Left Column */}
@@ -252,7 +252,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
       )}
 
       {/* ── CONSULTATIONS Tab ── */}
-      {activeTab === "CONSULTATIONS" && (
+      {activeTab === "Consultations" && (
         <div className="flex flex-col gap-3 mb-10">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white border border-[#E4E8F0] rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
@@ -272,7 +272,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
                 <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">11:30</span></span>
                 <span className="text-[11px] text-[#676E76]">12/10/2024</span>
               </div>
-              <span className={`text-[12px] font-medium ${i === 2 ? 'text-[#D92D20]' : 'text-[#D92D20]'}`}>
+              <span className={`text-[12px] font-medium ${i === 2 ? 'text-[#D92D20]' : 'text-[#179353]'}`}>
                 {i === 2 ? "Pending report" : "Completed"}
               </span>
               <button className="flex items-center gap-1 text-[12px] font-medium text-[#24292E] hover:text-[#5476FC] transition-colors">
@@ -285,7 +285,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
       )}
 
       {/* ── SCHEDULES Tab ── */}
-      {activeTab === "SCHEDULES" && (
+      {activeTab === "Schedules" && (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-12 mb-10">
           
           {/* Left Column: Edit or Add Timeslot */}
@@ -354,7 +354,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
       )}
 
       {/* ── RATING AND PERFORMANCE Tab ── */}
-      {activeTab === "RATING AND PERFORMANCE" && (
+      {activeTab === "Rating and Performance" && (
         <div className="bg-[#EEF0F6] border border-[#E4E8F0] rounded-2xl p-8 mb-10 shadow-sm">
           <h3 className="text-[16px] font-bold text-[#24292E] mb-6">Rating and Reviews</h3>
           
