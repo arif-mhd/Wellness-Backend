@@ -37,6 +37,21 @@ interface OtherInfoRow {
   value: string;
 }
 
+interface BranchRow {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  status: "requested" | "details_pending" | "pending_approval" | "active" | "rejected";
+  licenseNumber?: string | null;
+  dohLicense?: string | null;
+  addressProofFileUrl?: string | null;
+  consultationRates?: RateRow[];
+  paymentSettings?: string | null;
+  bio?: string | null;
+  clinicImageUrl?: string | null;
+}
+
 interface Clinic {
   id: string;
   fullName: string;
@@ -61,6 +76,8 @@ interface Clinic {
   registeredAt: string;
   approvedAt: string | null;
   rejectedReason?: string | null;
+  isMultiBranchOrg?: boolean;
+  branches?: BranchRow[];
 }
 
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -185,6 +202,58 @@ function ClinicDetailInner({ id }: { id: string }) {
                 <DetailRow label="Insurance" value={row.insurance} />
                 <DetailRow label="Network" value={row.network} />
                 <DetailRow label="Discounts" value={row.discounts} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {clinic.isMultiBranchOrg && clinic.branches && clinic.branches.length > 0 && (
+          <div className="bg-white rounded-[1.75rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 space-y-4 lg:col-span-2">
+            <h2 className="text-[15px] font-medium text-slate-800 mb-2">Branches</h2>
+            {clinic.branches.map((b) => (
+              <div key={b.id} className="border-b border-slate-50 last:border-0 pb-4 last:pb-0 space-y-1.5">
+                {b.clinicImageUrl && (
+                  <img src={b.clinicImageUrl} alt={b.name} className="w-12 h-12 rounded-full object-cover border border-slate-100 mb-2" />
+                )}
+                <DetailRow label="Name" value={b.name} />
+                <DetailRow label="Address" value={b.address} />
+                <DetailRow label="Phone" value={b.phone} />
+                <DetailRow label="License Number" value={b.licenseNumber} />
+                <DetailRow label="DOH License" value={b.dohLicense} />
+                <DetailRow label="Payment Settings" value={b.paymentSettings} />
+                <DetailRow label="Status" value={
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                    b.status === "active" ? "bg-emerald-50 text-emerald-600" : b.status === "rejected" ? "bg-red-50 text-red-500" : b.status === "details_pending" ? "bg-indigo-50 text-indigo-500" : "bg-amber-50 text-amber-600"
+                  }`}>
+                    {{
+                      active: "Active",
+                      requested: "Request Awaiting Review",
+                      details_pending: "Awaiting Clinic's Details",
+                      pending_approval: "Pending Final Approval",
+                      rejected: "Rejected",
+                    }[b.status]}
+                  </span>
+                } />
+                {b.addressProofFileUrl && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Address Proof</span>
+                    <a href={b.addressProofFileUrl} target="_blank" rel="noreferrer" className="text-[11px] text-[#6A8BFF] font-medium hover:underline">View file</a>
+                  </div>
+                )}
+                {b.consultationRates && b.consultationRates.length > 0 && (
+                  <div className="pt-1 space-y-1">
+                    <span className="text-[11px] text-slate-400 font-medium block">Consultation Rates</span>
+                    {b.consultationRates.map((r, i) => (
+                      <DetailRow key={i} label={r.category} value={`AED ${r.price}`} />
+                    ))}
+                  </div>
+                )}
+                {b.bio && (
+                  <div className="pt-1">
+                    <span className="text-[11px] text-slate-400 font-medium block mb-1">Bio</span>
+                    <p className="text-[12px] text-slate-700 leading-relaxed">{b.bio}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

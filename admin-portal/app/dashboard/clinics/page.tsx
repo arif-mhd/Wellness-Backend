@@ -6,6 +6,27 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+interface RateRow {
+  category: string;
+  price: string;
+}
+
+interface Branch {
+  id: string;
+  name: string;
+  address: string;
+  phone: string | null;
+  status: "requested" | "details_pending" | "pending_approval" | "active" | "rejected";
+  requestedAt?: string;
+  licenseNumber?: string | null;
+  dohLicense?: string | null;
+  addressProofFileUrl?: string | null;
+  consultationRates?: RateRow[];
+  paymentSettings?: string | null;
+  bio?: string | null;
+  clinicImageUrl?: string | null;
+}
+
 interface Clinic {
   id: string;
   supertokens_id: string;
@@ -25,6 +46,8 @@ interface Clinic {
   registeredAt: string;
   approvedAt: string | null;
   rejectedReason?: string | null;
+  isMultiBranchOrg?: boolean;
+  branches?: Branch[];
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -47,6 +70,21 @@ const DoubleCaret = () => (
     <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M19 9l-7 7-7-7" /></svg>
   </div>
 );
+
+const BRANCH_STATUS_LABEL: Record<Branch["status"], string> = {
+  active: "Active",
+  requested: "Request Awaiting Review",
+  details_pending: "Awaiting Clinic's Details",
+  pending_approval: "Pending Final Approval",
+  rejected: "Rejected",
+};
+const BRANCH_STATUS_COLOR: Record<Branch["status"], string> = {
+  active: "bg-emerald-50 text-emerald-600",
+  requested: "bg-amber-50 text-amber-600",
+  details_pending: "bg-indigo-50 text-indigo-500",
+  pending_approval: "bg-amber-50 text-amber-600",
+  rejected: "bg-red-50 text-red-500",
+};
 
 function ClinicAvatar({ clinic, size = "md" }: { clinic: Clinic; size?: "sm" | "md" | "lg" }) {
   const sz = size === "lg" ? "w-16 h-16 text-lg" : size === "sm" ? "w-9 h-9 text-xs" : "w-10 h-10 text-[11px]";
@@ -77,6 +115,7 @@ function ManageClinicsPageInner() {
   const [actionError, setActionError] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [branchActionId, setBranchActionId] = useState<string | null>(null);
 
   const fetchClinics = useCallback(async () => {
     setFetchError("");
@@ -134,7 +173,10 @@ function ManageClinicsPageInner() {
         const approved = queue.find(c => c.id === id);
         if (approved) {
           setQueue(prev => prev.filter(c => c.id !== id));
-          setClinics(prev => [{ ...approved, status: "approved", approvedAt: new Date().toISOString() }, ...prev]);
+          // Approving the clinic also activates any branches it declared at
+          // registration (still "pending_approval" at this point).
+          const branches = approved.branches?.map(b => b.status === "pending_approval" ? { ...b, status: "active" as const } : b);
+          setClinics(prev => [{ ...approved, status: "approved", approvedAt: new Date().toISOString(), branches }, ...prev]);
         }
         setSelectedClinicId(null);
         setActiveTab("onboard");
@@ -169,6 +211,60 @@ function ManageClinicsPageInner() {
       setActionError("Cannot reach the server.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Updates one branch's status within whichever list (clinics/queue)
+  // currently holds its parent clinic — a post-registration branch request
+  // can only ever belong to an already-approved org, but this stays correct
+  // either way.
+  const updateBranchStatus = (orgId: string, branchId: string, status: Branch["status"]) => {
+    const patch = (list: Clinic[]) => list.map(c =>
+      c.id === orgId
+        ? { ...c, branches: c.branches?.map(b => b.id === branchId ? { ...b, status } : b) }
+        : c
+    );
+    setClinics(prev => patch(prev));
+    setQueue(prev => patch(prev));
+  };
+
+  const handleApproveBranch = async (orgId: string, branchId: string) => {
+    setBranchActionId(branchId);
+    setActionError("");
+    try {
+      const res = await adminFetch(`/api/admin/clinics/${orgId}/branches/${branchId}/approve`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        updateBranchStatus(orgId, branchId, data.branchStatus === "active" ? "active" : "details_pending");
+      } else {
+        setActionError(data.error || "Branch approval failed.");
+      }
+    } catch {
+      setActionError("Cannot reach the server.");
+    } finally {
+      setBranchActionId(null);
+    }
+  };
+
+  const handleRejectBranch = async (orgId: string, branchId: string) => {
+    const reason = window.prompt("Reason for rejection (optional):") ?? "";
+    setBranchActionId(branchId);
+    setActionError("");
+    try {
+      const res = await adminFetch(`/api/admin/clinics/${orgId}/branches/${branchId}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        updateBranchStatus(orgId, branchId, "rejected");
+      } else {
+        setActionError(data.error || "Branch rejection failed.");
+      }
+    } catch {
+      setActionError("Cannot reach the server.");
+    } finally {
+      setBranchActionId(null);
     }
   };
 
@@ -308,6 +404,7 @@ function ManageClinicsPageInner() {
                     <tbody>
                       {sortedClinics.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(clinic => {
                         const isSelected = selectedClinicId === clinic.id;
+                        const pendingBranchCount = clinic.branches?.filter(b => b.status === "requested" || b.status === "pending_approval").length ?? 0;
                         return (
                           <tr
                             key={clinic.id}
@@ -320,7 +417,14 @@ function ManageClinicsPageInner() {
                                 <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${activeTab === "onboard" ? "bg-[#10b981]" : "bg-amber-400"}`} />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{clinic.fullName}</p>
+                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
+                                  {clinic.fullName}
+                                  {pendingBranchCount > 0 && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
+                                      {pendingBranchCount} branch{pendingBranchCount > 1 ? "es" : ""} pending
+                                    </span>
+                                  )}
+                                </p>
                                 <p className="text-[11px] font-normal text-slate-400 truncate">{clinic.email}</p>
                               </div>
                             </td>
@@ -348,7 +452,8 @@ function ManageClinicsPageInner() {
                   totalPages={Math.ceil(sortedClinics.length / itemsPerPage)}
                   onPageChange={setCurrentPage}
                 />
-              )}</div>
+              )}
+            </div>
           </div>
 
           {/* RIGHT — Clinic Details Panel */}
@@ -413,6 +518,97 @@ function ManageClinicsPageInner() {
                   </div>
                 ))}
               </div>
+
+              {selectedClinic.isMultiBranchOrg && selectedClinic.branches && selectedClinic.branches.length > 0 && (
+                <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-4 mb-6">
+                  <h3 className="text-[12px] font-semibold text-slate-700">Branches</h3>
+                  {selectedClinic.branches.map((b) => (
+                    <div key={b.id} className="border-b border-slate-50 last:border-0 pb-4 last:pb-0 space-y-1.5">
+                      <div className="flex items-center gap-3">
+                        {b.clinicImageUrl && (
+                          <img src={b.clinicImageUrl} alt={b.name} className="w-8 h-8 rounded-full object-cover border border-slate-100 shrink-0" />
+                        )}
+                        <span className="text-[12px] text-slate-800 font-semibold truncate flex-1">{b.name}</span>
+                        <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${BRANCH_STATUS_COLOR[b.status]}`}>
+                          {BRANCH_STATUS_LABEL[b.status]}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] text-slate-400 font-medium shrink-0">Address</span>
+                        <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{b.address}</span>
+                      </div>
+                      {b.phone && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">Phone</span>
+                          <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{b.phone}</span>
+                        </div>
+                      )}
+                      {b.licenseNumber && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">License Number</span>
+                          <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{b.licenseNumber}</span>
+                        </div>
+                      )}
+                      {b.dohLicense && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">DOH License</span>
+                          <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{b.dohLicense}</span>
+                        </div>
+                      )}
+                      {b.addressProofFileUrl && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">Address Proof</span>
+                          <a href={b.addressProofFileUrl} target="_blank" rel="noreferrer" className="text-[11px] text-[#6A8BFF] font-medium hover:underline">View file</a>
+                        </div>
+                      )}
+                      {b.paymentSettings && (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">Payment Settings</span>
+                          <span className="text-[11px] text-slate-800 font-medium truncate max-w-[170px]">{b.paymentSettings}</span>
+                        </div>
+                      )}
+                      {b.consultationRates && b.consultationRates.length > 0 && (
+                        <div className="pt-1 space-y-1">
+                          <span className="text-[11px] text-slate-400 font-medium">Consultation Rates</span>
+                          {b.consultationRates.map((r, i) => (
+                            <div key={i} className="flex items-center justify-between gap-3 pl-2">
+                              <span className="text-[11px] text-slate-500">{r.category}</span>
+                              <span className="text-[11px] text-slate-800 font-medium">AED {r.price}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {b.bio && (
+                        <div className="pt-1">
+                          <span className="text-[11px] text-slate-400 font-medium block mb-1">Bio</span>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">{b.bio}</p>
+                        </div>
+                      )}
+                      {b.status === "details_pending" && (
+                        <p className="text-[11px] text-indigo-500 pt-1">Waiting on the clinic to submit the branch's full profile and schedule.</p>
+                      )}
+                      {(b.status === "requested" || b.status === "pending_approval") && (
+                        <div className="flex gap-2 pt-1.5">
+                          <button
+                            onClick={() => handleRejectBranch(selectedClinic.id, b.id)}
+                            disabled={branchActionId === b.id}
+                            className="flex-1 py-1.5 rounded-lg border border-red-200 text-red-600 text-[11px] font-semibold hover:bg-red-50 transition disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => handleApproveBranch(selectedClinic.id, b.id)}
+                            disabled={branchActionId === b.id}
+                            className="flex-1 py-1.5 rounded-lg bg-[#6A8BFF] text-white text-[11px] font-semibold hover:bg-[#5a7ae6] transition disabled:opacity-60"
+                          >
+                            {branchActionId === b.id ? "…" : b.status === "requested" ? "Approve Request" : "Approve"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Approve/Reject actions for pending clinics */}
               {activeTab === "queue" && (
