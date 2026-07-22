@@ -15,6 +15,7 @@ import {
 } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
+import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -36,7 +37,7 @@ async function populateDoctorStats(doctors: any[]) {
   if (doctors.length === 0) return doctors;
 
   const appointments = await queryDocuments<any>(appointmentsContainer, {
-    query: "SELECT c.doctorId, c.status, c.emr FROM c WHERE c.status IN ('completed', 'in_progress')",
+    query: "SELECT c.doctorId, c.status, c.emr, c.visitType FROM c WHERE c.status IN ('completed', 'in_progress')",
   });
   const feedbacks = await queryDocuments<any>(feedbackContainer, {
     query: "SELECT c.provider.id AS doctorId, c.rating FROM c WHERE c.folder = 'appointment'",
@@ -47,6 +48,7 @@ async function populateDoctorStats(doctors: any[]) {
     const docFeedbacks = feedbacks.filter((f) => f.doctorId === doc.id);
 
     doc.consultations = docAppts.length;
+    doc.consultationsOnline = docAppts.filter((a) => a.visitType === "online").length;
     doc.prescriptions = docAppts.filter((a) => Array.isArray(a.emr?.medicines) && a.emr.medicines.length > 0).length;
 
     if (docFeedbacks.length > 0) {
@@ -55,7 +57,13 @@ async function populateDoctorStats(doctors: any[]) {
     } else {
       doc.rating = 0;
     }
-    doc.avgConsultation = 0;
+
+    // Consultations per week since the clinic added this doctor — a rough
+    // "how busy" indicator for the Manage Doctors table.
+    const weeksSinceAdded = doc.approvedAt
+      ? Math.max(1, (Date.now() - new Date(doc.approvedAt).getTime()) / (7 * 24 * 60 * 60 * 1000))
+      : 1;
+    doc.avgConsultation = Math.round((docAppts.length / weeksSinceAdded) * 10) / 10;
   }
 
   return doctors;
@@ -118,10 +126,12 @@ router.post(
 // doctors), status "approved", stamped with clinicId. Mirrors
 // POST /api/admin/doctors.
 router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const {
     email, password, fullName, phone,
-    dateOfBirth, gender, emiratesId, bloodGroup, address, languages, otherInfo,
+    dateOfBirth, gender, emiratesId, bloodGroup, height, weight, address, languages, otherInfo,
     avatarUrl, emiratesIdFileUrl,
     specialty, license, qualification, specializations,
     fees, consultationRates, paymentSettings, resumeFileUrl,
@@ -160,6 +170,8 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       gender: gender || null,
       emiratesId: emiratesId || null,
       bloodGroup: bloodGroup || null,
+      height: height || null,
+      weight: weight || null,
       address: address || null,
       languages: languages || null,
       otherInfo: otherInfo ?? [],
@@ -178,7 +190,7 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       isOnline: true,
       registeredAt: now,
       approvedAt: now,
-      approvedBy: clinicId,
+      approvedBy: scope.actorId,
       createdByClinic: true,
       clinicId,
       profileCompletedAt: now,
@@ -191,7 +203,7 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       action: "Doctor Added",
       details: `Dr. ${fullName} added by clinic (${specialty ?? "specialty TBD"})`,
       performedBy: "Clinic",
-      performedById: clinicId,
+      performedById: scope.actorId,
       entityType: "doctor",
       entityId: supertokensId,
     });
@@ -205,14 +217,22 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
 
 // ─── GET /api/clinics/doctors ────────────────────────────────────────────────
 router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
+  if (!scope) return;
+  const clinicIds = scopeToClinicIds(scope);
+
   try {
-    const { resources } = await doctorsContainer.items
-      .query({
-        query: "SELECT * FROM c WHERE c.clinicId = @clinicId AND c.status = 'approved' ORDER BY c.approvedAt DESC",
-        parameters: [{ name: "@clinicId", value: clinicId }],
-      })
-      .fetchAll();
+    let resources: any[] = [];
+    if (clinicIds.length > 0) {
+      const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
+      const result = await doctorsContainer.items
+        .query({
+          query: `SELECT * FROM c WHERE ${clause} AND c.status = 'approved' ORDER BY c.approvedAt DESC`,
+          parameters,
+        })
+        .fetchAll();
+      resources = result.resources;
+    }
 
     const populated = await populateDoctorStats(resources);
     res.json({ doctors: populated });
@@ -224,7 +244,9 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 
 // ─── GET /api/clinics/doctors/:id ────────────────────────────────────────────
 router.get("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
     if (!doctor) return;
@@ -238,11 +260,13 @@ router.get("/:id", requireRole("clinic"), async (req: SessionRequest, res: Respo
 
 // ─── PATCH /api/clinics/doctors/:id ──────────────────────────────────────────
 router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const {
-    bio, eligibility, specialty, license, qualification, specializations,
+    fullName, bio, eligibility, specialty, license, qualification, specializations,
     address, languages, fees, consultationRates, paymentSettings,
-    avatarUrl, resumeFileUrl, phone, gender, dateOfBirth, bloodGroup,
+    avatarUrl, resumeFileUrl, phone, gender, dateOfBirth, bloodGroup, height, weight,
   } = req.body;
 
   try {
@@ -251,6 +275,7 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
 
     const updated = {
       ...doctor,
+      fullName:          fullName          ?? doctor.fullName,
       bio:               bio               ?? doctor.bio,
       eligibility:       eligibility       ?? doctor.eligibility,
       specialty:         specialty         ?? doctor.specialty,
@@ -268,6 +293,8 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
       gender:            gender            ?? doctor.gender,
       dateOfBirth:       dateOfBirth       ?? doctor.dateOfBirth,
       bloodGroup:        bloodGroup        ?? doctor.bloodGroup,
+      height:            height            ?? doctor.height,
+      weight:            weight            ?? doctor.weight,
       updatedAt: new Date().toISOString(),
     };
 
@@ -281,7 +308,9 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
 
 // ─── PATCH /api/clinics/doctors/:id/online-status ────────────────────────────
 router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const { isOnline } = req.body;
   if (typeof isOnline !== "boolean") {
     res.status(400).json({ error: "isOnline must be a boolean." });
@@ -303,7 +332,9 @@ router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionReq
 // only ever known to whoever typed it into this request — nothing is stored
 // or returned by this endpoint or any other.
 router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const { password } = req.body;
   if (!password || password.length < 8) {
     res.status(400).json({ error: "password must be at least 8 characters." });
@@ -327,7 +358,7 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
       action: "Doctor Credentials Reset",
       details: `Dr. ${doctor.fullName ?? doctor.id} credentials reset by clinic`,
       performedBy: "Clinic",
-      performedById: clinicId,
+      performedById: scope.actorId,
       entityType: "doctor",
       entityId: doctor.id,
     });
@@ -344,7 +375,9 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
 // pending-verification step, since the clinic is the authority for its own
 // doctors (unlike the legacy self-registered-doctor + admin-verifies flow).
 router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const { slots } = req.body;
   if (!Array.isArray(slots)) {
     res.status(400).json({ error: "slots must be an array." });
@@ -361,9 +394,51 @@ router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res:
   }
 });
 
+// ─── POST /api/clinics/doctors/:id/verify-slots ──────────────────────────────
+// Promotes a doctor's pending schedule change (submitted via their own
+// self-service dashboard) into their live slots. Mirrors
+// POST /api/admin/doctors/:id/verify-slots, scoped to the clinic's own
+// doctors — this is what the Home page's task-list "Approve" action calls.
+router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
+  try {
+    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    if (!doctor) return;
+
+    const updatedDoctor = {
+      ...doctor,
+      slots: doctor.tempSlots ?? doctor.slots,
+      slotsPending: false,
+      slotsVerifiedAt: new Date().toISOString(),
+      slotsVerifiedBy: scope.actorId,
+    };
+
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor Slots Verified",
+      details: `Dr. ${doctor.fullName ?? doctor.id} availability slots verified by clinic`,
+      performedBy: "Clinic",
+      performedById: scope.actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", doctor: updatedDoctor });
+  } catch (err) {
+    console.error("Verify clinic doctor slots error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/clinics/doctors/:id/absences ──────────────────────────────────
 router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   const { startDate, endDate, reason, fileUrl, fileName } = req.body;
   if (!startDate || !endDate || !reason) {
     res.status(400).json({ error: "startDate, endDate, and reason are required." });
@@ -425,7 +500,9 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
 
 // ─── DELETE /api/clinics/doctors/:id/absences/:absenceId ────────────────────
 router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
     if (!doctor) return;
@@ -442,7 +519,9 @@ router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: Ses
 
 // ─── GET /api/clinics/doctors/:id/consultations ──────────────────────────────
 router.get("/:id/consultations", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
     if (!doctor) return;
@@ -461,15 +540,26 @@ router.get("/:id/consultations", requireRole("clinic"), async (req: SessionReque
       } catch { /* skip */ }
     }
 
-    const consultations = appts.map((a) => ({
-      id: a.id,
-      patientName: patientDocs[a.patientId]?.fullName ?? "Patient",
-      patientAvatarUrl: patientDocs[a.patientId]?.avatarUrl ?? null,
-      reason: a.reason ?? "General Consultation",
-      status: a.status,
-      scheduledAt: a.scheduledAt,
-      hasReport: !!a.emr?.savedAt,
-    }));
+    const consultations = appts.map((a) => {
+      const patient = patientDocs[a.patientId];
+      const dob = patient?.dateOfBirth ?? patient?.dob ?? null;
+      const age = dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+      return {
+        id: a.id,
+        patientId: a.patientId,
+        patientName: patient?.fullName ?? "Patient",
+        patientEmail: patient?.email ?? "",
+        patientAvatarUrl: patient?.avatarUrl ?? null,
+        patientAge: age,
+        reason: a.reason ?? "General Consultation",
+        primaryDiagnosis: a.status === "completed" ? (a.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded") : "Pending",
+        status: a.status,
+        scheduledAt: a.scheduledAt,
+        patientWaitingSince: a.patientWaitingSince ?? null,
+        hasReport: !!a.emr?.savedAt,
+        preVisitData: a.preVisitData ?? null,
+      };
+    });
 
     res.json({ consultations });
   } catch (err) {
@@ -480,7 +570,9 @@ router.get("/:id/consultations", requireRole("clinic"), async (req: SessionReque
 
 // ─── GET /api/clinics/doctors/:id/reviews ────────────────────────────────────
 router.get("/:id/reviews", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
     if (!doctor) return;
@@ -506,7 +598,9 @@ router.get("/:id/reviews", requireRole("clinic"), async (req: SessionRequest, re
 // Soft-delete: data is preserved so patients retain access to appointment
 // history, but the doctor's account is deactivated and all sessions revoked.
 router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const clinicId = req.session!.getUserId();
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
     if (!doctor) return;
@@ -524,7 +618,7 @@ router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Re
       action: "Doctor Removed",
       details: `Dr. ${doctor.fullName ?? doctor.id} removed by clinic`,
       performedBy: "Clinic",
-      performedById: clinicId,
+      performedById: scope.actorId,
       entityType: "doctor",
       entityId: doctor.id,
     });

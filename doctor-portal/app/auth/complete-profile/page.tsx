@@ -10,11 +10,17 @@ import OwnersPersonalInfoForm from "@/components/profile/OwnersPersonalInfoForm"
 import InsurancesForm from "@/components/profile/InsurancesForm";
 import ClinicCompanyInfoForm from "@/components/profile/ClinicCompanyInfoForm";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
+import BranchCountForm from "@/components/profile/BranchCountForm";
 import ProfileVerificationModal from "@/components/profile/ProfileVerificationModal";
+import MultiBranchPopup from "@/components/profile/MultiBranchPopup";
 
-// Upload files to blob via the backend and return { fieldName: sasUrl } map
+// Upload files to blob via the backend and return { fieldName: sasUrl } map.
+// branchIndex namespaces the blob path for a multi-branch loop iteration so
+// each branch's files don't overwrite one another; omit it for org-level
+// uploads (insurance SPC contract) and the single-branch path.
 async function uploadFiles(
-  files: Record<string, File | null>
+  files: Record<string, File | null>,
+  branchIndex?: number
 ): Promise<Record<string, string>> {
   const form = new FormData();
   let hasFile = false;
@@ -22,6 +28,7 @@ async function uploadFiles(
     if (file) { form.append(field, file); hasFile = true; }
   }
   if (!hasFile) return {};
+  if (branchIndex !== undefined) form.append("branchIndex", String(branchIndex));
 
   const res = await apiFetch("/api/clinics/upload", {
     method: "POST",
@@ -77,14 +84,24 @@ function slotsFromKeys(selectedSlots: string[]) {
   return result;
 }
 
+type Phase = "owner" | "insurances" | "branchCount" | "companyInfo" | "availability";
+
 function CompleteProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
+  const [phase, setPhase] = useState<Phase>("owner");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showMultiBranchPopup, setShowMultiBranchPopup] = useState(false);
+
+  // Multi-branch loop state — irrelevant/unused on the single-branch path.
+  const [isMultiBranch, setIsMultiBranch] = useState(false);
+  const [branchCount, setBranchCount] = useState(0);
+  const [branchIndex, setBranchIndex] = useState(0);
+  const [branchDrafts, setBranchDrafts] = useState<any[]>([]);
+  const [currentBranchName, setCurrentBranchName] = useState("");
 
   const nameParam       = searchParams.get("name")       || "";
   const emailParam      = searchParams.get("email")      || "";
@@ -95,47 +112,98 @@ function CompleteProfileContent() {
 
   const [ownerInfo, setOwnerInfo] = useState<any>(null);
   const [insuranceInfo, setInsuranceInfo] = useState<any>(null);
+  // Single-branch-path-only state (the org's own company info/availability).
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [availabilityInfo, setAvailabilityInfo] = useState<any>(null);
 
-  const handleStep1Submit = (formData: any) => { setOwnerInfo(formData); setStep(2); };
-  const handleStep2Submit = (formData: any) => { setInsuranceInfo(formData); setStep(3); };
-  const handleStep3Submit = (formData: any) => { setCompanyInfo(formData); setStep(4); };
+  const ownerPayloadFields = () => ({
+    fullName:             ownerInfo?.fullName || null,
+    phone:                ownerInfo?.contactNumber || null,
+    emiratesIdOrPassport: ownerInfo?.emiratesIdOrPassport || null,
+    email:                ownerInfo?.email || null,
+    gender:               ownerInfo?.gender || null,
+    dateOfBirth:          ownerInfo?.dateOfBirth || null,
+    positionInClinic:     ownerInfo?.positionInClinic || null,
+    bloodGroup:           ownerInfo?.bloodGroup || null,
+    maritalStatus:        ownerInfo?.maritalStatus || null,
+    height:               ownerInfo?.height || null,
+    weight:               ownerInfo?.weight || null,
+    languages:            Array.isArray(ownerInfo?.languages) ? ownerInfo.languages.join(", ") : null,
+    otherInfo:            ownerInfo?.otherInfo ?? [],
+  });
 
-  const handleStep4Submit = async (formData: any) => {
-    setAvailabilityInfo(formData);
+  const handleStep1Submit = (formData: any) => { setOwnerInfo(formData); setPhase("insurances"); };
+
+  const handleStep2Submit = (formData: any) => {
+    setInsuranceInfo(formData);
+    // The Insurances screen stays mounted underneath — this is a modal
+    // overlay, not a phase change, matching the reference wireframe where
+    // the popup floats over the (dimmed) Insurances screen.
+    setShowMultiBranchPopup(true);
+  };
+
+  const handleNoBranches = () => {
+    setShowMultiBranchPopup(false);
+    setIsMultiBranch(false);
+    setPhase("companyInfo");
+  };
+
+  const handleYesBranches = () => {
+    setShowMultiBranchPopup(false);
+    setPhase("branchCount");
+  };
+
+  const handleBranchCountSubmit = (n: number) => {
+    setIsMultiBranch(true);
+    setBranchCount(n);
+    setBranchIndex(0);
+    setBranchDrafts([]);
+    setCurrentBranchName("");
+    setPhase("companyInfo");
+  };
+
+  const handleCompanyInfoGoBack = () => {
+    if (!isMultiBranch) { setPhase("insurances"); return; }
+    if (branchIndex === 0) { setPhase("branchCount"); return; }
+    setBranchIndex((i) => i - 1);
+    setPhase("availability");
+  };
+
+  const handleCompanyInfoSubmit = (formData: any) => {
+    if (!isMultiBranch) {
+      setCompanyInfo(formData);
+      setPhase("availability");
+      return;
+    }
+    setBranchDrafts((prev) => {
+      const next = [...prev];
+      next[branchIndex] = { ...next[branchIndex], ...formData };
+      return next;
+    });
+    setPhase("availability");
+  };
+
+  const submitSingleBranch = async (availabilityData: any) => {
     setSubmitting(true);
     setSubmitError("");
 
     try {
-      // 1. Upload files to blob storage
       const fileUrls = await uploadFiles({
         spcContract:   insuranceInfo?.spcContractFile ?? null,
         addressProof:  companyInfo?.addressProofFile  ?? null,
         logo:          companyInfo?.clinicImage        ?? null,
       }).catch(() => ({} as Record<string, string>));
 
-      // 2. Convert availability slot keys → backend slot objects
-      const slots = slotsFromKeys(formData?.selectedSlots ?? []);
+      const slots = slotsFromKeys(availabilityData?.selectedSlots ?? []);
 
-      // 3. Merge insurance entries with the (single) uploaded SPC contract
       const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
         ...row,
         spcContractFileUrl: fileUrls.spcContract || null,
         verified: !!insuranceInfo?.spcVerified,
       }));
 
-      // 4. Build profile payload
       const payload: Record<string, any> = {
-        fullName:             ownerInfo?.fullName || null,
-        phone:                ownerInfo?.contactNumber || null,
-        emiratesIdOrPassport: ownerInfo?.emiratesIdOrPassport || null,
-        email:                ownerInfo?.email || null,
-        gender:               ownerInfo?.gender || null,
-        dateOfBirth:          ownerInfo?.dateOfBirth || null,
-        positionInClinic:     ownerInfo?.positionInClinic || null,
-        languages:            Array.isArray(ownerInfo?.languages) ? ownerInfo.languages.join(", ") : null,
-        otherInfo:            ownerInfo?.otherInfo ?? [],
+        ...ownerPayloadFields(),
         insurances,
         licenseNumber:        companyInfo?.licenseNumber || null,
         dohLicense:           companyInfo?.dohLicense || null,
@@ -148,7 +216,6 @@ function CompleteProfileContent() {
         slots,
       };
 
-      // 5. Save profile
       const res = await apiFetch("/api/clinics/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -168,6 +235,99 @@ function CompleteProfileContent() {
       setSubmitting(false);
     }
   };
+
+  const submitMultiBranch = async (drafts: any[]) => {
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      // Insurances stays a single, org-level step — its file uploads once,
+      // not per branch.
+      const orgFileUrls = await uploadFiles({
+        spcContract: insuranceInfo?.spcContractFile ?? null,
+      }).catch(() => ({} as Record<string, string>));
+
+      const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
+        ...row,
+        spcContractFileUrl: orgFileUrls.spcContract || null,
+        verified: !!insuranceInfo?.spcVerified,
+      }));
+
+      const branches = await Promise.all(drafts.map(async (b, i) => {
+        const fileUrls = await uploadFiles({
+          addressProof: b.addressProofFile ?? null,
+          logo:         b.clinicImage      ?? null,
+        }, i).catch(() => ({} as Record<string, string>));
+
+        return {
+          id: "branch_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + "_" + i,
+          name:                 b.branchName || `Branch ${i + 1}`,
+          licenseNumber:        b.licenseNumber || null,
+          dohLicense:           b.dohLicense || null,
+          address:              b.address || null,
+          addressProofFileUrl:  fileUrls.addressProof || null,
+          consultationRates:    b.consultationRates ?? [],
+          paymentSettings:      b.paymentSettings || null,
+          bio:                  b.bio || null,
+          clinicImageUrl:       fileUrls.logo || null,
+          slots:                slotsFromKeys(b.selectedSlots ?? []),
+          status:               "pending_approval",
+          requestedAt:          new Date().toISOString(),
+        };
+      }));
+
+      const payload: Record<string, any> = {
+        ...ownerPayloadFields(),
+        insurances,
+        isMultiBranchOrg: true,
+        branches,
+      };
+
+      const res = await apiFetch("/api/clinics/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Failed to save profile (${res.status}).`);
+      }
+
+      setShowVerificationModal(true);
+    } catch (err: any) {
+      console.error("Multi-branch profile submit error:", err);
+      setSubmitError(err?.message ?? "Failed to save profile. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAvailabilitySubmit = (formData: any) => {
+    if (!isMultiBranch) {
+      setAvailabilityInfo(formData);
+      submitSingleBranch(formData);
+      return;
+    }
+
+    const updatedDrafts = [...branchDrafts];
+    updatedDrafts[branchIndex] = { ...updatedDrafts[branchIndex], selectedSlots: formData?.selectedSlots ?? [] };
+    setBranchDrafts(updatedDrafts);
+
+    if (branchIndex + 1 < branchCount) {
+      setBranchIndex((i) => i + 1);
+      setCurrentBranchName("");
+      setPhase("companyInfo");
+    } else {
+      submitMultiBranch(updatedDrafts);
+    }
+  };
+
+  const sidebarStep =
+    phase === "owner" ? 1 :
+    phase === "insurances" ? 2 :
+    phase === "branchCount" || phase === "companyInfo" ? 3 :
+    4;
 
   return (
     <div className="relative min-h-screen bg-gradient-to-tr from-slate-50 via-white to-indigo-50/30 flex flex-col justify-between py-12 px-4 md:px-8 overflow-hidden font-outfit">
@@ -195,16 +355,20 @@ function CompleteProfileContent() {
           </div>
         )}
 
+        {showMultiBranchPopup && (
+          <MultiBranchPopup onNo={handleNoBranches} onYes={handleYesBranches} />
+        )}
+
         {showVerificationModal && (
           <ProfileVerificationModal onClose={() => router.push("/auth/login")} />
         )}
 
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-8">
           <div className="lg:col-span-4 h-full">
-            <ProfileCompletionSidebar currentStep={step} />
+            <ProfileCompletionSidebar currentStep={sidebarStep} />
           </div>
           <div className="lg:col-span-8">
-            {step === 1 && (
+            {phase === "owner" && (
               <OwnersPersonalInfoForm
                 initialFullName={nameParam}
                 initialEmail={emailParam}
@@ -215,17 +379,40 @@ function CompleteProfileContent() {
                 onSubmit={handleStep1Submit}
               />
             )}
-            {step === 2 && (
-              <InsurancesForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />
+            {phase === "insurances" && (
+              <InsurancesForm onSubmit={handleStep2Submit} onGoBack={() => setPhase("owner")} />
             )}
-            {step === 3 && (
-              <ClinicCompanyInfoForm onSubmit={handleStep3Submit} onGoBack={() => setStep(2)} />
+            {phase === "branchCount" && (
+              <BranchCountForm
+                onSubmit={handleBranchCountSubmit}
+                onGoBack={() => { setPhase("insurances"); setShowMultiBranchPopup(true); }}
+              />
             )}
-            {step === 4 && (
+            {phase === "companyInfo" && (
+              isMultiBranch ? (
+                <ClinicCompanyInfoForm
+                  key={`ci-${branchIndex}`}
+                  onSubmit={handleCompanyInfoSubmit}
+                  onGoBack={handleCompanyInfoGoBack}
+                  branchName={currentBranchName}
+                  onBranchNameChange={setCurrentBranchName}
+                  heading={`Branch ${branchIndex + 1} of ${branchCount} — Company Information`}
+                />
+              ) : (
+                <ClinicCompanyInfoForm
+                  key="ci-single"
+                  onSubmit={handleCompanyInfoSubmit}
+                  onGoBack={handleCompanyInfoGoBack}
+                />
+              )
+            )}
+            {phase === "availability" && (
               <SetAvailabilityForm
-                initialAvailability={availabilityInfo?.selectedSlots}
-                onSubmit={handleStep4Submit}
-                onGoBack={() => setStep(3)}
+                key={isMultiBranch ? `av-${branchIndex}` : "av-single"}
+                initialAvailability={isMultiBranch ? branchDrafts[branchIndex]?.selectedSlots : availabilityInfo?.selectedSlots}
+                onSubmit={handleAvailabilitySubmit}
+                onGoBack={() => setPhase("companyInfo")}
+                heading={isMultiBranch ? `Branch ${branchIndex + 1} of ${branchCount} — Set Availability` : undefined}
               />
             )}
           </div>

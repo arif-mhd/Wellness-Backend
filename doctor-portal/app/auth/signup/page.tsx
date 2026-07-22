@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { signIn } from "supertokens-web-js/recipe/emailpassword";
 import logoImg from "@/assets/images/wellness_logo.png";
 
 // Import modular step components
@@ -227,6 +228,21 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // Registration only creates the account — it doesn't log the user
+        // in. Without this, the session is missing for the entire
+        // complete-profile wizard that follows, and only surfaces as an
+        // error once that wizard makes its first backend call.
+        const signInResult = await signIn({
+          formFields: [
+            { id: "email", value: registrationEmail },
+            { id: "password", value: password },
+          ],
+        });
+        if (signInResult.status !== "OK") {
+          setError("Account created, but automatic sign-in failed. Please log in manually.");
+          setLoading(false);
+          return;
+        }
         setStep(5);
       } else if (res.status === 409) {
         setError("An account with this email already exists.");

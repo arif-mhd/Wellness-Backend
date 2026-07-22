@@ -648,14 +648,20 @@ router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest
 
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors.
-router.get("/", async (_req: Request, res: Response) => {
+// Optional ?clinicId= filters to just that clinic's roster (used by the
+// Clinic Profile screen's "Doctors Available" section) — additive, existing
+// callers that don't pass it are unaffected.
+router.get("/", async (req: Request, res: Response) => {
+  const clinicId = typeof req.query.clinicId === "string" ? req.query.clinicId : null;
   try {
-    const { resources } = await doctorsContainer.items
-      .query({
-        query: "SELECT * FROM c WHERE c.status = @status ORDER BY c.approvedAt DESC",
-        parameters: [{ name: "@status", value: "approved" }],
-      })
-      .fetchAll();
+    const query = clinicId
+      ? "SELECT * FROM c WHERE c.status = @status AND c.clinicId = @clinicId ORDER BY c.approvedAt DESC"
+      : "SELECT * FROM c WHERE c.status = @status ORDER BY c.approvedAt DESC";
+    const parameters = clinicId
+      ? [{ name: "@status", value: "approved" }, { name: "@clinicId", value: clinicId }]
+      : [{ name: "@status", value: "approved" }];
+
+    const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
 
     res.json({ doctors: resources });
   } catch (err) {

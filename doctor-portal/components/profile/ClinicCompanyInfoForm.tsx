@@ -12,6 +12,19 @@ interface RateRow {
 interface ClinicCompanyInfoFormProps {
   onSubmit: (data: any) => void;
   onGoBack: () => void;
+  /** When provided, this form is one iteration of the multi-branch loop — a
+   *  required "Branch Name" field is shown, and its value is included in
+   *  the submitted data. Omitted entirely for the single-org path. */
+  branchName?: string;
+  onBranchNameChange?: (value: string) => void;
+  /** Overrides the default "Clinic / Company Information" heading — used to
+   *  show e.g. "Branch 2 of 3 — Company Information" during the loop. */
+  heading?: string;
+  /** Prefills fields already known from an earlier step (e.g. a branch's
+   *  phase-1 add-request) so the clinic doesn't have to retype them. */
+  initialLicenseNumber?: string;
+  initialDohLicense?: string;
+  initialAddress?: string;
 }
 
 const inputCls =
@@ -53,13 +66,16 @@ function VerifyField({
   );
 }
 
-export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicCompanyInfoFormProps) {
-  const [licenseNumber, setLicenseNumber] = useState("");
+export default function ClinicCompanyInfoForm({
+  onSubmit, onGoBack, branchName, onBranchNameChange, heading,
+  initialLicenseNumber = "", initialDohLicense = "", initialAddress = "",
+}: ClinicCompanyInfoFormProps) {
+  const [licenseNumber, setLicenseNumber] = useState(initialLicenseNumber);
   const [licenseVerified, setLicenseVerified] = useState(false);
-  const [dohLicense, setDohLicense] = useState("");
+  const [dohLicense, setDohLicense] = useState(initialDohLicense);
   const [dohVerified, setDohVerified] = useState(false);
 
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(initialAddress);
   const [addressProofFile, setAddressProofFile] = useState<File | null>(null);
   const [addressVerified, setAddressVerified] = useState(false);
 
@@ -113,12 +129,14 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (onBranchNameChange && !branchName?.trim()) { setFormError("Branch Name is required."); return; }
     if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
     if (!dohLicense.trim()) { setFormError("DOH License is required."); return; }
     if (!address.trim()) { setFormError("Address is required."); return; }
 
     setFormError("");
     onSubmit({
+      branchName: onBranchNameChange ? branchName : undefined,
       licenseNumber,
       dohLicense,
       address,
@@ -134,7 +152,7 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
     <div className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 p-8 md:p-10 font-outfit select-none">
       <div className="mb-8">
         <h3 className="text-xl md:text-[1.4rem] font-normal tracking-tight text-gray-800 font-marcellus leading-tight">
-          Clinic / Company Information
+          {heading ?? "Clinic / Company Information"}
         </h3>
         <p className="text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
           Tell us about the clinic itself.
@@ -148,6 +166,19 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {onBranchNameChange && (
+          <div>
+            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">Branch Name*</div>
+            <input
+              type="text"
+              placeholder="e.g. Downtown Branch"
+              value={branchName ?? ""}
+              onChange={(e) => onBranchNameChange(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">License Number*</div>

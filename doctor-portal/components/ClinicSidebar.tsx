@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
 import { signOut } from "supertokens-web-js/recipe/session";
@@ -32,6 +32,12 @@ const PatientsIcon = ({ active }: { active: boolean }) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M13.334 14v-1.333a2.667 2.667 0 0 0-2.667-2.667H5.334a2.667 2.667 0 0 0-2.667 2.667V14" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M8 7.333A2.667 2.667 0 1 0 8 2a2.667 2.667 0 0 0 0 5.333Z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const BranchIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "white" : "#3D4B5A"} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="12" r="2.5" />
+    <path d="M6 8.5v7M6 12h9.5" />
   </svg>
 );
 const AnalyticsIcon = ({ active }: { active: boolean }) => (
@@ -103,7 +109,7 @@ const CollapseIcon = () => (
 );
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: "/clinic", label: "Home", Icon: HomeIcon },
   { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon },
   { href: "/clinic/doctors", label: "Doctors", Icon: DoctorsIcon },
@@ -115,14 +121,17 @@ const NAV_ITEMS = [
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
   { href: "/clinic/accounts", label: "Users / Accounts", Icon: AccountsIcon },
 ];
+const BRANCHES_NAV_ITEM = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
   const [clinicName, setClinicName] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAvatar, setClinicAvatar] = useState("");
+  const [isMultiBranchOrg, setIsMultiBranchOrg] = useState(false);
 
   const toggle = () => setOpen(!open);
 
@@ -134,9 +143,19 @@ export default function ClinicSidebar() {
         setClinicName(c.fullName ?? "");
         setClinicEmail(c.email ?? "");
         setClinicAvatar(c.clinicImageUrl ?? "");
+        setIsMultiBranchOrg(!!c.isMultiBranchOrg);
       })
       .catch(() => {});
   }, []);
+
+  // While viewing a specific branch ("View Dash"), keep that context on
+  // every nav link so navigating between pages doesn't drop back to the
+  // org-wide aggregate view. Only ever set for the org owner — branch users
+  // never see or need this.
+  const branchId = searchParams.get("branchId");
+  const withBranch = (href: string) => (branchId ? `${href}?branchId=${branchId}` : href);
+
+  const NAV_ITEMS = isMultiBranchOrg ? [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM] : BASE_NAV_ITEMS;
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }
@@ -179,7 +198,7 @@ export default function ClinicSidebar() {
             return (
               <Link
                 key={href}
-                href={href}
+                href={withBranch(href)}
                 title={open ? undefined : label}
                 className={[
                   "flex items-center py-3 transition-[background,box-shadow,padding] duration-150 rounded-[92px] overflow-hidden",

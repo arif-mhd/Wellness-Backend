@@ -15,6 +15,9 @@ import adminDoctorsRouter from "./routes/adminDoctors";
 import clinicsRouter from "./routes/clinics";
 import adminClinicsRouter from "./routes/adminClinics";
 import clinicDoctorsRouter from "./routes/clinicDoctors";
+import clinicAppointmentsRouter from "./routes/clinicAppointments";
+import clinicPatientsRouter from "./routes/clinicPatients";
+import clinicBranchesRouter from "./routes/clinicBranches";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
 import appointmentsRouter from "./routes/appointments";
@@ -86,11 +89,18 @@ app.use("/api/doctors/notifications", doctorNotificationsRouter);
 // no longer linked from the admin nav (clinics own doctor management now).
 app.use("/api/admin/doctors", adminDoctorsRouter);
 
+// Clinic-managed doctor accounts (create/roster/schedule/credentials) and
+// appointments — mounted BEFORE the general /api/clinics router below, since
+// clinicsRouter has a catch-all GET /:id route that would otherwise swallow
+// plain "GET /api/clinics/doctors" (treating "doctors" as a clinic id) before
+// Express ever reaches these more specific routers.
+app.use("/api/clinics/doctors", clinicDoctorsRouter);
+app.use("/api/clinics/appointments", clinicAppointmentsRouter);
+app.use("/api/clinics/patients", clinicPatientsRouter);
+app.use("/api/clinics/branches", clinicBranchesRouter);
+
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);
-
-// Clinic-managed doctor accounts (create/roster/schedule/credentials)
-app.use("/api/clinics/doctors", clinicDoctorsRouter);
 
 // Admin clinic management (requires admin role)
 app.use("/api/admin/clinics", adminClinicsRouter);
