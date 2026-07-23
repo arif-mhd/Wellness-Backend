@@ -48,6 +48,100 @@ router.get("/approved", requireRole("admin"), async (_req: Request, res: Respons
   }
 });
 
+// ─── POST /api/admin/clinics/:orgId/branches/:branchId/approve ──────────────
+// Two-phase add-branch flow: a "requested" branch (name/license/address
+// only) is approved into "details_pending" — the clinic must then submit
+// its full company profile + schedule (POST .../submit-details) before a
+// second, final approval activates it. A "pending_approval" branch (either
+// a details submission, or a branch declared during the clinic's own
+// registration with everything already filled in) is approved straight to
+// "active". Same endpoint, same admin UI — just phase-aware.
+router.post("/:orgId/branches/:branchId/approve", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const { orgId, branchId } = req.params;
+  const adminId = req.session!.getUserId();
+
+  try {
+    const { resource: org } = await clinicsContainer.item(orgId, orgId).read().catch(() => ({ resource: undefined as any }));
+    if (!org) { res.status(404).json({ error: "Clinic not found." }); return; }
+
+    const branch = (org.branches ?? []).find((b: any) => b.id === branchId);
+    if (!branch) { res.status(404).json({ error: "Branch not found." }); return; }
+
+    if (branch.status !== "requested" && branch.status !== "pending_approval") {
+      res.status(400).json({ error: "This branch isn't awaiting approval." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const isFinal = branch.status === "pending_approval";
+    const branches = org.branches.map((b: any) =>
+      b.id === branchId
+        ? isFinal
+          ? { ...b, status: "active", approvedAt: now }
+          : { ...b, status: "details_pending", detailsRequestedAt: now }
+        : b
+    );
+    await clinicsContainer.items.upsert({ ...org, branches, updatedAt: now });
+
+    logActivity({
+      source: "admin",
+      action: isFinal ? "Branch Approved" : "Branch Request Approved",
+      details: isFinal
+        ? `Branch "${branch.name}" approved for ${org.fullName ?? orgId}`
+        : `Branch request "${branch.name}" approved for ${org.fullName ?? orgId} — awaiting full details`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "clinic",
+      entityId: orgId,
+    });
+
+    res.json({ status: "OK", branchStatus: isFinal ? "active" : "details_pending" });
+  } catch (err) {
+    console.error("Approve branch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/admin/clinics/:orgId/branches/:branchId/reject ───────────────
+router.post("/:orgId/branches/:branchId/reject", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const { orgId, branchId } = req.params;
+  const { reason } = req.body;
+  const adminId = req.session!.getUserId();
+
+  try {
+    const { resource: org } = await clinicsContainer.item(orgId, orgId).read().catch(() => ({ resource: undefined as any }));
+    if (!org) { res.status(404).json({ error: "Clinic not found." }); return; }
+
+    const branch = (org.branches ?? []).find((b: any) => b.id === branchId);
+    if (!branch) { res.status(404).json({ error: "Branch not found." }); return; }
+
+    if (branch.status !== "requested" && branch.status !== "pending_approval") {
+      res.status(400).json({ error: "This branch isn't awaiting approval." });
+      return;
+    }
+
+    const branches = org.branches.map((b: any) =>
+      b.id === branchId ? { ...b, status: "rejected", rejectedReason: reason || null } : b
+    );
+    await clinicsContainer.items.upsert({ ...org, branches, updatedAt: new Date().toISOString() });
+
+    logActivity({
+      source: "admin",
+      action: "Branch Rejected",
+      details: `Branch "${branch.name}" rejected for ${org.fullName ?? orgId}${reason ? `: ${reason}` : ""}`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "clinic",
+      entityId: orgId,
+    });
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Reject branch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── GET /api/admin/clinics/:id ──────────────────────────────────────────────
 // Must come after /pending and /approved to avoid those being captured as :id
 router.get("/:id", requireRole("admin"), async (req: Request, res: Response) => {
@@ -89,11 +183,25 @@ router.post("/:id/approve", requireRole("admin"), async (req: SessionRequest, re
     await UserRoles.removeUserRole("public", id, "clinic_pending");
     await UserRoles.addRoleToUser("public", id, "clinic");
 
+    const now = new Date().toISOString();
+    // Branches declared as part of this registration (status still
+    // "pending_approval" — a not-yet-approved clinic has no way to submit a
+    // later add-request, so every branch here was part of the same
+    // submission, already has its full company profile + schedule, and
+    // skips the two-phase add-branch flow) get activated in the same
+    // approval action as the clinic itself.
+    const branches = Array.isArray(clinic.branches)
+      ? clinic.branches.map((b: any) =>
+          b.status === "pending_approval" ? { ...b, status: "active", approvedAt: now } : b
+        )
+      : clinic.branches;
+
     const updatedClinic = {
       ...clinic,
       status: "approved",
-      approvedAt: new Date().toISOString(),
+      approvedAt: now,
       approvedBy: adminId,
+      branches,
     };
 
     await clinicsContainer.items.upsert(updatedClinic);
@@ -169,6 +277,7 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
     email, password, fullName, phone,
     dateOfBirth, gender, emiratesIdOrPassport,
     positionInClinic, languages, otherInfo,
+    bloodGroup, maritalStatus, height, weight,
     insurances,
     licenseNumber, dohLicense, address, addressProofFileUrl,
     consultationRates, paymentSettings, bio, clinicImageUrl,
@@ -210,6 +319,10 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
       gender:                gender                || null,
       emiratesIdOrPassport:  emiratesIdOrPassport  || null,
       positionInClinic:      positionInClinic      || null,
+      bloodGroup:            bloodGroup            || null,
+      maritalStatus:         maritalStatus         || null,
+      height:                height                || null,
+      weight:                weight                || null,
       languages:             languages             || null,
       otherInfo:             otherInfo             ?? [],
       insurances:            insurances            ?? [],

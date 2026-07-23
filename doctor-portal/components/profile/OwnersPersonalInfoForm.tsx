@@ -45,6 +45,10 @@ export default function OwnersPersonalInfoForm({
   const [gender, setGender] = useState(initialGender);
   const [dob, setDob] = useState(initialDob);
   const [positionInClinic, setPositionInClinic] = useState("");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [maritalStatus, setMaritalStatus] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
 
   const [languages, setLanguages] = useState<string[]>([]);
   const [langInput, setLangInput] = useState("");
@@ -96,6 +100,10 @@ export default function OwnersPersonalInfoForm({
       gender,
       dateOfBirth: dob,
       positionInClinic,
+      bloodGroup,
+      maritalStatus,
+      height,
+      weight,
       languages,
       otherInfo: otherInfo.filter((r) => r.label.trim() || r.value.trim()),
     });
@@ -192,6 +200,47 @@ export default function OwnersPersonalInfoForm({
             placeholder="Position in Clinic*"
             value={positionInClinic}
             onChange={(e) => setPositionInClinic(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <select
+            value={bloodGroup}
+            onChange={(e) => setBloodGroup(e.target.value)}
+            className={`${inputCls} cursor-pointer ${bloodGroup ? "text-gray-800" : "text-gray-400"}`}
+          >
+            <option value="">Blood Group</option>
+            {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+              <option key={bg} value={bg}>{bg}</option>
+            ))}
+          </select>
+          <select
+            value={maritalStatus}
+            onChange={(e) => setMaritalStatus(e.target.value)}
+            className={`${inputCls} cursor-pointer ${maritalStatus ? "text-gray-800" : "text-gray-400"}`}
+          >
+            <option value="">Marital Status</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            type="text"
+            placeholder="Height (e.g. 175 cm)"
+            value={height}
+            onChange={(e) => setHeight(e.target.value)}
+            className={inputCls}
+          />
+          <input
+            type="text"
+            placeholder="Weight (e.g. 70 kg)"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
             className={inputCls}
           />
         </div>

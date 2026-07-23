@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import DoctorPersonalInfoForm from "@/components/doctors/DoctorPersonalInfoForm";
 import DoctorMedicalCareerForm from "@/components/doctors/DoctorMedicalCareerForm";
@@ -10,7 +10,8 @@ import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 async function uploadFiles(
   draftId: string,
   singleFiles: Record<string, File | null>,
-  specCertFiles: File[]
+  specCertFiles: File[],
+  qs: string
 ): Promise<{ urls: Record<string, string>; specCertUrls: string[] }> {
   const form = new FormData();
   let hasFile = false;
@@ -24,7 +25,7 @@ async function uploadFiles(
   if (!hasFile) return { urls: {}, specCertUrls: [] };
   form.append("draftId", draftId);
 
-  const res = await apiFetch("/api/clinics/doctors/upload", { method: "POST", body: form });
+  const res = await apiFetch(`/api/clinics/doctors/upload${qs}`, { method: "POST", body: form });
   if (!res.ok) throw new Error("File upload failed");
   const { urls } = await res.json();
   const { specCert, ...rest } = urls ?? {};
@@ -39,6 +40,9 @@ const STEPS = [
 
 export default function AddDoctorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const branchId = searchParams.get("branchId");
+  const qs = branchId ? `?branchId=${branchId}` : "";
 
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +80,8 @@ export default function AddDoctorPage() {
       const { urls, specCertUrls } = await uploadFiles(
         draftId,
         { avatar: careerInfo?.profilePic ?? null, resume: careerInfo?.resumeFile ?? null },
-        specCertFiles
+        specCertFiles,
+        qs
       ).catch(() => ({ urls: {} as Record<string, string>, specCertUrls: [] as string[] }));
 
       let certIdx = 0;
@@ -107,7 +112,7 @@ export default function AddDoctorPage() {
         bio: careerInfo?.bio || null,
       };
 
-      const res = await apiFetch("/api/clinics/doctors", {
+      const res = await apiFetch(`/api/clinics/doctors${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -118,7 +123,7 @@ export default function AddDoctorPage() {
         throw new Error(err.error ?? "Failed to add doctor.");
       }
 
-      router.push("/clinic/doctors");
+      router.push(`/clinic/doctors${qs}`);
     } catch (err: any) {
       console.error("Add doctor submit error:", err);
       setSubmitError(err?.message ?? "Failed to add doctor. Please try again.");
@@ -133,7 +138,7 @@ export default function AddDoctorPage() {
       {/* ── Page Header ── */}
       <div className="flex items-center gap-3 mb-10 max-w-4xl mx-auto">
         <button
-          onClick={() => router.push("/clinic/doctors")}
+          onClick={() => router.push(`/clinic/doctors${qs}`)}
           className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm border border-[#E4E8F0] hover:bg-gray-50 transition-all"
           aria-label="Go back"
         >

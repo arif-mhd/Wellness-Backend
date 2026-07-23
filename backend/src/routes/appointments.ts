@@ -7,12 +7,14 @@ import {
   appointmentsContainer,
   patientsContainer,
   doctorsContainer,
+  clinicsContainer,
   queryDocuments,
   notificationsContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
+import { getActorClinicIds } from "../utils/clinicScope";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -86,12 +88,14 @@ function generateAppointmentId(doctorName: string, scheduledAt: string): string 
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
-  const { doctorId, scheduledAt, reason, shareMedicalHistory, paymentAmount, familyMemberId } = req.body;
+  const { doctorId, scheduledAt, reason, shareMedicalHistory, paymentAmount, familyMemberId, visitType } = req.body;
 
   if (!doctorId || !scheduledAt || !reason) {
     res.status(400).json({ error: "doctorId, scheduledAt, and reason are required." });
     return;
   }
+
+  const resolvedVisitType: "online" | "offline" = visitType === "offline" ? "offline" : "online";
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -107,6 +111,8 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       id,
       patientId,
       doctorId,
+      clinicId: doctor.clinicId ?? null,
+      visitType: resolvedVisitType,
       scheduledAt,
       durationMins: 30,
       reason,
@@ -114,7 +120,7 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       status: "scheduled",
       paymentStatus: "paid",
       paymentAmount: paymentAmount ?? doctor.fees ?? 250,
-      livekitRoom: id,
+      livekitRoom: resolvedVisitType === "online" ? id : null,
       createdAt: now,
       updatedAt: now,
       familyMemberId: familyMemberId ?? null,
@@ -193,14 +199,27 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       });
     }
 
-    // Enrich with doctor name
+    // Enrich with doctor name (and, when the doctor belongs to a clinic, the clinic name)
     const enriched = await Promise.all(
       appointments.map(async (apt) => {
         try {
           const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-          return { ...apt, doctorName: doctor?.fullName ?? "Unknown Doctor", doctorSpecialty: doctor?.specialty ?? "", doctorAvatarUrl: doctor?.avatarUrl ?? null };
+          let clinicName: string | null = null;
+          if (doctor?.clinicId) {
+            try {
+              const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
+              clinicName = clinic?.fullName ?? null;
+            } catch { /* clinic lookup best-effort */ }
+          }
+          return {
+            ...apt,
+            doctorName: doctor?.fullName ?? "Unknown Doctor",
+            doctorSpecialty: doctor?.specialty ?? "",
+            doctorAvatarUrl: doctor?.avatarUrl ?? null,
+            clinicName,
+          };
         } catch {
-          return { ...apt, doctorName: "Unknown Doctor", doctorSpecialty: "", doctorAvatarUrl: null };
+          return { ...apt, doctorName: "Unknown Doctor", doctorSpecialty: "", doctorAvatarUrl: null, clinicName: null };
         }
       })
     );
@@ -681,11 +700,33 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
       return;
     }
     if (apt.patientId !== userId && apt.doctorId !== userId) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
+      const clinicIds = await getActorClinicIds(userId);
+      if (!apt.clinicId || !clinicIds.includes(apt.clinicId)) {
+        res.status(403).json({ error: "Not authorized." });
+        return;
+      }
     }
 
-    res.json({ appointment: apt });
+    let enriched = apt;
+    try {
+      const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
+      let clinicName: string | null = null;
+      if (doctor?.clinicId) {
+        try {
+          const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
+          clinicName = clinic?.fullName ?? null;
+        } catch { /* best-effort */ }
+      }
+      enriched = {
+        ...apt,
+        doctorName: doctor?.fullName ?? apt.doctorName,
+        doctorSpecialty: doctor?.specialty ?? apt.doctorSpecialty,
+        doctorAvatarUrl: doctor?.avatarUrl ?? apt.doctorAvatarUrl,
+        clinicName,
+      };
+    } catch { /* fall back to the raw doc if doctor lookup fails */ }
+
+    res.json({ appointment: enriched });
   } catch (err) {
     console.error("Fetch appointment error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -703,7 +744,13 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    if (apt.patientId !== userId && apt.doctorId !== userId) {
+    const isDoctor = apt.doctorId === userId;
+    const isPatient = apt.patientId === userId;
+    let isClinic = false;
+    if (!isDoctor && !isPatient && apt.clinicId) {
+      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
+    }
+    if (!isPatient && !isDoctor && !isClinic) {
       res.status(403).json({ error: "Not authorized." });
       return;
     }
@@ -711,7 +758,6 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     const updated = { ...apt, status: "cancelled", updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
 
-    const isDoctor = apt.doctorId === userId;
     const now = new Date().toISOString();
 
     const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
@@ -724,16 +770,17 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       minute: "2-digit",
     });
 
-    if (isDoctor) {
+    if (isDoctor || isClinic) {
       // Notify patient
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
+      const cancelledBy = isClinic ? "the clinic" : "the doctor";
       const patientNotification = {
         id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
         patientId: apt.patientId,
         profileId: apt.familyMemberId ?? apt.patientId,
         title: "Appointment Cancelled",
-        body: `Your appointment with Dr. ${doctorName} on ${dateText} at ${timeText} has been cancelled by the doctor.`,
+        body: `Your appointment with Dr. ${doctorName} on ${dateText} at ${timeText} has been cancelled by ${cancelledBy}.`,
         type: "appointment_cancelled",
         referenceId: id,
         isRead: false,
@@ -758,10 +805,10 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     }
 
     logActivity({
-      source: isDoctor ? "doctor" : "patient",
+      source: isClinic ? "clinic" : isDoctor ? "doctor" : "patient",
       action: "Appointment Cancelled",
       details: `Appointment ${id} cancelled`,
-      performedBy: isDoctor ? "Doctor" : "Patient",
+      performedBy: isClinic ? "Clinic" : isDoctor ? "Doctor" : "Patient",
       performedById: userId,
       entityType: "appointment",
       entityId: id,
@@ -791,7 +838,13 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    if (apt.patientId !== userId && apt.doctorId !== userId) {
+    const callerIsDoctor = apt.doctorId === userId;
+    const callerIsPatient = apt.patientId === userId;
+    let callerIsClinic = false;
+    if (!callerIsDoctor && !callerIsPatient && apt.clinicId) {
+      callerIsClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
+    }
+    if (!callerIsPatient && !callerIsDoctor && !callerIsClinic) {
       res.status(403).json({ error: "Not authorized." });
       return;
     }
@@ -897,7 +950,6 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     };
     await appointmentsContainer.items.upsert(updated);
 
-    const isDoctor = apt.doctorId === userId;
     const now = new Date().toISOString();
 
     const dateText = parseLocalTime(scheduledAt).toLocaleDateString("en-US", {
@@ -910,7 +962,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       minute: "2-digit",
     });
 
-    if (isDoctor) {
+    if (callerIsDoctor || callerIsClinic) {
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       const doctorName = docDoc?.fullName ?? "Doctor";
       const patientNotification = {
@@ -942,10 +994,10 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     }
 
     logActivity({
-      source: isDoctor ? "doctor" : "patient",
+      source: callerIsClinic ? "clinic" : callerIsDoctor ? "doctor" : "patient",
       action: "Appointment Rescheduled",
       details: `Appointment ${id} rescheduled from ${oldScheduledAt} to ${scheduledAt}`,
-      performedBy: isDoctor ? "Doctor" : "Patient",
+      performedBy: callerIsClinic ? "Clinic" : callerIsDoctor ? "Doctor" : "Patient",
       performedById: userId,
       entityType: "appointment",
       entityId: id,
@@ -1089,10 +1141,10 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
 });
 
 // ─── POST /api/appointments/:id/remind ──────────────────────────────────────
-// Doctor sends the patient a manual reminder notification about an upcoming
-// appointment.
-router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
+// Sends the patient a manual reminder notification about an upcoming
+// appointment. The assigned doctor or the owning clinic can trigger this.
+router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
   const { id } = req.params;
 
   try {
@@ -1101,12 +1153,17 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    if (apt.doctorId !== doctorId) {
+    const isDoctor = apt.doctorId === userId;
+    let isClinic = false;
+    if (!isDoctor && apt.clinicId) {
+      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
+    }
+    if (!isDoctor && !isClinic) {
       res.status(403).json({ error: "Not authorized." });
       return;
     }
 
-    const docDoc = await doctorsContainer.item(doctorId, doctorId).read().then(r => r.resource).catch(() => null);
+    const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
     const doctorName = docDoc?.fullName ?? "Doctor";
 
     const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
@@ -1119,18 +1176,32 @@ router.post("/:id/remind", requireRole("doctor"), async (req: SessionRequest, re
       minute: "2-digit",
     });
 
+    const body = isClinic
+      ? `You have a reminder about your appointment with Dr. ${doctorName} on ${dateText} at ${timeText}.`
+      : `Dr. ${doctorName} sent you a reminder about your appointment on ${dateText} at ${timeText}.`;
+
     const patientNotification = {
       id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
       patientId: apt.patientId,
       profileId: apt.familyMemberId ?? apt.patientId,
       title: "Appointment Reminder",
-      body: `Dr. ${doctorName} sent you a reminder about your appointment on ${dateText} at ${timeText}.`,
+      body,
       type: "appointment_reminder",
       referenceId: id,
       isRead: false,
       sentAt: new Date().toISOString(),
     };
     await notificationsContainer.items.create(patientNotification);
+
+    logActivity({
+      source: isClinic ? "clinic" : "doctor",
+      action: "Appointment Reminder Sent",
+      details: `Reminder sent for appointment ${id}`,
+      performedBy: isClinic ? "Clinic" : doctorName,
+      performedById: userId,
+      entityType: "appointment",
+      entityId: id,
+    });
 
     res.json({ status: "OK" });
   } catch (err) {

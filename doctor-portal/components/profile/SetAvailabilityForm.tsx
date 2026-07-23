@@ -7,6 +7,9 @@ interface SetAvailabilityFormProps {
   initialAvailability?: string[];
   onSubmit: (data: any) => void;
   onGoBack: () => void;
+  /** Overrides the default "Set Availability" heading — used to show e.g.
+   *  "Branch 2 of 3 — Set Availability" during the multi-branch loop. */
+  heading?: string;
 }
 
 const DAY_KEYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -82,7 +85,7 @@ function getConsultingTime(selectedSlots: string[], dayKey: DayKey): string {
   return ranges.join(", ");
 }
 
-export default function SetAvailabilityForm({ initialAvailability, onSubmit, onGoBack }: SetAvailabilityFormProps) {
+export default function SetAvailabilityForm({ initialAvailability, onSubmit, onGoBack, heading }: SetAvailabilityFormProps) {
   const [selectedSlots, setSelectedSlots] = useState<string[]>(initialAvailability ?? DEFAULT_SLOTS);
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -184,7 +187,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
     <div className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 p-8 md:p-10 font-outfit">
       <div className="mb-6">
         <h3 className="text-xl md:text-[1.4rem] font-normal tracking-tight text-gray-800 font-marcellus leading-tight">
-          Set Availability
+          {heading ?? "Set Availability"}
         </h3>
         <p className="text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
           {viewMode === "week"

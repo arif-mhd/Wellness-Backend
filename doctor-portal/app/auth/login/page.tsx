@@ -47,6 +47,31 @@ export default function LoginPage() {
         }
 
         if (roles.includes("clinic_pending")) {
+          // A clinic_pending account whose onboarding wizard was never
+          // finished (e.g. they lost their session mid-wizard, or just
+          // closed the tab) has nowhere to go from the generic "awaiting
+          // review" screen — send them back to finish it instead.
+          try {
+            const meRes = await fetch(`${API_URL}/api/clinics/me`, { credentials: "include" });
+            if (meRes.ok) {
+              const { clinic } = await meRes.json();
+              if (!clinic?.profileCompletedAt) {
+                const params = new URLSearchParams({
+                  name: clinic?.fullName ?? "",
+                  email: clinic?.email ?? email,
+                  phone: clinic?.phone ?? "",
+                  dob: clinic?.dateOfBirth ?? "",
+                  gender: clinic?.gender ?? "",
+                  emiratesId: clinic?.emiratesIdOrPassport ?? "",
+                });
+                router.push(`/auth/complete-profile?${params.toString()}`);
+                return;
+              }
+            }
+          } catch {
+            // If we can't resolve profile status, fall through to the
+            // pending screen — better than blocking login entirely.
+          }
           router.push("/auth/pending");
           return;
         }

@@ -15,6 +15,8 @@ interface Step4CreatePasswordProps {
   usernameValue?: string;
   submitLabel?: string;
   loadingLabel?: string;
+  title?: string;
+  description?: string;
 }
 
 export default function Step4CreatePassword({
@@ -28,23 +30,25 @@ export default function Step4CreatePassword({
   usernameValue,
   submitLabel = "Create Password",
   loadingLabel = "Creating Account...",
+  title = "Create Your Password",
+  description = "Choose a strong password to secure your account and keep your information safe.",
 }: Step4CreatePasswordProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Password Live Validation States
   const isMinLength = password.length >= 8;
-  const isComplex = 
-    /[A-Z]/.test(password) && 
-    /[a-z]/.test(password) && 
-    /[0-9]/.test(password) && 
+  const isComplex =
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
     /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col">
-      <h2 className="text-[20px] font-bold text-[#24292E] mb-2">Create Your Password</h2>
+      <h2 className="text-[20px] font-bold text-[#24292E] mb-2">{title}</h2>
       <p className="text-[12px] text-[#676E76] leading-relaxed mb-8">
-        Choose a strong password to secure your account and keep your information safe.
+        {description}
       </p>
       
       <div className="w-full flex flex-col gap-6 mb-8">
