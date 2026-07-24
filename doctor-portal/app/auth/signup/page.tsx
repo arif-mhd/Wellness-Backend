@@ -25,12 +25,9 @@ export default function SignupPage() {
   const [resending, setResending] = useState(false);
   
   // Basic Details Form States
-  const [fullName, setFullName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [emiratesId, setEmiratesId] = useState("");
   const [agreed, setAgreed] = useState(false);
 
   // Password States
@@ -184,7 +181,7 @@ export default function SignupPage() {
   // Step 3: Basic Details Submission
   const handleStep3Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !dateOfBirth.trim() || !gender.trim() || !phone.trim() || !agreed) {
+    if (!clinicName.trim() || !phone.trim() || !agreed) {
       setError("Please complete all required fields and agree to the terms.");
       return;
     }
@@ -217,11 +214,8 @@ export default function SignupPage() {
         body: JSON.stringify({
           email:       registrationEmail,
           password,
-          fullName,
+          clinicName,
           phone,
-          dateOfBirth,
-          gender,
-          emiratesIdOrPassport: emiratesId,
         }),
       });
 
@@ -257,8 +251,10 @@ export default function SignupPage() {
   };
 
   const handleFinalComplete = () => {
-    // Send doctor to complete their profile before awaiting approval
-    router.push(`/auth/complete-profile?name=${encodeURIComponent(fullName)}&email=${encodeURIComponent(email || emailOrPhone)}&phone=${encodeURIComponent(phone)}&dob=${encodeURIComponent(dateOfBirth)}&gender=${encodeURIComponent(gender)}&emiratesId=${encodeURIComponent(emiratesId)}`);
+    // Send the clinic owner to complete their own personal profile next —
+    // clinicName was already saved at registration, so it isn't (and
+    // shouldn't be) prefilled here as if it were the owner's own name.
+    router.push(`/auth/complete-profile?email=${encodeURIComponent(email || emailOrPhone)}`);
   };
 
   return (
@@ -441,18 +437,12 @@ export default function SignupPage() {
 
           {step === 3 && (
             <Step3BasicDetails
-              fullName={fullName}
-              setFullName={setFullName}
-              dateOfBirth={dateOfBirth}
-              setDateOfBirth={setDateOfBirth}
-              gender={gender}
-              setGender={setGender}
+              clinicName={clinicName}
+              setClinicName={setClinicName}
               email={email}
               setEmail={setEmail}
               phone={phone}
               setPhone={setPhone}
-              emiratesId={emiratesId}
-              setEmiratesId={setEmiratesId}
               agreed={agreed}
               setAgreed={setAgreed}
               onSubmit={handleStep3Submit}

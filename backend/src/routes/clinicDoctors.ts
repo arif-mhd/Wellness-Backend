@@ -15,7 +15,7 @@ import {
 } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
-import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -399,20 +399,33 @@ router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res:
 // self-service dashboard) into their live slots. Mirrors
 // POST /api/admin/doctors/:id/verify-slots, scoped to the clinic's own
 // doctors — this is what the Home page's task-list "Approve" action calls.
+//
+// The task list itself is built from the caller's *aggregate* view (every
+// branch's pending schedule changes, shown together on the main dashboard),
+// but the "Approve" button doesn't know which specific branch a given task's
+// doctor belongs to — so ownership here is checked against every clinic id
+// the caller can act as (getActorClinicIds), not a single resolved branch
+// scope. Using resolveClinicScope's single-branch mode here would 400 for
+// any doctor outside whichever branch happens to be selected in the URL.
 router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  const clinicId = scope.scopeId;
+  const actorId = req.session!.getUserId();
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
-    if (!doctor) return;
+    const allowedClinicIds = await getActorClinicIds(actorId);
+    const { resource: doctor } = await doctorsContainer
+      .item(req.params.id, req.params.id)
+      .read()
+      .catch(() => ({ resource: undefined as any }));
+    if (!doctor || !allowedClinicIds.includes(doctor.clinicId)) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
 
     const updatedDoctor = {
       ...doctor,
       slots: doctor.tempSlots ?? doctor.slots,
       slotsPending: false,
       slotsVerifiedAt: new Date().toISOString(),
-      slotsVerifiedBy: scope.actorId,
+      slotsVerifiedBy: actorId,
     };
 
     await doctorsContainer.items.upsert(updatedDoctor);
@@ -422,7 +435,7 @@ router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionReque
       action: "Doctor Slots Verified",
       details: `Dr. ${doctor.fullName ?? doctor.id} availability slots verified by clinic`,
       performedBy: "Clinic",
-      performedById: scope.actorId,
+      performedById: actorId,
       entityType: "doctor",
       entityId: doctor.id,
     });

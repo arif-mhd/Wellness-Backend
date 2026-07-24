@@ -129,25 +129,21 @@ export default function ClinicAppointmentsPage() {
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
-  const [isMultiBranchOrg, setIsMultiBranchOrg] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
 
+  // Every org owner's own account is at least its own main branch, so this
+  // always succeeds with >= 1 entry for them (empty/403 for a branch-user
+  // login, who doesn't need the switcher anyway). The switcher itself only
+  // makes sense once there's more than just the one main branch to pick.
   useEffect(() => {
-    apiFetch("/api/clinics/me")
-      .then((r) => r.json())
-      .then((data) => setIsMultiBranchOrg(!!data.clinic?.isMultiBranchOrg))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!isMultiBranchOrg) return;
     apiFetch("/api/clinics/branches")
       .then((r) => r.json())
       .then((data) => setBranches(Array.isArray(data.branches) ? data.branches.filter((b: BranchOption) => b.status === "active") : []))
       .catch(() => setBranches([]));
-  }, [isMultiBranchOrg]);
+  }, []);
 
+  const hasMultipleBranches = branches.length > 1;
   const activeBranchName = branchId ? branches.find((b) => b.id === branchId)?.name ?? "Branch" : null;
 
   const loadAppointments = () => {
@@ -308,7 +304,7 @@ export default function ClinicAppointmentsPage() {
         <div className="flex-1 min-w-0 flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Appointments</h1>
 
-          {isMultiBranchOrg && (
+          {hasMultipleBranches && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push("/clinic/appointments")}

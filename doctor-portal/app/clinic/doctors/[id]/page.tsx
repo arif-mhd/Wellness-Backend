@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
@@ -154,7 +154,8 @@ function StarRating({ rating, size = 12 }: { rating: number; size?: number }) {
 
 const inputCls = "h-8 border border-[#D6D9E0] text-[11px] font-medium text-center text-[#24292E] outline-none focus:border-[#5476FC] rounded-sm px-2 bg-white";
 
-export default function DoctorProfilePage({ params }: { params: { id: string } }) {
+export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
@@ -205,7 +206,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
   const [reviewTotal, setReviewTotal] = useState(0);
 
   const loadDoctor = () => {
-    apiFetch(`/api/clinics/doctors/${params.id}${qs}`)
+    apiFetch(`/api/clinics/doctors/${id}${qs}`)
       .then(async (r) => {
         if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error ?? "Failed to load doctor."); }
         return r.json();
@@ -215,18 +216,18 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadDoctor(); }, [params.id, qs]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadDoctor(); }, [id, qs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTab === "Consultations" && !consultationsLoaded) {
-      apiFetch(`/api/clinics/doctors/${params.id}/consultations${qs}`)
+      apiFetch(`/api/clinics/doctors/${id}/consultations${qs}`)
         .then((r) => r.json())
         .then((data) => setConsultations(Array.isArray(data.consultations) ? data.consultations : []))
         .catch(() => setConsultations([]))
         .finally(() => setConsultationsLoaded(true));
     }
     if (activeTab === "Rating and Performance" && !reviewsLoaded) {
-      apiFetch(`/api/clinics/doctors/${params.id}/reviews${qs}`)
+      apiFetch(`/api/clinics/doctors/${id}/reviews${qs}`)
         .then((r) => r.json())
         .then((data) => {
           setReviews(Array.isArray(data.reviews) ? data.reviews : []);
@@ -236,7 +237,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
         .catch(() => setReviews([]))
         .finally(() => setReviewsLoaded(true));
     }
-  }, [activeTab, consultationsLoaded, reviewsLoaded, params.id, qs]);
+  }, [activeTab, consultationsLoaded, reviewsLoaded, id, qs]);
 
   const startEditing = () => {
     if (!doctor) return;
@@ -263,7 +264,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
     setSavingDoc(true);
     setSaveError("");
     try {
-      const res = await apiFetch(`/api/clinics/doctors/${params.id}${qs}`, {
+      const res = await apiFetch(`/api/clinics/doctors/${id}${qs}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -290,7 +291,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
     if (!window.confirm(`Remove Dr. ${doctor.fullName} from your clinic? Their appointment history is preserved but they will no longer be able to log in.`)) return;
     setDeleting(true);
     try {
-      const res = await apiFetch(`/api/clinics/doctors/${params.id}${qs}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/clinics/doctors/${id}${qs}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       window.location.href = `/clinic/doctors${qs}`;
     } catch {
@@ -305,7 +306,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
     setTogglingOnline(true);
     setDoctor({ ...doctor, isOnline: next });
     try {
-      const res = await apiFetch(`/api/clinics/doctors/${params.id}/online-status${qs}`, {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/online-status${qs}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOnline: next }),
@@ -322,7 +323,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
     const password = window.prompt("New password for this doctor (min 8 characters):");
     if (!password) return;
     try {
-      const res = await apiFetch(`/api/clinics/doctors/${params.id}/reset-password${qs}`, {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/reset-password${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -349,7 +350,7 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
   const handleSaveSlots = async () => {
     setSavingSlots(true);
     try {
-      const res = await apiFetch(`/api/clinics/doctors/${params.id}/slots${qs}`, {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/slots${qs}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: slotDraft }),
@@ -670,7 +671,6 @@ export default function DoctorProfilePage({ params }: { params: { id: string } }
                         </div>
                         <span className={`text-[12px] font-medium shrink-0 ${statusColor(c)}`}>{statusLabel(c)}</span>
                         <div className="flex items-center gap-3 shrink-0">
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedConsultId(c.id); }} className="bg-black text-white text-[11px] font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">Consult Now</button>
                           <button onClick={(e) => { e.stopPropagation(); setSelectedConsultId(c.id); }} className="flex items-center gap-1 text-[12px] font-medium text-[#24292E] hover:text-[#5476FC] transition-colors">
                             View <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                           </button>

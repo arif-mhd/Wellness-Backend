@@ -30,6 +30,7 @@ interface Branch {
 interface Clinic {
   id: string;
   supertokens_id: string;
+  clinicName?: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -86,14 +87,19 @@ const BRANCH_STATUS_COLOR: Record<Branch["status"], string> = {
   rejected: "bg-red-50 text-red-500",
 };
 
+function clinicDisplayName(clinic: Clinic): string {
+  return clinic.clinicName || clinic.fullName || "";
+}
+
 function ClinicAvatar({ clinic, size = "md" }: { clinic: Clinic; size?: "sm" | "md" | "lg" }) {
   const sz = size === "lg" ? "w-16 h-16 text-lg" : size === "sm" ? "w-9 h-9 text-xs" : "w-10 h-10 text-[11px]";
+  const name = clinicDisplayName(clinic);
   if (clinic.clinicImageUrl) {
-    return <img src={clinic.clinicImageUrl} alt={clinic.fullName} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
+    return <img src={clinic.clinicImageUrl} alt={name} className={`${sz} rounded-full object-cover border border-slate-100 shrink-0`} />;
   }
   return (
     <div className={`${sz} rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-medium shrink-0`}>
-      {clinic.fullName?.split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
+      {name.split(" ").slice(0, 2).map(n => n[0]).join("") || "?"}
     </div>
   );
 }
@@ -271,7 +277,7 @@ function ManageClinicsPageInner() {
   const currentList = activeTab === "onboard" ? clinics : queue;
   const sortedClinics = currentList.filter(c => {
     const q = searchQuery.toLowerCase();
-    return !q || c.fullName?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.address?.toLowerCase().includes(q);
+    return !q || clinicDisplayName(c).toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.address?.toLowerCase().includes(q);
   });
 
   const selectedClinic = [...clinics, ...queue].find(c => c.id === selectedClinicId) ?? null;
@@ -418,7 +424,7 @@ function ManageClinicsPageInner() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
-                                  {clinic.fullName}
+                                  {clinicDisplayName(clinic)}
                                   {pendingBranchCount > 0 && (
                                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
                                       {pendingBranchCount} branch{pendingBranchCount > 1 ? "es" : ""} pending
@@ -477,7 +483,7 @@ function ManageClinicsPageInner() {
                     <span className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 border-2 border-white rounded-full ${selectedClinic.status === "approved" ? "bg-[#10b981]" : "bg-amber-400"}`} />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-medium text-slate-800">{selectedClinic.fullName}</h3>
+                    <h3 className="text-[15px] font-medium text-slate-800">{clinicDisplayName(selectedClinic)}</h3>
                     {selectedClinic.licenseNumber && (
                       <p className="text-[10px] font-medium text-[#6A8BFF] uppercase tracking-wide mt-1 bg-blue-50/50 inline-block px-1.5 py-0.5 rounded">
                         LICENSE {selectedClinic.licenseNumber}
@@ -495,6 +501,7 @@ function ManageClinicsPageInner() {
 
               <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-5 mb-6">
                 {[
+                  { label: "Owner Name",              value: selectedClinic.fullName },
                   { label: "Emirates ID / Passport", value: selectedClinic.emiratesIdOrPassport },
                   { label: "Position",                value: selectedClinic.positionInClinic },
                   { label: "Gender",                  value: selectedClinic.gender },
