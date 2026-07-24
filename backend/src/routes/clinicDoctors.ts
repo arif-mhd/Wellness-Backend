@@ -490,7 +490,7 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
     const now = new Date().toISOString();
     const startObj = new Date(startDate);
     const endObj = new Date(endDate);
-    const diffHours = Math.round((endObj.getTime() - startObj.getTime()) / (1000 * 60 * 60));
+    const diffHours = (endObj.getTime() - startObj.getTime()) / (1000 * 60 * 60);
     const duration = diffHours >= 24 ? `${Math.round(diffHours / 24)} day(s)` : `${diffHours} hour(s)`;
 
     const newAbsence = {

@@ -78,7 +78,7 @@ export default function DoctorsTimingTab() {
 
   const loadDoctors = () => {
     setLoading(true);
-    apiFetch("/api/clinics/doctors")
+    apiFetch("/api/clinics/doctors?t=" + Date.now())
       .then((r) => r.json())
       .then((data) => {
         setDoctors(data.doctors || []);
@@ -198,7 +198,7 @@ export default function DoctorsTimingTab() {
                     <div key={abs.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50">
                       <div className="flex flex-col gap-1">
                         <span className="text-[14px] font-semibold text-gray-800">
-                          {new Date(abs.startDate).toLocaleDateString()}
+                          {new Date(abs.startDate).toLocaleDateString()} · {new Date(abs.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(abs.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </span>
                         <span className="text-[12px] font-medium text-gray-500">
                           {abs.duration} · {abs.reason}
