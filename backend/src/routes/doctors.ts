@@ -359,6 +359,7 @@ router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res:
       fileName: fileName || null,
       fileUrl: fileUrl || null,
       createdAt: now,
+      status: "pending",
     };
 
     const currentAbsences = doctor.absences ?? [];

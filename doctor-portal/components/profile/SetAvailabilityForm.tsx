@@ -10,6 +10,8 @@ interface SetAvailabilityFormProps {
   /** Overrides the default "Set Availability" heading — used to show e.g.
    *  "Branch 2 of 3 — Set Availability" during the multi-branch loop. */
   heading?: string;
+  /** Hide action buttons until an edit is made (useful for standard profile pages) */
+  hideButtonsIfUnchanged?: boolean;
 }
 
 const DAY_KEYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -85,7 +87,7 @@ function getConsultingTime(selectedSlots: string[], dayKey: DayKey): string {
   return ranges.join(", ");
 }
 
-export default function SetAvailabilityForm({ initialAvailability, onSubmit, onGoBack, heading }: SetAvailabilityFormProps) {
+export default function SetAvailabilityForm({ initialAvailability, onSubmit, onGoBack, heading, hideButtonsIfUnchanged }: SetAvailabilityFormProps) {
   const [selectedSlots, setSelectedSlots] = useState<string[]>(initialAvailability ?? DEFAULT_SLOTS);
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -97,6 +99,15 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const monthLabel = useMemo(() => formatMonthYear(weekDates), [weekDates]);
   const activeDayKey = DAY_KEYS[selectedDayIdx];
+
+  const hasChanges = useMemo(() => {
+    if (!initialAvailability) return true; // if initial is undefined, user must explicitly accept DEFAULT_SLOTS or we just consider it a new setup (where buttons usually shouldn't be hidden)
+    if (initialAvailability.length !== selectedSlots.length) return true;
+    const baseSet = new Set(initialAvailability);
+    return selectedSlots.some((s) => !baseSet.has(s));
+  }, [initialAvailability, selectedSlots]);
+
+  const showButtons = hideButtonsIfUnchanged ? hasChanges : true;
 
   /* ── slot toggle helpers ─────────────────────────── */
   const applySlot = (dayKey: DayKey, timeVal: string, mode: "add" | "remove") => {
@@ -244,7 +255,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
           {viewMode === "week" && (
             <div
               className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none"
-              style={{ maxHeight: 420, overflowY: "auto" }}
+              style={{ maxHeight: "calc(100vh - 350px)", overflowY: "auto" }}
               onMouseLeave={() => setDragging(false)}
               onMouseUp={() => setDragging(false)}
             >
@@ -326,7 +337,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
               {/* Single-day column grid */}
               <div
                 className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none"
-                style={{ maxHeight: 420, overflowY: "auto" }}
+                style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}
                 onMouseLeave={() => setDragging(false)}
                 onMouseUp={() => setDragging(false)}
               >
@@ -394,13 +405,15 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
         </p>
 
         {/* Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 items-center">
-          <button type="button" onClick={onGoBack}
-            className="w-full bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] rounded-[0.8rem] font-medium text-sm py-4 flex items-center justify-center transition-colors cursor-pointer outline-none">
-            Go Back
-          </button>
-          <DoctorLoginButton type="submit" label="Continue" className="w-full py-4 text-center justify-center flex" />
-        </div>
+        {showButtons && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 items-center animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <button type="button" onClick={onGoBack}
+              className="w-full bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] rounded-[0.8rem] font-medium text-sm py-4 flex items-center justify-center transition-colors cursor-pointer outline-none">
+              Go Back
+            </button>
+            <DoctorLoginButton type="submit" label="Continue" className="w-full py-4 text-center justify-center flex" />
+          </div>
+        )}
       </form>
     </div>
   );

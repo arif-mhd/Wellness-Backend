@@ -486,6 +486,7 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
       fileName: fileName || null,
       fileUrl: fileUrl || null,
       createdAt: now,
+      status: "approved",
     };
 
     const updatedAbsences = [...(doctor.absences ?? []), newAbsence];
@@ -513,6 +514,46 @@ router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: Ses
     res.json({ status: "OK", absences: updatedAbsences });
   } catch (err) {
     console.error("Delete clinic doctor absence error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/clinics/doctors/:id/absences/:absenceId/status ──────────────
+router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+  const clinicId = scope.scopeId;
+  const { status } = req.body;
+
+  if (status !== "approved" && status !== "rejected") {
+    res.status(400).json({ error: "Invalid status." });
+    return;
+  }
+
+  try {
+    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    if (!doctor) return;
+
+    const currentAbsences = doctor.absences ?? [];
+    let updated = false;
+    const updatedAbsences = currentAbsences.map((abs: any) => {
+      if (abs.id === req.params.absenceId) {
+        updated = true;
+        return { ...abs, status };
+      }
+      return abs;
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: "Absence not found." });
+      return;
+    }
+
+    await doctorsContainer.items.upsert({ ...doctor, absences: updatedAbsences, updatedAt: new Date().toISOString() });
+
+    res.json({ status: "OK", absences: updatedAbsences });
+  } catch (err) {
+    console.error("Update clinic doctor absence status error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

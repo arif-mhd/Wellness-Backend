@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
+import DoctorsTimingTab from "@/components/clinic/DoctorsTimingTab";
 
 const DAY_KEY_TO_DOW: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
 const DOW_TO_DAY_KEY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -60,6 +61,7 @@ function slotsFromKeys(selectedSlots: string[]) {
 
 export default function ClinicSchedulesPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"appointments" | "clinic-timing" | "doctors-timing">("clinic-timing");
   const [initialAvailability, setInitialAvailability] = useState<string[] | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -99,28 +101,71 @@ export default function ClinicSchedulesPage() {
   };
 
   return (
-    <div className="px-8 py-8 max-w-4xl">
+    <div className="px-8 py-8 w-full">
       <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px] mb-6" style={{ fontFamily: "Outfit, sans-serif" }}>
-        Clinic Schedules
+        Schedules & Timing
       </h1>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center">
-          {error}
+      <div className="flex flex-wrap items-center gap-2 mb-8">
+        <button
+          onClick={() => setActiveTab("appointments")}
+          className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "appointments" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"
+            }`}
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Appointments
+        </button>
+        <button
+          onClick={() => setActiveTab("clinic-timing")}
+          className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "clinic-timing" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"
+            }`}
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Clinic Timing
+        </button>
+        <button
+          onClick={() => setActiveTab("doctors-timing")}
+          className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "doctors-timing" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"
+            }`}
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Doctors Timing
+        </button>
+      </div>
+
+      {activeTab === "clinic-timing" && (
+        <>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center">
+              {error}
+            </div>
+          )}
+
+          {!loaded ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
+          ) : (
+            <SetAvailabilityForm
+              initialAvailability={initialAvailability}
+              onSubmit={handleSubmit}
+              onGoBack={() => router.push("/clinic")}
+              hideButtonsIfUnchanged={true}
+            />
+          )}
+
+          {saving && <div className="text-center text-xs text-[#A0A8B0] mt-4">Saving...</div>}
+        </>
+      )}
+
+      {activeTab === "appointments" && (
+        <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 text-center text-gray-400 font-outfit">
+          <h3 className="text-xl text-gray-700 font-marcellus mb-2">Appointments</h3>
+          <p>The design for booked clinic appointments will go here.</p>
         </div>
       )}
 
-      {!loaded ? (
-        <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
-      ) : (
-        <SetAvailabilityForm
-          initialAvailability={initialAvailability}
-          onSubmit={handleSubmit}
-          onGoBack={() => router.push("/clinic")}
-        />
+      {activeTab === "doctors-timing" && (
+        <DoctorsTimingTab />
       )}
-
-      {saving && <div className="text-center text-xs text-[#A0A8B0] mt-4">Saving...</div>}
     </div>
   );
 }
