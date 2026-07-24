@@ -96,25 +96,25 @@ function CompleteProfileContent() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showMultiBranchPopup, setShowMultiBranchPopup] = useState(false);
 
-  // Multi-branch loop state — irrelevant/unused on the single-branch path.
+  // Additional-branch loop state — every clinic always fills in one
+  // Company Info + Availability pair first (their main branch, collected
+  // below via mainCompanyInfo/mainAvailabilityInfo); this loop only runs
+  // for branches *beyond* that one, so isMultiBranch/branchIndex/branchCount
+  // here always describe "how many extra locations", never the main one.
   const [isMultiBranch, setIsMultiBranch] = useState(false);
   const [branchCount, setBranchCount] = useState(0);
   const [branchIndex, setBranchIndex] = useState(0);
   const [branchDrafts, setBranchDrafts] = useState<any[]>([]);
   const [currentBranchName, setCurrentBranchName] = useState("");
 
-  const nameParam       = searchParams.get("name")       || "";
   const emailParam      = searchParams.get("email")      || "";
-  const phoneParam      = searchParams.get("phone")      || "";
-  const genderParam     = searchParams.get("gender")     || "";
-  const dobParam        = searchParams.get("dob")        || "";
-  const emiratesIdParam = searchParams.get("emiratesId") || "";
 
   const [ownerInfo, setOwnerInfo] = useState<any>(null);
   const [insuranceInfo, setInsuranceInfo] = useState<any>(null);
-  // Single-branch-path-only state (the org's own company info/availability).
-  const [companyInfo, setCompanyInfo] = useState<any>(null);
-  const [availabilityInfo, setAvailabilityInfo] = useState<any>(null);
+  // The main branch's own company info/availability — every clinic has
+  // this, whether or not they go on to add more branches.
+  const [mainCompanyInfo, setMainCompanyInfo] = useState<any>(null);
+  const [mainAvailabilityInfo, setMainAvailabilityInfo] = useState<any>(null);
 
   const ownerPayloadFields = () => ({
     fullName:             ownerInfo?.fullName || null,
@@ -134,18 +134,19 @@ function CompleteProfileContent() {
 
   const handleStep1Submit = (formData: any) => { setOwnerInfo(formData); setPhase("insurances"); };
 
+  // Insurances is always followed directly by the main branch's own Company
+  // Info + Availability — every clinic fills these in once, regardless of
+  // whether it turns out to have extra branches. The "do you operate
+  // additional branches?" popup only appears *after* that, once there's
+  // already a main branch established to compare "additional" against.
   const handleStep2Submit = (formData: any) => {
     setInsuranceInfo(formData);
-    // The Insurances screen stays mounted underneath — this is a modal
-    // overlay, not a phase change, matching the reference wireframe where
-    // the popup floats over the (dimmed) Insurances screen.
-    setShowMultiBranchPopup(true);
+    setPhase("companyInfo");
   };
 
   const handleNoBranches = () => {
     setShowMultiBranchPopup(false);
-    setIsMultiBranch(false);
-    setPhase("companyInfo");
+    submitSingleBranch();
   };
 
   const handleYesBranches = () => {
@@ -171,7 +172,8 @@ function CompleteProfileContent() {
 
   const handleCompanyInfoSubmit = (formData: any) => {
     if (!isMultiBranch) {
-      setCompanyInfo(formData);
+      // Main branch — always collected exactly once.
+      setMainCompanyInfo(formData);
       setPhase("availability");
       return;
     }
@@ -183,18 +185,20 @@ function CompleteProfileContent() {
     setPhase("availability");
   };
 
-  const submitSingleBranch = async (availabilityData: any) => {
+  // The org's own top-level fields ARE its main branch — no separate
+  // branches[] entry for it, whether or not extra branches follow.
+  const submitSingleBranch = async () => {
     setSubmitting(true);
     setSubmitError("");
 
     try {
       const fileUrls = await uploadFiles({
-        spcContract:   insuranceInfo?.spcContractFile ?? null,
-        addressProof:  companyInfo?.addressProofFile  ?? null,
-        logo:          companyInfo?.clinicImage        ?? null,
+        spcContract:   insuranceInfo?.spcContractFile   ?? null,
+        addressProof:  mainCompanyInfo?.addressProofFile ?? null,
+        logo:          mainCompanyInfo?.clinicImage       ?? null,
       }).catch(() => ({} as Record<string, string>));
 
-      const slots = slotsFromKeys(availabilityData?.selectedSlots ?? []);
+      const slots = slotsFromKeys(mainAvailabilityInfo?.selectedSlots ?? []);
 
       const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
         ...row,
@@ -205,13 +209,13 @@ function CompleteProfileContent() {
       const payload: Record<string, any> = {
         ...ownerPayloadFields(),
         insurances,
-        licenseNumber:        companyInfo?.licenseNumber || null,
-        dohLicense:           companyInfo?.dohLicense || null,
-        address:              companyInfo?.address || null,
+        licenseNumber:        mainCompanyInfo?.licenseNumber || null,
+        dohLicense:           mainCompanyInfo?.dohLicense || null,
+        address:              mainCompanyInfo?.address || null,
         addressProofFileUrl:  fileUrls.addressProof || null,
-        consultationRates:    companyInfo?.consultationRates ?? [],
-        paymentSettings:      companyInfo?.paymentSettings || null,
-        bio:                  companyInfo?.bio || null,
+        consultationRates:    mainCompanyInfo?.consultationRates ?? [],
+        paymentSettings:      mainCompanyInfo?.paymentSettings || null,
+        bio:                  mainCompanyInfo?.bio || null,
         clinicImageUrl:       fileUrls.logo || null,
         slots,
       };
@@ -241,15 +245,17 @@ function CompleteProfileContent() {
     setSubmitError("");
 
     try {
-      // Insurances stays a single, org-level step — its file uploads once,
-      // not per branch.
-      const orgFileUrls = await uploadFiles({
-        spcContract: insuranceInfo?.spcContractFile ?? null,
+      // Insurances and the main branch's own files are org-level uploads —
+      // once each, not namespaced per branch.
+      const mainFileUrls = await uploadFiles({
+        spcContract:  insuranceInfo?.spcContractFile    ?? null,
+        addressProof: mainCompanyInfo?.addressProofFile ?? null,
+        logo:         mainCompanyInfo?.clinicImage       ?? null,
       }).catch(() => ({} as Record<string, string>));
 
       const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
         ...row,
-        spcContractFileUrl: orgFileUrls.spcContract || null,
+        spcContractFileUrl: mainFileUrls.spcContract || null,
         verified: !!insuranceInfo?.spcVerified,
       }));
 
@@ -279,6 +285,15 @@ function CompleteProfileContent() {
       const payload: Record<string, any> = {
         ...ownerPayloadFields(),
         insurances,
+        licenseNumber:        mainCompanyInfo?.licenseNumber || null,
+        dohLicense:           mainCompanyInfo?.dohLicense || null,
+        address:              mainCompanyInfo?.address || null,
+        addressProofFileUrl:  mainFileUrls.addressProof || null,
+        consultationRates:    mainCompanyInfo?.consultationRates ?? [],
+        paymentSettings:      mainCompanyInfo?.paymentSettings || null,
+        bio:                  mainCompanyInfo?.bio || null,
+        clinicImageUrl:       mainFileUrls.logo || null,
+        slots:                slotsFromKeys(mainAvailabilityInfo?.selectedSlots ?? []),
         isMultiBranchOrg: true,
         branches,
       };
@@ -305,8 +320,11 @@ function CompleteProfileContent() {
 
   const handleAvailabilitySubmit = (formData: any) => {
     if (!isMultiBranch) {
-      setAvailabilityInfo(formData);
-      submitSingleBranch(formData);
+      // Main branch's availability is in — now ask whether there's more.
+      // The Availability screen stays mounted underneath as the popup's
+      // backdrop, matching the reference wireframe's floating-overlay look.
+      setMainAvailabilityInfo(formData);
+      setShowMultiBranchPopup(true);
       return;
     }
 
@@ -370,12 +388,7 @@ function CompleteProfileContent() {
           <div className="lg:col-span-8">
             {phase === "owner" && (
               <OwnersPersonalInfoForm
-                initialFullName={nameParam}
                 initialEmail={emailParam}
-                initialPhone={phoneParam}
-                initialGender={genderParam}
-                initialDob={dobParam}
-                initialEmiratesIdOrPassport={emiratesIdParam}
                 onSubmit={handleStep1Submit}
               />
             )}
@@ -385,7 +398,7 @@ function CompleteProfileContent() {
             {phase === "branchCount" && (
               <BranchCountForm
                 onSubmit={handleBranchCountSubmit}
-                onGoBack={() => { setPhase("insurances"); setShowMultiBranchPopup(true); }}
+                onGoBack={() => { setPhase("availability"); setShowMultiBranchPopup(true); }}
               />
             )}
             {phase === "companyInfo" && (
@@ -409,7 +422,7 @@ function CompleteProfileContent() {
             {phase === "availability" && (
               <SetAvailabilityForm
                 key={isMultiBranch ? `av-${branchIndex}` : "av-single"}
-                initialAvailability={isMultiBranch ? branchDrafts[branchIndex]?.selectedSlots : availabilityInfo?.selectedSlots}
+                initialAvailability={isMultiBranch ? branchDrafts[branchIndex]?.selectedSlots : mainAvailabilityInfo?.selectedSlots}
                 onSubmit={handleAvailabilitySubmit}
                 onGoBack={() => setPhase("companyInfo")}
                 heading={isMultiBranch ? `Branch ${branchIndex + 1} of ${branchCount} — Set Availability` : undefined}

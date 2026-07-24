@@ -110,10 +110,11 @@ export default function ClinicHomePage() {
   const [clinicAvatar, setClinicAvatar] = useState("");
   const [clinicSlots, setClinicSlots] = useState<Slot[]>([]);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [isMultiBranchOrg, setIsMultiBranchOrg] = useState(false);
+  const [hasMultipleBranches, setHasMultipleBranches] = useState(false);
   const [doctors, setDoctors] = useState<ClinicDoctor[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState("");
 
   useEffect(() => {
     // Viewing a specific branch ("View Dash") shows that branch's own
@@ -127,7 +128,6 @@ export default function ClinicHomePage() {
           setClinicName(b.name ?? "Branch");
           setClinicSlots(Array.isArray(b.slots) ? b.slots : []);
           setIsAvailable(b.isOnline !== false);
-          setIsMultiBranchOrg(false);
         })
         .catch(() => setClinicName("Branch"));
     } else {
@@ -135,13 +135,21 @@ export default function ClinicHomePage() {
         .then((r) => r.json())
         .then((data) => {
           const c = data.clinic ?? {};
-          setClinicName(c.fullName ?? "Your Clinic");
+          setClinicName(c.clinicName ?? c.fullName ?? "Your Clinic");
           setClinicAvatar(c.clinicImageUrl ?? "");
           setClinicSlots(Array.isArray(c.slots) ? c.slots : []);
           setIsAvailable(c.isOnline !== false);
-          setIsMultiBranchOrg(!!c.isMultiBranchOrg);
         })
         .catch(() => setClinicName("Your Clinic"));
+
+      // Every org owner's own account is at least its own main branch, so
+      // this always succeeds with >= 1 entry — "Clinic's Availability"
+      // below only makes sense to show once there's exactly one location
+      // (main branch alone); once there's more, hours differ per branch.
+      apiFetch("/api/clinics/branches")
+        .then((r) => r.json())
+        .then((data) => setHasMultipleBranches(Array.isArray(data.branches) && data.branches.filter((b: any) => b.status === "active").length > 1))
+        .catch(() => setHasMultipleBranches(false));
     }
 
     apiFetch(`/api/clinics/doctors${qs}`)
@@ -182,19 +190,33 @@ export default function ClinicHomePage() {
     }
   };
 
+  const removeTask = (task: Task) => {
+    setDashboard((prev) =>
+      prev
+        ? { ...prev, tasks: { total: prev.tasks.total - 1, items: prev.tasks.items.filter((t) => t !== task) } }
+        : prev
+    );
+  };
+
   const handleApproveTask = async (task: Task) => {
     if (!task.doctorId) return;
     setApprovingId(task.doctorId);
+    setTaskError("");
     try {
       const res = await apiFetch(`/api/clinics/doctors/${task.doctorId}/verify-slots${qs}`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to verify slots");
-      setDashboard((prev) =>
-        prev
-          ? { ...prev, tasks: { total: prev.tasks.total - 1, items: prev.tasks.items.filter((t) => t !== task) } }
-          : prev
-      );
-    } catch {
-      // leave the task in place so the clinic can retry
+      if (res.status === 404) {
+        // The doctor this task refers to no longer exists (removed since
+        // the dashboard last loaded) — nothing to approve, just clear it.
+        removeTask(task);
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Failed to approve (${res.status}).`);
+      }
+      removeTask(task);
+    } catch (err: any) {
+      setTaskError(err.message ?? "Failed to approve the schedule change. Please try again.");
     } finally {
       setApprovingId(null);
     }
@@ -390,7 +412,7 @@ export default function ClinicHomePage() {
                         className="h-[32px] px-[16px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] shrink-0"
                         style={{ fontFamily: "Outfit, sans-serif" }}
                       >
-                        Consult Now
+                        View
                       </button>
                     </div>
                   </div>
@@ -456,7 +478,7 @@ export default function ClinicHomePage() {
         {/* Right Column */}
         <div className="flex flex-col gap-6">
           {/* Availability Panel — org-level hours don't exist for multi-branch orgs viewed in aggregate */}
-          {!(isMultiBranchOrg && !branchId) && (
+          {!(hasMultipleBranches && !branchId) && (
             <div className="bg-white rounded-xl p-6 border border-white shadow-sm flex flex-col gap-5">
               <div className="flex justify-between items-center w-full">
                 <span className="text-[#24292E] text-[20px] font-normal tracking-[-0.4px]" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -508,6 +530,12 @@ export default function ClinicHomePage() {
                 Tasks Pending
               </span>
             </div>
+
+            {taskError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center mx-1">
+                {taskError}
+              </div>
+            )}
 
             {(dashboard?.tasks.items.length ?? 0) === 0 ? (
               <div className="p-5 flex flex-col gap-3 rounded-[12px] bg-[#CDE48C] w-full">

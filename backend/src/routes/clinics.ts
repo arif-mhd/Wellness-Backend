@@ -7,7 +7,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
-import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -75,7 +75,9 @@ router.get("/me", requireRole("clinic_pending", "clinic"), async (req: SessionRe
 
     if (clinic.branchId && clinic.orgId) {
       const { resource: org } = await clinicsContainer.item(clinic.orgId, clinic.orgId).read().catch(() => ({ resource: undefined as any }));
-      const branch = org?.branches?.find((b: any) => b.id === clinic.branchId);
+      const branch = clinic.branchId === clinic.orgId
+        ? (org ? mainBranchFrom(org) : undefined)
+        : org?.branches?.find((b: any) => b.id === clinic.branchId);
       if (branch) {
         res.json({
           clinic: {
@@ -115,6 +117,7 @@ router.post("/register", async (req: Request, res: Response) => {
   const {
     email,
     password,
+    clinicName,
     fullName,
     phone,
     dateOfBirth,
@@ -122,9 +125,9 @@ router.post("/register", async (req: Request, res: Response) => {
     emiratesIdOrPassport,
   } = req.body;
 
-  if (!email || !password || !fullName || !phone) {
+  if (!email || !password || !clinicName || !phone) {
     res.status(400).json({
-      error: "email, password, fullName and phone are required.",
+      error: "email, password, clinicName and phone are required.",
     });
     return;
   }
@@ -171,7 +174,11 @@ router.post("/register", async (req: Request, res: Response) => {
       supertokens_id: supertokensId,
       status: "pending_approval",
       email,
-      fullName,
+      clinicName,
+      // The owner's own personal name — collected later in the complete-profile
+      // wizard (Owner's Personal Information step), kept distinct from
+      // clinicName so filling it in never overwrites the clinic's own identity.
+      fullName: fullName || null,
       phone,
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
@@ -214,6 +221,8 @@ router.post("/register", async (req: Request, res: Response) => {
 router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: SessionRequest, res: Response) => {
   const clinicId = req.session!.getUserId();
   const {
+    // Clinic's own identity (distinct from the owner's personal fullName below)
+    clinicName,
     // Owner's personal information
     fullName, phone, emiratesIdOrPassport, email, gender, dateOfBirth,
     positionInClinic, languages, otherInfo,
@@ -267,8 +276,30 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       await clinicsContainer.items.upsert(updatedUser);
 
       const branchFieldsProvided = [licenseNumber, dohLicense, address, addressProofFileUrl, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
-      let updatedBranch = (org.branches ?? []).find((b: any) => b.id === clinic.branchId) ?? null;
-      if (branchFieldsProvided && updatedBranch) {
+      const isMainBranchUser = clinic.branchId === clinic.orgId;
+      let updatedBranch: any = isMainBranchUser
+        ? mainBranchFrom(org)
+        : (org.branches ?? []).find((b: any) => b.id === clinic.branchId) ?? null;
+
+      if (branchFieldsProvided && isMainBranchUser) {
+        // Main branch has no separate branches[] entry — its business
+        // fields live directly on the org doc itself.
+        const updatedOrg = {
+          ...org,
+          licenseNumber:       licenseNumber       ?? org.licenseNumber,
+          dohLicense:          dohLicense          ?? org.dohLicense,
+          address:             address             ?? org.address,
+          addressProofFileUrl: addressProofFileUrl ?? org.addressProofFileUrl,
+          consultationRates:   consultationRates   ?? org.consultationRates,
+          paymentSettings:     paymentSettings     ?? org.paymentSettings,
+          bio:                 bio                 ?? org.bio,
+          clinicImageUrl:      clinicImageUrl      ?? org.clinicImageUrl,
+          slots:               slots               ?? org.slots,
+          updatedAt: new Date().toISOString(),
+        };
+        await clinicsContainer.items.upsert(updatedOrg);
+        updatedBranch = mainBranchFrom(updatedOrg);
+      } else if (branchFieldsProvided && updatedBranch) {
         const branches = (org.branches ?? []).map((b: any) => {
           if (b.id !== clinic.branchId) return b;
           updatedBranch = {
@@ -321,6 +352,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
 
     const updated = {
       ...clinic,
+      clinicName:            clinicName            ?? clinic.clinicName,
       fullName:              fullName              ?? clinic.fullName,
       phone:                 phone                 ?? clinic.phone,
       emiratesIdOrPassport:  emiratesIdOrPassport  ?? clinic.emiratesIdOrPassport,
@@ -535,9 +567,18 @@ router.patch("/online-status", requireRole("clinic"), async (req: SessionRequest
       // Branch context (either a branch user, or the org owner viewing as
       // one via ?branchId=) — availability is a property of the branch
       // itself (several users can share it), so it lives on the org doc's
-      // branches[] entry, not on any individual login.
+      // branches[] entry, not on any individual login. The main branch is
+      // the exception — it has no separate entry, so its isOnline lives
+      // directly on the org doc.
       const { resource: org } = await clinicsContainer.item(scope.orgId, scope.orgId).read();
       if (!org) { res.status(404).json({ error: "Clinic not found." }); return; }
+
+      if (scope.scopeId === scope.orgId) {
+        await clinicsContainer.items.upsert({ ...org, isOnline, updatedAt: new Date().toISOString() });
+        res.json({ status: "OK", isOnline });
+        return;
+      }
+
       const branches = (org.branches ?? []).map((b: any) =>
         b.id === scope.scopeId ? { ...b, isOnline } : b
       );
@@ -604,15 +645,30 @@ router.get("/reviews", requireRole("clinic"), async (req: SessionRequest, res: R
 
 // ─── GET /api/clinics ─────────────────────────────────────────────────────────
 // Public directory — approved clinics only. Mirrors GET /api/doctors.
+// clinicsContainer also stores branch senior-staff login docs (they carry
+// their own personal fullName and a branchId), which are accounts, not
+// clinics — excluded here so they never appear in the patient-facing
+// directory (e.g. a branch's staff member showing up as if they were a
+// clinic of their own). Each org's active additional branches have their
+// own doctors too, so they're listed as their own entries alongside the
+// org's main-branch entry, not just folded into it.
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const { resources } = await clinicsContainer.items
+    const { resources: orgs } = await clinicsContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.status = @status ORDER BY c.approvedAt DESC",
+        query: "SELECT * FROM c WHERE c.status = @status AND NOT IS_DEFINED(c.branchId) ORDER BY c.approvedAt DESC",
         parameters: [{ name: "@status", value: "approved" }],
       })
       .fetchAll();
-    res.json({ clinics: resources });
+
+    const clinics = orgs.flatMap((org: any) => [
+      org,
+      ...(org.branches ?? [])
+        .filter((b: any) => b.status === "active")
+        .map((b: any) => branchAsPublicClinic(org, b)),
+    ]);
+
+    res.json({ clinics });
   } catch (err) {
     console.error("Fetch clinics error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -621,14 +677,38 @@ router.get("/", async (_req: Request, res: Response) => {
 
 // ─── GET /api/clinics/:id ─────────────────────────────────────────────────────
 // Public clinic profile. Must come after all literal-path routes above.
+// A doctor's clinicId may point at a real additional branch, which has no
+// standalone Cosmos document of its own (it only exists as an entry inside
+// its parent org's branches[] array) — so a plain point-read 404s for it.
+// Falls back to searching branches[] across orgs and synthesizing a
+// clinic-shaped view from the matched branch, mirroring mainBranchFrom.
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const { resource: clinic } = await clinicsContainer.item(req.params.id, req.params.id).read();
-    if (!clinic || clinic.status !== "approved") {
+    const { resource: direct } = await clinicsContainer
+      .item(req.params.id, req.params.id)
+      .read()
+      .catch(() => ({ resource: undefined as any }));
+
+    if (direct && direct.status === "approved" && !direct.branchId) {
+      res.json({ clinic: direct });
+      return;
+    }
+
+    const { resources: orgMatches } = await clinicsContainer.items
+      .query({
+        query: "SELECT VALUE c FROM c JOIN b IN c.branches WHERE b.id = @branchId AND c.status = 'approved'",
+        parameters: [{ name: "@branchId", value: req.params.id }],
+      })
+      .fetchAll();
+    const org = orgMatches[0];
+    const branch = org?.branches?.find((b: any) => b.id === req.params.id);
+
+    if (!branch || branch.status !== "active") {
       res.status(404).json({ error: "Clinic not found." });
       return;
     }
-    res.json({ clinic });
+
+    res.json({ clinic: branchAsPublicClinic(org, branch) });
   } catch (err) {
     console.error("Fetch clinic error:", err);
     res.status(500).json({ error: "Internal server error." });

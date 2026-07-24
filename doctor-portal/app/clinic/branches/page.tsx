@@ -19,6 +19,7 @@ interface Branch {
   bio?: string | null;
   isOnline?: boolean;
   status: BranchStatus;
+  isMain?: boolean;
   doctorCount: number;
   userCount: number;
   firstUser: { id: string; fullName: string } | null;
@@ -102,6 +103,9 @@ export default function ClinicBranchesPage() {
   });
 
   const goToDash = (b: Branch) => {
+    // Main branch is always reachable — it's the owner's own account, no
+    // separate senior-staff login is required the way real branches need one.
+    if (b.isMain) { router.push("/clinic"); return; }
     if (b.userCount > 0) router.push(`/clinic?branchId=${b.id}`);
     else router.push(`/clinic/branches/${b.id}`);
   };
@@ -190,7 +194,9 @@ export default function ClinicBranchesPage() {
                           <span className="text-[#676E76] text-[12px] truncate block">{b.address}</span>
                         </div>
                         <div className="w-[120px] shrink-0 pr-2">
-                          <span className="text-[#24292E] text-[12px] truncate block">{b.firstUser?.fullName ?? "Unassigned"}</span>
+                          <span className="text-[#24292E] text-[12px] truncate block">
+                            {b.firstUser?.fullName ?? (b.isMain ? "You (Owner)" : "Unassigned")}
+                          </span>
                         </div>
                         <div className="w-[130px] shrink-0 pr-2">
                           <span className="text-[#5476FC] text-[12px] font-medium truncate block">{b.status === "active" ? b.todayHours : "—"}</span>
@@ -209,7 +215,7 @@ export default function ClinicBranchesPage() {
                               onClick={(e) => { e.stopPropagation(); goToDash(b); }}
                               className="h-[30px] px-3 rounded-lg font-medium text-[11px] bg-[#1E293B] text-white hover:bg-[#0f172a] transition-colors whitespace-nowrap"
                             >
-                              {b.userCount > 0 ? "View Dash" : "Add Account"}
+                              {b.isMain || b.userCount > 0 ? "View Dash" : "Add Account"}
                             </button>
                           )}
                           {b.status === "details_pending" && (
@@ -260,7 +266,9 @@ export default function ClinicBranchesPage() {
             <div className="flex flex-col gap-2">
               <span className="text-[#676E76] text-[12px] font-semibold">Users</span>
               {selected.userCount === 0 ? (
-                <span className="text-[#A0A8B0] text-[12px]">No users assigned yet.</span>
+                <span className="text-[#A0A8B0] text-[12px]">
+                  {selected.isMain ? "You manage this branch directly — add a senior staff account if needed." : "No users assigned yet."}
+                </span>
               ) : (
                 <div className="flex items-center gap-2">
                   {selected.firstUser && (

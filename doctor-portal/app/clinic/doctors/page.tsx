@@ -139,28 +139,24 @@ export default function ManageDoctorsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isMultiBranchOrg, setIsMultiBranchOrg] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [showSelectBranchModal, setShowSelectBranchModal] = useState(false);
   const [addDoctorBranchId, setAddDoctorBranchId] = useState("");
   const [deptFilters, setDeptFilters] = useState<Set<string>>(new Set());
 
+  // Every org owner's own account is at least its own main branch, so this
+  // always succeeds with >= 1 entry for them (empty/403 for a branch-user
+  // login). Branch-picking UI only makes sense once there's more than just
+  // the one main branch.
   useEffect(() => {
-    apiFetch("/api/clinics/me")
-      .then((r) => r.json())
-      .then((data) => setIsMultiBranchOrg(!!data.clinic?.isMultiBranchOrg))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!isMultiBranchOrg) return;
     apiFetch("/api/clinics/branches")
       .then((r) => r.json())
       .then((data) => setBranches(Array.isArray(data.branches) ? data.branches.filter((b: BranchOption) => b.status === "active") : []))
       .catch(() => setBranches([]));
-  }, [isMultiBranchOrg]);
+  }, []);
 
+  const hasMultipleBranches = branches.length > 1;
   const activeBranchName = branchId ? branches.find((b) => b.id === branchId)?.name ?? "Branch" : null;
 
   useEffect(() => {
@@ -177,7 +173,7 @@ export default function ManageDoctorsPage() {
   );
 
   const handleAddDoctorClick = () => {
-    if (isMultiBranchOrg && !branchId) {
+    if (hasMultipleBranches && !branchId) {
       setAddDoctorBranchId("");
       setShowSelectBranchModal(true);
       return;
@@ -283,7 +279,7 @@ export default function ManageDoctorsPage() {
             <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Manage Doctors</h1>
           </div>
 
-          {isMultiBranchOrg && (
+          {hasMultipleBranches && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push("/clinic/doctors")}

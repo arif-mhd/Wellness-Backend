@@ -131,7 +131,11 @@ export default function ClinicSidebar() {
   const [clinicName, setClinicName] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAvatar, setClinicAvatar] = useState("");
-  const [isMultiBranchOrg, setIsMultiBranchOrg] = useState(false);
+  // Every org owner has a Branches tab (their own account is always at
+  // least the main branch) — only an actual branch-staff login (their own
+  // clinic.branchId is set, main branch included) doesn't get one, so they
+  // see a plain, single-clinic-style dashboard with no branch-switching UI.
+  const [isBranchUser, setIsBranchUser] = useState(false);
 
   const toggle = () => setOpen(!open);
 
@@ -140,10 +144,10 @@ export default function ClinicSidebar() {
       .then((r) => r.json())
       .then((data) => {
         const c = data.clinic ?? {};
-        setClinicName(c.fullName ?? "");
+        setClinicName(c.clinicName ?? c.fullName ?? "");
         setClinicEmail(c.email ?? "");
         setClinicAvatar(c.clinicImageUrl ?? "");
-        setIsMultiBranchOrg(!!c.isMultiBranchOrg);
+        setIsBranchUser(!!c.branchId);
       })
       .catch(() => {});
   }, []);
@@ -155,7 +159,7 @@ export default function ClinicSidebar() {
   const branchId = searchParams.get("branchId");
   const withBranch = (href: string) => (branchId ? `${href}?branchId=${branchId}` : href);
 
-  const NAV_ITEMS = isMultiBranchOrg ? [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM] : BASE_NAV_ITEMS;
+  const NAV_ITEMS = isBranchUser ? BASE_NAV_ITEMS : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }

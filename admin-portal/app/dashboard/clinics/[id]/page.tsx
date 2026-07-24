@@ -54,6 +54,7 @@ interface BranchRow {
 
 interface Clinic {
   id: string;
+  clinicName?: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -136,7 +137,7 @@ function ClinicDetailInner({ id }: { id: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight">{clinic.fullName}</h1>
+        <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight">{clinic.clinicName || clinic.fullName}</h1>
         <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${
           clinic.status === "approved" ? "bg-emerald-50 text-emerald-600" : clinic.status === "rejected" ? "bg-red-50 text-red-500" : "bg-amber-50 text-amber-600"
         }`}>
@@ -153,6 +154,7 @@ function ClinicDetailInner({ id }: { id: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[1.75rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 space-y-4">
           <h2 className="text-[15px] font-medium text-slate-800 mb-2">Owner &amp; Contact</h2>
+          <DetailRow label="Owner Name" value={clinic.fullName} />
           <DetailRow label="Email" value={clinic.email} />
           <DetailRow label="Phone" value={clinic.phone} />
           <DetailRow label="Position in Clinic" value={clinic.positionInClinic} />

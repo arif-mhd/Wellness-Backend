@@ -13,25 +13,31 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
-import { buildInClause } from "../utils/clinicScope";
+import { buildInClause, mainBranchFrom } from "../utils/clinicScope";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Loads the caller's own clinic doc and confirms they're a multi-branch org
-// owner — every route in this file is org-admin-only (branch users get 403).
+// Loads the caller's own clinic doc — every route in this file is org-owner
+// only (a branch-user account, including a main-branch senior-staff login,
+// has its own branchId set and gets 403'd here; they manage their one
+// branch through the ordinary clinic endpoints, never this file).
 async function requireOrgOwner(req: SessionRequest, res: Response) {
   const actorId = req.session!.getUserId();
   const { resource: org } = await clinicsContainer.item(actorId, actorId).read().catch(() => ({ resource: undefined as any }));
-  if (!org || !org.isMultiBranchOrg) {
+  if (!org || org.branchId) {
     res.status(403).json({ error: "Not authorized." });
     return null;
   }
   return org;
 }
 
+// The org's own id always means "my main branch" — it has no separate
+// entry in branches[], it's the org doc's own top-level fields (see
+// mainBranchFrom).
 function findBranch(org: any, branchId: string) {
+  if (branchId === org.id) return mainBranchFrom(org);
   return (org.branches ?? []).find((b: any) => b.id === branchId) ?? null;
 }
 
@@ -128,8 +134,9 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
   if (!org) return;
 
   try {
+    const mainBranch = mainBranchFrom(org);
     const branches = org.branches ?? [];
-    const enriched = await Promise.all(branches.map(async (b: any) => ({
+    const enriched = await Promise.all([mainBranch, ...branches].map(async (b: any) => ({
       ...b,
       ...(await branchStats(b.id, org.id)),
       todayHours: todayHoursFor(b.slots),
@@ -453,7 +460,11 @@ router.post("/add-request", requireRole("clinic"), async (req: SessionRequest, r
       requestedAt: new Date().toISOString(),
     };
     const branches = [...(org.branches ?? []), newBranch];
-    await clinicsContainer.items.upsert({ ...org, branches, updatedAt: new Date().toISOString() });
+    // Flips true the moment a clinic requests its first branch beyond its
+    // own main one, regardless of what it answered at registration — kept
+    // accurate for display purposes, but scope resolution itself gates on
+    // branches.length, never trusts this flag alone (see resolveClinicScope).
+    await clinicsContainer.items.upsert({ ...org, branches, isMultiBranchOrg: true, updatedAt: new Date().toISOString() });
 
     logActivity({
       source: "clinic",

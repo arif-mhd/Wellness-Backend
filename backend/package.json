@@ -7,6 +7,7 @@
     "seed": "ts-node-dev --transpile-only src/data/seed.ts",
     "seed:fhir": "ts-node-dev --transpile-only src/data/seedFhirDemo.ts",
     "fhir:add": "ts-node-dev --transpile-only src/data/addFhirRecord.ts",
+    "otp": "ts-node scripts/fetch-otp.ts",
     "build": "tsc && node -e \"const fs=require('fs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/wellness-logo.png','dist/assets/wellness-logo.png')\"",
     "start": "node dist/index.js"
   },

@@ -17,10 +17,10 @@ export default function MultiBranchPopup({ onNo, onYes }: MultiBranchPopupProps)
         </div>
 
         <h2 className="text-xl md:text-[1.4rem] font-normal tracking-tight text-gray-800 font-marcellus mb-3">
-          Do you operate multiple branches?
+          Do you operate additional branches?
         </h2>
         <p className="text-gray-500 text-[0.85rem] leading-relaxed mb-8 font-outfit font-light">
-          If your clinic has more than one physical location, let us know so we can set up branch management for your account.
+          You&apos;ve just set up your main branch. If your clinic has other physical locations too, let us know so we can set up branch management for your account.
         </p>
 
         <div className="grid grid-cols-2 gap-4">

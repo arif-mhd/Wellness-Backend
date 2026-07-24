@@ -57,12 +57,7 @@ export default function LoginPage() {
               const { clinic } = await meRes.json();
               if (!clinic?.profileCompletedAt) {
                 const params = new URLSearchParams({
-                  name: clinic?.fullName ?? "",
                   email: clinic?.email ?? email,
-                  phone: clinic?.phone ?? "",
-                  dob: clinic?.dateOfBirth ?? "",
-                  gender: clinic?.gender ?? "",
-                  emiratesId: clinic?.emiratesIdOrPassport ?? "",
                 });
                 router.push(`/auth/complete-profile?${params.toString()}`);
                 return;

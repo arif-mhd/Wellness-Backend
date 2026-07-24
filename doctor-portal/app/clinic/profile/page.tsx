@@ -159,7 +159,7 @@ export default function ClinicProfilePage() {
     );
   }
 
-  const isMultiBranch = !!clinic.isMultiBranchOrg;
+  const displayName = clinic.clinicName || clinic.fullName;
   const branches: Branch[] = Array.isArray(clinic.branches) ? clinic.branches : [];
   const clinicSlots: Slot[] = Array.isArray(clinic.slots) ? clinic.slots : [];
   const insurances: any[] = Array.isArray(clinic.insurances) ? clinic.insurances : [];
@@ -187,17 +187,17 @@ export default function ClinicProfilePage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={clinic.clinicImageUrl} alt="Clinic Logo" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[#5476FC] text-2xl font-bold">{clinic.fullName?.[0]?.toUpperCase() || "C"}</span>
+                  <span className="text-[#5476FC] text-2xl font-bold">{displayName?.[0]?.toUpperCase() || "C"}</span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <h1 className="text-[#24292E] text-[28px] font-medium leading-none tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {clinic.fullName || "Your Clinic Name"}
+                  {displayName || "Your Clinic Name"}
                 </h1>
                 <span className="text-[#676E76] text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {isMultiBranch
-                    ? `${branches.filter((b) => b.status === "active").length} active branch${branches.filter((b) => b.status === "active").length === 1 ? "" : "es"}`
-                    : `Lic number ${clinic.licenseNumber || "—"}`}
+                  {`Lic number ${clinic.licenseNumber || "—"}`}
+                  {branches.filter((b) => b.status === "active").length > 0 &&
+                    ` · ${branches.filter((b) => b.status === "active").length} additional branch${branches.filter((b) => b.status === "active").length === 1 ? "" : "es"}`}
                 </span>
                 {doctors.length > 0 && (
                   <span className="inline-flex items-center gap-1.5 w-fit bg-[#E2F8EB] text-[#179353] text-[11px] font-medium px-2.5 py-1 rounded-full mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -214,58 +214,51 @@ export default function ClinicProfilePage() {
 
           <div className="h-[1px] bg-[#EBEEF5] w-full" />
 
-          {!isMultiBranch && (
-            <>
-              {/* Time slots */}
-              <SectionCard title="Time slots" onEdit={() => router.push("/clinic/schedules")} editLabel="EDIT TIMESLOTS">
-                <div className="flex flex-wrap gap-x-8 gap-y-3">
-                  {groupedClinicSlots.map((row) => (
-                    <div key={row.day} className="min-w-[140px]">
-                      {row.day.slice(0, 3)} : {row.hours}
+          {/* Time slots — main branch's own hours, always meaningful */}
+          <SectionCard title="Time slots" onEdit={() => router.push("/clinic/schedules")} editLabel="EDIT TIMESLOTS">
+            <div className="flex flex-wrap gap-x-8 gap-y-3">
+              {groupedClinicSlots.map((row) => (
+                <div key={row.day} className="min-w-[140px]">
+                  {row.day.slice(0, 3)} : {row.hours}
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          {/* Bio */}
+          <SectionCard title="Bio">
+            {clinic.bio || "No bio added yet."}
+          </SectionCard>
+
+          {/* Licenses */}
+          <SectionCard title="Licenses">
+            <div className="flex flex-col gap-1">
+              <span>License Number: {clinic.licenseNumber || "—"}</span>
+              <span>DOH License: {clinic.dohLicense || "—"}</span>
+            </div>
+          </SectionCard>
+
+          {/* Locations */}
+          <SectionCard title="Locations">
+            {clinic.address || "No address added yet."}
+          </SectionCard>
+
+          {/* Additional branch locations, if any */}
+          {branches.length > 0 && (
+            <SectionCard title="Additional Branch Locations">
+              <div className="flex flex-col gap-3">
+                {branches.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-4 p-3 rounded-lg bg-gray-50/50">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[#24292E] text-[13px] font-medium">{b.name}</span>
+                      <span className="text-[#676E76] text-xs">{b.address || "—"}</span>
                     </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-              {/* Bio */}
-              <SectionCard title="Bio">
-                {clinic.bio || "No bio added yet."}
-              </SectionCard>
-
-              {/* Licenses */}
-              <SectionCard title="Licenses">
-                <div className="flex flex-col gap-1">
-                  <span>License Number: {clinic.licenseNumber || "—"}</span>
-                  <span>DOH License: {clinic.dohLicense || "—"}</span>
-                </div>
-              </SectionCard>
-
-              {/* Locations */}
-              <SectionCard title="Locations">
-                {clinic.address || "No address added yet."}
-              </SectionCard>
-            </>
-          )}
-
-          {isMultiBranch && (
-            <SectionCard title="Branch Locations">
-              {branches.length === 0 ? (
-                <span>No branches added yet.</span>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {branches.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between gap-4 p-3 rounded-lg bg-gray-50/50">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[#24292E] text-[13px] font-medium">{b.name}</span>
-                        <span className="text-[#676E76] text-xs">{b.address || "—"}</span>
-                      </div>
-                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full shrink-0 ${BRANCH_STATUS_COLOR[b.status] ?? "text-gray-500 bg-gray-100"}`}>
-                        {BRANCH_STATUS_LABEL[b.status] ?? b.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full shrink-0 ${BRANCH_STATUS_COLOR[b.status] ?? "text-gray-500 bg-gray-100"}`}>
+                      {BRANCH_STATUS_LABEL[b.status] ?? b.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </SectionCard>
           )}
 
