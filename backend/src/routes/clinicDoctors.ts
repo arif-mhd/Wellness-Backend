@@ -532,10 +532,13 @@ router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: Ses
 });
 
 // ─── PATCH /api/clinics/doctors/:id/absences/:absenceId/status ──────────────
+// Ownership is checked against every clinic id the caller can act as
+// (getActorClinicIds), not a single resolved branch scope — the Doctors
+// Timing tab lists doctors across every branch at once when viewing "All",
+// so approving an absence for a doctor outside whichever branch happens to
+// be selected in the URL must not 400. Same fix as POST /:id/verify-slots.
 router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  const clinicId = scope.scopeId;
+  const actorId = req.session!.getUserId();
   const { status } = req.body;
 
   if (status !== "approved" && status !== "rejected") {
@@ -544,8 +547,15 @@ router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (re
   }
 
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
-    if (!doctor) return;
+    const allowedClinicIds = await getActorClinicIds(actorId);
+    const { resource: doctor } = await doctorsContainer
+      .item(req.params.id, req.params.id)
+      .read()
+      .catch(() => ({ resource: undefined as any }));
+    if (!doctor || !allowedClinicIds.includes(doctor.clinicId)) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
 
     const currentAbsences = doctor.absences ?? [];
     let updated = false;

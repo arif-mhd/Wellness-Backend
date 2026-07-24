@@ -18,6 +18,8 @@ import clinicDoctorsRouter from "./routes/clinicDoctors";
 import clinicAppointmentsRouter from "./routes/clinicAppointments";
 import clinicPatientsRouter from "./routes/clinicPatients";
 import clinicBranchesRouter from "./routes/clinicBranches";
+import clinicFeedbackRouter from "./routes/clinicFeedback";
+import clinicInsuranceRouter from "./routes/clinicInsurance";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
 import appointmentsRouter from "./routes/appointments";
@@ -98,6 +100,8 @@ app.use("/api/clinics/doctors", clinicDoctorsRouter);
 app.use("/api/clinics/appointments", clinicAppointmentsRouter);
 app.use("/api/clinics/patients", clinicPatientsRouter);
 app.use("/api/clinics/branches", clinicBranchesRouter);
+app.use("/api/clinics/feedback", clinicFeedbackRouter);
+app.use("/api/clinics/insurance-policies", clinicInsuranceRouter);
 
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);

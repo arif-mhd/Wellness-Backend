@@ -65,7 +65,7 @@ function formatWorkingDays(slots: any[]) {
   return days.map(d => dayNames[d as number]).join(", ");
 }
 
-export default function DoctorsTimingTab() {
+export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
@@ -74,17 +74,18 @@ export default function DoctorsTimingTab() {
 
   useEffect(() => {
     loadDoctors();
-  }, []);
+  }, [qs]);
 
   const loadDoctors = () => {
     setLoading(true);
-    apiFetch("/api/clinics/doctors")
+    apiFetch(`/api/clinics/doctors${qs}`)
       .then((r) => r.json())
       .then((data) => {
         setDoctors(data.doctors || []);
-        if (data.doctors && data.doctors.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(data.doctors[0].id);
-        }
+        setSelectedDoctorId((prev) => {
+          if (prev && (data.doctors || []).some((d: any) => d.id === prev)) return prev;
+          return data.doctors && data.doctors.length > 0 ? data.doctors[0].id : null;
+        });
       })
       .catch((err) => setError("Failed to load doctors"))
       .finally(() => setLoading(false));

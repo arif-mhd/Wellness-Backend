@@ -119,7 +119,7 @@ const BASE_NAV_ITEMS = [
   { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
   { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
-  { href: "/clinic/accounts", label: "Users / Accounts", Icon: AccountsIcon },
+  { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon },
 ];
 const BRANCHES_NAV_ITEM = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 

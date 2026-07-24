@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
 import DoctorsTimingTab from "@/components/clinic/DoctorsTimingTab";
+import AppointmentsTimingTab from "@/components/clinic/AppointmentsTimingTab";
+
+interface BranchOption { id: string; name: string; status: string; }
 
 const DAY_KEY_TO_DOW: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
 const DOW_TO_DAY_KEY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -61,11 +64,34 @@ function slotsFromKeys(selectedSlots: string[]) {
 
 export default function ClinicSchedulesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const branchId = searchParams.get("branchId");
+  const qs = branchId ? `?branchId=${branchId}` : "";
+
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+
   const [activeTab, setActiveTab] = useState<"appointments" | "clinic-timing" | "doctors-timing">("clinic-timing");
   const [initialAvailability, setInitialAvailability] = useState<string[] | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Every org owner's own account is at least its own main branch, so this
+  // always succeeds with >= 1 entry for them (empty/403 for a branch-user
+  // login, who doesn't need the switcher anyway) — same pattern used on
+  // Appointments/Doctors/Analytics. Note: this only scopes the Appointments
+  // and Doctors Timing tabs' data; Clinic Timing keeps editing whatever the
+  // logged-in caller's own account already resolves to, unchanged.
+  useEffect(() => {
+    apiFetch("/api/clinics/branches")
+      .then((r) => r.json())
+      .then((data) => setBranches(Array.isArray(data.branches) ? data.branches.filter((b: BranchOption) => b.status === "active") : []))
+      .catch(() => setBranches([]));
+  }, []);
+
+  const hasMultipleBranches = branches.length > 1;
+  const activeBranchName = branchId ? branches.find((b) => b.id === branchId)?.name ?? "Branch" : null;
 
   useEffect(() => {
     apiFetch("/api/clinics/me")
@@ -133,6 +159,42 @@ export default function ClinicSchedulesPage() {
         </button>
       </div>
 
+      {hasMultipleBranches && (
+        <div className="flex items-center gap-2 mb-8">
+          <button
+            onClick={() => router.push("/clinic/schedules")}
+            className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${!branchId ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+          >
+            All
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowBranchDropdown((v) => !v)}
+              className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all flex items-center gap-1.5 ${branchId ? "bg-[#5476FC] text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+            >
+              {activeBranchName ?? "Select Branch"}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {showBranchDropdown && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowBranchDropdown(false)} />
+                <div className="absolute left-0 top-9 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 w-48 z-20">
+                  {branches.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => { router.push(`/clinic/schedules?branchId=${b.id}`); setShowBranchDropdown(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${branchId === b.id ? "bg-blue-50 text-blue-600" : "text-slate-700 hover:bg-slate-50"}`}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === "clinic-timing" && (
         <>
           {error && (
@@ -157,14 +219,11 @@ export default function ClinicSchedulesPage() {
       )}
 
       {activeTab === "appointments" && (
-        <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 text-center text-gray-400 font-outfit">
-          <h3 className="text-xl text-gray-700 font-marcellus mb-2">Appointments</h3>
-          <p>The design for booked clinic appointments will go here.</p>
-        </div>
+        <AppointmentsTimingTab qs={qs} />
       )}
 
       {activeTab === "doctors-timing" && (
-        <DoctorsTimingTab />
+        <DoctorsTimingTab qs={qs} />
       )}
     </div>
   );
