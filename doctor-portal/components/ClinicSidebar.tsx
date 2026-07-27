@@ -227,7 +227,7 @@ export default function ClinicSidebar() {
       <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 ${open ? "px-5" : "px-3 items-center"}`}>
         {[
           { href: "/clinic/settings", label: "Settings", Icon: SettingsIcon },
-          { href: "/clinic/help", label: "Help n Support", Icon: HelpIcon },
+          { href: "/clinic/help", label: "Help & Support", Icon: HelpIcon },
         ].map(({ href, label, Icon }) => (
           <Link
             key={href}

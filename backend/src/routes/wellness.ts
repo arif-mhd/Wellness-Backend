@@ -213,7 +213,7 @@ function mapOffCategory(tag: string): string {
 
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[] }
-// Returns: { reply: string, offTopic: boolean }
+// Returns: { reply: string, offTopic: boolean, suggestBooking: boolean }
 router.post("/chat", async (req: SessionRequest, res: Response) => {
   const { message, history = [] } = req.body;
   if (!message?.trim()) {
@@ -235,12 +235,20 @@ RULES:
 - Keep answers concise: 2-4 sentences max.
 - Be friendly and empathetic.
 - Never diagnose or prescribe. Always recommend consulting a doctor for serious symptoms.
+- Whenever you recommend the user see a doctor, healthcare professional, or urgent care (e.g. for concerning symptoms, or when they ask for help finding/booking care), end your reply with the exact marker "[SUGGEST_BOOKING]" on its own line after your message. Only include this marker when you're actually recommending they see someone — not for general wellness tips.
 - For greetings like "hi" or "hello", respond warmly and ask how you can help with their health today.`;
 
   try {
     const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
     let responseText: string | null = null;
     let lastError: any = null;
+
+    const contents = [
+      ...(Array.isArray(history) ? history : [])
+        .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
+        .map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
+      { role: "user", parts: [{ text: message }] },
+    ];
 
     for (const model of models) {
       try {
@@ -250,7 +258,7 @@ RULES:
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: message }] }],
+            contents,
             generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
           }),
         });
@@ -278,9 +286,12 @@ RULES:
       res.json({
         reply: "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
         offTopic: true,
+        suggestBooking: false,
       });
     } else {
-      res.json({ reply: trimmed, offTopic: false });
+      const suggestBooking = trimmed.includes("[SUGGEST_BOOKING]");
+      const reply = trimmed.replace("[SUGGEST_BOOKING]", "").trim();
+      res.json({ reply, offTopic: false, suggestBooking });
     }
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);

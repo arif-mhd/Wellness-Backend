@@ -3,7 +3,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
-import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer } from "../config/cosmos";
+import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer } from "../config/cosmos";
 
 const router = Router();
 
@@ -52,6 +52,16 @@ async function getPharmacyName(pharmacyId: string): Promise<string> {
   }
 }
 
+async function getClinicName(clinicId: string): Promise<string> {
+  try {
+    const { resource } = await clinicsContainer.item(clinicId, clinicId).read();
+    return resource?.clinicName || resource?.fullName || "Unknown Clinic";
+  } catch (err) {
+    console.error(`[support] getClinicName(${clinicId}) error:`, err);
+    return "Unknown Clinic";
+  }
+}
+
 // ── Patient routes ────────────────────────────────────────────────────────────
 
 // POST /api/support — patient or doctor creates a ticket
@@ -64,7 +74,7 @@ router.post("/", verifySession(), async (req: SessionRequest, res: Response) => 
     return res.status(400).json({ error: "subject and description are required" });
   }
 
-  const submitterRole = role === "doctor" ? "doctor" : role === "pharmacy" ? "pharmacy" : "patient";
+  const submitterRole = role === "doctor" ? "doctor" : role === "pharmacy" ? "pharmacy" : role === "clinic" ? "clinic" : "patient";
 
   const ticket = {
     id: uuidv4(),
@@ -146,7 +156,7 @@ router.post("/:ticketId/comments", verifySession(), async (req: SessionRequest, 
   const ticket = resources[0] as any;
   const comment = {
     id: uuidv4(),
-    authorRole: ticket.submitterRole === "doctor" ? "doctor" : ticket.submitterRole === "pharmacy" ? "pharmacy" : "patient",
+    authorRole: ticket.submitterRole === "doctor" ? "doctor" : ticket.submitterRole === "pharmacy" ? "pharmacy" : ticket.submitterRole === "clinic" ? "clinic" : "patient",
     message: message.trim(),
     createdAt: new Date().toISOString(),
   };
@@ -193,6 +203,7 @@ router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Respo
       let submitterName = "Unknown";
       if (t.submitterRole === "doctor") submitterName = await getDoctorName(t.patientId);
       else if (t.submitterRole === "pharmacy") submitterName = await getPharmacyName(t.patientId);
+      else if (t.submitterRole === "clinic") submitterName = await getClinicName(t.patientId);
       else submitterName = await getPatientName(t.patientId);
       return { ...t, patientName: submitterName, submitterName };
     })
@@ -219,8 +230,9 @@ router.get("/admin/:ticketId", verifySession(), async (req: SessionRequest, res:
   let submitterName = "Unknown";
   if (ticket.submitterRole === "doctor") submitterName = await getDoctorName(ticket.patientId);
   else if (ticket.submitterRole === "pharmacy") submitterName = await getPharmacyName(ticket.patientId);
+  else if (ticket.submitterRole === "clinic") submitterName = await getClinicName(ticket.patientId);
   else submitterName = await getPatientName(ticket.patientId);
-  
+
   ticket.patientName = submitterName;
   ticket.submitterName = submitterName;
   return res.json(ticket);
