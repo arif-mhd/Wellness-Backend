@@ -65,7 +65,7 @@ function formatWorkingDays(slots: any[]) {
   return days.map(d => dayNames[d as number]).join(", ");
 }
 
-export default function DoctorsTimingTab() {
+export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
@@ -74,17 +74,18 @@ export default function DoctorsTimingTab() {
 
   useEffect(() => {
     loadDoctors();
-  }, []);
+  }, [qs]);
 
   const loadDoctors = () => {
     setLoading(true);
-    apiFetch("/api/clinics/doctors?t=" + Date.now())
+    apiFetch(`/api/clinics/doctors${qs}`)
       .then((r) => r.json())
       .then((data) => {
         setDoctors(data.doctors || []);
-        if (data.doctors && data.doctors.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(data.doctors[0].id);
-        }
+        setSelectedDoctorId((prev) => {
+          if (prev && (data.doctors || []).some((d: any) => d.id === prev)) return prev;
+          return data.doctors && data.doctors.length > 0 ? data.doctors[0].id : null;
+        });
       })
       .catch((err) => setError("Failed to load doctors"))
       .finally(() => setLoading(false));
@@ -141,21 +142,20 @@ export default function DoctorsTimingTab() {
         {doctors.map(doctor => {
           const isSelected = selectedDoctorId === doctor.id;
           return (
-            <div 
-              key={doctor.id} 
+            <div
+              key={doctor.id}
               onClick={() => setSelectedDoctorId(doctor.id)}
-              className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                isSelected 
-                  ? "bg-white border-[#5476FC] shadow-[0_0_0_2px_rgba(84,118,252,0.2)]" 
+              className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${isSelected
+                  ? "bg-white border-[#5476FC] shadow-[0_0_0_2px_rgba(84,118,252,0.2)]"
                   : "bg-gray-50 border-gray-200 hover:border-[#8AA0FF]"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 {doctor.avatarUrl ? (
                   <img src={doctor.avatarUrl} alt={doctor.fullName} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-semibold">
-                    {(doctor.fullName || "?").slice(0,1).toUpperCase()}
+                    {(doctor.fullName || "?").slice(0, 1).toUpperCase()}
                   </div>
                 )}
                 <div className="flex flex-col min-w-0">
@@ -180,7 +180,7 @@ export default function DoctorsTimingTab() {
                 key={selectedDoctor.id} // re-mount when doctor changes
                 initialAvailability={keysFromSlots(selectedDoctor.slots || [])}
                 onSubmit={handleSubmit}
-                onGoBack={() => {}} // Not really needed if hideButtonsIfUnchanged is used, but required by type
+                onGoBack={() => { }} // Not really needed if hideButtonsIfUnchanged is used, but required by type
                 hideButtonsIfUnchanged={false}
                 heading={`Availability for ${selectedDoctor.fullName}`}
               />
@@ -198,7 +198,7 @@ export default function DoctorsTimingTab() {
                     <div key={abs.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50">
                       <div className="flex flex-col gap-1">
                         <span className="text-[14px] font-semibold text-gray-800">
-                          {new Date(abs.startDate).toLocaleDateString()} · {new Date(abs.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(abs.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {new Date(abs.startDate).toLocaleDateString()} · {new Date(abs.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(abs.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <span className="text-[12px] font-medium text-gray-500">
                           {abs.duration} · {abs.reason}
@@ -208,7 +208,7 @@ export default function DoctorsTimingTab() {
                         {abs.status === "pending" ? (
                           <>
                             <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
-                            <button 
+                            <button
                               onClick={() => handleApproveAbsence(abs.id)}
                               className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
                             >

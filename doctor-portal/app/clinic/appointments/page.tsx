@@ -116,6 +116,10 @@ export default function ClinicAppointmentsPage() {
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
+  // Deep link from Schedules > Appointments (Reschedule/View buttons there
+  // route here with the specific appointment pre-selected) instead of
+  // duplicating a reschedule flow on that page.
+  const apptIdParam = searchParams.get("apptId");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,6 +209,14 @@ export default function ClinicAppointmentsPage() {
   useEffect(() => {
     if (!selectedId && filtered.length > 0) setSelectedId(filtered[0].id);
   }, [filtered, selectedId]);
+
+  // A deep-linked apptId wins over the "first in the filtered list" default,
+  // once that appointment has actually loaded.
+  useEffect(() => {
+    if (apptIdParam && appointments.some((a) => a.id === apptIdParam)) {
+      setSelectedId(apptIdParam);
+    }
+  }, [apptIdParam, appointments]);
 
   const handleReschedule = async () => {
     if (!selectedAppt || !rescheduleValue) return;

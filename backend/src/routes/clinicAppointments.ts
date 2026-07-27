@@ -65,6 +65,8 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
       let patientDob = patient?.dateOfBirth ?? patient?.dob ?? null;
       let patientEmail = patient?.email ?? "";
       let patientAvatarUrl = patient?.avatarUrl ?? null;
+      let patientGender = patient?.gender ?? null;
+      let patientChronicDiseases: string[] = patient?.chronicDiseases ?? [];
 
       if (apt.familyMemberId && patient?.familyMembers) {
         const member = patient.familyMembers.find((m: any) => m.id === apt.familyMemberId);
@@ -73,6 +75,8 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
           patientDob = member.dob ?? member.dateOfBirth ?? patientDob;
           patientAvatarUrl = member.avatarUrl ?? patientAvatarUrl;
           if (member.email) patientEmail = member.email;
+          patientGender = member.gender ?? patientGender;
+          patientChronicDiseases = member.chronicDiseases ?? patientChronicDiseases;
         }
       }
 
@@ -84,8 +88,11 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         ...apt,
         patientName,
         patientEmail,
+        patientDob,
         patientAge: calcAge(patientDob),
         patientAvatarUrl,
+        patientGender: patientGender ?? "other",
+        patientChronicIllnesses: patientChronicDiseases.length > 0 ? patientChronicDiseases.join(", ") : "None reported",
         doctorName: doctor?.fullName ?? "Doctor",
         doctorEmail: doctor?.email ?? "",
         doctorAvatarUrl: doctor?.avatarUrl ?? null,
