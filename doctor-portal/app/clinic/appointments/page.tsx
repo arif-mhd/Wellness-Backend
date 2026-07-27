@@ -267,9 +267,8 @@ export default function ClinicAppointmentsPage() {
     return (
       <div
         onClick={() => setSelectedId(appt.id)}
-        className={`flex items-center px-4 py-3 rounded-xl border transition-all cursor-pointer ${
-          isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
-        }`}
+        className={`flex items-center px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+          }`}
       >
         {/* Name */}
         <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-2 pr-3">

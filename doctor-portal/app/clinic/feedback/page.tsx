@@ -195,13 +195,13 @@ export default function ClinicFeedbackPage() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab("clinic")}
-            className={`px-8 py-2 rounded-xl text-[13px] font-medium tracking-wide transition-all ${activeTab === "clinic" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+            className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "clinic" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
           >
             Clinic
           </button>
           <button
             onClick={() => setActiveTab("doctors")}
-            className={`px-8 py-2 rounded-xl text-[13px] font-medium tracking-wide transition-all ${activeTab === "doctors" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+            className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "doctors" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
           >
             Doctors
           </button>

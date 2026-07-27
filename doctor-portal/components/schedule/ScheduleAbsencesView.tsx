@@ -34,10 +34,10 @@ const formatHHMM = (timeStr: string) => {
 const formatTimeOnly = (isoStr: string) => {
   try {
     const d = new Date(isoStr);
-    const h = d.getUTCHours() % 12 || 12;
-    const m = d.getUTCMinutes();
-    const ampm = d.getUTCHours() >= 12 ? "PM" : "AM";
-    const hourPart = d.getUTCHours() >= 12 ? String(h).padStart(2, "0") : String(h);
+    const h = d.getHours() % 12 || 12;
+    const m = d.getMinutes();
+    const ampm = d.getHours() >= 12 ? "PM" : "AM";
+    const hourPart = d.getHours() >= 12 ? String(h).padStart(2, "0") : String(h);
     const minPart = m === 0 ? "" : `:${String(m).padStart(2, "0")}`;
     return `${hourPart}${minPart} ${ampm}`;
   } catch {
@@ -69,18 +69,16 @@ const formatAbsenceDates = (startDateStr: string, endDateStr: string) => {
 
 const formatPillDate = (date: Date) => {
   try {
-    const day = date.getUTCDate();
-    const months = ["June", "July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May"];
-    // Wait, let's use standard index ordering for months
+    const day = date.getDate();
     const standardMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const month = standardMonths[date.getUTCMonth()];
-    const year = date.getUTCFullYear();
+    const month = standardMonths[date.getMonth()];
+    const year = date.getFullYear();
     
-    const hour = date.getUTCHours() % 12 || 12;
-    const minute = date.getUTCMinutes();
-    const ampm = date.getUTCHours() >= 12 ? "PM" : "AM";
+    const hour = date.getHours() % 12 || 12;
+    const minute = date.getMinutes();
+    const ampm = date.getHours() >= 12 ? "PM" : "AM";
     
-    const padH = date.getUTCHours() >= 12 ? String(hour).padStart(2, "0") : String(hour);
+    const padH = date.getHours() >= 12 ? String(hour).padStart(2, "0") : String(hour);
     const padM = String(minute).padStart(2, "0");
     
     return `${day} ${month}, ${year}, ${padH}:${padM} ${ampm}`;
@@ -362,7 +360,7 @@ export default function ScheduleAbsencesView() {
             const absEnd = new Date(endDate);
             available = available.filter((t) => {
               const [h, m] = t.split(":").map(Number);
-              const slotStart = new Date(`${rescheduleDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`);
+              const slotStart = new Date(`${rescheduleDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
               const slotEnd = new Date(slotStart.getTime() + (data.slotDurationMins ?? 30) * 60 * 1000);
               return !(slotStart < absEnd && slotEnd > absStart);
             });
@@ -622,7 +620,7 @@ export default function ScheduleAbsencesView() {
                       {HOURS_SLOT.map((hour) => {
                         const subslots = [hour.start, hour.mid];
                         return subslots.map((timeStr) => {
-                          const cellStart = new Date(`${day.dateStr}T${timeStr}:00.000Z`);
+                          const cellStart = new Date(`${day.dateStr}T${timeStr}:00`);
                           const cellEnd = new Date(cellStart.getTime() + 30 * 60 * 1000);
                           const matchedAbs = absences.find((abs: any) => {
                             const absStart = new Date(abs.startDate);
