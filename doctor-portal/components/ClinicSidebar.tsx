@@ -119,8 +119,8 @@ const BASE_NAV_ITEMS = [
   { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
   { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
-  { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon },
 ];
+const ACCOUNTS_NAV_ITEM = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
 const BRANCHES_NAV_ITEM = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 
 export default function ClinicSidebar() {
@@ -136,6 +136,7 @@ export default function ClinicSidebar() {
   // clinic.branchId is set, main branch included) doesn't get one, so they
   // see a plain, single-clinic-style dashboard with no branch-switching UI.
   const [isBranchUser, setIsBranchUser] = useState(false);
+  const [hasBranches, setHasBranches] = useState(false);
 
   const toggle = () => setOpen(!open);
 
@@ -147,7 +148,18 @@ export default function ClinicSidebar() {
         setClinicName(c.clinicName ?? c.fullName ?? "");
         setClinicEmail(c.email ?? "");
         setClinicAvatar(c.clinicImageUrl ?? "");
-        setIsBranchUser(!!c.branchId);
+        const isBranch = !!c.branchId;
+        setIsBranchUser(isBranch);
+        
+        if (!isBranch) {
+          apiFetch("/api/clinics/branches")
+            .then(res => res.json())
+            .then(bData => {
+              const branches = bData.branches || bData || [];
+              setHasBranches(branches.length > 0);
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {});
   }, []);
@@ -159,7 +171,11 @@ export default function ClinicSidebar() {
   const branchId = searchParams.get("branchId");
   const withBranch = (href: string) => (branchId ? `${href}?branchId=${branchId}` : href);
 
-  const NAV_ITEMS = isBranchUser ? BASE_NAV_ITEMS : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
+  const adminNav = hasBranches
+    ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM]
+    : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
+
+  const NAV_ITEMS = isBranchUser ? BASE_NAV_ITEMS : adminNav;
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }
@@ -227,7 +243,7 @@ export default function ClinicSidebar() {
       <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 ${open ? "px-5" : "px-3 items-center"}`}>
         {[
           { href: "/clinic/settings", label: "Settings", Icon: SettingsIcon },
-          { href: "/clinic/help", label: "Help n Support", Icon: HelpIcon },
+          { href: "/clinic/help", label: "Help & Support", Icon: HelpIcon },
         ].map(({ href, label, Icon }) => (
           <Link
             key={href}

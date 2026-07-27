@@ -148,7 +148,7 @@ export default function ClinicAccountsPage() {
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-8 py-2 rounded-xl text-[13px] font-medium tracking-wide capitalize transition-all ${activeTab === t ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+              className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide capitalize transition-all ${activeTab === t ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
             >
               {t}
             </button>
