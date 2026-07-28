@@ -409,7 +409,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
           </svg>
         </Link>
         <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px]">
-          Manage Doctors &gt; doctor details
+          Doctor Details
         </h1>
       </div>
 
@@ -500,11 +500,10 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-2.5 rounded-full text-[12px] font-bold tracking-wider transition-all ${
-              activeTab === tab
+            className={`px-6 py-2.5 rounded-full text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
                 ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-[1.02]"
                 : "bg-white text-[#676E76] border border-[#E4E8F0] hover:border-[#5476FC] hover:text-[#5476FC] shadow-sm"
-            }`}
+              }`}
           >
             {tab.toUpperCase()}
           </button>

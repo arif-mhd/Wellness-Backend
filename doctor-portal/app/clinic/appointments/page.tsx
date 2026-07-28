@@ -58,14 +58,6 @@ function FilterPill({ label, active, onClick, activeClass = "bg-black text-white
   );
 }
 
-function ArrowRight() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18l6-6-6-6" />
-    </svg>
-  );
-}
-
 const STATUS_LABEL: Record<Appointment["status"], string> = {
   scheduled: "Scheduled",
   in_progress: "Consulting",
@@ -80,7 +72,7 @@ const STATUS_COLOR: Record<Appointment["status"], string> = {
 };
 
 function statusLabel(apt: Appointment) {
-  if (apt.status === "scheduled" && apt.patientWaitingSince) return "Waiting...";
+  if (apt.status === "scheduled" && apt.patientWaitingSince) return "Waiting";
   if (apt.status === "completed" && !apt.emr) return "EMR Pending";
   return STATUS_LABEL[apt.status];
 }
@@ -102,11 +94,13 @@ function toLocalInputValue(iso: string) {
 
 // Column widths — shared between header and rows
 const COL = {
-  name: "200px",
-  age: "48px",
-  reason: "140px",
-  dept: "140px",
+  name: "215px",
+  age: "38px",
+  reason: "100px",
+  dept: "100px",
   diagnosis: "160px",
+  status: "82px",
+  doctor: "125px",
 };
 
 interface BranchOption { id: string; name: string; status: string; }
@@ -291,17 +285,14 @@ export default function ClinicAppointmentsPage() {
             {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
           </span>
         </div>
-        {/* Status + Doctor + Action */}
-        <div className="flex-1 flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
-            <span className={`w-2 h-2 rounded-full shrink-0 ${appt.doctorIsOnline ? "bg-[#1FAF65]" : "bg-[#D0D5DD]"}`} title={appt.doctorIsOnline ? "Doctor online" : "Doctor offline"} />
-            <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
-            <span className="text-[#24292E] text-[12px] truncate hidden lg:block">{appt.doctorName}</span>
-          </div>
-          <button onClick={() => setSelectedId(appt.id)} className="text-[#5476FC] text-[12px] font-medium flex items-center gap-0.5 shrink-0 hover:underline">
-            View <ArrowRight />
-          </button>
+        {/* Status */}
+        <div style={{ width: COL.status, flexShrink: 0 }}>
+          <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
+        </div>
+        {/* Doctor */}
+        <div style={{ width: COL.doctor, flexShrink: 0 }} className="flex items-center gap-1.5">
+          <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
+          <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
         </div>
       </div>
     );
@@ -392,7 +383,7 @@ export default function ClinicAppointmentsPage() {
 
           {/* Table — horizontally scrollable */}
           <div className="w-full overflow-x-auto">
-            <div style={{ minWidth: "780px" }}>
+            <div style={{ minWidth: "820px" }}>
 
               {/* Table Header */}
               <div className="flex items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]">
@@ -401,7 +392,8 @@ export default function ClinicAppointmentsPage() {
                 <div style={{ width: COL.reason, flexShrink: 0 }}>Reason For Visit</div>
                 <div style={{ width: COL.dept, flexShrink: 0 }}>Department</div>
                 <div style={{ width: COL.diagnosis, flexShrink: 0 }}>Primary Diagnosis</div>
-                <div className="flex-1">Status</div>
+                <div style={{ width: COL.status, flexShrink: 0 }}>Status</div>
+                <div style={{ width: COL.doctor, flexShrink: 0 }}>Doctor</div>
               </div>
 
               {loading ? (
