@@ -74,12 +74,14 @@ const STATUS_COLOR: Record<Appointment["status"], string> = {
 
 function statusLabel(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "Waiting";
+  if (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() < Date.now()) return "Done";
   if (apt.status === "completed" && !apt.emr) return "EMR Pending";
   return STATUS_LABEL[apt.status];
 }
 
 function statusColor(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "text-[#D92D20]";
+  if (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() < Date.now()) return "text-[#179353]";
   if (apt.status === "completed" && !apt.emr) return "text-[#F59E0B]";
   return STATUS_COLOR[apt.status];
 }

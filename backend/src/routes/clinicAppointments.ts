@@ -19,6 +19,17 @@ function calcAge(dob: string | null | undefined): number | null {
   return Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
 }
 
+// If an appointment was never explicitly progressed (still 'scheduled') but
+// its scheduled time is already in the past, treat it as 'completed' for
+// display purposes. Only 'scheduled' is coerced — in_progress, completed,
+// and cancelled are returned as-is.
+function effectiveStatus(apt: { status: string; scheduledAt: string }): string {
+  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) {
+    return "completed";
+  }
+  return apt.status;
+}
+
 // ─── GET /api/clinics/appointments ───────────────────────────────────────────
 // Every appointment ever booked with one of this clinic's doctors, enriched
 // with patient/doctor display data. clinicId is stamped on the appointment
@@ -80,12 +91,14 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         }
       }
 
-      const primaryDiagnosis = apt.status === "completed"
+      const status = effectiveStatus(apt);
+      const primaryDiagnosis = status === "completed"
         ? (apt.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded")
         : "Pending";
 
       return {
         ...apt,
+        status,
         patientName,
         patientEmail,
         patientDob,

@@ -18,6 +18,15 @@ function calcAge(dob: string | null | undefined): number | null {
   return Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 }
 
+// If an appointment was never progressed (still 'scheduled') but its time
+// has already passed, report it as 'completed' for display purposes.
+function effectiveStatus(apt: { status: string; scheduledAt: string }): string {
+  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) {
+    return "completed";
+  }
+  return apt.status;
+}
+
 // Resolves display identity (name/email/dob/avatar/height/weight/bloodGroup/gender)
 // for either the account holder or one of their family members.
 function resolveIdentity(patient: any, familyMemberId: string | null) {
@@ -128,7 +137,7 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         summary: latest?.reason ?? "—",
         lastConsult: latest?.scheduledAt ?? null,
         doctors,
-        consultations: sorted.map((a) => ({ reason: a.reason, date: a.scheduledAt, status: a.status })),
+        consultations: sorted.map((a) => ({ reason: a.reason, date: a.scheduledAt, status: effectiveStatus(a) })),
         nextAppointmentId: nextUpcoming?.id ?? null,
         isNew,
       };
@@ -201,7 +210,7 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
       age,
       reason: a.reason ?? "General Consultation",
       scheduledAt: a.scheduledAt,
-      status: a.status,
+      status: effectiveStatus(a),
     }));
 
     res.json({
