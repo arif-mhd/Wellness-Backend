@@ -1,285 +1,512 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/apiFetch";
 
-const TICKETS = [
-  { id: "1736787", title: "Ticket 1", text: "Lorem Ipsum is simply dummy text of", status: "Pending" },
-  { id: "1736787", title: "Ticket 1", text: "Lorem Ipsum is simply dummy text of", status: "Closed" },
-  { id: "1736787", title: "Ticket 1", text: "Lorem Ipsum is simply dummy text of", status: "Closed" },
-  { id: "1736787", title: "Ticket 1", text: "Lorem Ipsum is simply dummy text of", status: "Closed" },
-];
+interface SupportTicket {
+  id: string;
+  patientId: string;
+  subject: string;
+  description: string;
+  category: string;
+  status: "Open" | "In Progress" | "Closed";
+  adminReply?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  submitterRole?: string;
+}
 
-const RECEIVED_TICKETS = [
-  { id: "#1234", priority: "P1", description: "Lorem", status: "Pending", date: "11/01/2024", developer: "Developer A", patientName: "Sarah Jenkins", avatar: "https://ui-avatars.com/api/?name=Sarah+Jenkins&background=F4F6FF&color=5476FC", subject: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy te", comments: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s." },
-  { id: "#1235", priority: "P3", description: "Payment Issue", status: "Open", date: "11/01/2024", developer: "Developer D", patientName: "Michael Chen", avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=F4F6FF&color=5476FC", subject: "Cannot process payment with my credit card on file", comments: "User reported a payment failure. The gateway returned a timeout error. Will investigate the API logs." },
-  { id: "#1236", priority: "P2", description: "Login Error", status: "Resolved", date: "11/01/2024", developer: "Developer C", patientName: "Emma Watson", avatar: "https://ui-avatars.com/api/?name=Emma+Watson&background=F4F6FF&color=5476FC", subject: "Unable to login to the patient portal using Safari", comments: "The login issue was traced back to a recent Safari update blocking third-party cookies required by our auth provider. A patch has been applied." },
-  { id: "#1237", priority: "P5", description: "Feature Request", status: "Closed", date: "11/01/2024", developer: "Developer E", patientName: "David Miller", avatar: "https://ui-avatars.com/api/?name=David+Miller&background=F4F6FF&color=5476FC", subject: "Can we have dark mode in the mobile app?", comments: "User requested dark mode. Added to the product backlog for Q3 roadmap." },
-];
+export default function ClinicHelpSupportPage() {
+  const router = useRouter();
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"All" | "Open" | "In Progress" | "Closed">("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
-const CATEGORIES = [
-  "technical problems",
-  "billing inquiries",
-  "service-related",
-  "Option 4",
-  "Option 5"
-];
+  // Modal form states
+  const [showRaiseIssue, setShowRaiseIssue] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Technical Problems");
+  const [subject, setSubject] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [comments, setComments] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-export default function ClinicHelpPage() {
-  const [activeTab, setActiveTab] = useState<"Sent" | "Received">("Received");
-  const [showModal, setShowModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("technical problems");
-  const [expandedRow, setExpandedRow] = useState<number | null>(0);
+  const fetchTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/support");
+      if (res.ok) {
+        const data = await res.json();
+        setTickets(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesFilter =
+      filter === "All" || ticket.status === filter;
+    const matchesSearch =
+      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.category.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / ITEMS_PER_PAGE));
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleCreateTicket = async () => {
+    const ticketSubject = subject.trim() || `${selectedCategory} issue`;
+    const ticketDescription = comments.trim();
+    if (!ticketDescription) return;
+
+    setSubmitting(true);
+    try {
+      const res = await apiFetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: ticketSubject,
+          description: ticketDescription,
+          category: selectedCategory.toLowerCase().replace(/ /g, "_"),
+          role: "clinic",
+        }),
+      });
+      if (res.ok) {
+        const newTicket = await res.json();
+        setTickets((prev) => [newTicket, ...prev]);
+      }
+    } finally {
+      setSubmitting(false);
+      setSubject("");
+      setContactNumber("");
+      setComments("");
+      setSelectedCategory("Technical Problems");
+      setShowRaiseIssue(false);
+    }
+  };
+
+  function formatDate(iso: string) {
+    try {
+      const d = new Date(iso);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${d.getDate()} ${months[d.getMonth()]}, ${d.getFullYear()}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    } catch { return iso; }
+  }
 
   return (
-    <div className="flex w-full h-full font-sans px-5 pb-12 pt-2 min-h-screen" style={{ fontFamily: "Outfit, sans-serif" }}>
-      {/* Left Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 pr-8">
-        <h1 className="text-[#383F45] font-semibold text-[28px] leading-none tracking-[-0.5px] mb-5">
-          Support and tickets
-        </h1>
+    <div className="px-10 pb-12 select-none flex flex-col gap-8 relative">
 
-        <div className="flex gap-2 mb-6">
+      {/* Page title */}
+      <div className="flex flex-col justify-center items-start mt-2">
+        <h1
+          className="text-[#24292E] font-medium text-[32px] tracking-[-0.64px]"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Help & Support
+        </h1>
+      </div>
+
+      {/* Center Assist Banner & Search */}
+      <div className="flex flex-col items-center justify-center text-center gap-4 py-4">
+        <h2
+          className="text-[#24292E] font-normal text-[22px] tracking-[-0.44px]"
+          style={{ fontFamily: "Marcellus, serif" }}
+        >
+          How can we assist you?
+        </h2>
+        <p
+          className="text-[#9EA5AD] text-[12px] max-w-[620px] leading-relaxed font-medium"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          If you have any questions or need assistance, we're here to help. Explore the options below for quick solutions or reach out directly to our support team.
+        </p>
+
+        {/* Search Help Input */}
+        <div className="relative w-full max-w-[480px] mt-2">
+          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-[#9EA5AD]">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M6.41667 11.0833C8.994 11.0833 11.0833 8.994 11.0833 6.41667C11.0833 3.83934 8.994 1.75 6.41667 1.75C3.83934 1.75 1.75 3.83934 1.75 6.41667C1.75 8.994 3.83934 11.0833 6.41667 11.0833Z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12.2504 12.2504L9.71289 9.71289"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search tickets..."
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            className="w-full bg-[#F4F6FA] text-[#24292E] placeholder-[#9EA5AD] text-xs rounded-full pl-12 pr-6 py-3.5 border border-transparent focus:border-[#EBEEF5] focus:bg-white outline-none transition-all text-center"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          />
+        </div>
+      </div>
+
+      {/* Support History Controls */}
+      <div className="flex items-center justify-between mt-2 flex-wrap gap-4">
+        <span
+          className="text-[#24292E] font-semibold text-[15px] tracking-[-0.3px]"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Support History
+        </span>
+
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab("Sent")}
-            className={`px-8 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "Sent" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+            onClick={() => setShowRaiseIssue(true)}
+            className="px-6 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] text-white font-medium text-xs rounded-xl shadow-sm transition-all duration-200"
+            style={{ fontFamily: "Outfit, sans-serif" }}
           >
-            Sent
+            Raise an Issue
           </button>
-          <button
-            onClick={() => setActiveTab("Received")}
-            className={`px-8 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "Received" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
+
+          <Link
+            href="/clinic/help/faq"
+            className="px-5 py-2.5 bg-white border border-[#EBEEF5] text-[#24292E] hover:bg-slate-50 font-medium text-xs rounded-xl transition-all flex items-center gap-1.5"
+            style={{ fontFamily: "Outfit, sans-serif" }}
           >
-            Received
+            Frequently Asked Questions
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1.5 6h9M7.5 2.5L11 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+
+      {/* History Table Wrapper */}
+      <div className="flex flex-col gap-5 w-full">
+
+        {/* Filters Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {(["All", "Open", "In Progress", "Closed"] as const).map((opt) => {
+              const isActive = filter === opt;
+              const openCount = opt === "Open" ? tickets.filter(t => t.status === "Open").length : null;
+              return (
+                <button
+                  key={opt}
+                  onClick={() => { setFilter(opt); setCurrentPage(1); }}
+                  className={`px-5 py-2 rounded-full text-xs font-semibold tracking-[-0.24px] border transition-all duration-200 flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-[#24292E] text-white border-transparent shadow-sm"
+                      : "bg-white text-[#676E76] border-[#EBEEF5] hover:bg-gray-50"
+                  }`}
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {opt}
+                  {openCount !== null && openCount > 0 && (
+                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-[#FFF0F0] text-[#E05252]"}`}>
+                      {openCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={fetchTickets}
+            className="text-[#9EA5AD] hover:text-[#24292E] text-xs font-semibold flex items-center gap-1 transition-colors"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          >
+            Refresh
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
         </div>
 
-        <div className="h-px bg-[#EBEEF5] mb-6 w-full" />
-
-        {activeTab === "Sent" ? (
-          <>
-            <h2 className="text-[#383F45] font-semibold text-[22px] mb-12">Help & Support</h2>
-
-            {/* Centered Search block */}
-            <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto">
-              <h3 className="text-[20px] font-bold text-[#24292E] mb-6">Need some help?</h3>
-              <div className="relative w-full mb-8">
-                <input type="text" placeholder="Search" className="w-full h-[46px] pl-5 pr-12 border border-[#D0D5DD] rounded-[8px] text-[13px] outline-none focus:border-[#5476FC] transition-colors shadow-sm" />
-                <svg className="absolute right-4 top-3.5 text-[#9EA5AD]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </div>
-              <button onClick={() => setShowModal(true)} className="px-10 py-3 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all tracking-wide">
-                Raise an issue
-              </button>
+        {/* List Table Card */}
+        <div className="bg-white border border-[#EBEEF5] rounded-[24px] px-6 py-4 shadow-sm flex flex-col">
+          {loading ? (
+            <div className="py-12 text-center text-[#9EA5AD] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Loading tickets...
             </div>
-
-            {/* Past Tickets */}
-            <div className="mt-16 w-full max-w-[500px] mx-auto">
-              <h3 className="text-[18px] font-bold text-[#24292E] mb-5">Past Tickets</h3>
-              <div className="flex flex-col gap-3">
-                {TICKETS.map((t, i) => (
-                  <div key={i} className="flex justify-between items-center bg-[#E5E7EB] border border-[#D0D5DD]/50 px-5 py-4 rounded-[8px] hover:shadow-sm transition-all">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[14px] font-bold text-[#24292E]">{t.title}</span>
-                      <span className="text-[12px] text-[#676E76] font-medium">{t.text}</span>
-                    </div>
-                    <div className="flex flex-col items-end justify-between h-full min-h-[40px] gap-2">
-                      <span className="text-[11px] font-bold text-[#24292E]">ID: {t.id}</span>
-                      <span className={`text-[11px] font-semibold ${t.status === 'Pending' ? 'text-[#D92D20]' : 'text-[#179353]'}`}>
-                        {t.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col w-full h-full">
-            {/* Top Toolbar */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="relative w-[200px]">
-                  <input type="text" placeholder="Search all" className="w-full h-[36px] pl-3 pr-10 border border-[#D0D5DD] rounded-[8px] text-[13px] outline-none focus:border-[#5476FC] transition-colors" />
-                  <svg className="absolute right-3 top-2.5 text-[#9EA5AD]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </div>
-                <button className="text-[#383F45] hover:text-[#5476FC] transition-colors">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex items-center gap-4 text-[12px] text-[#676E76] font-medium">
-                <button className="text-[#24292E] font-bold">Last 1 hour</button>
-                <button className="hover:text-[#24292E] transition-colors">All</button>
-                <button className="hover:text-[#24292E] transition-colors">Today</button>
-                <button className="hover:text-[#24292E] transition-colors">This Week</button>
-                <button className="hover:text-[#24292E] transition-colors">This month</button>
-              </div>
-            </div>
-
-            {/* Table Headers */}
-            <div className="flex items-center px-6 pb-3 text-[11px] font-bold text-[#24292E]">
-              <div className="w-[15%] flex items-center gap-1 cursor-pointer">Ticket # <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-              <div className="w-[12%] flex items-center gap-1 cursor-pointer">Priority <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-              <div className="w-[20%] flex items-center gap-1 cursor-pointer">Ticket Description <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-              <div className="w-[18%] flex items-center gap-1 cursor-pointer">Ticket status <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-              <div className="w-[15%] flex items-center gap-1 cursor-pointer">Date <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-              <div className="w-[20%] flex items-center gap-1 cursor-pointer">Developer <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg></div>
-            </div>
-
-            {/* Tickets List */}
-            <div className="flex flex-col gap-3">
-              {RECEIVED_TICKETS.map((t, i) => {
-                const isExpanded = expandedRow === i;
-                const getStatusColor = (status: string) => {
-                  if (status === 'Pending') return 'text-[#9EA5AD]';
-                  if (status === 'Open') return 'text-[#5476FC]';
-                  if (status === 'Resolved') return 'text-[#179353]';
-                  return 'text-[#111827]';
-                };
-                return (
-                  <div 
-                    key={i} 
-                    className={`flex items-center px-6 py-4 cursor-pointer min-h-[60px] border rounded-[8px] transition-all duration-300 ${isExpanded ? "bg-[#F4F6FF] border-[#5476FC]" : "bg-white border-[#D0D5DD] hover:border-[#9EA5AD]"}`}
-                    onClick={() => setExpandedRow(i)}
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="text-[10px] font-medium text-[#9EA5AD] uppercase tracking-wider">
+                  <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
+                  <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Summary</th>
+                  <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Date and Time</th>
+                  <th className="py-4 font-medium text-right" style={{ fontFamily: "Outfit, sans-serif" }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTickets.map((ticket) => (
+                  <tr
+                    key={ticket.id}
+                    onClick={() => router.push(`/clinic/help/ticket?id=${ticket.id}`)}
+                    className="hover:bg-[#F9FAFC]/50 transition-colors cursor-pointer"
                   >
-                    <div className="w-[15%] flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full shrink-0 border border-[#D0D5DD] overflow-hidden bg-[#EAF0F6]">
-                        <svg className="w-full h-full text-[#A0ABB8] mt-1" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    {/* Subject Column */}
+                    <td className="py-[22px] flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full border border-[#EEF2FF] bg-[#EEF2FF]/40 flex items-center justify-center text-[#5476FC] shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                          <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="2" />
+                          <path d="M10 6.5h.01M10 9.5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-bold text-[#111827]">{t.id}</span>
-                        <span className="text-[11px] text-[#676E76] font-medium truncate max-w-[80px]">{t.patientName}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[12px] font-medium text-[#24292E]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          {ticket.subject}
+                        </span>
+                        <span className="text-[10px] text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          #{ticket.id.slice(0, 8).toUpperCase()}
+                        </span>
                       </div>
-                    </div>
-                    <div className="w-[12%] text-[12px] font-medium text-[#676E76]">{t.priority}</div>
-                    <div className="w-[20%] text-[13px] font-bold text-[#5476FC]">{t.description}</div>
-                    <div className={`w-[18%] flex items-center gap-1 text-[13px] font-bold ${getStatusColor(t.status)}`}>
-                      {t.status}
-                    </div>
-                    <div className="w-[15%] text-[12px] font-medium text-[#676E76]">{t.date}</div>
-                    <div className="w-[20%] text-[12px] font-medium text-[#676E76]">{t.developer}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+                    </td>
 
-      {/* Right Sidebar */}
-      <div className={`w-[360px] shrink-0 ${activeTab === "Received" ? "pt-[104px]" : ""}`}>
-        {activeTab === "Received" ? (
-          expandedRow !== null ? (
-            <div className="bg-[#EEF0FC] rounded-[24px] p-6 shadow-sm sticky top-4 flex flex-col gap-6">
-              <h2 className="text-[#24292E] text-[16px] font-bold">Ticket Details</h2>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-[#D0D5DD] bg-[#EAF0F6]">
-                  <svg className="w-full h-full text-[#A0ABB8] mt-1.5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                  </svg>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[13px] font-bold text-[#111827]">{RECEIVED_TICKETS[expandedRow].patientName}</span>
-                  <span className="text-[11px] text-[#676E76] font-medium">{RECEIVED_TICKETS[expandedRow].description}</span>
-                </div>
-              </div>
+                    {/* Summary Column */}
+                    <td className="py-[22px]">
+                      <div className="flex items-center gap-2 max-w-[320px]">
+                        <span className="px-2.5 py-1 bg-[#EEF2FF] text-[#5476FC] text-[9.5px] font-medium rounded-[6px] shrink-0 capitalize" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          {ticket.category.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-xs text-[#9EA5AD] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          {ticket.description}
+                        </span>
+                      </div>
+                    </td>
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[13px] font-bold text-[#111827]">Subject</span>
-                <div className="bg-white rounded-xl p-4 text-[13px] text-[#676E76] font-medium leading-relaxed shadow-sm border border-[#D0D5DD]/30">
-                  {RECEIVED_TICKETS[expandedRow].subject}
-                </div>
-              </div>
+                    {/* Date Column */}
+                    <td className="py-[22px] text-xs text-[#676E76] font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      {formatDate(ticket.createdAt)}
+                    </td>
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[13px] font-bold text-[#111827]">Comments</span>
-                <div className="bg-white rounded-xl p-4 text-[13px] text-[#676E76] font-medium leading-relaxed shadow-sm border border-[#D0D5DD]/30 min-h-[140px]">
-                  {RECEIVED_TICKETS[expandedRow].comments}
-                </div>
-              </div>
+                    {/* Status Column */}
+                    <td className="py-[22px] text-right">
+                      <span className={`inline-block px-3 py-1.5 rounded-full text-[10px] font-medium tracking-[-0.2px] ${
+                        ticket.status === "Open"
+                          ? "bg-[#FFF0F0] text-[#E05252]"
+                          : ticket.status === "In Progress"
+                          ? "bg-[#FFF8E7] text-[#D97706]"
+                          : "bg-[#E2FBE9] text-[#0E9F6E]"
+                      }`} style={{ fontFamily: "Outfit, sans-serif" }}>
+                        {ticket.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
 
-              <div className="flex flex-col gap-2 w-full mt-2">
-                <button className="w-full py-2.5 rounded-xl bg-[#A0A4A8] text-white text-[13px] font-medium tracking-wide hover:bg-[#8B8F94] transition-colors">
-                  Edit
-                </button>
-                <button className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium tracking-wide shadow-[0_2px_8px_rgba(84,118,252,0.2)] hover:shadow-[0_4px_12px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
-                  Solve
-                </button>
-              </div>
-            </div>
-          ) : null
-        ) : (
-          <div className="bg-[#EEF0FC] rounded-[24px] p-7 shadow-sm min-h-[calc(100vh-140px)] sticky top-4">
-            <h2 className="text-[#24292E] text-[16px] font-bold">Help Suggestions & FAQs</h2>
-          </div>
-        )}
-      </div>
+                {paginatedTickets.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-[#9EA5AD] text-xs font-semibold" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      No support tickets found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      {/* Raise Issue Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1E1E1E]/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" style={{ fontFamily: "Outfit, sans-serif" }}>
-          <div className="bg-white w-full max-w-[540px] max-h-[90vh] overflow-y-auto rounded-[16px] p-6 shadow-2xl flex flex-col gap-4 relative border border-[#D0D5DD] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <button onClick={() => setShowModal(false)} className="absolute right-5 top-5 text-[#9EA5AD] hover:text-[#24292E] transition-colors">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+        {/* Table Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all disabled:opacity-40"
+            >
+              <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                <path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <h2 className="text-[#111827] text-[18px] font-bold tracking-tight mb-1">Raise an issue</h2>
 
-            <div className="flex flex-col gap-3">
-              <span className="text-[#111827] text-[13px] font-semibold">Choose issue category</span>
-              <div className="flex flex-col gap-2">
-                {CATEGORIES.map(cat => (
-                  <label key={cat} onClick={() => setSelectedCategory(cat)} className="flex items-center gap-3 cursor-pointer group py-1">
-                    <div className={`w-[18px] h-[18px] rounded-full border flex items-center justify-center transition-all ${selectedCategory === cat ? "border-[#5476FC]" : "border-[#D0D5DD] group-hover:border-[#5476FC]"}`}>
-                      {selectedCategory === cat && <div className="w-2.5 h-2.5 bg-[#5476FC] rounded-full" />}
-                    </div>
-                    <span className="text-[13px] text-[#24292E] font-medium capitalize">{cat}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 mt-1">
-              <span className="text-[#111827] text-[13px] font-semibold">Contact number</span>
-              <input type="text" className="w-full h-11 border border-[#D0D5DD] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors" />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[#111827] text-[13px] font-semibold">Write about it</span>
-              <textarea className="w-full border border-[#D0D5DD] rounded-xl p-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] min-h-[100px] resize-none transition-colors" />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[#111827] text-[13px] font-semibold">Upload images or attach a file</span>
-              <div className="flex gap-3">
-                <div className="flex-1 border border-[#D0D5DD] rounded-xl px-4 py-3 text-[13px] text-[#9EA5AD] flex items-center bg-white cursor-pointer transition-colors">
-                  Select
-                </div>
-                <button className="px-6 py-2 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all tracking-wide">
-                  Attach
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => {
+              const isSelected = currentPage === pg;
+              return (
+                <button
+                  key={pg}
+                  onClick={() => setCurrentPage(pg)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
+                    isSelected
+                      ? "bg-[#5879FC] text-white shadow-sm"
+                      : "text-[#9EA5AD] hover:text-[#5879FC]"
+                  }`}
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {pg}
                 </button>
+              );
+            })}
+
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5879FC] hover:border-[#5879FC] transition-all disabled:opacity-40"
+            >
+              <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Raise an Issue Center Modal ────────────────────────────────────── */}
+      {showRaiseIssue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_50px_rgba(0,0,0,0.15)] w-full max-w-[500px] mx-4 flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal header */}
+            <div className="relative flex items-center justify-center min-h-[36px] border-b border-[#EBEEF5]/40 pb-2">
+              <h3
+                className="text-[#24292E] font-normal text-[22px] tracking-[-0.44px] text-center"
+                style={{ fontFamily: "Marcellus, serif" }}
+              >
+                Raise an Issue
+              </h3>
+              <button
+                onClick={() => setShowRaiseIssue(false)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-[#F5F6FA] flex items-center justify-center text-[#9EA5AD] hover:text-[#383F45] transition-all"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1.5 10.5l9-9M1.5 1.5l9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Subject */}
+            <div className="flex flex-col gap-2">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Subject
+              </span>
+              <input
+                type="text"
+                placeholder="Brief subject of your issue"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] px-4 py-3.5 text-[13px] text-[#24292E] placeholder-[#9EA5AD] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            {/* Choose category list */}
+            <div className="flex flex-col gap-2.5">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Choose a category
+              </span>
+              <div className="flex flex-col gap-3">
+                {["Technical Problems", "Billing Inquiries", "Service-Related", "Others"].map((cat) => {
+                  const isChecked = selectedCategory === cat;
+                  return (
+                    <label key={cat} className="flex items-center gap-3.5 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="category"
+                        checked={isChecked}
+                        onChange={() => setSelectedCategory(cat)}
+                        className="hidden"
+                      />
+                      <div className={`w-[18px] h-[18px] rounded-[4px] border flex items-center justify-center transition-all ${
+                        isChecked
+                          ? "border-[#5476FC] bg-[#5476FC] text-white"
+                          : "border-[#BAC7FF] bg-white group-hover:border-[#5476FC]"
+                      }`}>
+                        {isChecked && (
+                          <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4.5l2.5 2.5 5-5.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <span
+                        className="text-[#24292E] text-sm font-normal select-none"
+                        style={{ fontFamily: "Marcellus, serif" }}
+                      >
+                        {cat}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex justify-end mt-2 gap-3">
-              <button onClick={() => setShowModal(false)} className="px-6 py-2.5 rounded-xl border border-[#D0D5DD] text-[#676E76] text-[13px] font-medium hover:bg-gray-50 transition-all">
+            {/* Contact Number */}
+            <div className="flex flex-col gap-2">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Contact number
+              </span>
+              <input
+                type="text"
+                placeholder="Contact Number"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] px-4 py-3.5 text-[13px] text-[#24292E] placeholder-[#9EA5AD] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            {/* Add Comments */}
+            <div className="flex flex-col gap-2">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Add Comments *
+              </span>
+              <textarea
+                placeholder="Describe your issue in detail..."
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] p-4 text-[13px] text-[#24292E] placeholder-[#9EA5AD] min-h-[100px] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={() => setShowRaiseIssue(false)}
+                className="flex-1 py-3 rounded-[14px] bg-[#EEF2FF] text-[#243D7F] hover:bg-[#E4EAFF] font-medium text-[13px] tracking-[-0.26px] transition-all"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
                 Cancel
               </button>
-              <button onClick={() => setShowModal(false)} className="px-8 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all tracking-wide">
-                Create ticket
+              <button
+                onClick={handleCreateTicket}
+                disabled={submitting || !comments.trim()}
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] disabled:opacity-50 text-white font-medium text-[13px] tracking-[-0.26px] transition-all duration-200"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                {submitting ? "Creating..." : "Create Ticket"}
               </button>
             </div>
+
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { Suspense, useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
@@ -53,8 +53,8 @@ function AvatarPlaceholder({ avatarUrl, name, size = "w-24 h-24" }: { avatarUrl?
   );
 }
 
-export default function PatientProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  const unwrappedParams = use(params);
+function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const searchParams = useSearchParams();
   const member = searchParams.get("member");
   const branchId = searchParams.get("branchId");
@@ -70,7 +70,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
     if (member) query.set("member", member);
     if (branchId) query.set("branchId", branchId);
     const qs = query.toString();
-    apiFetch(`/api/clinics/patients/${unwrappedParams.id}${qs ? `?${qs}` : ""}`)
+    apiFetch(`/api/clinics/patients/${id}${qs ? `?${qs}` : ""}`)
       .then(async (r) => {
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
@@ -84,7 +84,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
       })
       .catch((err) => setError(err.message ?? "Failed to load patient."))
       .finally(() => setLoading(false));
-  }, [unwrappedParams.id, member, branchId]);
+  }, [id, member, branchId]);
 
   return (
     <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative flex flex-col items-center">
@@ -159,8 +159,8 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-6 py-2.5 rounded-full text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
-                      ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-[1.02]"
-                      : "bg-white text-[#676E76] border border-[#E4E8F0] hover:border-[#5476FC] hover:text-[#5476FC] shadow-sm"
+                    ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-[1.02]"
+                    : "bg-white text-[#676E76] border border-[#E4E8F0] hover:border-[#5476FC] hover:text-[#5476FC] shadow-sm"
                     }`}
                 >
                   {tab}
@@ -229,5 +229,13 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
       </div>
     </div>
+  );
+}
+
+export default function PatientProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <PatientProfileContent params={params} />
+    </Suspense>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 const DOW_TO_DAY_KEY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const DAY_KEY_TO_DOW: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
@@ -71,6 +72,8 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const { can } = useClinicPermissions();
+  const canManage = can("manage_schedules");
 
   useEffect(() => {
     loadDoctors();
@@ -176,16 +179,24 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
         {selectedDoctor && (
           <>
             <div className="bg-indigo-50/30 rounded-3xl p-6 border border-indigo-50/50">
-              <SetAvailabilityForm
-                key={selectedDoctor.id} // re-mount when doctor changes
-                initialAvailability={keysFromSlots(selectedDoctor.slots || [])}
-                onSubmit={handleSubmit}
-                onGoBack={() => { }} // Not really needed if hideButtonsIfUnchanged is used, but required by type
-                hideButtonsIfUnchanged={false}
-                heading={`Availability for ${selectedDoctor.fullName}`}
-              />
-              {saving && <div className="text-center text-xs text-[#A0A8B0] mt-4">Saving...</div>}
-              {error && <div className="text-center text-xs text-red-600 mt-2">{error}</div>}
+              {canManage ? (
+                <>
+                  <SetAvailabilityForm
+                    key={selectedDoctor.id} // re-mount when doctor changes
+                    initialAvailability={keysFromSlots(selectedDoctor.slots || [])}
+                    onSubmit={handleSubmit}
+                    onGoBack={() => { }} // Not really needed if hideButtonsIfUnchanged is used, but required by type
+                    hideButtonsIfUnchanged={false}
+                    heading={`Availability for ${selectedDoctor.fullName}`}
+                  />
+                  {saving && <div className="text-center text-xs text-[#A0A8B0] mt-4">Saving...</div>}
+                  {error && <div className="text-center text-xs text-red-600 mt-2">{error}</div>}
+                </>
+              ) : (
+                <div className="text-center text-sm text-[#A0A8B0] py-6">
+                  You don&apos;t have permission to edit doctor schedules.
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
@@ -208,12 +219,14 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                         {abs.status === "pending" ? (
                           <>
                             <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
-                            <button
-                              onClick={() => handleApproveAbsence(abs.id)}
-                              className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
-                            >
-                              APPROVE
-                            </button>
+                            {canManage && (
+                              <button
+                                onClick={() => handleApproveAbsence(abs.id)}
+                                className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
+                              >
+                                APPROVE
+                              </button>
+                            )}
                           </>
                         ) : abs.status === "rejected" ? (
                           <span className="px-3 py-1 bg-red-100 text-red-700 text-[11px] font-bold rounded-full">Rejected</span>

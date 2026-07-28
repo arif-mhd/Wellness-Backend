@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
+import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
 
 const HOURS_SLOT = [
   { label: "7 AM", start: "07:00", mid: "07:30" },
@@ -101,6 +102,7 @@ export default function ScheduleAbsencesView() {
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showMarkAbsence, setShowMarkAbsence] = useState(false);
   const [reasonComment, setReasonComment] = useState("");
+  const { can } = useDoctorPermissions();
 
   const [absences, setAbsences] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
@@ -427,15 +429,17 @@ export default function ScheduleAbsencesView() {
     <div className="flex flex-col gap-5 w-full select-none relative">
       
       {/* Top action link below tabs */}
-      <div className="flex justify-start">
-        <button
-          onClick={handleMarkAbsenceClick}
-          className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold tracking-[-0.24px] hover:underline transition-all flex items-center gap-1.5 cursor-pointer"
-          style={{ fontFamily: "Outfit, sans-serif" }}
-        >
-          Mark Absence
-        </button>
-      </div>
+      {can("manage_own_schedule") && (
+        <div className="flex justify-start">
+          <button
+            onClick={handleMarkAbsenceClick}
+            className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold tracking-[-0.24px] hover:underline transition-all flex items-center gap-1.5 cursor-pointer"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          >
+            Mark Absence
+          </button>
+        </div>
+      )}
 
       {/* Double Column Layout: Calendar + Right Log Panel */}
       <div className="flex gap-6 items-start w-full">
@@ -727,15 +731,17 @@ export default function ScheduleAbsencesView() {
                     >
                       {formatAbsenceDates(log.startDate, log.endDate)} <span className="text-[#5476FC]">({log.duration})</span>
                     </div>
-                    <button
-                      onClick={() => handleDeleteAbsence(log.id)}
-                      className="text-[#9EA5AD] hover:text-red-500 transition-colors shrink-0 p-0.5"
-                      title="Delete Absence"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {can("manage_own_schedule") && (
+                      <button
+                        onClick={() => handleDeleteAbsence(log.id)}
+                        className="text-[#9EA5AD] hover:text-red-500 transition-colors shrink-0 p-0.5"
+                        title="Delete Absence"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                   <div
                     className="text-[10px] text-[#9EA5AD] leading-[1.5]"

@@ -17,14 +17,23 @@ function apiFetch(path: string, init?: RequestInit) {
 
 type Priority = "High" | "Medium" | "Low";
 type Status = "Open" | "Closed";
-type SubmitterRole = "all" | "patient" | "doctor";
+type SubmitterRole = "all" | "patient" | "doctor" | "clinic";
 
 interface TicketComment {
   id: string;
-  authorRole: "admin" | "doctor" | "patient";
+  authorRole: "admin" | "doctor" | "patient" | "clinic";
   message: string;
   createdAt: string;
 }
+
+const ROLE_LABEL: Record<string, string> = { doctor: "Doctor", clinic: "Clinic", patient: "Patient" };
+const ROLE_BADGE_COLOR: Record<string, string> = {
+  doctor: "bg-purple-50 text-purple-600",
+  clinic: "bg-emerald-50 text-emerald-600",
+  patient: "bg-blue-50 text-blue-600",
+};
+function roleLabel(role?: string) { return ROLE_LABEL[role ?? "patient"] ?? "Patient"; }
+function roleBadgeColor(role?: string) { return ROLE_BADGE_COLOR[role ?? "patient"] ?? ROLE_BADGE_COLOR.patient; }
 
 interface Ticket {
   id: string;
@@ -168,6 +177,7 @@ function SupportPageInner() {
   // Compute open counts per role (from all currently loaded tickets regardless of status filter)
   const patientOpenCount = tickets.filter(t => (t.submitterRole === "patient" || !t.submitterRole) && t.status === "Open").length;
   const doctorOpenCount = tickets.filter(t => t.submitterRole === "doctor" && t.status === "Open").length;
+  const clinicOpenCount = tickets.filter(t => t.submitterRole === "clinic" && t.status === "Open").length;
 
   function formatDate(iso: string) {
     try {
@@ -180,7 +190,7 @@ function SupportPageInner() {
     "Closed": "bg-[#1DA877] text-white",
   };
 
-  const displayName = (t: Ticket) => t.submitterName || t.patientName || (t.submitterRole === "doctor" ? "Unknown Doctor" : "Unknown Patient");
+  const displayName = (t: Ticket) => t.submitterName || t.patientName || `Unknown ${roleLabel(t.submitterRole)}`;
 
   return (
     <ProtectedRoute>
@@ -198,6 +208,7 @@ function SupportPageInner() {
                 { key: "all", label: "All Requests" },
                 { key: "patient", label: "Patient Requests", count: patientOpenCount },
                 { key: "doctor", label: "Doctor Requests", count: doctorOpenCount },
+                { key: "clinic", label: "Clinic Requests", count: clinicOpenCount },
               ] as { key: SubmitterRole; label: string; count?: number }[]).map(({ key, label, count }) => (
                 <button
                   key={key}
@@ -278,7 +289,6 @@ function SupportPageInner() {
                       filtered.map((t) => {
                         const isSelected = selectedId === t.id;
                         const priority = getPriority(t.category);
-                        const isDoctor = t.submitterRole === "doctor";
                         return (
                           <tr
                             key={t.id}
@@ -292,8 +302,8 @@ function SupportPageInner() {
                             <td className={`py-4 text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
                             <td className="py-4">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-semibold ${isDoctor ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
-                                {isDoctor ? "Doctor" : "Patient"}
+                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-semibold ${roleBadgeColor(t.submitterRole)}`}>
+                                {roleLabel(t.submitterRole)}
                               </span>
                             </td>
                             <td className="py-4 pr-4">
@@ -345,8 +355,8 @@ function SupportPageInner() {
 
               {/* Type badge */}
               <div className="flex items-center gap-2">
-                <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-semibold ${selected.submitterRole === "doctor" ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
-                  {selected.submitterRole === "doctor" ? "Doctor Request" : "Patient Request"}
+                <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-semibold ${roleBadgeColor(selected.submitterRole)}`}>
+                  {roleLabel(selected.submitterRole)} Request
                 </span>
               </div>
 
@@ -371,7 +381,7 @@ function SupportPageInner() {
               {/* Created by */}
               <div>
                 <p className="text-[12.5px] font-semibold text-slate-800 mb-2">
-                  {selected.submitterRole === "doctor" ? "Doctor" : "Patient"}
+                  {roleLabel(selected.submitterRole)}
                 </p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[13px] flex-shrink-0">
@@ -421,7 +431,7 @@ function SupportPageInner() {
                         <div key={c.id} className={`flex flex-col gap-0.5 ${isAdmin ? "items-end" : "items-start"}`}>
                           <div className={`max-w-[85%] rounded-xl p-3 ${isAdmin ? "bg-[#6A8BFF] text-white" : "bg-slate-50 text-slate-700"}`}>
                             <p className={`text-[10px] font-bold mb-0.5 ${isAdmin ? "text-white/80" : "text-slate-400"}`}>
-                              {isAdmin ? "You (Admin)" : selected.submitterRole === "doctor" ? "Doctor" : "Patient"}
+                              {isAdmin ? "You (Admin)" : roleLabel(selected.submitterRole)}
                             </p>
                             <p className="text-[12px] leading-relaxed">{c.message}</p>
                           </div>
@@ -462,7 +472,7 @@ function SupportPageInner() {
                 )}
                 <textarea
                   className="w-full border border-slate-100 rounded-xl p-4 text-[12px] font-medium text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-[#6A8BFF] bg-[#f8fafd] transition min-h-[100px]"
-                  placeholder={`Type your reply to the ${selected.submitterRole === "doctor" ? "doctor" : "patient"}...`}
+                  placeholder={`Type your reply to the ${roleLabel(selected.submitterRole).toLowerCase()}...`}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                 />

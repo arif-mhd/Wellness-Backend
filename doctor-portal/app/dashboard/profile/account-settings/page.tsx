@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const OTP_LENGTH      = 6;
@@ -292,6 +293,8 @@ export default function AccountSettingsPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  const { can } = useDoctorPermissions();
+
   useEffect(() => {
     apiFetch("/api/doctors/me")
       .then(r => r.json())
@@ -408,86 +411,94 @@ export default function AccountSettingsPage() {
               </div>
             )}
           </div>
-          <button onClick={handleSaveTimezone} disabled={savingTz}
-            className="h-[66px] px-6 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium shrink-0 hover:shadow-md transition-all disabled:opacity-70 flex items-center gap-2">
-            {savingTz && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            {tzSaved ? "Saved ✓" : "Save"}
-          </button>
+          {can("manage_own_profile") && (
+            <button onClick={handleSaveTimezone} disabled={savingTz}
+              className="h-[66px] px-6 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium shrink-0 hover:shadow-md transition-all disabled:opacity-70 flex items-center gap-2">
+              {savingTz && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {tzSaved ? "Saved ✓" : "Save"}
+            </button>
+          )}
         </div>
       </SectionCard>
 
       {/* ── Change Password ───────────────────────────────────── */}
-      <SectionCard title="Change Password" description="Update your password regularly to keep your account secure. Make sure to choose a strong password that includes a mix of letters, numbers, and special characters.">
-        {pwdError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2">{pwdError}</div>}
-        {pwdSuccess && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-2">Password changed successfully.</div>}
-        <div className="flex gap-4">
-          <FloatingInput label="Current Password" showToggle value={currentPwd} onChange={setCurrentPwd} placeholder="Enter current password" />
-          <FloatingInput label="New Password" showToggle value={newPwd} onChange={setNewPwd} placeholder="Enter new password" />
-        </div>
-        <div className="flex gap-4">
-          <FloatingInput label="Confirm New Password" showToggle value={confirmPwd} onChange={setConfirmPwd} placeholder="Re-enter new password" />
-          <div className="flex-1" />
-        </div>
-        <button onClick={handleChangePassword} disabled={savingPwd}
-          className="self-start h-10 px-6 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-70 flex items-center gap-2">
-          {savingPwd && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-          Update Password
-        </button>
-      </SectionCard>
+      {can("manage_account_settings") && (
+        <SectionCard title="Change Password" description="Update your password regularly to keep your account secure. Make sure to choose a strong password that includes a mix of letters, numbers, and special characters.">
+          {pwdError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2">{pwdError}</div>}
+          {pwdSuccess && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-2">Password changed successfully.</div>}
+          <div className="flex gap-4">
+            <FloatingInput label="Current Password" showToggle value={currentPwd} onChange={setCurrentPwd} placeholder="Enter current password" />
+            <FloatingInput label="New Password" showToggle value={newPwd} onChange={setNewPwd} placeholder="Enter new password" />
+          </div>
+          <div className="flex gap-4">
+            <FloatingInput label="Confirm New Password" showToggle value={confirmPwd} onChange={setConfirmPwd} placeholder="Re-enter new password" />
+            <div className="flex-1" />
+          </div>
+          <button onClick={handleChangePassword} disabled={savingPwd}
+            className="self-start h-10 px-6 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-70 flex items-center gap-2">
+            {savingPwd && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            Update Password
+          </button>
+        </SectionCard>
+      )}
 
       {/* ── 2FA ──────────────────────────────────────────────── */}
-      <SectionCard title="Secure Your Account with 2FA">
-        <div className="flex flex-col gap-1">
-          <p className="text-[#676E76] text-xs leading-relaxed">
-            Add an extra layer of security to your account by enabling Two-Factor Authentication (2FA). With 2FA, you&apos;ll be prompted to enter a unique verification code sent to your registered email in addition to your password whenever you log in.
-          </p>
-        </div>
-        {statusLoading ? (
-          <div className="w-6 h-6 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
-        ) : is2FAEnabled ? (
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#E8F1FF] text-[#5476FC] text-[13px] font-semibold rounded-xl">
-              <span className="w-2 h-2 rounded-full bg-[#5476FC] animate-pulse" />
-              2FA Enabled
-            </div>
-            <button onClick={handleDisable2FA} disabled={disabling}
-              className="text-[#E84949] text-sm font-semibold hover:underline disabled:opacity-50">
-              {disabling ? "Disabling…" : "Disable 2FA"}
-            </button>
+      {can("manage_account_settings") && (
+        <SectionCard title="Secure Your Account with 2FA">
+          <div className="flex flex-col gap-1">
+            <p className="text-[#676E76] text-xs leading-relaxed">
+              Add an extra layer of security to your account by enabling Two-Factor Authentication (2FA). With 2FA, you&apos;ll be prompted to enter a unique verification code sent to your registered email in addition to your password whenever you log in.
+            </p>
           </div>
-        ) : (
-          <button onClick={() => setShow2FA(true)} disabled={!doctorEmail}
-            className="self-start h-10 px-5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-50">
-            Enable 2FA
-          </button>
-        )}
-      </SectionCard>
+          {statusLoading ? (
+            <div className="w-6 h-6 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+          ) : is2FAEnabled ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#E8F1FF] text-[#5476FC] text-[13px] font-semibold rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-[#5476FC] animate-pulse" />
+                2FA Enabled
+              </div>
+              <button onClick={handleDisable2FA} disabled={disabling}
+                className="text-[#E84949] text-sm font-semibold hover:underline disabled:opacity-50">
+                {disabling ? "Disabling…" : "Disable 2FA"}
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShow2FA(true)} disabled={!doctorEmail}
+              className="self-start h-10 px-5 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-50">
+              Enable 2FA
+            </button>
+          )}
+        </SectionCard>
+      )}
 
       {/* ── Delete Account ────────────────────────────────────── */}
-      <SectionCard title="Delete your Account" description="If you choose to delete your account, all your data will be permanently removed. This action cannot be undone.">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <button onClick={() => { setDeleteChecked(c => !c); setDeleteError(""); }}
-            className="mt-0.5 w-[18px] h-[18px] rounded border shrink-0 flex items-center justify-center transition-colors"
-            style={{ background: deleteChecked ? "#5476FC" : "#E8F1FF", borderColor: deleteChecked ? "#5476FC" : "#8AA0FF" }}>
-            {deleteChecked && (
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
+      {can("manage_account_settings") && (
+        <SectionCard title="Delete your Account" description="If you choose to delete your account, all your data will be permanently removed. This action cannot be undone.">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <button onClick={() => { setDeleteChecked(c => !c); setDeleteError(""); }}
+              className="mt-0.5 w-[18px] h-[18px] rounded border shrink-0 flex items-center justify-center transition-colors"
+              style={{ background: deleteChecked ? "#5476FC" : "#E8F1FF", borderColor: deleteChecked ? "#5476FC" : "#8AA0FF" }}>
+              {deleteChecked && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+            <span className="text-[#676E76] text-xs leading-relaxed">
+              I understand that deleting my account is permanent and all my data will be lost. This action cannot be undone.
+            </span>
+          </label>
+          {deleteError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2">{deleteError}</div>}
+          <button onClick={handleDeleteAccount} disabled={!deleteChecked || deleting}
+            className={`self-start h-10 px-5 rounded-xl text-white text-sm font-medium transition-all flex items-center gap-2 ${
+              deleteChecked ? "bg-[#E84949] shadow-[0_4px_12px_rgba(232,73,73,0.25)] hover:shadow-[0_6px_16px_rgba(232,73,73,0.35)]" : "bg-[#E84949]/40 cursor-not-allowed"
+            }`}>
+            {deleting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            Delete Account
           </button>
-          <span className="text-[#676E76] text-xs leading-relaxed">
-            I understand that deleting my account is permanent and all my data will be lost. This action cannot be undone.
-          </span>
-        </label>
-        {deleteError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2">{deleteError}</div>}
-        <button onClick={handleDeleteAccount} disabled={!deleteChecked || deleting}
-          className={`self-start h-10 px-5 rounded-xl text-white text-sm font-medium transition-all flex items-center gap-2 ${
-            deleteChecked ? "bg-[#E84949] shadow-[0_4px_12px_rgba(232,73,73,0.25)] hover:shadow-[0_6px_16px_rgba(232,73,73,0.35)]" : "bg-[#E84949]/40 cursor-not-allowed"
-          }`}>
-          {deleting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-          Delete Account
-        </button>
-      </SectionCard>
+        </SectionCard>
+      )}
     </>
   );
 }

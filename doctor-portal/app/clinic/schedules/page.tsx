@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
@@ -62,7 +62,7 @@ function slotsFromKeys(selectedSlots: string[]) {
   return result;
 }
 
-export default function ClinicSchedulesPage() {
+function ClinicSchedulesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -226,5 +226,13 @@ export default function ClinicSchedulesPage() {
         <DoctorsTimingTab qs={qs} />
       )}
     </div>
+  );
+}
+
+export default function ClinicSchedulesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicSchedulesContent />
+    </Suspense>
   );
 }

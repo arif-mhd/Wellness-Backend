@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, use } from "react";
+import { Suspense, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
@@ -154,11 +155,12 @@ function StarRating({ rating, size = 12 }: { rating: number; size?: number }) {
 
 const inputCls = "h-8 border border-[#D6D9E0] text-[11px] font-medium text-center text-[#24292E] outline-none focus:border-[#5476FC] rounded-sm px-2 bg-white";
 
-export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
+function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
+  const { can } = useClinicPermissions();
 
   const [activeTab, setActiveTab] = useState(TAB_PARAM_MAP[searchParams.get("tab") ?? ""] ?? "About");
   const tabs = ["About", "Consultations", "Rating and Performance"];
@@ -416,9 +418,11 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
       {/* ── Top Profile Card ── */}
       <div className="bg-[#EEF0F6] rounded-2xl p-7 relative w-full flex flex-col lg:flex-row gap-12 lg:gap-24 mb-6 shadow-sm border border-[#E4E8F0]">
 
-        <button onClick={editing ? undefined : startEditing} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center text-[#24292E] hover:text-[#5476FC] bg-white rounded-lg shadow-sm border border-[#E4E8F0] transition-colors">
-          <EditIcon />
-        </button>
+        {can("manage_doctors") && (
+          <button onClick={editing ? undefined : startEditing} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center text-[#24292E] hover:text-[#5476FC] bg-white rounded-lg shadow-sm border border-[#E4E8F0] transition-colors">
+            <EditIcon />
+          </button>
+        )}
 
         {/* Column 1: Identity */}
         <div className="flex items-center gap-5">
@@ -428,7 +432,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
             <span className="text-[#676E76] text-[13px] mb-3">{doctor.email}</span>
             <div className="flex items-center gap-3">
               <span className="text-[#24292E] text-[14px] font-medium">{doctor.isOnline ? "Available" : "Not Available"}</span>
-              <ToggleSwitch isOn={!!doctor.isOnline} onClick={handleToggleOnline} disabled={togglingOnline} />
+              <ToggleSwitch isOn={!!doctor.isOnline} onClick={handleToggleOnline} disabled={togglingOnline || !can("manage_doctors")} />
             </div>
           </div>
         </div>
@@ -479,17 +483,19 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                 ) : (
                   <span className="text-[#24292E] font-bold">{doctor.fullName}</span>
                 )}
-                {!editing && <button onClick={startEditing} className="text-gray-400 hover:text-black"><EditIcon /></button>}
+                {!editing && can("manage_doctors") && <button onClick={startEditing} className="text-gray-400 hover:text-black"><EditIcon /></button>}
               </div>
             </div>
             <div className="flex justify-between items-center text-[12px]">
               <span className="text-[#676E76]">Username</span>
               <span className="text-[#24292E] font-bold">{doctor.email}</span>
             </div>
-            <div className="flex justify-between items-center text-[12px]">
-              <span className="text-[#676E76]">Password</span>
-              <button onClick={handleResetPassword} className="text-[#5476FC] font-bold hover:underline">Reset</button>
-            </div>
+            {can("manage_doctors") && (
+              <div className="flex justify-between items-center text-[12px]">
+                <span className="text-[#676E76]">Password</span>
+                <button onClick={handleResetPassword} className="text-[#5476FC] font-bold hover:underline">Reset</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -577,9 +583,11 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <h3 className="text-[#24292E] text-[14px] font-bold">Time slots</h3>
-                <button onClick={openSlotEditor} className="text-[#676E76] hover:text-[#24292E]">
-                  <EditIcon />
-                </button>
+                {can("manage_schedules") && (
+                  <button onClick={openSlotEditor} className="text-[#676E76] hover:text-[#24292E]">
+                    <EditIcon />
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -598,27 +606,29 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
           {saveError && <div className="col-span-1 xl:col-span-2 text-xs text-red-600 text-center">{saveError}</div>}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
-            <button onClick={handleDelete} disabled={deleting} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
-              {deleting ? "REMOVING..." : "DELETE"}
-            </button>
-            {editing ? (
-              <button onClick={() => setEditing(false)} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
-                CANCEL
+          {can("manage_doctors") && (
+            <div className="flex justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
+              <button onClick={handleDelete} disabled={deleting} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
+                {deleting ? "REMOVING..." : "DELETE"}
               </button>
-            ) : (
-              <button onClick={startEditing} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
-                EDIT
+              {editing ? (
+                <button onClick={() => setEditing(false)} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                  CANCEL
+                </button>
+              ) : (
+                <button onClick={startEditing} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                  EDIT
+                </button>
+              )}
+              <button
+                onClick={editing ? handleSave : undefined}
+                disabled={!editing || savingDoc}
+                className="px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
+              >
+                {savingDoc ? "SAVING..." : "SAVE"}
               </button>
-            )}
-            <button
-              onClick={editing ? handleSave : undefined}
-              disabled={!editing || savingDoc}
-              className="px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
-            >
-              {savingDoc ? "SAVING..." : "SAVE"}
-            </button>
-          </div>
+            </div>
+          )}
 
         </div>
       )}
@@ -822,5 +832,13 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
       )}
 
     </div>
+  );
+}
+
+export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <DoctorProfileContent params={params} />
+    </Suspense>
   );
 }

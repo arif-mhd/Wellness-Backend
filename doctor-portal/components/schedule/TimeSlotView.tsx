@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
 
 interface TimeSlotRange {
   dayOfWeek: number;
@@ -78,7 +79,8 @@ export default function TimeSlotView() {
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
   const [activeDayOfWeek, setActiveDayOfWeek] = useState<number>(new Date().getDay());
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
-  
+  const { can } = useDoctorPermissions();
+
   // Slot tracking sets
   const [originalSlots, setOriginalSlots] = useState<Set<string>>(new Set());
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
@@ -605,15 +607,17 @@ export default function TimeSlotView() {
           </div>
 
           {/* Send for Approval button */}
-          <div className="mt-5 flex justify-start">
-            <button
-              onClick={() => setShowApprovalDialog(true)}
-              className="px-6 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#547FCF] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] text-white font-bold text-xs rounded-full transition-all duration-200"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              Send for Approval
-            </button>
-          </div>
+          {can("manage_own_schedule") && (
+            <div className="mt-5 flex justify-start">
+              <button
+                onClick={() => setShowApprovalDialog(true)}
+                className="px-6 py-2.5 bg-gradient-to-b from-[#8AA0FF] to-[#547FCF] hover:from-[#758FFF] hover:to-[#4065FB] hover:shadow-[0_8px_20px_rgba(84,118,252,0.25)] text-white font-bold text-xs rounded-full transition-all duration-200"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Send for Approval
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Task panel */}

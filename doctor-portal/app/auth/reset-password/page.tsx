@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -8,7 +8,7 @@ import logoImg from "@/assets/images/wellness_logo.png";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
@@ -225,5 +225,13 @@ export default function ResetPasswordPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

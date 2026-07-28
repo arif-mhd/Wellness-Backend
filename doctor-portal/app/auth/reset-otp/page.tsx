@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,7 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const OTP_LENGTH = 6;
 const COUNTDOWN_SECONDS = 600;
 
-export default function ResetOtpPage() {
+function ResetOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
@@ -239,5 +239,13 @@ export default function ResetOtpPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function ResetOtpPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetOtpContent />
+    </Suspense>
   );
 }

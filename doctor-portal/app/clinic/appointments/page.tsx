@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface Appointment {
   id: string;
@@ -105,7 +106,7 @@ const COL = {
 
 interface BranchOption { id: string; name: string; status: string; }
 
-export default function ClinicAppointmentsPage() {
+function ClinicAppointmentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -129,6 +130,8 @@ export default function ClinicAppointmentsPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const { can } = useClinicPermissions();
+  const canManage = can("manage_appointments");
 
   // Every org owner's own account is at least its own main branch, so this
   // always succeeds with >= 1 entry for them (empty/403 for a branch-user
@@ -488,22 +491,24 @@ export default function ClinicAppointmentsPage() {
             {actionError && <p className="text-[11px] text-red-600">{actionError}</p>}
 
             {/* Reschedule + Cancel */}
-            <div className="flex flex-col gap-2 mt-1">
-              <button
-                onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
-                disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
-                className="w-full border border-[#C8D0DA] text-[#676E76] text-[12px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Reschedule Consultation
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={actionBusy || selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
-                className="w-full border border-[#F5C2C2] text-[#D92D20] text-[12px] font-medium py-2 rounded-lg hover:bg-red-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Cancel Appointment
-              </button>
-            </div>
+            {canManage && (
+              <div className="flex flex-col gap-2 mt-1">
+                <button
+                  onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
+                  disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
+                  className="w-full border border-[#C8D0DA] text-[#676E76] text-[12px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Reschedule Consultation
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={actionBusy || selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
+                  className="w-full border border-[#F5C2C2] text-[#D92D20] text-[12px] font-medium py-2 rounded-lg hover:bg-red-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Cancel Appointment
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -578,5 +583,13 @@ export default function ClinicAppointmentsPage() {
       )}
 
     </div>
+  );
+}
+
+export default function ClinicAppointmentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicAppointmentsContent />
+    </Suspense>
   );
 }
