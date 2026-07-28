@@ -249,7 +249,7 @@ function ClinicHomeContent() {
   });
 
   return (
-    <div className="px-8 pb-12 select-none">
+    <div className="px-4 md:px-8 pb-12 select-none">
       {/* Top Greeting Row */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
         <div className="flex flex-col justify-center items-flex-start gap-1">

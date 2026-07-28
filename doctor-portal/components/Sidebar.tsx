@@ -99,7 +99,7 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
@@ -149,23 +149,25 @@ export default function Sidebar() {
     : "opacity-0 max-w-0 ml-0 pointer-events-none";
 
   return (
-    /**
-     * KEY PERF FIX:
-     *  • Single <aside> element — NEVER unmounted.
-     *  • Width driven by transition-[width] on the element itself.
-     *    The browser compositor handles this on the GPU thread.
-     *  • overflow-hidden prevents content from bleeding during the slide.
-     *  • will-change:width hints the GPU to keep this layer promoted.
-     */
-    <aside
-      style={{ willChange: "width" }}
-      className={[
-        "relative z-10 h-full shrink-0 flex flex-col justify-between",
-        "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
-        "transition-[width] duration-300 ease-in-out",
-        open ? "w-[255px]" : "w-[80px]",
-      ].join(" ")}
-    >
+    <>
+      {/* Mobile backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-[#1E1E1E]/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+      <aside
+        style={{ willChange: "width, transform" }}
+        className={[
+          "z-50 h-full shrink-0 flex flex-col justify-between",
+          "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
+          "transition-all duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          open ? "w-[255px]" : "w-[80px]",
+        ].join(" ")}
+      >
       {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2 w-full">
 
@@ -299,6 +301,7 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -87,7 +87,7 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
   }, [id, member, branchId]);
 
   return (
-    <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative flex flex-col items-center">
+    <div className="px-4 md:px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative flex flex-col items-center">
       <div className="w-full max-w-[1100px] flex flex-col">
 
         {/* Header */}
@@ -177,41 +177,51 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                   consultations.map((consult) => {
                     const dateObj = new Date(consult.scheduledAt);
                     return (
-                      <div key={consult.id} className="flex items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm">
+                      <div key={consult.id} className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm">
 
                         {/* Doctor Avatar + Name */}
-                        <div className="w-[200px] flex shrink-0 items-center gap-4">
+                        <div className="w-full md:w-[200px] flex shrink-0 items-center gap-4">
                           <AvatarPlaceholder name={consult.doctorName} size="w-8 h-8" />
                           <span className="text-[#24292E] text-[13px] font-medium truncate">{consult.doctorName}</span>
                         </div>
 
-                        {/* Age */}
-                        <div className="w-[80px] shrink-0 text-[#24292E] text-[13px] text-center font-medium">
-                          {consult.age ?? "—"}
-                        </div>
-
-                        {/* Reason */}
-                        <div className="w-[120px] shrink-0 text-[#676E76] text-[12px] text-center truncate">
-                          {consult.reason}
-                        </div>
-
-                        {/* Department */}
-                        <div className="flex-1 min-w-[120px] shrink-0 text-[#676E76] text-[12px] text-center truncate">
-                          {consult.doctorSpecialty}
-                        </div>
-
-                        {/* Time / Date */}
-                        <div className="w-[140px] shrink-0 flex flex-col items-center justify-center">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[#24292E] text-[12px]">Time -</span>
-                            <span className="text-[#5476FC] text-[12px] font-bold">{dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                        {/* Mobile grid wrapper / Desktop flex wrapper */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+                          {/* Age */}
+                          <div className="md:w-[80px] shrink-0 flex flex-col md:block justify-start">
+                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span>
+                            <span className="text-[#24292E] text-[13px] font-medium md:text-center block text-left">{consult.age ?? "—"}</span>
                           </div>
-                          <span className="text-[#676E76] text-[11px] mt-0.5">{dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
-                        </div>
 
-                        {/* Status */}
-                        <div className={`w-[100px] shrink-0 text-center text-[12px] font-medium ${STATUS_COLOR[consult.status] ?? "text-[#676E76]"}`}>
-                          {STATUS_LABEL[consult.status] ?? consult.status}
+                          {/* Reason */}
+                          <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
+                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
+                            <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.reason}</span>
+                          </div>
+
+                          {/* Department */}
+                          <div className="md:flex-1 md:min-w-[120px] shrink-0 flex flex-col md:block justify-start">
+                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span>
+                            <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.doctorSpecialty}</span>
+                          </div>
+
+                          {/* Time / Date */}
+                          <div className="md:w-[140px] shrink-0 flex flex-col md:items-center justify-start">
+                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time</span>
+                            <div className="flex items-center gap-1">
+                              <span className="hidden md:inline text-[#24292E] text-[12px]">Time -</span>
+                              <span className="text-[#5476FC] text-[12px] font-bold">{dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                            </div>
+                            <span className="text-[#676E76] text-[11px] mt-0.5 block md:text-center text-left">{dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                          </div>
+
+                          {/* Status */}
+                          <div className="md:w-[100px] shrink-0 flex flex-col md:block justify-start">
+                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
+                            <span className={`text-[12px] font-medium block md:text-center text-left ${STATUS_COLOR[consult.status] ?? "text-[#676E76]"}`}>
+                              {STATUS_LABEL[consult.status] ?? consult.status}
+                            </span>
+                          </div>
                         </div>
 
                       </div>

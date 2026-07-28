@@ -414,9 +414,8 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      {/* Specialist Invite Popup — rendered via portal to document.body */}
       {inviteModalContent}
-      <div className="px-8 pb-12 select-none">
+      <div className="px-4 md:px-8 pb-12 select-none">
 
         {/* Top Greeting Row */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
@@ -430,7 +429,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Patients Waiting Online Widget */}
-          <div className="flex items-center gap-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 w-full xl:w-auto">
             <div className="flex flex-col gap-1.5">
               <span className="text-[#707070] text-xs font-semibold tracking-[-0.24px]" style={{ fontFamily: "Inter, sans-serif" }}>
                 Patients Waiting Online
@@ -458,7 +457,7 @@ export default function DashboardPage() {
 
             <button
               onClick={() => router.push("/appointments/waitingroom")}
-              className="h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-[26px] rounded-xl font-medium text-[16px] flex items-center justify-center gap-3 shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_12px_24px_rgba(84,118,252,0.35)] transition-all"
+              className="w-full sm:w-auto h-[48px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white px-[26px] rounded-xl font-medium text-[16px] flex items-center justify-center gap-3 shadow-[0_8px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_12px_24px_rgba(84,118,252,0.35)] transition-all"
             >
               <span style={{ fontFamily: "Outfit, sans-serif" }}>Waiting Room</span>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

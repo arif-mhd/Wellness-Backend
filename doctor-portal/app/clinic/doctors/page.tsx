@@ -111,16 +111,6 @@ const TIMING_DAYS = [
   { label: "Saturday", dow: 6 },
 ];
 
-// Fixed Column Widths
-const COL = {
-  name: "190px",
-  cons1: "90px",
-  cons2: "90px",
-  avg: "90px",
-  presc: "90px",
-  feedback: "110px",
-};
-
 function ManageDoctorsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -213,11 +203,11 @@ function ManageDoctorsContent() {
     return (
       <div
         onClick={() => setSelectedId(doc.id)}
-        className={`flex items-center px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+        className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
         {/* Name Column */}
-        <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-3 pr-3">
+        <div className="w-full md:w-[210px] shrink-0 flex items-center gap-3 pr-3">
           <div className="relative">
             <AvatarPlaceholder name={displayName} avatarUrl={doc.avatarUrl} size="w-10 h-10" />
             <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${doc.isOnline ? 'bg-[#179353]' : 'bg-[#9EA5AD]'}`} />
@@ -231,42 +221,48 @@ function ManageDoctorsContent() {
           </div>
         </div>
 
-        {/* Specialties */}
-        <div className="flex-1 min-w-[90px] pr-2 flex flex-col text-[#24292E] text-[11px] font-medium leading-tight justify-center">
-          <span>{specialties[0]} {specialties[1]}</span>
-          <span>{specialties[2]}</span>
-        </div>
+        {/* Mobile grid wrapper / Desktop flex wrapper */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+          {/* Specialties */}
+          <div className="md:flex-1 md:min-w-[90px] md:pr-2 flex flex-col justify-start md:justify-center text-[#24292E] text-[11px] font-medium leading-tight">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Specialties</span>
+            <div className="flex flex-col text-left">
+              <span>{specialties[0]} {specialties[1]}</span>
+              <span>{specialties[2]}</span>
+            </div>
+          </div>
 
-        {/* Cons 1 */}
-        <div style={{ width: COL.cons1, flexShrink: 0 }} className="text-[#0A56D9] text-[13px] font-semibold text-center">{doc.consultations ?? 0}</div>
+          {/* Cons 1 */}
+          <div className="md:w-[110px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Consultations</span><span className="text-[#0A56D9] text-[13px] font-semibold md:text-center block text-left">{doc.consultations ?? 0}</span></div>
 
-        {/* Cons 2 */}
-        <div style={{ width: COL.cons2, flexShrink: 0 }} className="text-[#0A56D9] text-[13px] font-semibold text-center">{doc.consultationsOnline ?? 0}</div>
+          {/* Cons 2 */}
+          <div className="md:w-[110px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Online</span><span className="text-[#0A56D9] text-[13px] font-semibold md:text-center block text-left">{doc.consultationsOnline ?? 0}</span></div>
 
-        {/* Avg */}
-        <div style={{ width: COL.avg, flexShrink: 0 }} className="text-[#0A56D9] text-[13px] font-semibold text-center">{doc.avgConsultation ?? 0}</div>
+          {/* Avg */}
+          <div className="md:w-[110px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Avg Time</span><span className="text-[#0A56D9] text-[13px] font-semibold md:text-center block text-left">{doc.avgConsultation ?? 0}</span></div>
 
-        {/* Prescriptions */}
-        <div style={{ width: COL.presc, flexShrink: 0 }} className="text-[#0A56D9] text-[13px] font-semibold text-center">{doc.prescriptions ?? 0}</div>
+          {/* Prescriptions */}
+          <div className="md:w-[110px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Prescriptions</span><span className="text-[#0A56D9] text-[13px] font-semibold md:text-center block text-left">{doc.prescriptions ?? 0}</span></div>
 
-        {/* Feedback */}
-        <div style={{ width: COL.feedback, flexShrink: 0 }} className="flex justify-center">
-          <StarRating rating={doc.rating ?? 0} />
+          {/* Feedback */}
+          <div className="md:w-[110px] shrink-0 flex flex-col md:block justify-start md:items-center">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Feedback</span>
+            <div className="flex justify-start md:justify-center w-full"><StarRating rating={doc.rating ?? 0} /></div>
+          </div>
         </div>
 
         {/* Action */}
-        <div className="w-[50px] flex shrink-0 items-center justify-end">
+        <div className="hidden md:flex w-[50px] shrink-0 items-center justify-end">
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
-      <div className="flex flex-col xl:flex-row gap-6 items-start">
-
+    <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Manage Doctors</h1>
@@ -353,13 +349,13 @@ function ManageDoctorsContent() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text"
                   placeholder="Search all"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-60 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+                  className="w-full sm:w-60 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
                 />
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>
@@ -377,19 +373,19 @@ function ManageDoctorsContent() {
             </div>
           </div>
 
-          {/* Table — horizontally scrollable */}
-          <div className="w-full overflow-x-auto mt-2 pb-4 custom-scrollbar">
-            <div style={{ minWidth: "810px" }}>
+          {/* Table — stacked on mobile */}
+          <div className="w-full mt-2 pb-4 custom-scrollbar">
+            <div className="w-full">
 
               {/* Table Header */}
-              <div className="flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
-                <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-1">Name</div>
+              <div className="hidden md:flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
+                <div className="w-[210px] shrink-0 flex items-center gap-1">Name</div>
                 <div className="flex-1 min-w-[90px]" /> {/* Spacer for specialties */}
-                <div style={{ width: COL.cons1, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Total No. of<br />Consultation</div>
-                <div style={{ width: COL.cons2, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Online<br />Consultations</div>
-                <div style={{ width: COL.avg, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Average<br />Consultation</div>
-                <div style={{ width: COL.presc, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Number of<br />prescription</div>
-                <div style={{ width: COL.feedback, flexShrink: 0 }} className="flex justify-center items-center gap-1">P. Feedback</div>
+                <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Total No. of<br />Consultation</div>
+                <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Online<br />Consultations</div>
+                <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Average<br />Consultation</div>
+                <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Number of<br />prescription</div>
+                <div className="w-[110px] shrink-0 flex justify-center items-center gap-1">P. Feedback</div>
                 <div className="w-[50px] flex shrink-0" />
               </div>
 

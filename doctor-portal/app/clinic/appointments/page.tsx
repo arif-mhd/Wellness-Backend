@@ -104,16 +104,7 @@ function toLocalInputValue(iso: string) {
   return clean.slice(0, 16);
 }
 
-// Column widths — shared between header and rows
-const COL = {
-  name: "215px",
-  age: "38px",
-  reason: "100px",
-  dept: "100px",
-  diagnosis: "160px",
-  status: "82px",
-  doctor: "125px",
-};
+
 
 interface BranchOption { id: string; name: string; status: string; }
 
@@ -274,49 +265,59 @@ function ClinicAppointmentsContent() {
     return (
       <div
         onClick={() => setSelectedId(appt.id)}
-        className={`flex items-center px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+        className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
         {/* Name */}
-        <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-2 pr-3">
+        <div className="w-full md:w-[215px] shrink-0 flex items-center gap-2 pr-3">
           <Avatar name={appt.patientName} size="w-9 h-9 text-sm" />
           <div className="flex flex-col min-w-0">
             <span className="text-[#24292E] text-[13px] font-medium truncate">{appt.patientName}</span>
             <span className="text-[#A0A8B0] text-[11px] truncate">{appt.patientEmail}</span>
           </div>
         </div>
-        {/* Age */}
-        <div style={{ width: COL.age, flexShrink: 0 }} className="text-[#24292E] text-[13px]">{appt.patientAge ?? "—"}</div>
-        {/* Reason */}
-        <div style={{ width: COL.reason, flexShrink: 0 }} className="text-[#24292E] text-[13px] truncate pr-3">{appt.reason}</div>
-        {/* Dept */}
-        <div style={{ width: COL.dept, flexShrink: 0 }} className="text-[#24292E] text-[13px] truncate pr-3">{appt.doctorSpecialty}</div>
-        {/* Diagnosis / Time */}
-        <div style={{ width: COL.diagnosis, flexShrink: 0 }} className="flex flex-col pr-3">
-          <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
-          <span className="text-[#676E76] text-[11px]">
-            {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-          </span>
-        </div>
-        {/* Status */}
-        <div style={{ width: COL.status, flexShrink: 0 }}>
-          <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
-        </div>
-        {/* Doctor */}
-        <div style={{ width: COL.doctor, flexShrink: 0 }} className="flex items-center gap-1.5">
-          <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
-          <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
+        
+        {/* Mobile grid wrapper / Desktop flex wrapper */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+          {/* Age */}
+          <div className="md:w-[38px] shrink-0 text-[#24292E] text-[13px] flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span><span>{appt.patientAge ?? "—"}</span></div>
+          {/* Reason */}
+          <div className="md:w-[100px] shrink-0 text-[#24292E] text-[13px] truncate md:pr-3 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span><span>{appt.reason}</span></div>
+          {/* Dept */}
+          <div className="md:w-[100px] shrink-0 text-[#24292E] text-[13px] truncate md:pr-3 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span><span>{appt.doctorSpecialty}</span></div>
+          {/* Diagnosis / Time */}
+          <div className="md:w-[160px] shrink-0 flex flex-col md:block md:pr-3 justify-start">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time/Diag</span>
+            <div className="flex flex-col text-left">
+              <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
+              <span className="text-[#676E76] text-[11px]">
+                {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              </span>
+            </div>
+          </div>
+          {/* Status */}
+          <div className="md:w-[82px] shrink-0 flex flex-col md:block justify-start">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
+            <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
+          </div>
+          {/* Doctor */}
+          <div className="md:w-[125px] shrink-0 flex flex-col md:flex-row items-start md:items-center justify-start gap-1 md:gap-1.5">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Doctor</span>
+            <div className="flex items-center gap-1.5">
+              <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
+              <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
-      <div className="flex flex-col xl:flex-row gap-6 items-start">
-
+    <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Appointments</h1>
 
           {hasMultipleBranches && (
@@ -373,15 +374,15 @@ function ClinicAppointmentsContent() {
                 <FilterPill label="Online" active={activeMode === "Online"} onClick={() => setActiveMode("Online")} activeClass="bg-[#179353] text-white" />
               </div>
             </div>
-            <div className="flex flex-col gap-2 sm:items-end">
-              <div className="flex items-center gap-2">
-                <div className="relative">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:items-end">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <input
                     type="text"
                     placeholder="Search all"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="w-52 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+                    className="w-full sm:w-52 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
                   />
                   <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </div>
@@ -394,19 +395,19 @@ function ClinicAppointmentsContent() {
             </div>
           </div>
 
-          {/* Table — horizontally scrollable */}
-          <div className="w-full overflow-x-auto">
-            <div style={{ minWidth: "820px" }}>
+          {/* Table — stacked on mobile */}
+          <div className="w-full">
+            <div className="w-full">
 
               {/* Table Header */}
-              <div className="flex items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]">
-                <div style={{ width: COL.name, flexShrink: 0 }}>Name</div>
-                <div style={{ width: COL.age, flexShrink: 0 }}>Age</div>
-                <div style={{ width: COL.reason, flexShrink: 0 }}>Reason For Visit</div>
-                <div style={{ width: COL.dept, flexShrink: 0 }}>Department</div>
-                <div style={{ width: COL.diagnosis, flexShrink: 0 }}>Primary Diagnosis</div>
-                <div style={{ width: COL.status, flexShrink: 0 }}>Status</div>
-                <div style={{ width: COL.doctor, flexShrink: 0 }}>Doctor</div>
+              <div className="hidden md:flex items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]">
+                <div className="w-[215px] shrink-0">Name</div>
+                <div className="w-[38px] shrink-0">Age</div>
+                <div className="w-[100px] shrink-0">Reason For Visit</div>
+                <div className="w-[100px] shrink-0">Department</div>
+                <div className="w-[160px] shrink-0">Primary Diagnosis</div>
+                <div className="w-[82px] shrink-0">Status</div>
+                <div className="w-[125px] shrink-0">Doctor</div>
               </div>
 
               {loading ? (

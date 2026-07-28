@@ -160,11 +160,11 @@ function PatientsListContent() {
     return (
       <div
         onClick={() => setSelectedId(p.id)}
-        className={`flex items-center px-4 py-3 rounded-2xl border transition-all cursor-pointer ${isSelected ? "bg-[#F4F7FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+        className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${isSelected ? "bg-[#F4F7FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
         {/* Profile Column */}
-        <div style={{ width: COL.profile, flexShrink: 0 }} className="flex items-center gap-3 pr-3">
+        <div className="w-full md:w-[220px] shrink-0 flex items-center gap-3 pr-3">
           <AvatarPlaceholder avatarUrl={p.avatarUrl} name={p.name} size="w-[42px] h-[42px]" />
           <div className="flex flex-col min-w-0">
             <span className="text-[#24292E] text-[13px] font-medium truncate">{p.name}</span>
@@ -172,31 +172,34 @@ function PatientsListContent() {
           </div>
         </div>
 
-        {/* Age */}
-        <div style={{ width: COL.age, flexShrink: 0 }} className="text-[#24292E] text-[13px] font-medium text-center">{p.age ?? "—"}</div>
+        {/* Mobile grid wrapper / Desktop flex wrapper */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+          {/* Age */}
+          <div className="md:w-[60px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span><span className="text-[#24292E] text-[13px] font-medium block md:text-center text-left">{p.age ?? "—"}</span></div>
 
-        {/* Diagnosis */}
-        <div style={{ width: COL.diagnosis, flexShrink: 0 }} className="text-[#676E76] text-[12px] text-center truncate" title={p.diagnosis}>{p.diagnosis}</div>
+          {/* Diagnosis */}
+          <div className="md:w-[160px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Diagnosis</span><span className="text-[#676E76] text-[12px] block md:text-center text-left truncate" title={p.diagnosis}>{p.diagnosis}</span></div>
 
-        {/* Summary */}
-        <div style={{ width: COL.summary, flexShrink: 0 }} className="text-[#676E76] text-[12px] text-center truncate" title={p.summary}>{p.summary}</div>
+          {/* Summary */}
+          <div className="md:w-[200px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Summary</span><span className="text-[#676E76] text-[12px] block md:text-center text-left truncate" title={p.summary}>{p.summary}</span></div>
 
-        {/* Last Consult */}
-        <div style={{ width: COL.lastConsult, flexShrink: 0 }} className="flex flex-col items-center justify-center">
-          <span className="text-[#676E76] text-[12px]">Last Consult</span>
-          <span className="text-[#24292E] text-[12px] font-medium">{formatDate(p.lastConsult)}</span>
-        </div>
+          {/* Last Consult */}
+          <div className="md:w-[120px] shrink-0 flex flex-col md:items-center justify-start">
+            <span className="text-[#9EA5AD] md:text-[#676E76] text-[10px] md:text-[12px] uppercase md:normal-case font-semibold md:font-normal tracking-wider md:tracking-normal mb-0.5 md:mb-0 md:block md:text-center">Last Consult</span>
+            <span className="text-[#24292E] text-[12px] font-medium">{formatDate(p.lastConsult)}</span>
+          </div>
 
-        {/* Actions */}
-        <div className="flex-1 flex items-center justify-end pr-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); sendReminder(p); }}
-            disabled={!p.nextAppointmentId || state === "sending"}
-            className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-6 py-2 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            title={p.nextAppointmentId ? "Send a reminder about their next appointment" : "No upcoming appointment to remind about"}
-          >
-            {state === "sending" ? "Sending..." : state === "sent" ? "Sent" : state === "error" ? "Retry" : "Remind"}
-          </button>
+          {/* Actions */}
+          <div className="w-full md:flex-1 flex items-center justify-start md:justify-end md:pr-2 col-span-2 sm:col-span-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); sendReminder(p); }}
+              disabled={!p.nextAppointmentId || state === "sending"}
+              className="w-full md:w-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-6 py-2 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title={p.nextAppointmentId ? "Send a reminder about their next appointment" : "No upcoming appointment to remind about"}
+            >
+              {state === "sending" ? "Sending..." : state === "sent" ? "Sent" : state === "error" ? "Retry" : "Remind"}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -205,11 +208,10 @@ function PatientsListContent() {
   const selectedReminderState = selectedPatient ? (reminderState[selectedPatient.id] ?? "idle") : "idle";
 
   return (
-    <div className="px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative">
-      <div className="flex flex-col xl:flex-row gap-6 items-start">
-
+    <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative">
+      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-bold tracking-tight">Patients</h1>
 
           {/* Top Controls */}
@@ -219,15 +221,15 @@ function PatientsListContent() {
               <FilterPill label="New" active={activeTab === "NEW"} onClick={() => setActiveTab("NEW")} />
             </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <div className="flex items-center gap-3">
-                <div className="relative">
+            <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <input
                     type="text"
                     placeholder="Search all"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="w-64 h-10 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-[13px] outline-none focus:border-[#5476FC] text-[#24292E] placeholder-[#A7AAB4]"
+                    className="w-full sm:w-64 h-10 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-[13px] outline-none focus:border-[#5476FC] text-[#24292E] placeholder-[#A7AAB4]"
                   />
                   <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A7AAB4]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </div>
@@ -243,12 +245,12 @@ function PatientsListContent() {
 
           {/* Table List */}
           <div className="w-full flex flex-col gap-3 pb-4 mt-2">
-            <div className="flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
-              <div style={{ width: COL.profile, flexShrink: 0 }}>Name</div>
-              <div style={{ width: COL.age, flexShrink: 0 }} className="text-center">Age</div>
-              <div style={{ width: COL.diagnosis, flexShrink: 0 }} className="text-center">Diagnosis</div>
-              <div style={{ width: COL.summary, flexShrink: 0 }} className="text-center">Summary</div>
-              <div style={{ width: COL.lastConsult, flexShrink: 0 }} className="text-center">Last Consult</div>
+            <div className="hidden md:flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
+              <div className="w-[220px] shrink-0">Name</div>
+              <div className="w-[60px] shrink-0 text-center">Age</div>
+              <div className="w-[160px] shrink-0 text-center">Diagnosis</div>
+              <div className="w-[200px] shrink-0 text-center">Summary</div>
+              <div className="w-[120px] shrink-0 text-center">Last Consult</div>
               <div className="flex-1" />
             </div>
 

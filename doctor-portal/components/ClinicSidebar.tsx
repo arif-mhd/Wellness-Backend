@@ -132,7 +132,7 @@ export default function ClinicSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
   const [clinicName, setClinicName] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAvatar, setClinicAvatar] = useState("");
@@ -195,15 +195,24 @@ export default function ClinicSidebar() {
     : "opacity-0 max-w-0 ml-0 pointer-events-none";
 
   return (
-    <aside
-      style={{ willChange: "width" }}
-      className={[
-        "relative z-10 h-full shrink-0 flex flex-col justify-between",
-        "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
-        "transition-[width] duration-300 ease-in-out",
-        open ? "w-[255px]" : "w-[80px]",
-      ].join(" ")}
-    >
+    <>
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-[#1E1E1E]/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+      <aside
+        style={{ willChange: "width, transform" }}
+        className={[
+          "z-50 h-full shrink-0 flex flex-col justify-between",
+          "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
+          "transition-all duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          open ? "w-[255px]" : "w-[80px]",
+        ].join(" ")}
+      >
       <div className="flex flex-col gap-2 w-full min-h-0">
         <div className="relative flex items-center h-[72px] px-5 w-full shrink-0">
           <img
@@ -296,6 +305,7 @@ export default function ClinicSidebar() {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -9,7 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isOpen: sidebarOpen } = useSidebar();
+  const { isOpen: sidebarOpen, setIsMobileOpen } = useSidebar();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -56,13 +56,21 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      <div className="z-10 h-full flex flex-col justify-between">
+      <div className="z-50 h-full flex flex-col justify-between lg:z-10">
         <ClinicSidebar />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 z-10 h-full">
-        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"}`}>
+        <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-6 lg:px-[40px]"}`}>
           <div className="flex items-center gap-3">
+            <button 
+              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none" 
+              onClick={() => setIsMobileOpen(true)}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <img
               src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
               className="w-[91px] h-[30px] object-contain"

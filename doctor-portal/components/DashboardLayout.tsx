@@ -285,7 +285,7 @@ function GlobalSearch() {
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isOpen: sidebarOpen } = useSidebar();
+  const { isOpen: sidebarOpen, setIsMobileOpen } = useSidebar();
   const pathname = usePathname();
   const isVideoCall = pathname === "/video-calls";
 
@@ -461,7 +461,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       {!isVideoCall && (
-        <div className="z-10 h-full flex flex-col justify-between">
+        <div className="z-50 h-full flex flex-col justify-between lg:z-10">
           <Sidebar />
         </div>
       )}
@@ -469,13 +469,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Right Content */}
       <div className="flex-1 flex flex-col min-w-0 z-10 h-full">
         <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${
-          isVideoCall ? "px-10 lg:px-[40px]" : sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"
+          isVideoCall ? "px-6 lg:px-[40px]" : sidebarOpen ? "px-6 xl:px-[24px]" : "px-6 lg:px-[40px]"
         }`}>
           {/* Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {!isVideoCall && (
+              <button 
+                className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none" 
+                onClick={() => setIsMobileOpen(true)}
+              >
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            )}
             <img
               src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain"
+              className="w-[91px] h-[30px] object-contain hidden sm:block"
               alt="Wellness Central"
             />
           </div>
