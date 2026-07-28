@@ -15,7 +15,7 @@ import {
 } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
-import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds, hasPermission, getActorPermissionState } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -128,6 +128,10 @@ router.post(
 router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const {
     email, password, fullName, phone,
@@ -262,6 +266,10 @@ router.get("/:id", requireRole("clinic"), async (req: SessionRequest, res: Respo
 router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const {
     fullName, bio, eligibility, specialty, license, qualification, specializations,
@@ -310,6 +318,10 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
 router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const { isOnline } = req.body;
   if (typeof isOnline !== "boolean") {
@@ -334,6 +346,10 @@ router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionReq
 router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const { password } = req.body;
   if (!password || password.length < 8) {
@@ -377,6 +393,10 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
 router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_schedules")) {
+    res.status(403).json({ error: "You don't have permission to manage schedules." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const { slots } = req.body;
   if (!Array.isArray(slots)) {
@@ -410,6 +430,11 @@ router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res:
 router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const actorId = req.session!.getUserId();
   try {
+    const actorPerms = await getActorPermissionState(actorId);
+    if (!hasPermission(actorPerms, "manage_schedules")) {
+      res.status(403).json({ error: "You don't have permission to manage schedules." });
+      return;
+    }
     const allowedClinicIds = await getActorClinicIds(actorId);
     const { resource: doctor } = await doctorsContainer
       .item(req.params.id, req.params.id)
@@ -451,6 +476,10 @@ router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionReque
 router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_schedules")) {
+    res.status(403).json({ error: "You don't have permission to manage schedules." });
+    return;
+  }
   const clinicId = scope.scopeId;
   const { startDate, endDate, reason, fileUrl, fileName } = req.body;
   if (!startDate || !endDate || !reason) {
@@ -516,6 +545,10 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
 router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_schedules")) {
+    res.status(403).json({ error: "You don't have permission to manage schedules." });
+    return;
+  }
   const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
@@ -547,6 +580,11 @@ router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (re
   }
 
   try {
+    const actorPerms = await getActorPermissionState(actorId);
+    if (!hasPermission(actorPerms, "manage_schedules")) {
+      res.status(403).json({ error: "You don't have permission to manage schedules." });
+      return;
+    }
     const allowedClinicIds = await getActorClinicIds(actorId);
     const { resource: doctor } = await doctorsContainer
       .item(req.params.id, req.params.id)
@@ -664,6 +702,10 @@ router.get("/:id/reviews", requireRole("clinic"), async (req: SessionRequest, re
 router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
   const clinicId = scope.scopeId;
   try {
     const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);

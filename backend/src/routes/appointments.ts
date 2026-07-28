@@ -14,7 +14,7 @@ import {
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
-import { getActorClinicIds } from "../utils/clinicScope";
+import { getActorClinicIds, getActorPermissionState, hasPermission } from "../utils/clinicScope";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -205,10 +205,12 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
         try {
           const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
           let clinicName: string | null = null;
+          let clinicAddress: string | null = null;
           if (doctor?.clinicId) {
             try {
               const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
               clinicName = clinic?.fullName ?? null;
+              clinicAddress = clinic?.address ?? null;
             } catch { /* clinic lookup best-effort */ }
           }
           return {
@@ -217,9 +219,10 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
             doctorSpecialty: doctor?.specialty ?? "",
             doctorAvatarUrl: doctor?.avatarUrl ?? null,
             clinicName,
+            clinicAddress,
           };
         } catch {
-          return { ...apt, doctorName: "Unknown Doctor", doctorSpecialty: "", doctorAvatarUrl: null, clinicName: null };
+          return { ...apt, doctorName: "Unknown Doctor", doctorSpecialty: "", doctorAvatarUrl: null, clinicName: null, clinicAddress: null };
         }
       })
     );
@@ -754,6 +757,10 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       res.status(403).json({ error: "Not authorized." });
       return;
     }
+    if (isClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
+      res.status(403).json({ error: "You don't have permission to manage appointments." });
+      return;
+    }
 
     const updated = { ...apt, status: "cancelled", updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
@@ -846,6 +853,10 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     }
     if (!callerIsPatient && !callerIsDoctor && !callerIsClinic) {
       res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+    if (callerIsClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
+      res.status(403).json({ error: "You don't have permission to manage appointments." });
       return;
     }
 
