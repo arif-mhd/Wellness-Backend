@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
 
 const EMIRATES = [
   { key: "AUH", city: "Abu Dhabi" },
@@ -18,6 +19,8 @@ const CONSULTATION_TIMES = [10, 15, 20, 30, 45, 60];
 // ── Small helpers ──────────────────────────────────────────────────────────────
 
 function EditBtn({ onClick }: { onClick: () => void }) {
+  const { can } = useDoctorPermissions();
+  if (!can("manage_own_profile")) return null;
   return (
     <button onClick={onClick} className="text-[#596066] hover:text-[#5476FC] transition-colors p-0.5 shrink-0">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -128,6 +131,7 @@ export default function ProfilePage() {
   const [saveError, setSaveError] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { can: canDoctor } = useDoctorPermissions();
 
   const loadDoctor = useCallback(async () => {
     try {
@@ -230,19 +234,21 @@ export default function ProfilePage() {
               {doc.fullName?.[0]?.toUpperCase() ?? doc.email?.[0]?.toUpperCase() ?? "D"}
             </div>
           )}
-          <button
-            onClick={handleAvatarClick}
-            disabled={avatarUploading}
-            className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            {avatarUploading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-            )}
-          </button>
+          {canDoctor("manage_own_profile") && (
+            <button
+              onClick={handleAvatarClick}
+              disabled={avatarUploading}
+              className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {avatarUploading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
         <div className="flex flex-col gap-2 justify-center">
           <h1 className="text-[#383F45] text-[32px] font-normal leading-none tracking-tight">

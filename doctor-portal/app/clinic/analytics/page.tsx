@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import AllConsultations from "@/components/analytics/AllConsultations";
@@ -70,7 +70,7 @@ function StarRating({ value }: { value: number }) {
   );
 }
 
-export default function ClinicAnalyticsPage() {
+function ClinicAnalyticsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -276,5 +276,13 @@ export default function ClinicAnalyticsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ClinicAnalyticsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicAnalyticsContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface InsurancePolicy {
   id: string;
@@ -19,7 +20,7 @@ interface BranchOption { id: string; name: string; status: string; }
 
 const EMPTY_FORM = { name: "", network: "", discounts: "", spcContractFileUrl: null as string | null, renewDate: "" };
 
-export default function ClinicInsurancePage() {
+function ClinicInsuranceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -38,6 +39,8 @@ export default function ClinicInsurancePage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { can } = useClinicPermissions();
+  const canManage = can("manage_insurance");
 
   useEffect(() => {
     apiFetch("/api/clinics/branches")
@@ -169,7 +172,7 @@ export default function ClinicInsurancePage() {
   }
 
   const panelOpen = editing || !!selected;
-  const fieldsDisabled = !editing;
+  const fieldsDisabled = !editing || !canManage;
 
   return (
     <div className="flex h-full w-full font-sans select-none px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -195,12 +198,14 @@ export default function ClinicInsurancePage() {
               Inactive
             </button>
           </div>
-          <button
-            onClick={startAdd}
-            className="px-6 py-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
-          >
-            Add Insurance
-          </button>
+          {canManage && (
+            <button
+              onClick={startAdd}
+              className="px-6 py-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              Add Insurance
+            </button>
+          )}
         </div>
 
         {/* Branch selector — same ALL / Select Branch pattern used elsewhere in the portal */}
@@ -373,7 +378,7 @@ export default function ClinicInsurancePage() {
 
               {/* Action row */}
               <div className="mt-8 flex items-center gap-3">
-                {selected && (
+                {selected && canManage && (
                   <button
                     onClick={handleDelete}
                     disabled={saving}
@@ -382,7 +387,7 @@ export default function ClinicInsurancePage() {
                     Delete
                   </button>
                 )}
-                {selected && !editing && (
+                {selected && !editing && canManage && (
                   <button
                     onClick={() => setEditing(true)}
                     className="px-5 py-2.5 rounded-xl text-[13px] font-medium text-[#3D4B5A] border border-[#EBEEF5] hover:bg-[#F7F9FC] transition-colors"
@@ -390,7 +395,7 @@ export default function ClinicInsurancePage() {
                     Edit
                   </button>
                 )}
-                {editing && (
+                {editing && canManage && (
                   <button
                     onClick={() => handleSave()}
                     disabled={saving || uploading}
@@ -409,5 +414,13 @@ export default function ClinicInsurancePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ClinicInsurancePage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicInsuranceContent />
+    </Suspense>
   );
 }

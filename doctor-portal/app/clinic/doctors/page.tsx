@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface Slot {
   dayOfWeek: number;
@@ -128,7 +129,7 @@ const COL = {
   feedback: "110px",
 };
 
-export default function ManageDoctorsPage() {
+function ManageDoctorsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -144,6 +145,7 @@ export default function ManageDoctorsPage() {
   const [showSelectBranchModal, setShowSelectBranchModal] = useState(false);
   const [addDoctorBranchId, setAddDoctorBranchId] = useState("");
   const [deptFilters, setDeptFilters] = useState<Set<string>>(new Set());
+  const { can } = useClinicPermissions();
 
   // Every org owner's own account is at least its own main branch, so this
   // always succeeds with >= 1 entry for them (empty/403 for a branch-user
@@ -340,12 +342,14 @@ export default function ManageDoctorsPage() {
                   {dept.toUpperCase()}
                 </label>
               ))}
-              <button
-                onClick={handleAddDoctorClick}
-                className="ml-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center"
-              >
-                Add Doctor
-              </button>
+              {can("manage_doctors") && (
+                <button
+                  onClick={handleAddDoctorClick}
+                  className="ml-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center"
+                >
+                  Add Doctor
+                </button>
+              )}
             </div>
           )}
 
@@ -368,7 +372,7 @@ export default function ManageDoctorsPage() {
                 />
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>
-              {departments.length === 0 && (
+              {departments.length === 0 && can("manage_doctors") && (
                 <button
                   onClick={handleAddDoctorClick}
                   className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center whitespace-nowrap"
@@ -544,5 +548,13 @@ export default function ManageDoctorsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ManageDoctorsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManageDoctorsContent />
+    </Suspense>
   );
 }

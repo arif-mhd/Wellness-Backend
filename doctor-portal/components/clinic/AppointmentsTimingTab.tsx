@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface Appointment {
   id: string;
@@ -34,6 +35,8 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
   const [toDate, setToDate] = useState("");
   const [fromTime, setFromTime] = useState("");
   const [toTime, setToTime] = useState("");
+  const { can } = useClinicPermissions();
+  const canManage = can("manage_appointments");
 
   useEffect(() => {
     setLoading(true);
@@ -163,13 +166,15 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
                   {new Date(a.scheduledAt).toLocaleDateString("en-GB")}, {new Date(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => goToAppointment(a.id)}
-                    disabled={a.status === "completed"}
-                    className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Reschedule
-                  </button>
+                  {canManage && (
+                    <button
+                      onClick={() => goToAppointment(a.id)}
+                      disabled={a.status === "completed"}
+                      className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Reschedule
+                    </button>
+                  )}
                   <button
                     onClick={() => goToAppointment(a.id)}
                     className="px-4 py-1.5 border border-gray-200 text-gray-700 text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import DoctorPersonalInfoForm from "@/components/doctors/DoctorPersonalInfoForm";
@@ -38,7 +38,7 @@ const STEPS = [
   { key: 3, label: "Set Credentials" },
 ];
 
-export default function AddDoctorPage() {
+function AddDoctorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -206,5 +206,13 @@ export default function AddDoctorPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AddDoctorPage() {
+  return (
+    <Suspense fallback={null}>
+      <AddDoctorContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
@@ -53,7 +53,8 @@ function AvatarPlaceholder({ avatarUrl, name, size = "w-24 h-24" }: { avatarUrl?
   );
 }
 
-export default function PatientProfilePage({ params }: { params: { id: string } }) {
+function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const searchParams = useSearchParams();
   const member = searchParams.get("member");
   const branchId = searchParams.get("branchId");
@@ -69,7 +70,7 @@ export default function PatientProfilePage({ params }: { params: { id: string } 
     if (member) query.set("member", member);
     if (branchId) query.set("branchId", branchId);
     const qs = query.toString();
-    apiFetch(`/api/clinics/patients/${params.id}${qs ? `?${qs}` : ""}`)
+    apiFetch(`/api/clinics/patients/${id}${qs ? `?${qs}` : ""}`)
       .then(async (r) => {
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
@@ -83,7 +84,7 @@ export default function PatientProfilePage({ params }: { params: { id: string } 
       })
       .catch((err) => setError(err.message ?? "Failed to load patient."))
       .finally(() => setLoading(false));
-  }, [params.id, member, branchId]);
+  }, [id, member, branchId]);
 
   return (
     <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative flex flex-col items-center">
@@ -228,5 +229,13 @@ export default function PatientProfilePage({ params }: { params: { id: string } 
 
       </div>
     </div>
+  );
+}
+
+export default function PatientProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <PatientProfileContent params={params} />
+    </Suspense>
   );
 }

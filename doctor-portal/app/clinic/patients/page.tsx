@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
@@ -79,7 +79,7 @@ const COL = {
   lastConsult: "120px",
 };
 
-export default function PatientsListPage() {
+function PatientsListContent() {
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
@@ -333,5 +333,13 @@ export default function PatientsListPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function PatientsListPage() {
+  return (
+    <Suspense fallback={null}>
+      <PatientsListContent />
+    </Suspense>
   );
 }

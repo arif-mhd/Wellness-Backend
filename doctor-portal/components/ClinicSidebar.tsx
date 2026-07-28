@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions, type PermissionKey } from "@/lib/useClinicPermissions";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const HomeIcon = ({ active }: { active: boolean }) => (
@@ -109,19 +110,23 @@ const CollapseIcon = () => (
 );
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
-const BASE_NAV_ITEMS = [
+// `perm`, when set, gates the WHOLE nav item (and by extension the page) for
+// a branch-staff account that's had that permission explicitly revoked — the
+// org owner and any account without that key set to `false` sees every item,
+// unchanged from before this feature existed.
+const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: PermissionKey }[] = [
   { href: "/clinic", label: "Home", Icon: HomeIcon },
   { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon },
   { href: "/clinic/doctors", label: "Doctors", Icon: DoctorsIcon },
-  { href: "/clinic/patients", label: "Patients", Icon: PatientsIcon },
-  { href: "/clinic/analytics", label: "Analytics", Icon: AnalyticsIcon },
+  { href: "/clinic/patients", label: "Patients", Icon: PatientsIcon, perm: "manage_patients" },
+  { href: "/clinic/analytics", label: "Analytics", Icon: AnalyticsIcon, perm: "view_analytics" },
   { href: "/clinic/insurance", label: "Insurance", Icon: InsuranceIcon },
   { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
-  { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon },
+  { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon, perm: "manage_payment" },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
 ];
-const ACCOUNTS_NAV_ITEM = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
-const BRANCHES_NAV_ITEM = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
+const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
+const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
@@ -137,6 +142,7 @@ export default function ClinicSidebar() {
   // see a plain, single-clinic-style dashboard with no branch-switching UI.
   const [isBranchUser, setIsBranchUser] = useState(false);
   const [hasBranches, setHasBranches] = useState(false);
+  const { can } = useClinicPermissions();
 
   const toggle = () => setOpen(!open);
 
@@ -150,7 +156,7 @@ export default function ClinicSidebar() {
         setClinicAvatar(c.clinicImageUrl ?? "");
         const isBranch = !!c.branchId;
         setIsBranchUser(isBranch);
-        
+
         if (!isBranch) {
           apiFetch("/api/clinics/branches")
             .then(res => res.json())
@@ -175,7 +181,9 @@ export default function ClinicSidebar() {
     ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM]
     : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
 
-  const NAV_ITEMS = isBranchUser ? BASE_NAV_ITEMS : adminNav;
+  const NAV_ITEMS = (isBranchUser ? BASE_NAV_ITEMS : adminNav).filter(
+    (item) => !item.perm || can(item.perm)
+  );
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }

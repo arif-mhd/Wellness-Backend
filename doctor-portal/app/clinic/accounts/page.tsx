@@ -2,28 +2,46 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import type { PermissionKey } from "@/lib/useClinicPermissions";
+import type { DoctorPermissionKey } from "@/lib/useDoctorPermissions";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Branches/Doctors/Staff tabs list real accounts (existing endpoints). The
-// right-hand "Access" panel has no defined permission model yet (placeholder
-// labels in the reference design) — toggles work visually but Save/Save for
-// all users don't persist anywhere until a real permission set exists.
+// right-hand "Access" panel manages each account's granular permissions via
+// /api/clinics/permissions — a branch-staff or clinic-managed doctor account
+// with no `permissions` field (or a key simply not present) is fully allowed;
+// a toggle switched off explicitly restricts that one action. Selecting a
+// branch itself (rather than one of its users) applies the change to every
+// staff account currently in that branch at once.
 // ─────────────────────────────────────────────────────────────────────────
 
 interface BranchItem { id: string; name: string; userCount: number; }
 interface AccountUser { id: string; fullName: string; email: string; avatarUrl?: string | null; branchId?: string; branchName?: string; }
 interface DoctorItem { id: string; fullName: string; email: string; specialty?: string; avatarUrl?: string | null; }
 
-const ACCESS_ITEMS = [
-  { key: "access1", label: "Access 1" },
-  { key: "access2", label: "Access 2" },
-  { key: "access3", label: "Access 3" },
-  { key: "access4", label: "Access 4" },
-  { key: "access5", label: "Access 5" },
-  { key: "access6", label: "Access 6" },
-  { key: "access7", label: "Access 7" },
+// Applies to branches (bulk) and individual staff (branch-user) accounts —
+// restricts what that account can do on the CLINIC's own portal pages.
+const STAFF_ACCESS_ITEMS: { key: PermissionKey; label: string; description: string }[] = [
+  { key: "manage_doctors", label: "Manage Doctors", description: "Add, edit, verify slots for, or remove doctor accounts." },
+  { key: "manage_patients", label: "Manage Patients", description: "View the clinic's patient records." },
+  { key: "manage_appointments", label: "Manage Appointments", description: "Cancel or reschedule patient appointments." },
+  { key: "manage_schedules", label: "Manage Schedules", description: "Edit clinic timing, doctor slots, and absences." },
+  { key: "view_analytics", label: "View Analytics", description: "Access the clinic's analytics and reports dashboard." },
+  { key: "manage_insurance", label: "Manage Insurance", description: "Add, edit, or remove accepted insurance policies." },
+  { key: "manage_payment", label: "Manage Payment & Fees", description: "View and update payment settings and fee structures." },
 ];
-const ACCESS_DESCRIPTION = "Lorem Ipsum is simply dummy text of the printing and typesetting industry.";
+
+// Applies to an individual doctor account — restricts what that doctor can
+// do in their OWN dashboard (a different app context from the clinic
+// portal). Deliberately smaller: a doctor's dashboard is mostly view-only or
+// core clinical work (consultations, EMR) that can't be restricted without
+// blocking them from doing their job.
+const DOCTOR_ACCESS_ITEMS: { key: DoctorPermissionKey; label: string; description: string }[] = [
+  { key: "manage_own_schedule", label: "Manage Own Schedule", description: "Request availability changes and mark their own absences." },
+  { key: "manage_own_profile", label: "Manage Own Profile", description: "Edit their own bio, specialty, fees, and contact info." },
+  { key: "view_analytics", label: "View Analytics", description: "Access their own analytics and earnings dashboard." },
+  { key: "manage_account_settings", label: "Manage Account Settings", description: "Change password, two-factor settings, or deactivate their account." },
+];
 
 type Selected = { type: "branch" | "user" | "doctor"; id: string; label: string } | null;
 
@@ -65,6 +83,8 @@ export default function ClinicAccountsPage() {
 
   const [selected, setSelected] = useState<Selected>(null);
   const [access, setAccess] = useState<Record<string, boolean>>({});
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  const [savingAccess, setSavingAccess] = useState(false);
   const [saveNote, setSaveNote] = useState("");
 
   useEffect(() => {
@@ -118,16 +138,46 @@ export default function ClinicAccountsPage() {
     setSelected(next);
     setAccess({});
     setSaveNote("");
+    // A branch itself has no single permissions doc — it's a bulk-apply
+    // target, not an account — so there's nothing to fetch for it. Every
+    // toggle starts "on" (default-allow) until Save for all users overwrites.
+    if (next && next.type !== "branch") {
+      setLoadingAccess(true);
+      apiFetch(`/api/clinics/permissions/${next.id}`)
+        .then((r) => (r.ok ? r.json() : { permissions: {} }))
+        .then((data) => setAccess(data.permissions ?? {}))
+        .catch(() => setAccess({}))
+        .finally(() => setLoadingAccess(false));
+    }
   };
 
-  const toggleAccess = (key: string) => setAccess((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleAccess = (key: string) =>
+    setAccess((prev) => ({ ...prev, [key]: prev[key] === false }));
 
-  const save = (scope: "one" | "all") => {
-    setSaveNote(
-      scope === "one"
-        ? "Saved locally — permissions aren't wired to the backend yet."
-        : "Applied locally to every user in this branch — not yet wired to the backend."
-    );
+  const save = async (scope: "one" | "all") => {
+    if (!selected) return;
+    setSavingAccess(true);
+    setSaveNote("");
+    try {
+      const url =
+        scope === "all"
+          ? `/api/clinics/permissions/branch/${selected.id}/all`
+          : `/api/clinics/permissions/${selected.id}`;
+      const res = await apiFetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions: access }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to save access.");
+      }
+      setSaveNote(scope === "all" ? "Applied to every user in this branch." : "Saved.");
+    } catch (err: any) {
+      setSaveNote(err.message ?? "Failed to save access.");
+    } finally {
+      setSavingAccess(false);
+    }
   };
 
   const q = searchQuery.trim().toLowerCase();
@@ -294,36 +344,49 @@ export default function ClinicAccountsPage() {
           ) : (
             <>
               <h2 className="text-[#24292E] text-[15px] font-semibold">{selected.label}</h2>
+              {selected.type === "branch" && (
+                <p className="text-[11px] text-[#9EA5AD] -mt-4">Applies to every staff account in this branch.</p>
+              )}
+              {selected.type === "doctor" && (
+                <p className="text-[11px] text-[#9EA5AD] -mt-4">Applies to this doctor's own dashboard, not the clinic portal.</p>
+              )}
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                {ACCESS_ITEMS.map((a) => (
-                  <div key={a.key} className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-[13px] font-semibold text-[#24292E] block mb-0.5">{a.label}</span>
-                      <span className="text-[10.5px] text-[#9EA5AD] leading-snug block">{ACCESS_DESCRIPTION}</span>
+              {loadingAccess ? (
+                <p className="text-[#838B95] text-sm text-center py-10">Loading access…</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                  {(selected.type === "doctor" ? DOCTOR_ACCESS_ITEMS : STAFF_ACCESS_ITEMS).map((a) => (
+                    <div key={a.key} className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[13px] font-semibold text-[#24292E] block mb-0.5">{a.label}</span>
+                        <span className="text-[10.5px] text-[#9EA5AD] leading-snug block">{a.description}</span>
+                      </div>
+                      <Toggle on={access[a.key] !== false} onClick={() => toggleAccess(a.key)} />
                     </div>
-                    <Toggle on={!!access[a.key]} onClick={() => toggleAccess(a.key)} />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {saveNote && <p className="text-[11px] text-[#5476FC] leading-relaxed">{saveNote}</p>}
 
               <div className="flex items-center gap-3 mt-2">
-                {selected.type === "branch" && (
+                {selected.type === "branch" ? (
                   <button
                     onClick={() => save("all")}
-                    className="px-5 py-2.5 rounded-xl text-[12px] font-semibold bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4] transition-colors whitespace-nowrap"
+                    disabled={savingAccess || loadingAccess}
+                    className="flex-1 py-2.5 bg-black text-white text-[13px] font-semibold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-60"
                   >
-                    Save for all users
+                    {savingAccess ? "Saving…" : "Save for all users"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => save("one")}
+                    disabled={savingAccess || loadingAccess}
+                    className="flex-1 py-2.5 bg-black text-white text-[13px] font-semibold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-60"
+                  >
+                    {savingAccess ? "Saving…" : "Save"}
                   </button>
                 )}
-                <button
-                  onClick={() => save("one")}
-                  className="flex-1 py-2.5 bg-black text-white text-[13px] font-semibold rounded-xl hover:bg-gray-800 transition-colors"
-                >
-                  Save
-                </button>
               </div>
             </>
           )}

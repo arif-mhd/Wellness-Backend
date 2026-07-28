@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
@@ -100,7 +100,7 @@ function Avatar({ name, size = "w-10 h-10" }: { name: string; size?: string }) {
   );
 }
 
-export default function ClinicHomePage() {
+function ClinicHomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -583,5 +583,13 @@ export default function ClinicHomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ClinicHomePage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicHomeContent />
+    </Suspense>
   );
 }
