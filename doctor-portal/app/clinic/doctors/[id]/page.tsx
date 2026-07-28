@@ -593,9 +593,13 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {TIMING_DAYS.map(({ label, dow }) => {
                   const daySlots = (doctor.slots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                  const isOpen = daySlots.length > 0;
                   return (
-                    <div key={label} className="border border-[#D6D9E0] h-8 flex items-center justify-center text-[11px] text-[#676E76] font-medium px-1 text-center">
-                      {label.slice(0, 3)} : {daySlots.length > 0 ? daySlots.map((s) => `${fmt12(s.startTime)}-${fmt12(s.endTime)}`).join(", ") : "Closed"}
+                    <div key={label} className={`rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 border transition-colors ${isOpen ? "bg-[#F3F6FF] border-[#5476FC]/20 shadow-sm" : "bg-[#F9FAFB] border-[#E4E8F0]"}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${isOpen ? "text-[#5476FC]" : "text-[#A7AAB4]"}`}>{label.slice(0, 3)}</span>
+                      <span className={`text-[11px] font-medium text-center leading-tight ${isOpen ? "text-[#24292E]" : "text-[#A7AAB4]"}`}>
+                        {isOpen ? daySlots.map((s) => `${fmt12(s.startTime)} - ${fmt12(s.endTime)}`).join(", ") : "Closed"}
+                      </span>
                     </div>
                   );
                 })}

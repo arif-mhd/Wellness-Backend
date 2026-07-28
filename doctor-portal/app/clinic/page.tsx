@@ -60,6 +60,12 @@ function fmt12(t: string) {
   return `${hr12}.${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+function parseLocalISO(iso: string): Date {
+  if (!iso) return new Date();
+  const clean = iso.endsWith("Z") ? iso.slice(0, -1) : iso;
+  return new Date(clean);
+}
+
 function pctChange(current: number, previous: number) {
   if (previous === 0) return current === 0 ? 0 : 100;
   return Math.round(((current - previous) / previous) * 100);
@@ -405,7 +411,7 @@ function ClinicHomeContent() {
                     </div>
                     <div className="flex items-center justify-between gap-3 mt-1">
                       <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                        {new Date(a.scheduledAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}
+                        {parseLocalISO(a.scheduledAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}
                       </span>
                       <button
                         onClick={() => goToDoctor(a.doctorId)}

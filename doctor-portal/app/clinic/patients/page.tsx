@@ -105,21 +105,26 @@ function PatientsListContent() {
       if (activeTab === "NEW" && !p.isNew) return false;
 
       if (timeFilter !== "All") {
-        if (!p.lastConsult) return false;
-        const d = new Date(p.lastConsult);
         const today = new Date();
-        if (timeFilter === "Today") {
-          if (d.toDateString() !== today.toDateString()) return false;
-        } else if (timeFilter === "This Week") {
-          const weekStart = new Date(today);
-          weekStart.setDate(today.getDate() - today.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 7);
-          if (d < weekStart || d >= weekEnd) return false;
-        } else if (timeFilter === "This month") {
-          if (d.getMonth() !== today.getMonth() || d.getFullYear() !== today.getFullYear()) return false;
-        }
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+
+        const hasMatchingConsult = p.consultations.some(c => {
+          if (!c.date) return false;
+          const d = new Date(c.date);
+          if (timeFilter === "Today") {
+            return d.toDateString() === today.toDateString();
+          } else if (timeFilter === "This Week") {
+            return d >= weekStart && d < weekEnd;
+          } else if (timeFilter === "This month") {
+            return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+          }
+          return false;
+        });
+        if (!hasMatchingConsult) return false;
       }
 
       if (searchQuery.trim()) {
@@ -183,7 +188,7 @@ function PatientsListContent() {
         </div>
 
         {/* Actions */}
-        <div className="flex-1 flex items-center justify-end gap-3">
+        <div className="flex-1 flex items-center justify-end pr-2">
           <button
             onClick={(e) => { e.stopPropagation(); sendReminder(p); }}
             disabled={!p.nextAppointmentId || state === "sending"}
@@ -192,12 +197,6 @@ function PatientsListContent() {
           >
             {state === "sending" ? "Sending..." : state === "sent" ? "Sent" : state === "error" ? "Retry" : "Remind"}
           </button>
-          <Link href={profileHref(p, branchId)} onClick={(e) => e.stopPropagation()} className="text-[#24292E] text-[12px] font-medium flex items-center gap-1 hover:text-[#5476FC] transition-colors">
-            View
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
         </div>
       </div>
     );
@@ -217,7 +216,7 @@ function PatientsListContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
             <div className="flex flex-wrap items-center gap-2">
               <FilterPill label="All" active={activeTab === "ALL"} onClick={() => setActiveTab("ALL")} />
-              <FilterPill label="New" active={activeTab === "NEW"} onClick={() => setActiveTab("NEW")} activeClass="bg-[#EAECEF] text-[#24292E] shadow-sm border border-transparent" />
+              <FilterPill label="New" active={activeTab === "NEW"} onClick={() => setActiveTab("NEW")} />
             </div>
 
             <div className="flex flex-col items-end gap-3">
@@ -242,10 +241,17 @@ function PatientsListContent() {
             </div>
           </div>
 
-          <span className="text-[#24292E] text-[13px] font-bold mt-2">Recent</span>
-
           {/* Table List */}
-          <div className="w-full flex flex-col gap-3 pb-4">
+          <div className="w-full flex flex-col gap-3 pb-4 mt-2">
+            <div className="flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
+              <div style={{ width: COL.profile, flexShrink: 0 }}>Name</div>
+              <div style={{ width: COL.age, flexShrink: 0 }} className="text-center">Age</div>
+              <div style={{ width: COL.diagnosis, flexShrink: 0 }} className="text-center">Diagnosis</div>
+              <div style={{ width: COL.summary, flexShrink: 0 }} className="text-center">Summary</div>
+              <div style={{ width: COL.lastConsult, flexShrink: 0 }} className="text-center">Last Consult</div>
+              <div className="flex-1" />
+            </div>
+
             {loading ? (
               <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
             ) : filtered.length === 0 ? (
@@ -294,7 +300,7 @@ function PatientsListContent() {
 
             {/* Consultations */}
             <h3 className="text-[#24292E] text-[13px] font-bold mb-3">Consultations</h3>
-            <div className="flex flex-col gap-2 mb-8 max-h-[180px] overflow-y-auto">
+            <div className="flex flex-col gap-2 mb-8 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
               {selectedPatient.consultations.length === 0 ? (
                 <span className="text-[#A7AAB4] text-[12px]">No consultations yet.</span>
               ) : (

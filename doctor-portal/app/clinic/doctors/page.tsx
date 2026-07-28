@@ -59,14 +59,6 @@ function FilterPill({ label, active, onClick, activeClass = "bg-black text-white
   );
 }
 
-function ChevronDown() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-0.5 opacity-60 shrink-0">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
 function AvatarPlaceholder({ name, avatarUrl, size = "w-10 h-10 text-sm" }: { name: string; avatarUrl?: string | null; size?: string }) {
   if (avatarUrl) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -208,10 +200,15 @@ function ManageDoctorsContent() {
   function DoctorRow({ doc }: { doc: Doctor }) {
     const isSelected = selectedId === doc.id;
     const displayName = doc.fullName?.startsWith("Dr.") ? doc.fullName : `Dr. ${doc.fullName}`;
+    const mainSpecialty = doc.specialty ?? "General Physician";
     const secondarySpecialty = doc.specializations?.[0]?.name ?? "";
-    const specialties = secondarySpecialty
-      ? [doc.specialty ?? "General Physician", "+", secondarySpecialty]
-      : [doc.specialty ?? "General Physician", "", ""];
+    
+    // Avoid showing "ENT + ENT" if the user entered the same string in both fields
+    const isDuplicate = secondarySpecialty && mainSpecialty.toLowerCase() === secondarySpecialty.toLowerCase();
+    
+    const specialties = (secondarySpecialty && !isDuplicate)
+      ? [mainSpecialty, "+", secondarySpecialty]
+      : [mainSpecialty, "", ""];
 
     return (
       <div
@@ -259,12 +256,6 @@ function ManageDoctorsContent() {
 
         {/* Action */}
         <div className="w-[50px] flex shrink-0 items-center justify-end">
-          <Link href={`/clinic/doctors/${doc.id}${doctorLinkQs(doc)}`} className="text-[#24292E] text-[12px] font-medium flex items-center gap-1 hover:text-[#5476FC] transition-colors">
-            View
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
         </div>
       </div>
     );
@@ -391,14 +382,14 @@ function ManageDoctorsContent() {
             <div style={{ minWidth: "810px" }}>
 
               {/* Table Header */}
-              <div className="flex items-center px-4 py-2 text-[10px] font-medium text-[#24292E] border-b border-[#EBEEF5]">
-                <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-1 cursor-pointer">Name <ChevronDown /></div>
+              <div className="flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
+                <div style={{ width: COL.name, flexShrink: 0 }} className="flex items-center gap-1">Name</div>
                 <div className="flex-1 min-w-[90px]" /> {/* Spacer for specialties */}
-                <div style={{ width: COL.cons1, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center leading-tight">Total No. of<br />Consultation <ChevronDown /></div>
-                <div style={{ width: COL.cons2, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center leading-tight">Online<br />Consultations <ChevronDown /></div>
-                <div style={{ width: COL.avg, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center leading-tight">Average<br />Consultation <ChevronDown /></div>
-                <div style={{ width: COL.presc, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 cursor-pointer text-center leading-tight">Number of<br />prescription <ChevronDown /></div>
-                <div style={{ width: COL.feedback, flexShrink: 0 }} className="flex justify-center items-center gap-1 cursor-pointer">P. Feedback <ChevronDown /></div>
+                <div style={{ width: COL.cons1, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Total No. of<br />Consultation</div>
+                <div style={{ width: COL.cons2, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Online<br />Consultations</div>
+                <div style={{ width: COL.avg, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Average<br />Consultation</div>
+                <div style={{ width: COL.presc, flexShrink: 0 }} className="flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Number of<br />prescription</div>
+                <div style={{ width: COL.feedback, flexShrink: 0 }} className="flex justify-center items-center gap-1">P. Feedback</div>
                 <div className="w-[50px] flex shrink-0" />
               </div>
 

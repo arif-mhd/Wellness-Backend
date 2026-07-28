@@ -47,7 +47,7 @@ async function populateDoctorStats(doctors: any[]) {
 
     doc.consultations = docAppts.length;
     doc.prescriptions = docAppts.filter(a => Array.isArray(a.emr?.medicines) && a.emr.medicines.length > 0).length;
-    
+
     if (docFeedbacks.length > 0) {
       const sum = docFeedbacks.reduce((s, f) => s + (f.rating ?? 0), 0);
       doc.rating = Math.round((sum / docFeedbacks.length) * 10) / 10;
@@ -55,7 +55,7 @@ async function populateDoctorStats(doctors: any[]) {
       doc.rating = 0;
     }
 
-    doc.avgConsultation = 0; 
+    doc.avgConsultation = 0;
   }
 
   return doctors;
@@ -335,42 +335,42 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
 
     const now = new Date().toISOString();
     const doctorDoc = {
-      id:             supertokensId,
+      id: supertokensId,
       supertokens_id: supertokensId,
-      status:         "approved",
+      status: "approved",
       email,
       fullName,
       phone,
-      dateOfBirth:    dateOfBirth    || null,
-      gender:         gender         || null,
-      emiratesId:     emiratesId     || null,
-      bio:            bio            || null,
-      businessEmail:  businessEmail  || null,
-      bloodGroup:      bloodGroup     || null,
-      height:          height         || null,
-      weight:          weight         || null,
-      maritalStatus:   maritalStatus  || null,
-      address:         address        || null,
-      postalCode:      postalCode     || null,
-      languages:       languages      || null,
-      avatarUrl:       avatarUrl      || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      emiratesId: emiratesId || null,
+      bio: bio || null,
+      businessEmail: businessEmail || null,
+      bloodGroup: bloodGroup || null,
+      height: height || null,
+      weight: weight || null,
+      maritalStatus: maritalStatus || null,
+      address: address || null,
+      postalCode: postalCode || null,
+      languages: languages || null,
+      avatarUrl: avatarUrl || null,
       emiratesIdFileUrl: emiratesIdFileUrl || null,
-      specialty:       specialty      || null,
-      license:         license        || null,
-      experience:      experience     || null,
-      medicalSchool:   medicalSchool  || null,
-      residency:       residency      || null,
-      fees:            fees           ?? null,
-      feesPerEmirate:  feesPerEmirate ?? null,
-      slots:           slots          ?? [],
-      degreeFileUrl:   degreeFileUrl  || null,
-      specFileUrl:     specFileUrl    || null,
-      otherFileUrl:    otherFileUrl   || null,
-      bankDetails:     bankDetails    ?? null,
-      registeredAt:    now,
-      approvedAt:      now,
-      approvedBy:      adminId,
-      createdByAdmin:  true,
+      specialty: specialty || null,
+      license: license || null,
+      experience: experience || null,
+      medicalSchool: medicalSchool || null,
+      residency: residency || null,
+      fees: fees ?? null,
+      feesPerEmirate: feesPerEmirate ?? null,
+      slots: slots ?? [],
+      degreeFileUrl: degreeFileUrl || null,
+      specFileUrl: specFileUrl || null,
+      otherFileUrl: otherFileUrl || null,
+      bankDetails: bankDetails ?? null,
+      registeredAt: now,
+      approvedAt: now,
+      approvedBy: adminId,
+      createdByAdmin: true,
       profileCompletedAt: now,
     };
 
@@ -405,11 +405,11 @@ router.post(
   "/upload",
   requireRole("admin"),
   upload.fields([
-    { name: "avatar",     maxCount: 1 },
+    { name: "avatar", maxCount: 1 },
     { name: "emiratesId", maxCount: 1 },
-    { name: "degree",     maxCount: 1 },
-    { name: "spec",       maxCount: 1 },
-    { name: "other",      maxCount: 1 },
+    { name: "degree", maxCount: 1 },
+    { name: "spec", maxCount: 1 },
+    { name: "other", maxCount: 1 },
   ]),
   async (req: Request, res: Response) => {
     const draftId = (req.body?.draftId as string) || `draft_${Date.now()}`;
@@ -424,7 +424,7 @@ router.post(
     try {
       for (const [field, fileArr] of Object.entries(files ?? {})) {
         const file = fileArr[0];
-        const ext  = MIME_EXT[file.mimetype] ?? "bin";
+        const ext = MIME_EXT[file.mimetype] ?? "bin";
         const blobPath = `doctors/${draftId}/${field}_${Date.now()}.${ext}`;
         await uploadBlob(blobPath, file.buffer, file.mimetype);
         urls[field] = generateSasUrl(blobPath);
