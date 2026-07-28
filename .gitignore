@@ -5,6 +5,9 @@ node_modules/
 .next/
 dist/
 build/
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
 
 # Environment files (never commit secrets)
 .env

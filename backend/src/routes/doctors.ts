@@ -6,6 +6,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
+import { hasDoctorPermission } from "../utils/doctorPermissions";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -97,6 +98,10 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
       res.status(404).json({ error: "Doctor profile not found." });
       return;
     }
+    if (!hasDoctorPermission(doctor, "manage_own_profile")) {
+      res.status(403).json({ error: "You don't have permission to edit your profile." });
+      return;
+    }
 
     const updated = {
       ...doctor,
@@ -165,6 +170,10 @@ router.put("/slots", requireRole("doctor"), async (req: SessionRequest, res: Res
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) {
       res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    if (!hasDoctorPermission(doctor, "manage_own_schedule")) {
+      res.status(403).json({ error: "You don't have permission to manage your schedule." });
       return;
     }
 
@@ -301,6 +310,10 @@ router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res:
       res.status(404).json({ error: "Doctor profile not found." });
       return;
     }
+    if (!hasDoctorPermission(doctor, "manage_own_schedule")) {
+      res.status(403).json({ error: "You don't have permission to manage your schedule." });
+      return;
+    }
 
     // 1. Calculate conflicts
     const rangeStart = new Date(new Date(startDate).getTime() - 30 * 60 * 1000).toISOString();
@@ -386,6 +399,10 @@ router.delete("/absences/:id", requireRole("doctor"), async (req: SessionRequest
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) {
       res.status(404).json({ error: "Doctor profile not found." });
+      return;
+    }
+    if (!hasDoctorPermission(doctor, "manage_own_schedule")) {
+      res.status(403).json({ error: "You don't have permission to manage your schedule." });
       return;
     }
 
@@ -725,6 +742,10 @@ router.post("/change-password", requireRole("doctor"), async (req: SessionReques
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
+      res.status(403).json({ error: "You don't have permission to manage account settings." });
+      return;
+    }
 
     const signInResult = await EmailPassword.signIn("public", doctor.email, currentPassword);
     if (signInResult.status !== "OK") {
@@ -833,6 +854,10 @@ router.post("/2fa/enable", requireRole("doctor"), async (req: SessionRequest, re
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
+    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
+      res.status(403).json({ error: "You don't have permission to manage account settings." });
+      return;
+    }
     await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
     res.json({ status: "OK", twoFactorEnabled: true });
   } catch (err) {
@@ -847,6 +872,10 @@ router.post("/2fa/disable", requireRole("doctor"), async (req: SessionRequest, r
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
+    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
+      res.status(403).json({ error: "You don't have permission to manage account settings." });
+      return;
+    }
     await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
     res.json({ status: "OK", twoFactorEnabled: false });
   } catch (err) {
@@ -863,6 +892,10 @@ router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Res
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
+    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
+      res.status(403).json({ error: "You don't have permission to manage account settings." });
+      return;
+    }
 
     await doctorsContainer.items.upsert({
       ...doctor,

@@ -26,9 +26,14 @@ import { clinicsContainer } from "../config/cosmos";
 // `actorId` is always the real logged-in user, kept separate from the
 // resolved scope — callers must use actorId (never scopeId/scopeIds) for
 // audit fields like logActivity/approvedBy/slotsVerifiedBy.
+//
+// `isBranchUser`/`permissions` carry the caller's own granular-permission
+// state (see hasPermission below) so endpoints that already resolve a scope
+// don't need a second Cosmos read just to check what the caller is allowed
+// to do.
 export type ClinicScope =
-  | { mode: "single"; scopeId: string; actorId: string; orgId: string | null }
-  | { mode: "aggregate"; scopeIds: string[]; actorId: string; orgId: string };
+  | { mode: "single"; scopeId: string; actorId: string; orgId: string | null; isBranchUser: boolean; permissions?: Record<string, boolean> }
+  | { mode: "aggregate"; scopeIds: string[]; actorId: string; orgId: string; isBranchUser: boolean; permissions?: Record<string, boolean> };
 
 // Overloads so TypeScript narrows the return type by the literal passed at
 // each call site: mutation/ownership-check endpoints (allowAggregate: false)
@@ -67,7 +72,7 @@ export async function resolveClinicScope(
       res.status(403).json({ error: "Not authorized for this branch." });
       return null;
     }
-    return { mode: "single", scopeId: caller.branchId, actorId, orgId: caller.orgId ?? null };
+    return { mode: "single", scopeId: caller.branchId, actorId, orgId: caller.orgId ?? null, isBranchUser: true, permissions: caller.permissions };
   }
 
   // Org owner's own top-level account, once it has (or has ever requested)
@@ -81,19 +86,19 @@ export async function resolveClinicScope(
       // The org's own id always means "my main branch" — it's not a real
       // entry in branches[], it's the org doc's own top-level fields.
       if (requestedBranchId === actorId) {
-        return { mode: "single", scopeId: actorId, actorId, orgId: actorId };
+        return { mode: "single", scopeId: actorId, actorId, orgId: actorId, isBranchUser: false };
       }
       const branch = branches.find((b) => b.id === requestedBranchId);
       if (!branch || branch.status !== "active") {
         res.status(403).json({ error: "branchId does not belong to your organization." });
         return null;
       }
-      return { mode: "single", scopeId: branch.id, actorId, orgId: actorId };
+      return { mode: "single", scopeId: branch.id, actorId, orgId: actorId, isBranchUser: false };
     }
 
     if (opts.allowAggregate) {
       const activeBranchIds = branches.filter((b) => b.status === "active").map((b) => b.id);
-      return { mode: "aggregate", scopeIds: [actorId, ...activeBranchIds], actorId, orgId: actorId };
+      return { mode: "aggregate", scopeIds: [actorId, ...activeBranchIds], actorId, orgId: actorId, isBranchUser: false };
     }
 
     res.status(400).json({ error: "branchId is required." });
@@ -101,7 +106,47 @@ export async function resolveClinicScope(
   }
 
   // Ordinary clinic with no branches of its own — unchanged behavior.
-  return { mode: "single", scopeId: actorId, actorId, orgId: null };
+  return { mode: "single", scopeId: actorId, actorId, orgId: null, isBranchUser: false };
+}
+
+// ── Granular staff permissions ────────────────────────────────────────────
+// A branch-user (staff) account can be restricted from specific management
+// actions by the org owner via the User Roles page. The org owner's own
+// account (and, by extension, any single-location clinic that has no
+// branches at all) is never subject to these — they're the ones granting
+// permissions, not receiving them.
+//
+// Default-allow semantics are load-bearing: an account with no `permissions`
+// field at all (every account that existed before this feature shipped, and
+// any new one until an owner explicitly customizes it) behaves exactly as it
+// did before — full access. A permission is only ever *removed* by the owner
+// explicitly setting that key to `false`; anything else (missing key,
+// missing object entirely) means "allowed".
+export type PermissionKey =
+  | "manage_doctors"
+  | "manage_patients"
+  | "manage_appointments"
+  | "manage_schedules"
+  | "view_analytics"
+  | "manage_insurance"
+  | "manage_payment";
+
+export function hasPermission(actor: { isBranchUser: boolean; permissions?: Record<string, boolean> }, key: PermissionKey): boolean {
+  if (!actor.isBranchUser) return true;
+  if (!actor.permissions || typeof actor.permissions !== "object") return true;
+  return actor.permissions[key] !== false;
+}
+
+// For endpoints that use getActorClinicIds (the aggregate-safe pattern)
+// instead of resolveClinicScope — same caller-doc read, shaped for
+// hasPermission.
+export async function getActorPermissionState(actorId: string): Promise<{ isBranchUser: boolean; permissions?: Record<string, boolean> }> {
+  const { resource: doc } = await clinicsContainer
+    .item(actorId, actorId)
+    .read()
+    .catch(() => ({ resource: undefined as any }));
+  if (!doc) return { isBranchUser: false };
+  return { isBranchUser: !!doc.branchId, permissions: doc.permissions };
 }
 
 export function scopeToClinicIds(scope: ClinicScope): string[] {

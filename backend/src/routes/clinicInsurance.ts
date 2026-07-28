@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { clinicsContainer } from "../config/cosmos";
-import { resolveClinicScope, scopeToClinicIds } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, hasPermission } from "../utils/clinicScope";
 
 const router = Router();
 
@@ -41,6 +41,10 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_insurance")) {
+    res.status(403).json({ error: "You don't have permission to manage insurance." });
+    return;
+  }
   const { name, network, discounts, spcContractFileUrl, renewDate } = req.body;
 
   if (!name) {
@@ -80,6 +84,10 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
 router.put("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_insurance")) {
+    res.status(403).json({ error: "You don't have permission to manage insurance." });
+    return;
+  }
   const clinicIds = scopeToClinicIds(scope);
   const { name, network, discounts, spcContractFileUrl, renewDate, status } = req.body;
 
@@ -115,6 +123,10 @@ router.put("/:id", requireRole("clinic"), async (req: SessionRequest, res: Respo
 router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_insurance")) {
+    res.status(403).json({ error: "You don't have permission to manage insurance." });
+    return;
+  }
   const clinicIds = scopeToClinicIds(scope);
 
   try {
