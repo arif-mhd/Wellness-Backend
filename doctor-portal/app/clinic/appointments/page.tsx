@@ -84,8 +84,17 @@ function statusColor(apt: Appointment) {
   return STATUS_COLOR[apt.status];
 }
 
+// scheduledAt is stored as local-time ISO (no Z suffix). Stripping any
+// trailing Z before parsing prevents the browser from treating it as UTC,
+// which would cause a +5:30 offset error for IST users.
+function parseLocalISO(iso: string): Date {
+  if (!iso) return new Date();
+  const clean = iso.endsWith("Z") ? iso.slice(0, -1) : iso;
+  return new Date(clean);
+}
+
 function isActiveNow(apt: Appointment) {
-  return apt.status === "in_progress" || (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() >= Date.now());
+  return apt.status === "in_progress" || (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() >= Date.now());
 }
 
 function toLocalInputValue(iso: string) {
@@ -157,15 +166,14 @@ function ClinicAppointmentsContent() {
 
   useEffect(() => { loadAppointments(); }, [qs]);
 
-  const now = Date.now();
-
   const filtered = useMemo(() => {
+    const now = Date.now();
     return appointments.filter((apt) => {
       if (activeTab === "Upcoming") {
-        const upcoming = apt.status === "in_progress" || (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() >= now);
+        const upcoming = apt.status === "in_progress" || (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() >= now);
         if (!upcoming) return false;
       } else if (activeTab === "Past") {
-        const past = apt.status === "completed" || apt.status === "cancelled" || new Date(apt.scheduledAt).getTime() < now;
+        const past = apt.status === "completed" || apt.status === "cancelled" || parseLocalISO(apt.scheduledAt).getTime() < now;
         if (!past) return false;
       }
 
@@ -173,7 +181,7 @@ function ClinicAppointmentsContent() {
       if (activeMode === "Online" && apt.visitType !== "online") return false;
 
       if (timeFilter !== "All") {
-        const d = new Date(apt.scheduledAt);
+        const d = parseLocalISO(apt.scheduledAt);
         const today = new Date();
         if (timeFilter === "Today") {
           if (d.toDateString() !== today.toDateString()) return false;
@@ -196,7 +204,7 @@ function ClinicAppointmentsContent() {
 
       return true;
     });
-  }, [appointments, activeTab, activeMode, timeFilter, searchQuery, now]);
+  }, [appointments, activeTab, activeMode, timeFilter, searchQuery]);
 
   const newAppts = useMemo(() => filtered.filter(isActiveNow), [filtered]);
   const allAppts = filtered;
@@ -260,7 +268,7 @@ function ClinicAppointmentsContent() {
   // ── Row renderer ────────────────────────────────────────────
   function AppointmentRow({ appt }: { appt: Appointment }) {
     const isSelected = selectedId === appt.id;
-    const dateObj = new Date(appt.scheduledAt);
+    const dateObj = parseLocalISO(appt.scheduledAt);
     return (
       <div
         onClick={() => setSelectedId(appt.id)}
@@ -444,9 +452,9 @@ function ClinicAppointmentsContent() {
               </div>
             </div>
             <p className="text-[#9EA5AD] text-[11px] text-center">
-              {new Date(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               {" · "}
-              {new Date(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
             </p>
             <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full text-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
               View Profile
