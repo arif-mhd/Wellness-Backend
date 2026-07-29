@@ -94,7 +94,9 @@ function VideoCallInner() {
   const [doctorsLoading,     setDoctorsLoading]     = useState(false);
   const [specialistSearch,   setSpecialistSearch]   = useState("");
   const [selectedSpecialist, setSelectedSpecialist] = useState<AvailableDoctor | null>(null);
-  const [showSpecialistList, setShowSpecialistList] = useState(false);
+  // Right panel tab: "chat" | "emr" | "specialist"
+  const [rightTab, setRightTab] = useState<"chat" | "emr" | "specialist">("emr");
+
   const [showApprovalModal,  setShowApprovalModal]  = useState(false);
   const [showSuccessModal,   setShowSuccessModal]   = useState(false);
   const [inviteStatus,       setInviteStatus]       = useState<"idle" | "sending" | "waiting" | "accepted" | "declined">("idle");
@@ -637,56 +639,6 @@ function VideoCallInner() {
         </div>
       )}
 
-      {/* ── Specialist selection drawer ── */}
-      {showSpecialistList && !isSpecialist && (
-        <div className="fixed inset-0 z-[99999] flex items-start justify-end">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowSpecialistList(false)}/>
-          <div className="relative bg-white w-[360px] h-full shadow-2xl flex flex-col animate-[slideIn_0.25s_ease-out]">
-            <style dangerouslySetInnerHTML={{__html:`@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}`}}/>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <span className="text-[#24292e] font-semibold text-sm">Add Specialist</span>
-              <button onClick={() => setShowSpecialistList(false)} className="text-gray-400 hover:text-gray-600">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div className="px-4 py-3 border-b border-gray-100">
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input value={specialistSearch} onChange={e => setSpecialistSearch(e.target.value)}
-                  placeholder="Search…" className="w-full bg-gray-50 rounded-lg pl-8 pr-3 py-2 text-xs outline-none"/>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {doctorsLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
-                </div>
-              ) : filteredDoctors.map((doc, idx) => (
-                <div key={doc.id}>
-                  <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50">
-                    <div className="relative flex-shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={doc.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.fullName)}&background=5476FC&color=fff`}
-                        alt={doc.fullName} className="w-10 h-10 rounded-full object-cover"/>
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-white absolute bottom-0 right-0"/>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[#24292e] text-xs font-semibold truncate">{doc.fullName}</p>
-                      <StarRating rating={doc.rating}/>
-                      {doc.fees && <p className="text-[10px] text-gray-400">AED {doc.fees}</p>}
-                    </div>
-                    <button onClick={() => handleSelectDoctor(doc)}
-                      className="h-7 px-4 rounded-full text-[10px] font-semibold border border-gray-200 text-gray-600 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">
-                      Add
-                    </button>
-                  </div>
-                  {idx < filteredDoctors.length - 1 && <div className="h-px bg-gray-50 mx-5"/>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Approval modal ── */}
       {showApprovalModal && selectedSpecialist && (
@@ -786,7 +738,7 @@ function VideoCallInner() {
           </button>
           {!isSpecialist && (
             <>
-              <button onClick={() => { setShowSpecialistList(true); fetchAvailableDoctors(); }}
+              <button onClick={() => { setRightTab("specialist"); fetchAvailableDoctors(); }}
                 className="h-8 px-3 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-[10px] font-bold shadow-[0_2px_6px_rgba(84,118,252,0.3)] hover:opacity-90 whitespace-nowrap">
                 + Specialist
               </button>
@@ -815,14 +767,14 @@ function VideoCallInner() {
       {/* ── Main body ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left: Video + Chat */}
+        {/* Left: Video only */}
         <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
 
           {/* Video */}
           <div
             ref={videoContainerRef}
-            className="relative bg-[#1a2035] overflow-hidden"
-            style={{ height: isFullscreen ? "100vh" : "420px" }}
+            className="relative bg-[#1a2035] overflow-hidden flex-1"
+            style={{ height: isFullscreen ? "100vh" : undefined }}
           >
             {remoteTiles.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -925,83 +877,179 @@ function VideoCallInner() {
               </button>
             </div>
           </div>
-
-          {/* Chat */}
-          <div className="flex-1 flex flex-col overflow-hidden border-t border-gray-100">
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-500"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-              <span className="text-[#24292e] text-xs font-semibold">Chat</span>
-              {unread > 0 && <span className="min-w-[16px] h-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center px-1">{unread}</span>}
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3" onClick={() => setUnread(0)}>
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                  <p className="text-gray-300 text-[11px]">No messages yet</p>
-                </div>
-              ) : messages.map(m => (
-                <div key={m.id} className={`flex items-start gap-2 ${m.sender === "you" ? "flex-row-reverse" : ""}`}>
-                  <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${m.sender === "you" ? "bg-[#5476fc]/15 text-[#5476fc]" : "bg-gray-100 text-gray-500"}`}>
-                    {m.name.slice(0,2).toUpperCase()}
-                  </div>
-                  <div className={`max-w-[75%] flex flex-col gap-0.5 ${m.sender === "you" ? "items-end" : "items-start"}`}>
-                    <p className="text-[9px] text-gray-400 font-medium px-1">{m.name}</p>
-                    <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${m.sender === "you" ? "bg-[#5476fc] text-white rounded-tr-none" : "bg-gray-100 text-gray-700 rounded-tl-none"}`}>
-                      {m.text}
-                    </div>
-                    <p className="text-[9px] text-gray-300 px-1">{m.time}</p>
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef}/>
-            </div>
-            <div className="p-3 border-t border-gray-100 flex gap-2 items-center flex-shrink-0">
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-300 flex-shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-                placeholder="Type Something..."
-                className="flex-1 bg-transparent text-xs text-gray-700 placeholder-gray-300 outline-none"/>
-              <button onClick={sendChat} disabled={!chatInput.trim()}
-                className="w-7 h-7 rounded-full bg-[#5476fc] flex items-center justify-center disabled:opacity-30 hover:bg-[#4466ec] flex-shrink-0">
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-            </div>
-          </div>
         </div>
 
-        {/* Right: EMR */}
+        {/* Right: Tabbed panel — Chat | EMR | Add Specialist */}
         <div className="flex-1 overflow-hidden flex flex-col border-l border-gray-100">
-          <div className="flex-1 overflow-y-auto">
-            {loadingEmr ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
-              </div>
-            ) : (
-              <div className="px-6 py-4 flex flex-col gap-5">
-                <IntakePlan
-                  sections={emrSections}
-                  onChange={setEmrSections}
-                  openSection={expandedSection}
-                  onToggleSection={setExpandedSection}
-                  patientProfile={patientProfile}
-                  visitInfo={visitInfo}
-                  onVisitInfoChange={setVisitInfo}
-                  onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
-                />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
-                  <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
+          {/* Tab Bar */}
+          <div className="flex items-center gap-0 px-5 border-b border-gray-100 flex-shrink-0">
+            {([
+              { key: "chat" as const, label: "Chat" },
+              { key: "emr"  as const, label: "EMR" },
+              ...(!isSpecialist ? [{ key: "specialist" as const, label: "Add Specialist" }] : []),
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setRightTab(key);
+                  if (key === "chat") setUnread(0);
+                  if (key === "specialist") fetchAvailableDoctors();
+                }}
+                className={`relative px-4 py-3 text-xs font-semibold transition-colors ${
+                  rightTab === key
+                    ? "text-[#5476fc]"
+                    : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                {label}
+                {key === "chat" && unread > 0 && rightTab !== "chat" && (
+                  <span className="ml-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[9px] text-white inline-flex items-center justify-center px-1">{unread}</span>
+                )}
+                {rightTab === key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5476fc] rounded-t-full" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Chat tab ── */}
+          {rightTab === "chat" && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3" onClick={() => setUnread(0)}>
+                {messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                    <p className="text-gray-300 text-[11px]">No messages yet</p>
+                  </div>
+                ) : messages.map(m => (
+                  <div key={m.id} className={`flex items-start gap-2 ${m.sender === "you" ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${m.sender === "you" ? "bg-[#5476fc]/15 text-[#5476fc]" : "bg-gray-100 text-gray-500"}`}>
+                      {m.name.slice(0,2).toUpperCase()}
+                    </div>
+                    <div className={`max-w-[75%] flex flex-col gap-0.5 ${m.sender === "you" ? "items-end" : "items-start"}`}>
+                      <p className="text-[9px] text-gray-400 font-medium px-1">{m.name}</p>
+                      <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${m.sender === "you" ? "bg-[#5476fc] text-white rounded-tr-none" : "bg-gray-100 text-gray-700 rounded-tl-none"}`}>
+                        {m.text}
+                      </div>
+                      <p className="text-[9px] text-gray-300 px-1">{m.time}</p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef}/>
+              </div>
+              <div className="p-3 border-t border-gray-100 flex gap-2 items-center flex-shrink-0">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-300 flex-shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                  placeholder="Type Something..."
+                  className="flex-1 bg-transparent text-xs text-gray-700 placeholder-gray-300 outline-none"/>
+                <button onClick={sendChat} disabled={!chatInput.trim()}
+                  className="w-7 h-7 rounded-full bg-[#5476fc] flex items-center justify-center disabled:opacity-30 hover:bg-[#4466ec] flex-shrink-0">
+                  <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── EMR tab ── */}
+          {rightTab === "emr" && (
+            <>
+              <div className="flex-1 overflow-y-auto">
+                {loadingEmr ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : (
+                  <div className="px-6 py-4 flex flex-col gap-5">
+                    <IntakePlan
+                      sections={emrSections}
+                      onChange={setEmrSections}
+                      openSection={expandedSection}
+                      onToggleSection={setExpandedSection}
+                      patientProfile={patientProfile}
+                      visitInfo={visitInfo}
+                      onVisitInfoChange={setVisitInfo}
+                      onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
+                      <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
+                <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50">Cancel</button>
+                <button onClick={saveEmr} disabled={savingEmr}
+                  className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec]"}`}>
+                  {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save Consultation Notes"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── Add Specialist tab ── */}
+          {rightTab === "specialist" && !isSpecialist && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Search */}
+              <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input value={specialistSearch} onChange={e => setSpecialistSearch(e.target.value)}
+                    placeholder="Search by name or specialty…" className="w-full bg-gray-50 rounded-xl pl-8 pr-3 py-2.5 text-xs outline-none border border-transparent focus:border-[#5476fc]/30 transition-colors"/>
                 </div>
               </div>
-            )}
-          </div>
-          <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
-            <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50">Cancel</button>
-            <button onClick={saveEmr} disabled={savingEmr}
-              className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec]"}`}>
-              {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save Consultation Notes"}
-            </button>
-          </div>
+
+              {/* Status badges */}
+              {(inviteStatus === "waiting" || inviteStatus === "declined") && (
+                <div className="px-4 py-2 flex-shrink-0">
+                  {inviteStatus === "waiting" && (
+                    <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-blue-600 text-[10px] font-semibold animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"/>Waiting for patient approval…
+                    </div>
+                  )}
+                  {inviteStatus === "declined" && (
+                    <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-red-600 text-[10px] font-semibold">Patient declined the invite.</div>
+                  )}
+                </div>
+              )}
+
+              {/* Doctors list */}
+              <div className="flex-1 overflow-y-auto">
+                {doctorsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : filteredDoctors.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-2">
+                    <p className="text-gray-300 text-xs">No specialists found.</p>
+                  </div>
+                ) : filteredDoctors.map((doc, idx) => (
+                  <div key={doc.id}>
+                    <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                      <div className="relative flex-shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={doc.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.fullName)}&background=5476FC&color=fff`}
+                          alt={doc.fullName} className="w-10 h-10 rounded-full object-cover"/>
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-white absolute bottom-0 right-0"/>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[#24292e] text-xs font-semibold truncate">{doc.fullName}</p>
+                        <p className="text-gray-400 text-[10px] truncate">{doc.specialty}</p>
+                        <StarRating rating={doc.rating}/>
+                        {doc.fees && <p className="text-[10px] text-gray-400">AED {doc.fees}</p>}
+                      </div>
+                      <button onClick={() => handleSelectDoctor(doc)}
+                        className="h-7 px-4 rounded-full text-[10px] font-semibold border border-gray-200 text-gray-600 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">
+                        Add
+                      </button>
+                    </div>
+                    {idx < filteredDoctors.length - 1 && <div className="h-px bg-gray-50 mx-5"/>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
