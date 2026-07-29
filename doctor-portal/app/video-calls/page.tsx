@@ -57,6 +57,7 @@ function VideoCallInner() {
 
   const [connected,  setConnected]  = useState(false);
   const [ended,      setEnded]      = useState(false);
+  const [showRejoinOrEndPrompt, setShowRejoinOrEndPrompt] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [micOn,      setMicOn]      = useState(true);
   const [camOn,      setCamOn]      = useState(true);
@@ -266,6 +267,14 @@ function VideoCallInner() {
 
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
+
+        if (!isSpecialist) {
+          apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inCall: true }),
+          }).catch(() => { });
+        }
       } catch (e: any) {
         if (!cancelled) setError(`Connection error: ${e?.message}`);
       }
@@ -275,7 +284,16 @@ function VideoCallInner() {
 
     return () => {
       cancelled = true;
-      if (didConnectRef.current) room.disconnect();
+      if (didConnectRef.current) {
+        room.disconnect();
+        if (!isSpecialist) {
+          apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inCall: false }),
+          }).catch(() => { });
+        }
+      }
       roomRef.current = null;
     };
   }, [appointmentId, isSpecialist]);
@@ -294,10 +312,28 @@ function VideoCallInner() {
     });
   }, []);
 
-  const disconnect = useCallback(async () => {
+  const confirmDisconnect = useCallback(async () => {
+    setShowRejoinOrEndPrompt(false);
     await roomRef.current?.disconnect();
+    if (!isSpecialist) {
+      apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inCall: false }),
+      }).catch(() => { });
+    }
     setEnded(true);
-  }, []);
+  }, [appointmentId, isSpecialist]);
+
+  const disconnect = useCallback(() => {
+    if (isSpecialist) { confirmDisconnect(); return; }
+    const patientStillConnected = remoteTiles.some(t => t.participantId !== selectedSpecialist?.id);
+    if (patientStillConnected) {
+      setShowRejoinOrEndPrompt(true);
+      return;
+    }
+    confirmDisconnect();
+  }, [isSpecialist, remoteTiles, selectedSpecialist, confirmDisconnect]);
 
   // Load the current doctor's user ID on mount so components can identify own entries
   useEffect(() => {
@@ -551,20 +587,46 @@ function VideoCallInner() {
   const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
     " | " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 
+  useEffect(() => {
+    if (!ended) return;
+    const t = setTimeout(() => router.push("/dashboard"), 2000);
+    return () => clearTimeout(t);
+  }, [ended, router]);
+
   if (ended) return (
     <div className="flex flex-col items-center justify-center h-screen gap-4 bg-[#f7f9fc]">
       <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-2xl">✓</div>
       <h2 className="text-[#24292e] text-xl font-semibold">Call Ended</h2>
       <p className="text-[#676e76] text-sm">Duration: {timerStr}</p>
-      <button onClick={() => router.push("/dashboard")}
-        className="px-6 py-2.5 bg-[#5476fc] text-white text-sm font-medium rounded-xl hover:bg-[#4466ec]">
-        Back to Dashboard
-      </button>
     </div>
   );
 
   return (
     <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 96px)" }}>
+
+      {/* ── Patient still in call — rejoin or really end ── */}
+      {showRejoinOrEndPrompt && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowRejoinOrEndPrompt(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[380px] mx-4 p-7 flex flex-col items-center gap-4 animate-[zoomIn_0.2s_ease-out]">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-2xl">⚠️</div>
+            <h3 className="text-[#24292e] font-semibold text-base text-center">The Patient Is Still In The Call</h3>
+            <p className="text-gray-500 text-[12px] text-center leading-relaxed">
+              Ending now will disconnect the patient from the consultation.
+            </p>
+            <div className="flex flex-col gap-2.5 w-full">
+              <button onClick={() => setShowRejoinOrEndPrompt(false)}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 transition-all">
+                Rejoin
+              </button>
+              <button onClick={confirmDisconnect}
+                className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors">
+                End Call
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Follow-up scheduling modal ── */}
       {showFollowUpModal && !isSpecialist && (

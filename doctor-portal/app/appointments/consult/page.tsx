@@ -84,6 +84,7 @@ function ConsultRoom() {
   const [loadingEmr, setLoadingEmr] = useState(true);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
   const [showUnsavedEmrPrompt, setShowUnsavedEmrPrompt] = useState(false);
+  const [showRejoinOrEndPrompt, setShowRejoinOrEndPrompt] = useState(false);
 
   // EHR panel
   const [ehrOpen, setEhrOpen] = useState(false);
@@ -263,6 +264,11 @@ function ConsultRoom() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "in_progress" }),
         }).catch(() => { });
+        apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inCall: true }),
+        }).catch(() => { });
       } catch (e: any) {
         if (!cancelled) setError(`Connection error: ${e?.message}`);
       }
@@ -272,7 +278,14 @@ function ConsultRoom() {
 
     return () => {
       cancelled = true;
-      if (didConnectRef.current) room.disconnect();
+      if (didConnectRef.current) {
+        room.disconnect();
+        apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inCall: false }),
+        }).catch(() => { });
+      }
       roomRef.current = null;
     };
   }, [appointmentId]);
@@ -295,22 +308,32 @@ function ConsultRoom() {
 
   const confirmDisconnect = useCallback(async () => {
     setShowUnsavedEmrPrompt(false);
+    setShowRejoinOrEndPrompt(false);
     await roomRef.current?.disconnect();
-    apiFetch(`/api/appointments/${appointmentId}/status`, {
+    apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "completed" }),
+      body: JSON.stringify({ inCall: false }),
     }).catch(() => { });
     setEnded(true);
   }, [appointmentId]);
 
-  const disconnect = useCallback(() => {
+  const proceedToEnd = useCallback(() => {
     if (!emrSavedAtLeastOnce) {
       setShowUnsavedEmrPrompt(true);
       return;
     }
     confirmDisconnect();
   }, [emrSavedAtLeastOnce, confirmDisconnect]);
+
+  const disconnect = useCallback(() => {
+    const patientStillConnected = remoteTiles.some(t => t.participantId !== selectedSpecialist?.id);
+    if (patientStillConnected) {
+      setShowRejoinOrEndPrompt(true);
+      return;
+    }
+    proceedToEnd();
+  }, [remoteTiles, selectedSpecialist, proceedToEnd]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -485,15 +508,17 @@ function ConsultRoom() {
     }
   };
 
+  useEffect(() => {
+    if (!ended) return;
+    const t = setTimeout(() => router.push("/appointments"), 2000);
+    return () => clearTimeout(t);
+  }, [ended, router]);
+
   if (ended) return (
     <div className="flex flex-col items-center justify-center h-[calc(100vh-96px)] gap-4 bg-[#f7f9fc]">
       <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-2xl">✓</div>
       <h2 className="text-[#24292e] text-xl font-semibold">Call Ended</h2>
       <p className="text-[#676e76] text-sm">Duration: {timerStr}</p>
-      <button onClick={() => router.push("/appointments")}
-        className="px-6 py-2.5 bg-[#5476fc] text-white text-sm font-medium rounded-xl hover:bg-[#4466ec]">
-        Back to Appointments
-      </button>
     </div>
   );
 
@@ -680,6 +705,30 @@ function ConsultRoom() {
               <button onClick={confirmDisconnect}
                 className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors">
                 I&apos;ll Fill It Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient still in call — rejoin or really end ── */}
+      {showRejoinOrEndPrompt && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowRejoinOrEndPrompt(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[380px] mx-4 p-7 flex flex-col items-center gap-4 animate-[zoomIn_0.2s_ease-out]">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-2xl">⚠️</div>
+            <h3 className="text-[#24292e] font-semibold text-base text-center">{patientName} Is Still In The Call</h3>
+            <p className="text-gray-500 text-[12px] text-center leading-relaxed">
+              Ending now will disconnect {patientName} from the consultation.
+            </p>
+            <div className="flex flex-col gap-2.5 w-full">
+              <button onClick={() => setShowRejoinOrEndPrompt(false)}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] text-white text-xs font-bold shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90 transition-all">
+                Rejoin
+              </button>
+              <button onClick={proceedToEnd}
+                className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors">
+                End Call
               </button>
             </div>
           </div>
