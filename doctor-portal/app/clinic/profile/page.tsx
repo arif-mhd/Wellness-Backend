@@ -174,7 +174,7 @@ export default function ClinicProfilePage() {
   });
 
   return (
-    <div className="px-8 py-8 overflow-y-auto h-full w-full">
+    <div className="px-4 md:px-8 py-8 overflow-y-auto h-full w-full">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 items-start">
         {/* Main Content */}
         <div className="flex-1 flex flex-col gap-6 w-full min-w-0">

@@ -106,7 +106,7 @@ function CompleteEmrForm() {
               <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
             </div>
           ) : (
-            <div className="px-6 py-4 flex flex-col gap-5 max-w-[1100px] mx-auto">
+            <div className="px-4 md:px-6 py-4 flex flex-col gap-5 max-w-[1100px] mx-auto">
               <IntakePlan
                 sections={emrSections}
                 onChange={setEmrSections}
@@ -117,7 +117,7 @@ function CompleteEmrForm() {
                 onVisitInfoChange={setVisitInfo}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
                 <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
               </div>
@@ -126,7 +126,7 @@ function CompleteEmrForm() {
         </div>
 
         {/* Bottom save bar */}
-        <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-end gap-3 px-4 md:px-6 py-3 border-t border-gray-100 flex-shrink-0">
           <button onClick={() => router.push("/dashboard/prescriptions")}
             className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 transition-colors">
             Cancel

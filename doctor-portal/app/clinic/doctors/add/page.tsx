@@ -133,7 +133,7 @@ function AddDoctorContent() {
   };
 
   return (
-    <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 md:px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
       
       {/* ── Page Header ── */}
       <div className="flex items-center gap-3 mb-10 max-w-4xl mx-auto">
@@ -164,7 +164,7 @@ function AddDoctorContent() {
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold transition-all duration-300 ${step >= s.key ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-110" : "bg-white border-2 border-[#E4E8F0] text-[#A7AAB4]"}`}>
               {step > s.key ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg> : s.key}
             </div>
-            <span className={`text-[12px] font-bold whitespace-nowrap absolute top-12 transition-colors ${step >= s.key ? "text-[#24292E]" : "text-[#A7AAB4]"}`}>{s.label}</span>
+            <span className={`text-[10px] sm:text-[12px] font-bold text-center w-20 sm:w-auto sm:whitespace-nowrap absolute top-12 transition-colors ${step >= s.key ? "text-[#24292E]" : "text-[#A7AAB4]"}`}>{s.label}</span>
           </div>
         ))}
       </div>

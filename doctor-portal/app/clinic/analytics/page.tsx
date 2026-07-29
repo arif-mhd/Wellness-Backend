@@ -142,17 +142,17 @@ function ClinicAnalyticsContent() {
           .join(" · ");
 
   return (
-    <div className="px-5 pb-12 select-none" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 md:px-5 pb-12 select-none" style={{ fontFamily: "Outfit, sans-serif" }}>
       {/* Title & Search Row */}
-      <div className="flex justify-between items-center mb-6 mt-2 w-full">
-        <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6 mt-2 w-full">
+        <h1 className="text-[#383F45] font-normal text-[28px] sm:text-[32px] leading-none tracking-[-0.64px]">
           Analytics
         </h1>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <input
             type="text"
             placeholder="Search all"
-            className="w-[280px] h-[40px] pl-4 pr-10 rounded-[8px] border border-[#EBEEF5] text-sm text-[#383F45] bg-white outline-none focus:border-[#5476FC] transition-colors"
+            className="w-full sm:w-[280px] h-[40px] pl-4 pr-10 rounded-[8px] border border-[#EBEEF5] text-sm text-[#383F45] bg-white outline-none focus:border-[#5476FC] transition-colors"
           />
           <svg
             className="absolute right-3 top-2.5 text-[#838B95]"

@@ -110,12 +110,12 @@ export default function HelpSupportPage() {
 
   return (
     <ProtectedRoute>
-      <div className="px-10 pb-12 select-none flex flex-col gap-8 relative">
+      <div className="px-4 md:px-10 pb-12 select-none flex flex-col gap-8 relative">
 
         {/* Page title */}
         <div className="flex flex-col justify-center items-start mt-2">
           <h1
-            className="text-[#24292E] font-medium text-[32px] tracking-[-0.64px]"
+            className="text-[#24292E] font-medium text-[28px] sm:text-[32px] tracking-[-0.64px]"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
             Help & Support
@@ -203,8 +203,8 @@ export default function HelpSupportPage() {
         <div className="flex flex-col gap-5 w-full">
 
           {/* Filters Row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               {(["All", "Open", "In Progress", "Closed"] as const).map((opt) => {
                 const isActive = filter === opt;
                 const openCount = opt === "Open" ? tickets.filter(t => t.status === "Open").length : null;
@@ -249,7 +249,8 @@ export default function HelpSupportPage() {
                 Loading tickets...
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
+              <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-collapse" style={{ minWidth: "640px" }}>
                 <thead>
                   <tr className="text-[10px] font-medium text-[#9EA5AD] uppercase tracking-wider">
                     <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
@@ -324,6 +325,7 @@ export default function HelpSupportPage() {
                   )}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 

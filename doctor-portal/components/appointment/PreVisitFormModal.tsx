@@ -46,7 +46,7 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
     >
       {/* Modal panel — matches Figma: 371px wide, right-aligned, 32px from top */}
       <div
-        className="relative w-[371px] max-h-[calc(100vh-64px)] overflow-y-auto mt-14 mr-8 bg-white rounded-[12px] border border-white shadow-2xl flex flex-col gap-6 p-8 animate-slide-in-right"
+        className="relative w-[calc(100vw-32px)] sm:w-[371px] max-h-[calc(100vh-64px)] overflow-y-auto mt-14 mr-4 sm:mr-8 bg-white rounded-[12px] border border-white shadow-2xl flex flex-col gap-6 p-5 sm:p-8 animate-slide-in-right"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

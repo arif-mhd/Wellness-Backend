@@ -74,7 +74,7 @@ export default function FAQPage() {
 
   return (
     <ProtectedRoute>
-      <div className="px-10 pb-12 select-none flex flex-col gap-8">
+      <div className="px-4 md:px-10 pb-12 select-none flex flex-col gap-8">
         
         {/* Header: Back Button + Title */}
         <div className="flex items-center gap-4 mt-2">

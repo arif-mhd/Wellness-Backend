@@ -487,7 +487,6 @@ function VideoCallInner() {
 
   const handleSelectDoctor = (doc: AvailableDoctor) => {
     setSelectedSpecialist(doc);
-    setShowSpecialistList(false);
     setShowApprovalModal(true);
   };
 
@@ -702,10 +701,10 @@ function VideoCallInner() {
       )}
 
       {/* ── Top bar ── */}
-      <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-3 md:gap-4 px-3 md:px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <p className="text-[#24292e] text-xs font-semibold">[Internal] Calling{isSpecialist ? " · Specialist" : ""}</p>
-          <span className="text-gray-300">|</span>
+          <span className="text-gray-300 hidden sm:inline">|</span>
           <p className="text-gray-400 text-[10px] hidden sm:block">{dateStr}</p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className={`w-2 h-2 rounded-full ${connected ? "bg-red-500 animate-pulse" : "bg-yellow-400"}`}/>
@@ -765,15 +764,15 @@ function VideoCallInner() {
       </div>
 
       {/* ── Main body ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col xl:flex-row flex-1 overflow-y-auto xl:overflow-hidden">
 
         {/* Left: Video only */}
-        <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
+        <div className="flex flex-col w-full xl:w-[560px] xl:flex-shrink-0">
 
           {/* Video */}
           <div
             ref={videoContainerRef}
-            className="relative bg-[#1a2035] overflow-hidden flex-1"
+            className="relative bg-[#1a2035] overflow-hidden flex-1 min-h-[360px] xl:min-h-0"
             style={{ height: isFullscreen ? "100vh" : undefined }}
           >
             {remoteTiles.length === 0 ? (
@@ -960,7 +959,7 @@ function VideoCallInner() {
                     <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin"/>
                   </div>
                 ) : (
-                  <div className="px-6 py-4 flex flex-col gap-5">
+                  <div className="px-4 md:px-6 py-4 flex flex-col gap-5">
                     <IntakePlan
                       sections={emrSections}
                       onChange={setEmrSections}
@@ -971,7 +970,7 @@ function VideoCallInner() {
                       onVisitInfoChange={setVisitInfo}
                       onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
                       <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
                     </div>

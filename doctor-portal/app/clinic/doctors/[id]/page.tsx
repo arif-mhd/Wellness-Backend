@@ -669,15 +669,15 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                   ) : (
                     newConsults.map((c) => (
                       <div key={c.id} onClick={() => setSelectedConsultId(c.id)} className={`bg-white border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${selectedConsultId === c.id ? "border-[#5476FC]" : "border-[#E4E8F0]"}`}>
-                        <div className="flex items-center gap-3 w-[180px] shrink-0">
+                        <div className="flex items-center gap-3 w-full md:w-[180px] md:shrink-0">
                           <AvatarPlaceholder name={c.patientName} avatarUrl={c.patientAvatarUrl} size="w-10 h-10" />
                           <div className="flex flex-col min-w-0">
                             <span className="text-[13px] font-bold text-[#24292E] truncate">{c.patientName}</span>
                             <span className="text-[11px] text-[#676E76] truncate">{c.patientEmail}</span>
                           </div>
                         </div>
-                        <span className="text-[12px] font-medium text-[#24292E] w-[40px] shrink-0">{c.patientAge ?? "—"}</span>
-                        <span className="text-[11px] font-medium text-[#676E76] w-[120px] truncate shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
+                        <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
+                        <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                         <div className="flex flex-col gap-0.5 shrink-0">
                           <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{new Date(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
                           <span className="text-[11px] text-[#676E76]">{new Date(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
@@ -706,8 +706,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                           <span className="text-[11px] text-[#676E76] truncate">{c.patientEmail}</span>
                         </div>
                       </div>
-                      <span className="text-[12px] font-medium text-[#24292E] w-[40px] shrink-0">{c.patientAge ?? "—"}</span>
-                      <span className="text-[11px] font-medium text-[#676E76] w-[120px] truncate shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
+                      <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
+                      <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                       <div className="flex flex-col gap-0.5 shrink-0">
                         <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{new Date(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
                         <span className="text-[11px] text-[#676E76]">{new Date(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>

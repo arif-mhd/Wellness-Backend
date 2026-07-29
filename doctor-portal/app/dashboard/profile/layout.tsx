@@ -59,9 +59,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <div className="flex gap-8 px-8 pb-8 pt-2 min-h-full font-outfit">
+    <div className="flex flex-col lg:flex-row gap-8 px-4 md:px-8 pb-8 pt-2 min-h-full font-outfit">
       {/* ── Left: Account Preferences sidebar ─────────────────── */}
-      <aside className="w-[280px] shrink-0">
+      <aside className="w-full lg:w-[280px] lg:shrink-0">
         <div className="bg-white rounded-xl p-6 flex flex-col gap-1 border border-white">
           <div className="mb-3">
             <h2 className="text-[#24292E] font-medium text-base tracking-tight">Account Preferences</h2>

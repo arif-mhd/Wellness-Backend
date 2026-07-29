@@ -690,7 +690,7 @@ function ConsultRoom() {
       <EhrPanel open={ehrOpen} onClose={() => setEhrOpen(false)} loading={ehrLoading} data={ehrData} fhirLoading={fhirLoading} fhirData={fhirData} />
 
       {/* ── Top call bar ── */}
-      <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-3 md:gap-4 px-3 md:px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <p className="text-[#24292e] text-xs font-semibold truncate">[Internal] Calling · {patientName}</p>
           <span className="text-gray-300 hidden sm:block">|</span>
@@ -701,7 +701,7 @@ function ConsultRoom() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <div className="md:ml-auto flex flex-wrap items-center gap-2">
           {inviteStatus === "waiting" && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-600 text-[10px] font-semibold animate-pulse">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -758,15 +758,15 @@ function ConsultRoom() {
       </div>
 
       {/* ── Main body ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col xl:flex-row flex-1 overflow-y-auto xl:overflow-hidden">
 
         {/* ── Left: Video only (fills full height) ── */}
-        <div className="flex flex-col" style={{ width: "560px", flexShrink: 0 }}>
+        <div className="flex flex-col w-full xl:w-[560px] xl:flex-shrink-0">
 
           {/* Video area — fills remaining height */}
           <div
             ref={videoContainerRef}
-            className="relative bg-[#1a2035] overflow-hidden flex-1"
+            className="relative bg-[#1a2035] overflow-hidden flex-1 min-h-[360px] xl:min-h-0"
           >
             {/* Remote participants */}
             {remoteTiles.length === 0 ? (
@@ -1027,7 +1027,7 @@ function ConsultRoom() {
                     <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
-                  <div className="px-6 py-4 flex flex-col gap-5">
+                  <div className="px-4 md:px-6 py-4 flex flex-col gap-5">
                     <IntakePlan
                       sections={emrSections}
                       onChange={setEmrSections}
@@ -1037,7 +1037,7 @@ function ConsultRoom() {
                       onVisitInfoChange={setVisitInfo}
                       onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <AddMedicines medicines={medicines} onChange={setMedicines} />
                       <AddLabs labs={labs} onChange={setLabs} />
                     </div>

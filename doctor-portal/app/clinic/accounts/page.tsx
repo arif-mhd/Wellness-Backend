@@ -186,9 +186,9 @@ export default function ClinicAccountsPage() {
   const filteredStaff = q ? staff.filter((s) => s.fullName.toLowerCase().includes(q)) : staff;
 
   return (
-    <div className="flex h-full w-full font-sans select-none px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="flex flex-col lg:flex-row h-full w-full font-sans select-none px-4 md:px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
       {/* Left */}
-      <div className="flex-1 flex flex-col min-w-0 pr-8">
+      <div className="flex-1 flex flex-col min-w-0 lg:pr-8">
         <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px] mb-6">
           User roles
         </h1>
@@ -337,8 +337,8 @@ export default function ClinicAccountsPage() {
       </div>
 
       {/* Right: Access panel */}
-      <div className="w-[420px] shrink-0">
-        <div className="bg-[#EEF0FC] rounded-[24px] p-7 shadow-sm flex flex-col gap-6 sticky top-4">
+      <div className="w-full lg:w-[420px] lg:shrink-0 mt-6 lg:mt-0">
+        <div className="bg-[#EEF0FC] rounded-[24px] p-5 md:p-7 shadow-sm flex flex-col gap-6 lg:sticky lg:top-4">
           {!selected ? (
             <p className="text-[#838B95] text-sm text-center py-16">Select a branch, doctor, or staff account to manage access.</p>
           ) : (

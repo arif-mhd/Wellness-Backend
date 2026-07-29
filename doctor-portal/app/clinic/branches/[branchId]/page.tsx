@@ -393,7 +393,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
   const isAvailable = branch.isOnline !== false;
 
   return (
-    <div className="px-8 py-8" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 md:px-8 py-8" style={{ fontFamily: "Outfit, sans-serif" }}>
       <div className="flex items-center gap-3 mb-6">
         <Link
           href="/clinic/branches"
@@ -410,7 +410,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
       </div>
 
       {branch.status === "details_pending" && (
-        <div className="flex items-center justify-between gap-4 bg-[#EEF2FF] border border-[#D6DEFF] rounded-xl px-5 py-4 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-[#EEF2FF] border border-[#D6DEFF] rounded-xl px-5 py-4 mb-6">
           <div className="flex flex-col">
             <span className="text-[#24292E] text-[13px] font-semibold">Your branch request was approved</span>
             <span className="text-[#676E76] text-[12px]">Complete this branch's company profile and schedule to send it for final approval.</span>

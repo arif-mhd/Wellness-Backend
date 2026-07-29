@@ -76,11 +76,11 @@ export default function PaymentsPage() {
     <div className="flex flex-col gap-6 font-outfit select-none">
       {/* ── Earnings Summary Section ─────────────────────────────────── */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[#383F45] font-medium text-[20px] tracking-[-0.4px]">
             Earnings Summary
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button className="px-4 py-2.5 bg-[#E8EEFF]/80 text-[#182A6F] text-[12px] font-medium rounded-[12px] hover:bg-[#D5E1FF] transition-all">
               View Transaction History
             </button>
@@ -91,7 +91,7 @@ export default function PaymentsPage() {
         </div>
 
         {/* Stat cards */}
-        <div className="flex gap-6">
+        <div className="flex flex-col sm:flex-row gap-6">
           {[
             { label: "Earnings this month", value: "AED 6,000.00" },
             { label: "Total Earnings",      value: "AED 60,000.00" },
@@ -109,7 +109,7 @@ export default function PaymentsPage() {
 
       {/* ── Payment Methods Section ───────────────────────────────────── */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[#383F45] font-medium text-[20px] tracking-[-0.4px]">
             Payment Methods
           </h2>

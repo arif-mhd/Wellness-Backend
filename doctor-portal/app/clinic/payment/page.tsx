@@ -94,7 +94,7 @@ export default function ClinicPaymentPage() {
   };
 
   return (
-    <div className="px-8 py-8 w-full" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 md:px-8 py-8 w-full" style={{ fontFamily: "Outfit, sans-serif" }}>
       <h1 className="text-[#383F45] font-medium text-[24px] leading-[1.23] tracking-[-0.72px] mb-6">
         Payments
       </h1>
@@ -231,14 +231,14 @@ export default function ClinicPaymentPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-[#EBEEF5] shadow-sm overflow-hidden">
-          <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-4 px-6 py-3 border-b border-[#EBEEF5] text-[11px] font-semibold text-[#9EA5AD] uppercase tracking-wide">
+          <div className="hidden md:grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-4 px-6 py-3 border-b border-[#EBEEF5] text-[11px] font-semibold text-[#9EA5AD] uppercase tracking-wide">
             <span>Name</span>
             <span>Diagnosis</span>
             <span>Date and Time</span>
             <span className="text-right">Earnings</span>
           </div>
           {MOCK_HISTORY.map((row) => (
-            <div key={row.id} className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-4 px-6 py-4 border-b border-[#EBEEF5] last:border-0 items-center hover:bg-gray-50 transition-colors">
+            <div key={row.id} className="flex flex-col md:grid md:grid-cols-[2fr_2fr_1.2fr_1fr] gap-2 md:gap-4 px-6 py-4 border-b border-[#EBEEF5] last:border-0 md:items-center hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar name={row.name} />
                 <div className="flex flex-col min-w-0">
@@ -253,7 +253,7 @@ export default function ClinicPaymentPage() {
                 <span className="text-[11px] text-[#9EA5AD] truncate">{row.note}</span>
               </div>
               <span className="text-[12px] text-[#676E76]">{row.date}</span>
-              <span className="text-[13px] font-semibold text-[#24292E] text-right">AED {row.earning.toFixed(2)}</span>
+              <span className="text-[13px] font-semibold text-[#24292E] md:text-right">AED {row.earning.toFixed(2)}</span>
             </div>
           ))}
         </div>
@@ -262,7 +262,7 @@ export default function ClinicPaymentPage() {
       {/* ── Edit Consultation Fee modal ─────────────────────────────────── */}
       {showEditFee && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#24292E]/40 backdrop-blur-sm p-4">
-          <div className="bg-[#F7F9FC] rounded-[24px] w-[420px] p-8 shadow-2xl border border-[#EBEEF5] relative">
+          <div className="bg-[#F7F9FC] rounded-[24px] w-full max-w-[420px] p-8 shadow-2xl border border-[#EBEEF5] relative">
             <button onClick={() => setShowEditFee(false)} className="absolute top-6 right-6 text-[#676E76] hover:text-black transition-colors" aria-label="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
@@ -301,7 +301,7 @@ export default function ClinicPaymentPage() {
       {/* ── Withdraw Amount modal ────────────────────────────────────────── */}
       {showWithdraw && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#24292E]/40 backdrop-blur-sm p-4">
-          <div className="bg-[#F7F9FC] rounded-[24px] w-[420px] p-8 shadow-2xl border border-[#EBEEF5] relative">
+          <div className="bg-[#F7F9FC] rounded-[24px] w-full max-w-[420px] p-8 shadow-2xl border border-[#EBEEF5] relative">
             <button onClick={() => setShowWithdraw(false)} className="absolute top-6 right-6 text-[#676E76] hover:text-black transition-colors" aria-label="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
@@ -348,7 +348,7 @@ export default function ClinicPaymentPage() {
       {/* ── Confirm OTP modal ───────────────────────────────────────────── */}
       {showOtp && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#24292E]/40 backdrop-blur-sm p-4">
-          <div className="bg-[#F7F9FC] rounded-[24px] w-[380px] p-8 shadow-2xl border border-[#EBEEF5] relative text-center">
+          <div className="bg-[#F7F9FC] rounded-[24px] w-full max-w-[380px] p-8 shadow-2xl border border-[#EBEEF5] relative text-center">
             <button onClick={() => setShowOtp(false)} className="absolute top-6 right-6 text-[#676E76] hover:text-black transition-colors" aria-label="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
