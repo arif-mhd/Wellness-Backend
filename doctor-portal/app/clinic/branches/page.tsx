@@ -103,8 +103,6 @@ export default function ClinicBranchesPage() {
   });
 
   const goToDash = (b: Branch) => {
-    // Main branch is always reachable — it's the owner's own account, no
-    // separate senior-staff login is required the way real branches need one.
     if (b.isMain) { router.push("/clinic"); return; }
     if (b.userCount > 0) router.push(`/clinic?branchId=${b.id}`);
     else router.push(`/clinic/branches/${b.id}`);
@@ -138,124 +136,208 @@ export default function ClinicBranchesPage() {
   };
 
   return (
-    <div className="px-8 pb-12 select-none" style={{ fontFamily: "Outfit, sans-serif" }}>
-      <div className="flex items-center justify-between gap-4 mb-6 mt-2">
-        <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">Your Branches</h1>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search all"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-60 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
-          />
-          <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        {/* Left: branches table */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 flex flex-col gap-1">
-          {loading ? (
-            <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
-          ) : filteredBranches.length === 0 ? (
-            <div className="text-center text-sm text-[#A0A8B0] py-12">No branches yet — request one to get started.</div>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <div style={{ minWidth: "720px" }}>
-                {/* Header */}
-                <div className="flex items-center px-3 py-2 text-[10px] font-medium text-[#676E76] border-b border-[#EBEEF5] uppercase tracking-wide">
-                  <div className="w-[210px] shrink-0">Name</div>
-                  <div className="flex-1 min-w-[130px]">Location</div>
-                  <div className="w-[120px] shrink-0">Manager/User</div>
-                  <div className="w-[130px] shrink-0">Time</div>
-                  <div className="w-[90px] shrink-0">Status</div>
-                  <div className="w-[70px] shrink-0 text-center">No. of Appts</div>
-                  <div className="w-[110px] shrink-0" />
-                </div>
-
-                <div className="flex flex-col gap-2 mt-3">
-                  {filteredBranches.map((b) => {
-                    const idx = branches.findIndex((x) => x.id === b.id);
-                    const isSelected = selectedId === b.id;
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={() => setSelectedId(b.id)}
-                        className={`flex items-center px-3 py-3 rounded-xl border transition-all cursor-pointer ${
-                          isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
-                        }`}
-                      >
-                        <div className="w-[210px] shrink-0 flex items-center gap-3 pr-2">
-                          <Avatar name={b.name} idx={idx} />
-                          <span className="text-[#24292E] text-[13px] font-medium truncate">{b.name}</span>
-                        </div>
-                        <div className="flex-1 min-w-[130px] pr-2">
-                          <span className="text-[#676E76] text-[12px] truncate block">{b.address}</span>
-                        </div>
-                        <div className="w-[120px] shrink-0 pr-2">
-                          <span className="text-[#24292E] text-[12px] truncate block">
-                            {b.firstUser?.fullName ?? (b.isMain ? "You (Owner)" : "Unassigned")}
-                          </span>
-                        </div>
-                        <div className="w-[130px] shrink-0 pr-2">
-                          <span className="text-[#5476FC] text-[12px] font-medium truncate block">{b.status === "active" ? b.todayHours : "—"}</span>
-                        </div>
-                        <div className="w-[90px] shrink-0">
-                          <span className={`text-[12px] font-medium ${STATUS_COLOR[b.status]}`}>
-                            {b.status === "active" ? (b.isOnline !== false ? "Online" : "Offline") : STATUS_LABEL[b.status]}
-                          </span>
-                        </div>
-                        <div className="w-[70px] shrink-0 text-center text-[#24292E] text-[13px] font-medium">
-                          {b.status === "active" ? b.consultationsToday : "—"}
-                        </div>
-                        <div className="w-[110px] shrink-0 flex justify-end">
-                          {b.status === "active" && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); goToDash(b); }}
-                              className="h-[30px] px-3 rounded-lg font-medium text-[11px] bg-[#1E293B] text-white hover:bg-[#0f172a] transition-colors whitespace-nowrap"
-                            >
-                              {b.isMain || b.userCount > 0 ? "View Dash" : "Add Account"}
-                            </button>
-                          )}
-                          {b.status === "details_pending" && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); router.push(`/clinic/branches/${b.id}/complete-setup`); }}
-                              className="h-[30px] px-3 rounded-lg font-medium text-[11px] bg-[#5476FC] text-white hover:bg-[#3B59E3] transition-colors whitespace-nowrap"
-                            >
-                              Complete Setup
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+    <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
+        {/* ── Left: Main Content ───────────────────────────── */}
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Your Branches</h1>
+            <div className="relative w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full sm:w-60 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+              />
+              <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             </div>
-          )}
+          </div>
+
+          {/* Table */}
+          <div className="w-full">
+            <div className="w-full">
+              {loading ? (
+                <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
+              ) : filteredBranches.length === 0 ? (
+                <div className="text-center text-sm text-[#A0A8B0] py-12">No branches yet — request one to get started.</div>
+              ) : (
+                <>
+                  {/* Grid header — hidden below xl */}
+                  <div
+                    className="hidden xl:grid items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]"
+                    style={{ gridTemplateColumns: "2fr 1.5fr 1.2fr 1fr 0.8fr 1fr 1.1fr", gap: "12px" }}
+                  >
+                    <div className="text-left pl-[44px]">Name</div>
+                    <div className="text-left">Location</div>
+                    <div className="text-left">Manager/User</div>
+                    <div className="text-center">Time</div>
+                    <div className="text-center">Status</div>
+                    <div className="text-center">No. of Appointments</div>
+                    <div></div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 mt-4">
+                    {filteredBranches.map((b) => {
+                      const idx = branches.findIndex((x) => x.id === b.id);
+                      const isSelected = selectedId === b.id;
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => setSelectedId(b.id)}
+                          className={`rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+                            }`}
+                        >
+                          {/* Desktop: grid row matching header */}
+                          <div
+                            className="hidden xl:grid items-center px-4 py-3"
+                            style={{ gridTemplateColumns: "2fr 1.5fr 1.2fr 1fr 0.8fr 1fr 1.1fr", gap: "12px" }}
+                          >
+                            {/* Name */}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar name={b.name} idx={idx} size="w-9 h-9 text-sm" />
+                              <span className="text-[#24292E] text-[13px] font-medium truncate">{b.name}</span>
+                            </div>
+                            {/* Location */}
+                            <div className="flex items-center min-w-0">
+                              <span className="text-[#676E76] text-[12px] truncate">{b.address}</span>
+                            </div>
+                            {/* Manager */}
+                            <div className="flex items-center min-w-0">
+                              <span className="text-[#24292E] text-[12px] truncate">
+                                {b.firstUser?.fullName ?? (b.isMain ? "You (Owner)" : "Unassigned")}
+                              </span>
+                            </div>
+                            {/* Time */}
+                            <div className="flex justify-center min-w-0">
+                              <span className="text-[#5476FC] text-[12px] font-medium truncate">
+                                {b.status === "active" ? b.todayHours : "—"}
+                              </span>
+                            </div>
+                            {/* Status */}
+                            <div className="flex justify-center min-w-0">
+                              <span className={`text-[12px] font-medium whitespace-nowrap ${STATUS_COLOR[b.status]}`}>
+                                {b.status === "active" ? (b.isOnline !== false ? "Online" : "Offline") : STATUS_LABEL[b.status]}
+                              </span>
+                            </div>
+                            {/* No. of Appointments */}
+                            <div className="flex justify-center min-w-0">
+                              <span className="text-[#24292E] text-[13px] font-medium">
+                                {b.status === "active" ? b.consultationsToday : "—"}
+                              </span>
+                            </div>
+                            {/* Action */}
+                            <div className="flex justify-end pr-2">
+                              {b.status === "active" && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); goToDash(b); }}
+                                  className="w-[90px] h-[30px] rounded-xl font-medium text-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
+                                >
+                                  {b.isMain || b.userCount > 0 ? "Dashboard" : "Add Account"}
+                                </button>
+                              )}
+                              {b.status === "details_pending" && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/clinic/branches/${b.id}/complete-setup`); }}
+                                  className="w-[90px] h-[30px] rounded-xl font-medium text-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
+                                >
+                                  Complete Setup
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Mobile: stacked card layout */}
+                          <div className="xl:hidden px-4 py-3 flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                              <Avatar name={b.name} idx={idx} size="w-9 h-9 text-sm" />
+                              <span className="text-[#24292E] text-[13px] font-medium">{b.name}</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 pt-3 border-t border-gray-100">
+                              <div className="flex flex-col">
+                                <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Location</span>
+                                <span className="text-[#676E76] text-[12px] truncate">{b.address}</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Manager</span>
+                                <span className="text-[#24292E] text-[12px] truncate">
+                                  {b.firstUser?.fullName ?? (b.isMain ? "You (Owner)" : "Unassigned")}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time</span>
+                                <span className="text-[#5476FC] text-[12px] font-medium">
+                                  {b.status === "active" ? b.todayHours : "—"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
+                                <span className={`text-[12px] font-medium ${STATUS_COLOR[b.status]}`}>
+                                  {b.status === "active" ? (b.isOnline !== false ? "Online" : "Offline") : STATUS_LABEL[b.status]}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">No. of Appointments</span>
+                                <span className="text-[#24292E] text-[13px] font-medium">
+                                  {b.status === "active" ? b.consultationsToday : "—"}
+                                </span>
+                              </div>
+                            </div>
+                            {(b.status === "active" || b.status === "details_pending") && (
+                              <div className="pt-2">
+                                {b.status === "active" && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); goToDash(b); }}
+                                    className="h-[30px] px-4 rounded-xl font-medium text-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] transition-all"
+                                  >
+                                    {b.isMain || b.userCount > 0 ? "Dashboard" : "Add Account"}
+                                  </button>
+                                )}
+                                {b.status === "details_pending" && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); router.push(`/clinic/branches/${b.id}/complete-setup`); }}
+                                    className="h-[30px] px-4 rounded-xl font-medium text-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white hover:shadow-[0_4px_12px_rgba(84,118,252,0.4)] transition-all"
+                                  >
+                                    Complete Setup
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
           <button
             onClick={() => { setShowAddModal(true); setAddSuccess(false); setAddError(""); }}
-            className="self-start mt-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="self-start mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             Add Branch Request
           </button>
         </div>
 
-        {/* Right: Branch Details panel */}
+        {/* ── Right: Branch Details panel ──────────────── */}
         {selected && (
-          <div className="bg-white rounded-xl p-6 border border-[#E4E8F0] shadow-sm flex flex-col gap-5">
-            <h2 className="text-[#24292E] text-[15px] font-bold">Branch Details</h2>
+          <div className="w-full xl:w-[300px] bg-white rounded-2xl p-5 flex flex-col gap-4 shrink-0 border border-[#E4E8F0] shadow-sm">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Branch Details</h2>
+            <div className="h-px bg-[#EBEEF5]" />
 
             <div className="flex items-center gap-3">
-              <Avatar name={selected.name} idx={selectedIdx} size="w-14 h-14" />
+              <Avatar name={selected.name} idx={selectedIdx} size="w-11 h-11 text-sm" />
               <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[15px] font-semibold truncate">{selected.name}</span>
-                <span className="text-[#A0A8B0] text-[12px] truncate">{selected.address}</span>
-                <span className="text-[#A0A8B0] text-[11px]">ID: {selected.id}</span>
+                <span className="text-[#24292E] text-[13px] font-semibold truncate">{selected.name}</span>
+                <span className="text-[#9EA5AD] text-[11px] truncate">{selected.address}</span>
               </div>
             </div>
+
+            <p className="text-[#9EA5AD] text-[11px] text-center">
+              ID: {selected.id}
+            </p>
 
             {selected.bio && (
               <p className="text-[#676E76] text-[12px] leading-relaxed">{selected.bio}</p>
@@ -264,21 +346,21 @@ export default function ClinicBranchesPage() {
             <div className="h-px bg-[#EBEEF5]" />
 
             <div className="flex flex-col gap-2">
-              <span className="text-[#676E76] text-[12px] font-semibold">Users</span>
+              <span className="text-[#24292E] text-[12px] font-semibold">Users</span>
               {selected.userCount === 0 ? (
-                <span className="text-[#A0A8B0] text-[12px]">
+                <span className="text-[#9EA5AD] text-[11px]">
                   {selected.isMain ? "You manage this branch directly — add a senior staff account if needed." : "No users assigned yet."}
                 </span>
               ) : (
                 <div className="flex items-center gap-2">
                   {selected.firstUser && (
                     <div className="flex items-center gap-2">
-                      <Avatar name={selected.firstUser.fullName} idx={selectedIdx} size="w-7 h-7" />
+                      <Avatar name={selected.firstUser.fullName} idx={selectedIdx} size="w-7 h-7 text-[11px]" />
                       <span className="text-[#24292E] text-[12px]">{selected.firstUser.fullName}</span>
                     </div>
                   )}
                   {selected.userCount > 1 && (
-                    <span className="text-[#A0A8B0] text-[11px]">+{selected.userCount - 1} more</span>
+                    <span className="text-[#9EA5AD] text-[11px]">+{selected.userCount - 1} more</span>
                   )}
                 </div>
               )}
@@ -287,21 +369,21 @@ export default function ClinicBranchesPage() {
             <div className="h-px bg-[#EBEEF5]" />
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-[#676E76] text-[12px] font-semibold">Timing</span>
-              <span className="text-[#24292E] text-[12px]">Today: {selected.status === "active" ? selected.todayHours : "—"}</span>
+              <span className="text-[#24292E] text-[12px] font-semibold">Timing</span>
+              <span className="text-[#676E76] text-[11px]">Today: {selected.status === "active" ? selected.todayHours : "—"}</span>
             </div>
 
             <div className="h-px bg-[#EBEEF5]" />
 
             <div className="flex items-center justify-between">
-              <span className="text-[#676E76] text-[12px] font-semibold">Appointments Today</span>
-              <span className="text-[#5476FC] text-[16px] font-semibold">{selected.status === "active" ? selected.consultationsToday : "—"}</span>
+              <span className="text-[#24292E] text-[12px] font-semibold">Appointments Today</span>
+              <span className="text-[#5476FC] text-[15px] font-semibold">{selected.status === "active" ? selected.consultationsToday : "—"}</span>
             </div>
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[#24292E] text-[13px] font-semibold">Patients</span>
-                <span className="text-[#707070] text-[11px]">Last 8 Days</span>
+                <span className="text-[#24292E] text-[12px] font-semibold">Patients</span>
+                <span className="text-[#9EA5AD] text-[11px]">Last 8 Days</span>
               </div>
               <MiniTrendChart data={selected.patientsTrend ?? []} height={110} />
             </div>
@@ -309,19 +391,19 @@ export default function ClinicBranchesPage() {
             {selected.status === "active" ? (
               <button
                 onClick={() => router.push(`/clinic/branches/${selected.id}`)}
-                className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all"
+                className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 View Profile
               </button>
             ) : selected.status === "details_pending" ? (
               <button
                 onClick={() => router.push(`/clinic/branches/${selected.id}/complete-setup`)}
-                className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all"
+                className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 Complete Setup
               </button>
             ) : (
-              <p className="text-[12px] text-[#A0A8B0] text-center py-1">
+              <p className="text-[11px] text-[#9EA5AD] text-center mt-2">
                 {selected.status === "requested" && "Awaiting platform admin review."}
                 {selected.status === "pending_approval" && "Details submitted — awaiting final approval."}
                 {selected.status === "rejected" && "This branch request was rejected."}

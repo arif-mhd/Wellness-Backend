@@ -184,9 +184,9 @@ function PatientsListContent() {
           <div className="md:w-[200px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Summary</span><span className="text-[#676E76] text-[12px] block md:text-center text-left truncate" title={p.summary}>{p.summary}</span></div>
 
           {/* Last Consult */}
-          <div className="md:w-[120px] shrink-0 flex flex-col md:items-center justify-start">
-            <span className="text-[#9EA5AD] md:text-[#676E76] text-[10px] md:text-[12px] uppercase md:normal-case font-semibold md:font-normal tracking-wider md:tracking-normal mb-0.5 md:mb-0 md:block md:text-center">Last Consult</span>
-            <span className="text-[#24292E] text-[12px] font-medium">{formatDate(p.lastConsult)}</span>
+          <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
+            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Last Consult</span>
+            <span className="text-[#24292E] text-[12px] font-medium block md:text-center text-left">{formatDate(p.lastConsult)}</span>
           </div>
 
           {/* Actions */}

@@ -104,8 +104,6 @@ function toLocalInputValue(iso: string) {
   return clean.slice(0, 16);
 }
 
-
-
 interface BranchOption { id: string; name: string; status: string; }
 
 function ClinicAppointmentsContent() {
@@ -113,9 +111,6 @@ function ClinicAppointmentsContent() {
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
-  // Deep link from Schedules > Appointments (Reschedule/View buttons there
-  // route here with the specific appointment pre-selected) instead of
-  // duplicating a reschedule flow on that page.
   const apptIdParam = searchParams.get("apptId");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -125,6 +120,8 @@ function ClinicAppointmentsContent() {
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
   const [showPreVisitModal, setShowPreVisitModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleValue, setRescheduleValue] = useState("");
@@ -135,10 +132,6 @@ function ClinicAppointmentsContent() {
   const { can } = useClinicPermissions();
   const canManage = can("manage_appointments");
 
-  // Every org owner's own account is at least its own main branch, so this
-  // always succeeds with >= 1 entry for them (empty/403 for a branch-user
-  // login, who doesn't need the switcher anyway). The switcher itself only
-  // makes sense once there's more than just the one main branch to pick.
   useEffect(() => {
     apiFetch("/api/clinics/branches")
       .then((r) => r.json())
@@ -202,14 +195,20 @@ function ClinicAppointmentsContent() {
   const newAppts = useMemo(() => filtered.filter(isActiveNow), [filtered]);
   const allAppts = filtered;
 
+  const totalPages = Math.max(1, Math.ceil(allAppts.length / ITEMS_PER_PAGE));
+  const paginatedAllAppts = allAppts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [activeTab, activeMode, timeFilter, searchQuery]);
+
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? filtered[0] ?? null;
 
   useEffect(() => {
     if (!selectedId && filtered.length > 0) setSelectedId(filtered[0].id);
   }, [filtered, selectedId]);
 
-  // A deep-linked apptId wins over the "first in the filtered list" default,
-  // once that appointment has actually loaded.
   useEffect(() => {
     if (apptIdParam && appointments.some((a) => a.id === apptIdParam)) {
       setSelectedId(apptIdParam);
@@ -265,47 +264,85 @@ function ClinicAppointmentsContent() {
     return (
       <div
         onClick={() => setSelectedId(appt.id)}
-        className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
+        className={`rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
-        {/* Name */}
-        <div className="w-full md:w-[215px] shrink-0 flex items-center gap-2 pr-3">
-          <Avatar name={appt.patientName} size="w-9 h-9 text-sm" />
-          <div className="flex flex-col min-w-0">
-            <span className="text-[#24292E] text-[13px] font-medium truncate">{appt.patientName}</span>
-            <span className="text-[#A0A8B0] text-[11px] truncate">{appt.patientEmail}</span>
-          </div>
-        </div>
-        
-        {/* Mobile grid wrapper / Desktop flex wrapper */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
-          {/* Age */}
-          <div className="md:w-[38px] shrink-0 text-[#24292E] text-[13px] flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span><span>{appt.patientAge ?? "—"}</span></div>
-          {/* Reason */}
-          <div className="md:w-[100px] shrink-0 text-[#24292E] text-[13px] truncate md:pr-3 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span><span>{appt.reason}</span></div>
-          {/* Dept */}
-          <div className="md:w-[100px] shrink-0 text-[#24292E] text-[13px] truncate md:pr-3 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span><span>{appt.doctorSpecialty}</span></div>
-          {/* Diagnosis / Time */}
-          <div className="md:w-[160px] shrink-0 flex flex-col md:block md:pr-3 justify-start">
-            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time/Diag</span>
-            <div className="flex flex-col text-left">
-              <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
-              <span className="text-[#676E76] text-[11px]">
-                {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              </span>
+        {/* Desktop grid layout */}
+        <div
+          className="hidden md:grid items-center px-4 py-3"
+          style={{ gridTemplateColumns: "2.5fr 0.5fr 1.2fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
+        >
+          {/* Name */}
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <Avatar name={appt.patientName} size="w-9 h-9 text-sm" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#24292E] text-[13px] font-medium truncate">{appt.patientName}</span>
+              <span className="text-[#A0A8B0] text-[11px] truncate">{appt.patientEmail}</span>
             </div>
           </div>
+          {/* Age */}
+          <div className="text-[#24292E] text-[13px]">{appt.patientAge ?? "—"}</div>
+          {/* Reason */}
+          <div className="text-[#24292E] text-[13px] truncate pr-2">{appt.reason}</div>
+          {/* Dept */}
+          <div className="text-[#24292E] text-[13px] truncate pr-2">{appt.doctorSpecialty}</div>
+          {/* Time/Diag */}
+          <div className="flex flex-col text-left min-w-0 pr-2">
+            <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
+            <span className="text-[#676E76] text-[11px]">
+              {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            </span>
+          </div>
           {/* Status */}
-          <div className="md:w-[82px] shrink-0 flex flex-col md:block justify-start">
-            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
-            <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
+          <div className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>
+            {statusLabel(appt)}
           </div>
           {/* Doctor */}
-          <div className="md:w-[125px] shrink-0 flex flex-col md:flex-row items-start md:items-center justify-start gap-1 md:gap-1.5">
-            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Doctor</span>
-            <div className="flex items-center gap-1.5">
-              <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
-              <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Avatar name={appt.doctorName} size="w-7 h-7 text-[11px]" />
+            <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
+          </div>
+        </div>
+
+        {/* Mobile stacked layout */}
+        <div className="md:hidden flex flex-col px-4 py-3 gap-3">
+          <div className="flex items-center gap-2">
+            <Avatar name={appt.patientName} size="w-9 h-9 text-sm" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#24292E] text-[13px] font-medium truncate">{appt.patientName}</span>
+              <span className="text-[#A0A8B0] text-[11px] truncate">{appt.patientEmail}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2 pt-3 border-t border-gray-100">
+            <div className="flex flex-col">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span>
+              <span className="text-[#24292E] text-[13px]">{appt.patientAge ?? "—"}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
+              <span className="text-[#24292E] text-[13px] truncate">{appt.reason}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span>
+              <span className="text-[#24292E] text-[13px] truncate">{appt.doctorSpecialty}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time/Diag</span>
+              <div className="flex flex-col text-left">
+                <span className="text-[#24292E] text-[12px] font-medium truncate">{appt.primaryDiagnosis}</span>
+                <span className="text-[#676E76] text-[11px]">{dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              </div>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
+              <span className={`text-[12px] font-medium whitespace-nowrap ${statusColor(appt)}`}>{statusLabel(appt)}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Doctor</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Avatar name={appt.doctorName} size="w-5 h-5 text-[9px]" />
+                <span className="text-[#24292E] text-[12px] truncate">{appt.doctorName}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -400,14 +437,17 @@ function ClinicAppointmentsContent() {
             <div className="w-full">
 
               {/* Table Header */}
-              <div className="hidden md:flex items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]">
-                <div className="w-[215px] shrink-0">Name</div>
-                <div className="w-[38px] shrink-0">Age</div>
-                <div className="w-[100px] shrink-0">Reason For Visit</div>
-                <div className="w-[100px] shrink-0">Department</div>
-                <div className="w-[160px] shrink-0">Primary Diagnosis</div>
-                <div className="w-[82px] shrink-0">Status</div>
-                <div className="w-[125px] shrink-0">Doctor</div>
+              <div
+                className="hidden md:grid items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]"
+                style={{ gridTemplateColumns: "2.5fr 0.5fr 1.2fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
+              >
+                <div className="text-left pl-[44px]">Name</div>
+                <div className="text-left">Age</div>
+                <div className="text-left">Reason For Visit</div>
+                <div className="text-left">Department</div>
+                <div className="text-left">Primary Diagnosis</div>
+                <div className="text-left">Status</div>
+                <div className="text-left pl-[34px]">Doctor</div>
               </div>
 
               {loading ? (
@@ -431,8 +471,50 @@ function ClinicAppointmentsContent() {
                   {/* All */}
                   <h2 className="text-[#24292E] text-sm font-bold mb-2">All</h2>
                   <div className="flex flex-col gap-2">
-                    {allAppts.map(appt => <AppointmentRow key={appt.id} appt={appt} />)}
+                    {paginatedAllAppts.map(appt => <AppointmentRow key={appt.id} appt={appt} />)}
                   </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-5">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                      >
+                        <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                          <path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => {
+                        const isSelected = currentPage === pg;
+                        return (
+                          <button
+                            key={pg}
+                            onClick={() => setCurrentPage(pg)}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected
+                                ? "bg-[#5476FC] text-white shadow-sm"
+                                : "text-[#9EA5AD] hover:text-[#5476FC]"
+                              }`}
+                            style={{ fontFamily: "Outfit, sans-serif" }}
+                          >
+                            {pg}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                      >
+                        <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+                          <path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 

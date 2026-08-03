@@ -64,6 +64,8 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     const query = new URLSearchParams();
@@ -169,67 +171,126 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
             </div>
 
             {/* Consultations List */}
-            {activeTab === "Past Consultations" && (
-              <div className="flex flex-col gap-3 pb-8">
-                {consultations.length === 0 ? (
-                  <div className="text-center text-sm text-[#A0A8B0] py-8">No consultations with your clinic yet.</div>
-                ) : (
-                  consultations.map((consult) => {
-                    const dateObj = new Date(consult.scheduledAt);
-                    return (
-                      <div key={consult.id} className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm">
-
-                        {/* Doctor Avatar + Name */}
-                        <div className="w-full md:w-[200px] flex shrink-0 items-center gap-4">
-                          <AvatarPlaceholder name={consult.doctorName} size="w-8 h-8" />
-                          <span className="text-[#24292E] text-[13px] font-medium truncate">{consult.doctorName}</span>
+            {activeTab === "Past Consultations" && (() => {
+              const totalPages = Math.max(1, Math.ceil(consultations.length / ITEMS_PER_PAGE));
+              const paginated = consultations.slice(
+                (currentPage - 1) * ITEMS_PER_PAGE,
+                currentPage * ITEMS_PER_PAGE
+              );
+              return (
+                <div className="flex flex-col gap-3 pb-8">
+                  {consultations.length === 0 ? (
+                    <div className="text-center text-sm text-[#A0A8B0] py-8">No consultations with your clinic yet.</div>
+                  ) : (
+                    <>
+                      {/* Table Header — desktop only */}
+                      <div className="hidden md:flex flex-row items-center px-5 py-2 text-[13px] font-semibold text-[#9EA5AD] border-b border-[#EBEEF5]">
+                        <div className="w-[200px] shrink-0">Doctor</div>
+                        <div className="md:flex md:flex-row w-full">
+                          <div className="md:w-[80px] shrink-0 text-center">Age</div>
+                          <div className="md:w-[120px] shrink-0 text-center">Reason</div>
+                          <div className="md:flex-1 md:min-w-[120px] shrink-0 text-center">Department</div>
+                          <div className="md:w-[140px] shrink-0 text-center">Time &amp; Date</div>
+                          <div className="md:w-[100px] shrink-0 text-center">Status</div>
                         </div>
-
-                        {/* Mobile grid wrapper / Desktop flex wrapper */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
-                          {/* Age */}
-                          <div className="md:w-[80px] shrink-0 flex flex-col md:block justify-start">
-                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span>
-                            <span className="text-[#24292E] text-[13px] font-medium md:text-center block text-left">{consult.age ?? "—"}</span>
-                          </div>
-
-                          {/* Reason */}
-                          <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
-                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
-                            <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.reason}</span>
-                          </div>
-
-                          {/* Department */}
-                          <div className="md:flex-1 md:min-w-[120px] shrink-0 flex flex-col md:block justify-start">
-                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span>
-                            <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.doctorSpecialty}</span>
-                          </div>
-
-                          {/* Time / Date */}
-                          <div className="md:w-[140px] shrink-0 flex flex-col md:items-center justify-start">
-                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time</span>
-                            <div className="flex items-center gap-1">
-                              <span className="hidden md:inline text-[#24292E] text-[12px]">Time -</span>
-                              <span className="text-[#5476FC] text-[12px] font-bold">{dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-                            </div>
-                            <span className="text-[#676E76] text-[11px] mt-0.5 block md:text-center text-left">{dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
-                          </div>
-
-                          {/* Status */}
-                          <div className="md:w-[100px] shrink-0 flex flex-col md:block justify-start">
-                            <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
-                            <span className={`text-[12px] font-medium block md:text-center text-left ${STATUS_COLOR[consult.status] ?? "text-[#676E76]"}`}>
-                              {STATUS_LABEL[consult.status] ?? consult.status}
-                            </span>
-                          </div>
-                        </div>
-
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
+
+                      {paginated.map((consult) => {
+                        const dateObj = new Date(consult.scheduledAt);
+                        return (
+                          <div key={consult.id} className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm hover:border-[#8AA0FF] transition-all">
+
+                            {/* Doctor Avatar + Name */}
+                            <div className="w-full md:w-[200px] flex shrink-0 items-center gap-4">
+                              <AvatarPlaceholder name={consult.doctorName} size="w-8 h-8" />
+                              <span className="text-[#24292E] text-[13px] font-medium truncate">{consult.doctorName}</span>
+                            </div>
+
+                            {/* Mobile grid wrapper / Desktop flex wrapper */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row w-full gap-y-4 gap-x-2 md:gap-0 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-0 border-gray-100">
+                              {/* Age */}
+                              <div className="md:w-[80px] shrink-0 flex flex-col md:block justify-start">
+                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span>
+                                <span className="text-[#24292E] text-[13px] font-medium md:text-center block text-left">{consult.age ?? "—"}</span>
+                              </div>
+
+                              {/* Reason */}
+                              <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
+                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
+                                <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.reason}</span>
+                              </div>
+
+                              {/* Department */}
+                              <div className="md:flex-1 md:min-w-[120px] shrink-0 flex flex-col md:block justify-start">
+                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Department</span>
+                                <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.doctorSpecialty}</span>
+                              </div>
+
+                              {/* Time / Date */}
+                              <div className="md:w-[140px] shrink-0 flex flex-col md:items-center justify-start">
+                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time &amp; Date</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="hidden md:inline text-[#24292E] text-[12px]">Time -</span>
+                                  <span className="text-[#5476FC] text-[12px] font-bold">{dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                                </div>
+                                <span className="text-[#676E76] text-[11px] mt-0.5 block md:text-center text-left">{dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                              </div>
+
+                              {/* Status */}
+                              <div className="md:w-[100px] shrink-0 flex flex-col md:block justify-start">
+                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Status</span>
+                                <span className={`text-[12px] font-medium block md:text-center text-left ${STATUS_COLOR[consult.status] ?? "text-[#676E76]"}`}>
+                                  {STATUS_LABEL[consult.status] ?? consult.status}
+                                </span>
+                              </div>
+                            </div>
+
+                          </div>
+                        );
+                      })}
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-5">
+                          <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                          >
+                            <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => {
+                            const isSelected = currentPage === pg;
+                            return (
+                              <button
+                                key={pg}
+                                onClick={() => setCurrentPage(pg)}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected
+                                    ? "bg-[#5476FC] text-white shadow-sm"
+                                    : "text-[#9EA5AD] hover:text-[#5476FC]"
+                                  }`}
+                                style={{ fontFamily: "Outfit, sans-serif" }}
+                              >
+                                {pg}
+                              </button>
+                            );
+                          })}
+
+                          <button
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                          >
+                            <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {activeTab === "Visit Informations" && (
               <div className="text-center text-sm text-[#A0A8B0] py-16">No additional visit information recorded.</div>
