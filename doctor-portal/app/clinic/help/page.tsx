@@ -108,7 +108,7 @@ export default function ClinicHelpSupportPage() {
   }
 
   return (
-    <div className="px-10 pb-12 select-none flex flex-col gap-8 relative">
+    <div className="px-4 md:px-10 pb-12 select-none flex flex-col gap-8 relative">
 
       {/* Page title */}
       <div className="flex flex-col justify-center items-start mt-2">
@@ -247,7 +247,8 @@ export default function ClinicHelpSupportPage() {
               Loading tickets...
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
+            <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse" style={{ minWidth: "640px" }}>
               <thead>
                 <tr className="text-[10px] font-medium text-[#9EA5AD] uppercase tracking-wider">
                   <th className="py-4 font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>Subject</th>
@@ -322,6 +323,7 @@ export default function ClinicHelpSupportPage() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

@@ -175,9 +175,9 @@ function ClinicInsuranceContent() {
   const fieldsDisabled = !editing || !canManage;
 
   return (
-    <div className="flex h-full w-full font-sans select-none px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="flex flex-col lg:flex-row h-full w-full font-sans select-none px-4 md:px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
       {/* Left Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pr-8">
+      <div className="flex-1 flex flex-col min-w-0 lg:pr-8">
         <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px] mb-8">
           Insurance
         </h1>
@@ -254,17 +254,19 @@ function ClinicInsuranceContent() {
               <div
                 key={p.id}
                 onClick={() => selectPolicy(p)}
-                className={`flex items-center justify-between px-6 py-5 rounded-[16px] border cursor-pointer transition-all ${selectedId === p.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white"} hover:shadow-md`}
+                className={`px-6 py-5 rounded-[16px] border cursor-pointer transition-all ${selectedId === p.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white"} hover:shadow-md`}
               >
-                <div className="flex items-center gap-10 w-full min-w-0">
-                  <div className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === p.id ? "border-[#5476FC] bg-[#5476FC]" : "border-[#D0D5DD]"}`} />
-                  <div className="text-[15px] font-medium text-[#24292E] w-[150px] truncate">{p.name}</div>
-                  <div className="text-[12px] font-medium text-[#676E76] w-[100px] truncate">{p.network || "—"}</div>
-                  <div className="text-[12px] font-medium text-[#676E76] w-[100px] truncate">{p.discounts || "—"}</div>
-                  <div className="text-[13px] font-normal text-[#24292E] flex-1 truncate">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-10 w-full min-w-0">
+                  <div className="flex items-center gap-3 md:gap-10 md:contents">
+                    <div className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === p.id ? "border-[#5476FC] bg-[#5476FC]" : "border-[#D0D5DD]"}`} />
+                    <div className="text-[15px] font-medium text-[#24292E] w-full md:w-[150px] truncate">{p.name}</div>
+                  </div>
+                  <div className="text-[12px] font-medium text-[#676E76] md:w-[100px] truncate">{p.network || "—"}</div>
+                  <div className="text-[12px] font-medium text-[#676E76] md:w-[100px] truncate">{p.discounts || "—"}</div>
+                  <div className="text-[13px] font-normal text-[#24292E] md:flex-1 truncate">
                     Renew : {p.renewDate ? new Date(p.renewDate).toLocaleDateString("en-GB") : "—"}
                   </div>
-                  <div className={`text-[12px] font-semibold shrink-0 ${p.status === "active" ? "text-[#179353]" : "text-[#838B95]"}`}>
+                  <div className={`text-[12px] font-semibold md:shrink-0 ${p.status === "active" ? "text-[#179353]" : "text-[#838B95]"}`}>
                     {p.status === "active" ? "Active" : "Inactive"}
                   </div>
                 </div>
@@ -280,8 +282,8 @@ function ClinicInsuranceContent() {
       </div>
 
       {/* Right Details Panel */}
-      <div className="w-[380px] shrink-0">
-        <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-8 shadow-sm flex flex-col">
+      <div className="w-full lg:w-[380px] lg:shrink-0 mt-6 lg:mt-0">
+        <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-5 md:p-8 shadow-sm flex flex-col">
           {panelOpen ? (
             <>
               <h2 className="text-[18px] font-medium text-[#24292E] mb-6">

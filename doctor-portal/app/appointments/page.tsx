@@ -315,8 +315,8 @@ export default function AppointmentsPage() {
       <div className="flex-1 flex flex-col gap-6 min-w-0">
 
         {/* Title and Top Action Row */}
-        <div className="flex justify-between items-center w-full">
-          <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
+        <div className="flex flex-wrap justify-between items-center gap-3 w-full">
+          <h1 className="text-[#383F45] font-normal text-[28px] sm:text-[32px] leading-none tracking-[-0.64px]">
             Appointments
           </h1>
 
@@ -332,7 +332,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Tab Filters Row */}
-        <div className="flex justify-between items-center w-full relative">
+        <div className="flex flex-wrap justify-between items-center gap-3 w-full relative">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Tabs */}
             <button
@@ -469,8 +469,8 @@ export default function AppointmentsPage() {
           </h2>
 
           {/* Table Sorting Filters Bar */}
-          <div className="flex justify-between items-center w-full py-1">
-            <div className="flex items-center gap-6">
+          <div className="flex flex-wrap justify-between items-center gap-3 w-full py-1">
+            <div className="flex items-center flex-wrap gap-3 sm:gap-6">
               {/* Name sort */}
               <button
                 onClick={() => handleSort("name")}

@@ -122,7 +122,7 @@ function TicketContent() {
   updates.sort((a, b) => new Date(a.sortKey).getTime() - new Date(b.sortKey).getTime());
 
   return (
-    <div className="px-10 pb-12 select-none flex flex-col gap-8">
+    <div className="px-4 md:px-10 pb-12 select-none flex flex-col gap-8">
 
       {/* Header navigation bar */}
       <div className="flex items-center gap-4 mt-2">
@@ -155,7 +155,7 @@ function TicketContent() {
       </div>
 
       {/* Two column ticket details layout */}
-      <div className="flex gap-8 items-start w-full">
+      <div className="flex flex-col lg:flex-row gap-8 lg:items-start w-full">
 
         {/* LEFT COLUMN: Main details and updates */}
         <div className="flex-1 flex flex-col gap-6">
@@ -290,7 +290,7 @@ function TicketContent() {
         </div>
 
         {/* RIGHT COLUMN: Ticket Summary Sidecard */}
-        <div className="w-[340px] shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-6 flex flex-col gap-6 shadow-sm">
+        <div className="w-full lg:w-[340px] lg:shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-6 flex flex-col gap-6 shadow-sm">
           {/* Title Summary row */}
           <div className="flex items-center justify-between w-full">
             <h2

@@ -148,9 +148,9 @@ export default function ScreeningRecommendations({ appointments = [] }: Screenin
       {/* ── Table Card ──────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-4 relative w-full">
         {/* Table Header */}
-        <div className="flex justify-between items-center w-full pb-2 border-b border-[#EBEEF5]">
+        <div className="flex flex-wrap justify-between items-center w-full gap-x-4 pb-2 border-b border-[#EBEEF5]">
           <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider">Screening Recommendation</span>
-          <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider mr-10">Patients Recommended</span>
+          <span className="text-[#838B95] text-xs font-semibold uppercase tracking-wider sm:mr-10">Patients Recommended</span>
         </div>
 
         {/* Screening List */}
@@ -165,14 +165,14 @@ export default function ScreeningRecommendations({ appointments = [] }: Screenin
               return (
                 <div
                   key={item.name}
-                  className={`flex justify-between items-center px-4 py-3 rounded-xl transition-all ${
+                  className={`flex flex-wrap justify-between items-center gap-x-4 px-4 py-3 rounded-xl transition-all ${
                     isFirst ? "bg-[#F5F6FA]" : "hover:bg-slate-50"
                   }`}
                 >
-                  <span className="text-[#24292E] text-xs font-semibold truncate max-w-[400px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  <span className="text-[#24292E] text-xs font-semibold truncate max-w-full sm:max-w-[400px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                     {item.name}
                   </span>
-                  <span className="text-[#24292E] text-xs font-bold mr-24" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  <span className="text-[#24292E] text-xs font-bold sm:mr-24" style={{ fontFamily: "Outfit, sans-serif" }}>
                     {item.count}
                   </span>
                 </div>

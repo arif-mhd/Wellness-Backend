@@ -1103,6 +1103,114 @@ router.patch("/:id/waiting", requireRole("patient"), async (req: SessionRequest,
   }
 });
 
+// ─── PATCH /api/appointments/:id/call-presence ──────────────────────────────
+// Doctor or patient reports whether they are currently connected to the
+// LiveKit room for this appointment. Body: { inCall: boolean }. The backend
+// is the single source of truth for deciding when a call has genuinely
+// started (both parties simultaneously present) and, once both have since
+// left, whether the appointment should become "completed" (a real call
+// happened) or "cancelled" (no-show — the call never had both parties
+// present at once). This is deliberately separate from PATCH /:id/status,
+// which only the doctor can call and which governs the doctor-declared
+// lifecycle stage rather than live per-party room membership.
+router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { id } = req.params;
+  const { inCall } = req.body;
+
+  if (typeof inCall !== "boolean") {
+    res.status(400).json({ error: "inCall must be a boolean." });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+
+    const isDoctor = apt.doctorId === userId;
+    const isPatient = apt.patientId === userId;
+    if (!isDoctor && !isPatient) {
+      // Deliberately not isAuthorizedDoctor() — an invited specialist must
+      // never toggle doctorInCall/patientInCall; only the primary doctor
+      // and the patient participate in this presence model.
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updated: any = { ...apt, updatedAt: now };
+    if (isDoctor) updated.doctorInCall = inCall;
+    if (isPatient) updated.patientInCall = inCall;
+
+    if (updated.doctorInCall && updated.patientInCall && !updated.callStartedAt) {
+      updated.callStartedAt = now;
+    }
+
+    // Only decide completed/cancelled once BOTH sides have reported at least
+    // once — protects against a stale/not-yet-updated client on the other
+    // side (still undefined) being misread as "already left".
+    const bothSidesReported = typeof updated.doctorInCall === "boolean" && typeof updated.patientInCall === "boolean";
+
+    let completionAction: "completed" | "cancelled" | null = null;
+    if (
+      !inCall &&
+      bothSidesReported &&
+      !updated.doctorInCall &&
+      !updated.patientInCall &&
+      updated.status !== "completed" &&
+      updated.status !== "cancelled"
+    ) {
+      if (updated.callStartedAt) {
+        updated.status = "completed";
+        completionAction = "completed";
+      } else {
+        updated.status = "cancelled";
+        updated.cancelledReason = "no_show";
+        completionAction = "cancelled";
+      }
+    }
+
+    await appointmentsContainer.items.upsert(updated);
+
+    if (completionAction === "completed") {
+      const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
+      logActivity({
+        source: "doctor",
+        action: "Appointment Completed",
+        details: `Call ended for appointment ${id} — both parties had joined and have now left`,
+        performedBy: docDoc?.fullName ?? "Doctor",
+        performedById: apt.doctorId,
+        entityType: "appointment",
+        entityId: id,
+      });
+    } else if (completionAction === "cancelled") {
+      logActivity({
+        source: isDoctor ? "doctor" : "patient",
+        action: "Appointment Cancelled (No-Show)",
+        details: `Appointment ${id} cancelled — call never had both doctor and patient present simultaneously`,
+        performedBy: isDoctor ? "Doctor" : "Patient",
+        performedById: userId,
+        entityType: "appointment",
+        entityId: id,
+      });
+    }
+
+    res.json({
+      status: "OK",
+      doctorInCall: updated.doctorInCall ?? false,
+      patientInCall: updated.patientInCall ?? false,
+      callStartedAt: updated.callStartedAt ?? null,
+      appointmentStatus: updated.status,
+    });
+  } catch (err) {
+    console.error("Update call presence error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/appointments/:id/pre-visit ───────────────────────────────────
 // Patient submits the pre-visit questionnaire (reason, symptoms, conditions,
 // medications, notes) before joining the waiting room. Read back by the

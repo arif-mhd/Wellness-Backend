@@ -172,11 +172,11 @@ export default function SchedulesDashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="px-5 pb-12 select-none">
+      <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Header */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
           <h1
-            className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]"
+            className="text-[#383F45] font-normal text-[28px] sm:text-[32px] leading-none tracking-[-0.64px]"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
             Schedules

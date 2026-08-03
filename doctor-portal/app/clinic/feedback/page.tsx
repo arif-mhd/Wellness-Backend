@@ -185,9 +185,9 @@ export default function ClinicFeedbackPage() {
   );
 
   return (
-    <div className="flex h-full w-full font-sans select-none px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="flex flex-col lg:flex-row h-full w-full font-sans select-none px-4 md:px-5 pb-12 pt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
       {/* Left */}
-      <div className="flex-1 flex flex-col min-w-0 pr-8">
+      <div className="flex-1 flex flex-col min-w-0 lg:pr-8">
         <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px] mb-6">
           Feedbacks and Rating
         </h1>
@@ -207,7 +207,7 @@ export default function ClinicFeedbackPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-4 px-6 mb-2">
+        <div className="hidden sm:grid grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-4 px-6 mb-2">
           <SortHeader label={activeTab === "clinic" ? "Name of Patient" : "Doctor"} k="name" />
           <SortHeader label="Ratings" k="rating" />
           <SortHeader label="Date" k="date" />
@@ -225,7 +225,7 @@ export default function ClinicFeedbackPage() {
                 <div
                   key={r.id}
                   onClick={() => viewReview(r)}
-                  className={`grid grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-4 items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedReviewId === r.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                  className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedReviewId === r.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar name={r.reviewer?.name} url={r.reviewer?.avatar} />
@@ -256,7 +256,7 @@ export default function ClinicFeedbackPage() {
               <div
                 key={g.id}
                 onClick={() => viewDoctor(g)}
-                className={`grid grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-4 items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedDoctorId === g.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedDoctorId === g.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar name={g.name} url={g.avatar} />
@@ -279,8 +279,8 @@ export default function ClinicFeedbackPage() {
       </div>
 
       {/* Right: Rating and Reviews detail */}
-      <div className="w-[400px] shrink-0">
-        <div className="bg-[#EEF0FC] rounded-[24px] p-7 shadow-sm flex flex-col gap-5 sticky top-4">
+      <div className="w-full lg:w-[400px] lg:shrink-0 mt-6 lg:mt-0">
+        <div className="bg-[#EEF0FC] rounded-[24px] p-5 md:p-7 shadow-sm flex flex-col gap-5 lg:sticky lg:top-4">
           <h2 className="text-[#24292E] text-[16px] font-medium">Rating and Reviews</h2>
 
           {!selectedDoctor ? (

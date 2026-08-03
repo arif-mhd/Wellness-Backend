@@ -40,7 +40,7 @@ export default function PatientRatings({ feedback = [] }: PatientRatingsProps) {
     : "5.0";
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-5 w-[340px]">
+    <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-5 w-full xl:w-[340px]">
       {/* Header */}
       <div className="flex justify-between items-center w-full">
         <h2 className="text-[#24292E] text-[20px] font-normal tracking-[-0.4px]" style={{ fontFamily: "Outfit, sans-serif" }}>

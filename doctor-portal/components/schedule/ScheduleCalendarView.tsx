@@ -266,7 +266,7 @@ export default function ScheduleCalendarView({
 
       {/* ── Appointment Details Overlay ───────────────────────────────────────── */}
       {selectedAppt && (
-        <div className="absolute top-[130px] left-6 z-30 w-[330px] bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-[0_16px_40px_rgba(36,41,46,0.16)] flex flex-col gap-4">
+        <div className="absolute top-[130px] left-6 z-30 w-[min(330px,calc(100vw-72px))] bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-[0_16px_40px_rgba(36,41,46,0.16)] flex flex-col gap-4">
 
           {/* Header */}
           <div className="flex items-center justify-between">

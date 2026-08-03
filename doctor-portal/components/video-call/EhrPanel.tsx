@@ -308,7 +308,7 @@ export default function EhrPanel({ open, onClose, loading, data, fhirLoading, fh
   return (
     <div className="fixed inset-0 z-[999999] flex items-start justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-[480px] h-full shadow-2xl flex flex-col animate-[slideIn_0.25s_ease-out] overflow-hidden">
+      <div className="relative bg-white w-full max-w-[480px] h-full shadow-2xl flex flex-col animate-[slideIn_0.25s_ease-out] overflow-hidden">
         <style dangerouslySetInnerHTML={{ __html: `@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}` }} />
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">

@@ -271,7 +271,7 @@ export default function ProfilePage() {
         <h2 className="text-[#24292E] text-base font-medium tracking-tight">Personal Details</h2>
 
         {/* Row 1: License / Languages / Consult time */}
-        <div className="flex gap-5">
+        <div className="flex flex-col md:flex-row gap-5">
           {/* License — read-only */}
           <div className="bg-white rounded-xl p-6 flex flex-col gap-4 flex-1">
             <div className="flex items-center justify-between">
@@ -363,7 +363,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Two-column personal data */}
-        <div className="flex gap-6">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Left: phone, email (RO), gender, marital, emirates ID (RO) */}
           <div className="bg-white rounded-xl p-6 flex flex-col gap-5 flex-1">
             <div className="flex items-center justify-between">

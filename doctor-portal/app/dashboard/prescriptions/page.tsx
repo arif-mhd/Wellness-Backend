@@ -87,11 +87,11 @@ export default function PrescriptionsTasksPage() {
 
   return (
     <ProtectedRoute>
-      <div className="px-5 pb-12 select-none">
+      <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Title */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
           <h1
-            className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]"
+            className="text-[#383F45] font-normal text-[28px] sm:text-[32px] leading-none tracking-[-0.64px]"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
             Tasks
@@ -99,7 +99,7 @@ export default function PrescriptionsTasksPage() {
         </div>
 
         {/* ── Two-Column Main Layout Grid ────────────────────────────────────── */}
-        <div className="grid gap-8 items-start w-full" style={{ gridTemplateColumns: "1fr 372px" }}>
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_372px] gap-8 items-start w-full">
           {/* Left Column: Tasks List & Interactive Controls */}
           <div className="min-w-0">
             {loading ? (
@@ -122,7 +122,7 @@ export default function PrescriptionsTasksPage() {
           </div>
 
           {/* Right Column: Detailed Card (Fixed Width 372px) */}
-          <div className="w-[372px] shrink-0 self-start">
+          <div className="w-full xl:w-[372px] xl:shrink-0 self-start">
             <TaskDetailsCard task={activeTask} onAction={handleAction} />
           </div>
         </div>

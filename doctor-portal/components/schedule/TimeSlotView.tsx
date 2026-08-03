@@ -556,7 +556,7 @@ export default function TimeSlotView() {
 
             {/* ── Floating Popup Dialog inside grid ── */}
             {showApprovalDialog && (
-              <div className="absolute bottom-4 right-4 z-30 bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_45px_rgba(0,0,0,0.12)] w-[400px] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="absolute bottom-4 right-4 z-30 bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_45px_rgba(0,0,0,0.12)] w-[min(400px,calc(100vw-32px))] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
                 {/* Dialog header */}
                 <div className="flex items-center justify-between mb-4">
                   <h4

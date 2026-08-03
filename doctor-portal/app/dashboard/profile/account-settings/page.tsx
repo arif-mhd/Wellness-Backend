@@ -167,7 +167,7 @@ function TwoFAModal({ doctorEmail, onClose, onSuccess }: { doctorEmail: string; 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       {step === "confirm" && (
-        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
+        <div className="w-full max-w-[620px] mx-4 bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
           <div className="flex items-start justify-between">
             <h3 className="text-[#24292E] text-[22px] font-normal leading-[130%] tracking-[-0.66px]" style={{ fontFamily: "Marcellus, serif" }}>Enable Two-Factor Authentication</h3>
             {closeIcon}
@@ -192,7 +192,7 @@ function TwoFAModal({ doctorEmail, onClose, onSuccess }: { doctorEmail: string; 
       )}
 
       {step === "otp" && (
-        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
+        <div className="w-full max-w-[620px] mx-4 bg-white rounded-xl p-8 flex flex-col gap-6 shadow-2xl">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <button onClick={() => { setStep("confirm"); setOtp(Array(OTP_LENGTH).fill("")); setError(""); }}
@@ -238,7 +238,7 @@ function TwoFAModal({ doctorEmail, onClose, onSuccess }: { doctorEmail: string; 
       )}
 
       {step === "success" && (
-        <div className="w-[620px] bg-white rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl text-center">
+        <div className="w-full max-w-[620px] mx-4 bg-white rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl text-center">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center shadow-[0_8px_24px_rgba(84,118,252,0.3)]">
             <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -388,8 +388,8 @@ export default function AccountSettingsPage() {
 
       {/* ── Time Zone ─────────────────────────────────────────── */}
       <SectionCard title="Time Zone" description="Selecting the correct time zone is essential for ensuring your schedule and notifications match your local time.">
-        <div className="flex items-end gap-4">
-          <div className="relative w-full max-w-[440px]">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="relative w-full max-w-full sm:max-w-[440px]">
             <button onClick={() => setTzOpen(o => !o)}
               className="w-full h-[66px] px-6 rounded-xl bg-[#F5F6FA] flex items-center justify-between gap-4">
               <div className="flex flex-col items-start gap-1">
@@ -426,13 +426,13 @@ export default function AccountSettingsPage() {
         <SectionCard title="Change Password" description="Update your password regularly to keep your account secure. Make sure to choose a strong password that includes a mix of letters, numbers, and special characters.">
           {pwdError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2">{pwdError}</div>}
           {pwdSuccess && <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl px-4 py-2">Password changed successfully.</div>}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <FloatingInput label="Current Password" showToggle value={currentPwd} onChange={setCurrentPwd} placeholder="Enter current password" />
             <FloatingInput label="New Password" showToggle value={newPwd} onChange={setNewPwd} placeholder="Enter new password" />
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <FloatingInput label="Confirm New Password" showToggle value={confirmPwd} onChange={setConfirmPwd} placeholder="Re-enter new password" />
-            <div className="flex-1" />
+            <div className="hidden sm:block flex-1" />
           </div>
           <button onClick={handleChangePassword} disabled={savingPwd}
             className="self-start h-10 px-6 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium rounded-xl shadow-[0_4px_12px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_16px_rgba(84,118,252,0.35)] transition-all disabled:opacity-70 flex items-center gap-2">

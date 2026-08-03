@@ -356,7 +356,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-3 px-8 pt-8 pb-4">
+        <div className="flex items-center gap-3 px-4 md:px-8 pt-8 pb-4">
           <button
             onClick={onClose}
             className="flex items-center justify-center w-[48px] h-[48px] rounded-full bg-white shadow-sm hover:bg-gray-50 transition-all"
@@ -373,10 +373,10 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
         </div>
       )}
 
-      <div className="flex flex-col gap-6 px-8 pb-10 flex-1">
+      <div className="flex flex-col gap-6 px-4 md:px-8 pb-10 flex-1">
 
         {/* Patient header card */}
-        <div className="w-full bg-white rounded-[12px] p-8 flex flex-col gap-5">
+        <div className="w-full bg-white rounded-[12px] p-4 md:p-8 flex flex-col gap-5">
           {/* Top: avatar + name + stats */}
           <div className="flex items-center gap-6">
             <img
@@ -442,10 +442,10 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
         {/* Consultations tab content */}
         {activeTab === "Consultations" && (
-          <div className="flex gap-8 items-start">
+          <div className="flex flex-col lg:flex-row gap-8 lg:items-start">
 
             {/* Left: Consultation list */}
-            <div className="w-[360px] flex-shrink-0 bg-white rounded-[12px] p-8 flex flex-col gap-5">
+            <div className="w-full lg:w-[360px] lg:flex-shrink-0 bg-white rounded-[12px] p-4 md:p-8 flex flex-col gap-5">
               {/* List header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#707070] text-[12px] font-medium tracking-[-0.24px]">

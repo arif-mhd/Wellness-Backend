@@ -38,10 +38,10 @@ export default function AllConsultationsTable({
 
   return (
     <div className="w-full bg-white rounded-[12px] shadow-sm border border-[#EBEEF5] font-outfit mt-4">
-      <div className="flex flex-col gap-2 p-8">
+      <div className="flex flex-col gap-2 p-4 md:p-8">
 
-        {/* Table Header */}
-        <div className="flex items-center justify-between px-2 py-2 select-none">
+        {/* Table Header — desktop only, mobile rows show inline labels instead */}
+        <div className="hidden md:flex items-center justify-between px-2 py-2 select-none">
           {/* Name col */}
           <div className="flex-shrink-0 w-[200px] text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
             Name
@@ -79,7 +79,7 @@ export default function AllConsultationsTable({
             <div
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              className={`flex items-center justify-between px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
+              className={`flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0 px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
                 shouldFade
                   ? "opacity-40 grayscale-[30%]"
                   : ""
@@ -91,7 +91,7 @@ export default function AllConsultationsTable({
                 }`}
             >
               {/* Name Column — 200px */}
-              <div className="flex-shrink-0 w-[200px] flex items-center gap-4">
+              <div className="w-full md:w-[200px] md:flex-shrink-0 flex items-center gap-4">
                 <img
                   src={patient.avatar}
                   alt={patient.name}
@@ -117,7 +117,7 @@ export default function AllConsultationsTable({
               </div>
 
               {/* Diagnosis Column — flexible */}
-              <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2">
+              <div className="w-full md:flex-1 md:min-w-0 flex items-center gap-1.5 px-2">
                 <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none">
                   {patient.diagnosis}
                 </span>
@@ -128,7 +128,7 @@ export default function AllConsultationsTable({
 
               {/* Date + Action/Earnings Column — 293px */}
               <div
-                className="flex-shrink-0 w-[293px] flex items-center justify-between gap-2"
+                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2"
                 onClick={(e) => e.stopPropagation()}
               >
                 {activeTab === "Past" ? (
@@ -221,7 +221,7 @@ export default function AllConsultationsTable({
           </button>
 
           {/* Page Numbers */}
-          <div className="flex items-center gap-[26px]">
+          <div className="flex items-center flex-wrap justify-center gap-3 md:gap-[26px]">
             {Array.from({ length: totalPages }).map((_, i) => {
               const pageNum = i + 1;
               const isActive = pageNum === currentPage;

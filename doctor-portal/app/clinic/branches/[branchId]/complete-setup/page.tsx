@@ -170,7 +170,7 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="px-8 pb-12" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 md:px-8 pb-12" style={{ fontFamily: "Outfit, sans-serif" }}>
       <div className="flex items-center gap-3 mb-6 mt-2">
         <button
           onClick={() => router.push("/clinic/branches")}
