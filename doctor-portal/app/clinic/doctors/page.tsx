@@ -72,17 +72,37 @@ function AvatarPlaceholder({ name, avatarUrl, size = "w-10 h-10 text-sm" }: { na
 }
 
 function StarRating({ rating }: { rating: number }) {
-  const rounded = Math.round(rating);
   return (
     <div className="flex items-center gap-1">
       <div className="flex items-center text-[#5476FC]">
-        {[1, 2, 3, 4, 5].map(i => (
-          i <= rounded ? (
-            <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-          ) : (
-            <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-          )
-        ))}
+        {[1, 2, 3, 4, 5].map((i) => {
+          if (rating >= i - 0.25) {
+            return (
+              <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            );
+          } else if (rating >= i - 0.75) {
+            return (
+              <div key={i} className="relative w-3 h-3">
+                <svg className="absolute inset-0 text-[#5476FC]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+                <div className="absolute inset-0 overflow-hidden w-1/2">
+                  <svg className="text-[#5476FC]" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </div>
+              </div>
+            );
+          } else {
+            return (
+              <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            );
+          }
+        })}
       </div>
       <span className="text-[#24292E] text-[11px] font-medium">({rating})</span>
     </div>
@@ -380,12 +400,12 @@ function ManageDoctorsContent() {
               {/* Table Header */}
               <div className="hidden md:flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
                 <div className="w-[210px] shrink-0 flex items-center gap-1">Name</div>
-                <div className="flex-1 min-w-[90px]" /> {/* Spacer for specialties */}
+                <div className="flex-1 min-w-[90px]">Department</div>
                 <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Total No. of<br />Consultation</div>
                 <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Online<br />Consultations</div>
                 <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Average<br />Consultation</div>
                 <div className="w-[110px] shrink-0 flex flex-col items-center justify-center gap-0.5 text-center leading-tight">Number of<br />prescription</div>
-                <div className="w-[110px] shrink-0 flex justify-center items-center gap-1">P. Feedback</div>
+                <div className="w-[110px] shrink-0 flex justify-center items-center gap-1">Feedback</div>
                 <div className="w-[50px] flex shrink-0" />
               </div>
 

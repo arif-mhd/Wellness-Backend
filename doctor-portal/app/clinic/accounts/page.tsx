@@ -197,7 +197,10 @@ export default function ClinicAccountsPage() {
           {(["branches", "doctors", "staff"] as const).map((t) => (
             <button
               key={t}
-              onClick={() => setActiveTab(t)}
+              onClick={() => {
+                setActiveTab(t);
+                selectEntity(null);
+              }}
               className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide capitalize transition-all ${activeTab === t ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
             >
               {t}
@@ -226,49 +229,25 @@ export default function ClinicAccountsPage() {
             <div className="text-center py-10 text-[#838B95] text-sm">No branches found.</div>
           ) : (
             <div className="flex flex-col gap-3">
+              <div className="hidden sm:flex items-center justify-between px-6 py-2 border-b border-[#EBEEF5] mb-1">
+                <div className="text-left text-[12px] font-medium text-[#9EA5AD] pl-[48px]">Branch Name</div>
+                <div className="text-center w-[80px] text-[12px] font-medium text-[#9EA5AD]">Users</div>
+              </div>
               {filteredBranches.map((b) => (
                 <div key={b.id}>
                   <div
                     onClick={() => selectEntity({ type: "branch", id: b.id, label: b.name })}
-                    className={`flex items-center justify-between gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "branch" && selected.id === b.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                    className={`flex items-center gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "branch" && selected.id === b.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar name={b.name} />
                       <div className="flex flex-col min-w-0">
                         <span className="text-[14px] font-semibold text-[#24292E] truncate">{b.name}</span>
                         <span className="text-[11px] text-[#9EA5AD] truncate">{b.id}</span>
                       </div>
                     </div>
-                    <span className="text-[12px] text-[#676E76] whitespace-nowrap">{b.userCount} User{b.userCount !== 1 ? "s" : ""}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleBranch(b); }}
-                      className="flex items-center gap-1 px-4 py-1.5 border border-gray-200 text-[#24292E] text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors shrink-0"
-                    >
-                      View
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`transition-transform ${expandedBranchId === b.id ? "rotate-90" : ""}`}><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
-                    </button>
+                    <span className="w-[80px] text-center text-[12px] text-[#676E76] whitespace-nowrap">{b.userCount}</span>
                   </div>
-
-                  {expandedBranchId === b.id && (
-                    <div className="flex flex-col gap-2 mt-2 ml-6">
-                      {!branchUsersById[b.id] ? (
-                        <div className="text-[12px] text-[#9EA5AD] px-4 py-2">Loading users…</div>
-                      ) : branchUsersById[b.id].length === 0 ? (
-                        <div className="text-[12px] text-[#9EA5AD] px-4 py-2">No users added to this branch yet.</div>
-                      ) : (
-                        branchUsersById[b.id].map((u) => (
-                          <div
-                            key={u.id}
-                            onClick={() => selectEntity({ type: "user", id: u.id, label: u.fullName })}
-                            className={`flex items-center justify-between px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${selected?.type === "user" && selected.id === u.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-[#F7F9FC] hover:bg-white"}`}
-                          >
-                            <span className="text-[12.5px] font-medium text-[#24292E]">{u.fullName}</span>
-                            <span className="text-[11px] text-[#9EA5AD]">{u.id.slice(0, 8)}…</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -280,26 +259,22 @@ export default function ClinicAccountsPage() {
             <div className="text-center py-10 text-[#838B95] text-sm">No doctors found.</div>
           ) : (
             <div className="flex flex-col gap-3">
+              <div className="hidden sm:flex items-center px-6 py-2 border-b border-[#EBEEF5] mb-1">
+                <div className="text-left text-[12px] font-medium text-[#9EA5AD] pl-[48px]">Doctor Name</div>
+              </div>
               {filteredDoctors.map((d) => (
                 <div
                   key={d.id}
                   onClick={() => selectEntity({ type: "doctor", id: d.id, label: d.fullName })}
-                  className={`flex items-center justify-between gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "doctor" && selected.id === d.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                  className={`flex items-center gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "doctor" && selected.id === d.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar name={d.fullName} url={d.avatarUrl} />
                     <div className="flex flex-col min-w-0">
                       <span className="text-[14px] font-semibold text-[#24292E] truncate">{d.fullName}</span>
                       <span className="text-[11px] text-[#9EA5AD] truncate">{d.specialty || d.email}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); selectEntity({ type: "doctor", id: d.id, label: d.fullName }); }}
-                    className="flex items-center gap-1 px-4 py-1.5 border border-gray-200 text-[#24292E] text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors shrink-0"
-                  >
-                    View
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
-                  </button>
                 </div>
               ))}
             </div>
@@ -310,26 +285,22 @@ export default function ClinicAccountsPage() {
           <div className="text-center py-10 text-[#838B95] text-sm">No staff accounts found.</div>
         ) : (
           <div className="flex flex-col gap-3">
+            <div className="hidden sm:flex items-center px-6 py-2 border-b border-[#EBEEF5] mb-1">
+              <div className="text-left text-[12px] font-medium text-[#9EA5AD] pl-[48px]">Staff Name</div>
+            </div>
             {filteredStaff.map((u) => (
               <div
                 key={u.id}
                 onClick={() => selectEntity({ type: "user", id: u.id, label: u.fullName })}
-                className={`flex items-center justify-between gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "user" && selected.id === u.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                className={`flex items-center gap-4 px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selected?.type === "user" && selected.id === u.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Avatar name={u.fullName} url={u.avatarUrl} />
                   <div className="flex flex-col min-w-0">
                     <span className="text-[14px] font-semibold text-[#24292E] truncate">{u.fullName}</span>
                     <span className="text-[11px] text-[#9EA5AD] truncate">{u.branchName}</span>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); selectEntity({ type: "user", id: u.id, label: u.fullName }); }}
-                  className="flex items-center gap-1 px-4 py-1.5 border border-gray-200 text-[#24292E] text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors shrink-0"
-                >
-                  View
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
-                </button>
               </div>
             ))}
           </div>

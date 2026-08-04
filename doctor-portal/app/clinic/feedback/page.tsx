@@ -175,12 +175,9 @@ export default function ClinicFeedbackPage() {
     }
   };
 
-  const SortHeader = ({ label, k }: { label: string; k: SortKey }) => (
-    <button onClick={() => toggleSort(k)} className="flex items-center gap-1 text-[11px] font-semibold text-[#9EA5AD] uppercase tracking-wide hover:text-[#676E76] transition-colors">
+  const SortHeader = ({ label, k, extraClass = "text-left" }: { label: string; k: SortKey; extraClass?: string }) => (
+    <button onClick={() => toggleSort(k)} className={`text-[12px] font-medium text-[#9EA5AD] hover:text-[#676E76] transition-colors ${extraClass}`}>
       {label}
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={sortKey === k ? "opacity-100" : "opacity-40"}>
-        <path strokeLinecap="round" strokeLinejoin="round" d={sortDir === 1 && sortKey === k ? "M19 15l-7-7-7 7" : "M5 9l7 7 7-7"} />
-      </svg>
     </button>
   );
 
@@ -207,11 +204,10 @@ export default function ClinicFeedbackPage() {
           </button>
         </div>
 
-        <div className="hidden sm:grid grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-4 px-6 mb-2">
-          <SortHeader label={activeTab === "clinic" ? "Name of Patient" : "Doctor"} k="name" />
-          <SortHeader label="Ratings" k="rating" />
-          <SortHeader label="Date" k="date" />
-          <span />
+        <div className="hidden sm:grid grid-cols-[2.5fr_1.5fr_1fr] gap-4 px-6 py-2 border-b border-[#EBEEF5] mb-2">
+          <SortHeader label={activeTab === "clinic" ? "Name of Patient" : "Doctor"} k="name" extraClass="text-left" />
+          <SortHeader label="Ratings" k="rating" extraClass="text-center" />
+          <SortHeader label="Date" k="date" extraClass="text-center" />
         </div>
 
         {loading ? (
@@ -225,7 +221,7 @@ export default function ClinicFeedbackPage() {
                 <div
                   key={r.id}
                   onClick={() => viewReview(r)}
-                  className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedReviewId === r.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                  className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedReviewId === r.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar name={r.reviewer?.name} url={r.reviewer?.avatar} />
@@ -234,16 +230,12 @@ export default function ClinicFeedbackPage() {
                       <span className="text-[11px] text-[#9EA5AD] truncate">{r.provider?.name ?? "Doctor"}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <Stars value={r.rating} />
                     <span className="text-[13px] font-semibold text-[#24292E]">{r.rating.toFixed(1)}</span>
                     <span className="text-[11px] text-[#9EA5AD]">({doctorTotalById[r.provider?.id] ?? 0})</span>
                   </div>
-                  <span className="text-[12px] text-[#676E76]">{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>
-                  <button onClick={(e) => { e.stopPropagation(); viewReview(r); }} className="flex items-center gap-1 justify-self-start px-4 py-1.5 border border-gray-200 text-[#24292E] text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors">
-                    View
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
-                  </button>
+                  <span className="text-[12px] text-[#676E76] text-center">{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>
                 </div>
               ))}
             </div>
@@ -256,22 +248,18 @@ export default function ClinicFeedbackPage() {
               <div
                 key={g.id}
                 onClick={() => viewDoctor(g)}
-                className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedDoctorId === g.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
+                className={`flex flex-col sm:grid sm:grid-cols-[2.5fr_1.5fr_1fr] gap-2 sm:gap-4 sm:items-center px-6 py-4 rounded-2xl border cursor-pointer transition-all ${selectedDoctorId === g.id ? "border-[#5476FC] bg-[#EEF2FF]" : "border-[#EBEEF5] bg-white hover:shadow-md"}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar name={g.name} url={g.avatar} />
                   <span className="text-[14px] font-semibold text-[#24292E] truncate">{g.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <Stars value={g.avgRating} />
                   <span className="text-[13px] font-semibold text-[#24292E]">{g.avgRating.toFixed(1)}</span>
                   <span className="text-[11px] text-[#9EA5AD]">({g.total})</span>
                 </div>
-                <span className="text-[12px] text-[#676E76]">{new Date(g.lastDate).toLocaleDateString("en-GB")}</span>
-                <button onClick={(e) => { e.stopPropagation(); viewDoctor(g); }} className="flex items-center gap-1 justify-self-start px-4 py-1.5 border border-gray-200 text-[#24292E] text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors">
-                  View
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
-                </button>
+                <span className="text-[12px] text-[#676E76] text-center">{new Date(g.lastDate).toLocaleDateString("en-GB")}</span>
               </div>
             ))}
           </div>

@@ -246,7 +246,7 @@ function ClinicAnalyticsContent() {
           </div>
 
           {/* ── Right sidebar: Patient Ratings ──────────────────────────── */}
-          <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-4 xl:sticky xl:top-6">
+          <div className="bg-white rounded-2xl p-6 border border-[#EBEEF5] shadow-sm flex flex-col gap-4">
             <div className="flex justify-between items-center w-full">
               <div className="flex items-center gap-2">
                 <span className="text-[#24292E] text-[15px] font-semibold">Patient Ratings</span>
