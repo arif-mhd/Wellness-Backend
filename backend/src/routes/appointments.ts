@@ -15,6 +15,10 @@ import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
 import { getActorClinicIds, getActorPermissionState, hasPermission } from "../utils/clinicScope";
+import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
+import { livekitApiKey, livekitApiSecret } from "../config/livekit";
+import { FhirError } from "../services/fhirClient";
+import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -33,21 +37,17 @@ function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
 }
 
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
-  const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
-  const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
-  const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
-  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
+  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+  const at = new AccessToken(livekitApiKey, livekitApiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
 }
 
 async function sendLivekitData(room: string, payload: Record<string, unknown>): Promise<void> {
   try {
-    const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
-    const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
-    const wsUrl     = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
-    const httpUrl   = wsUrl.replace(/^wss?:\/\//, "https://");
-    const svc = new RoomServiceClient(httpUrl, apiKey, apiSecret);
+    const wsUrl   = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const httpUrl = wsUrl.replace(/^wss?:\/\//, "https://");
+    const svc = new RoomServiceClient(httpUrl, livekitApiKey, livekitApiSecret);
     const data = Buffer.from(JSON.stringify(payload));
     await svc.sendData(room, data, DataPacket_Kind.RELIABLE);
   } catch (err) {
@@ -88,7 +88,7 @@ function generateAppointmentId(doctorName: string, scheduledAt: string): string 
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
-  const { doctorId, scheduledAt, reason, shareMedicalHistory, paymentAmount, familyMemberId, visitType } = req.body;
+  const { doctorId, scheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId } = req.body;
 
   if (!doctorId || !scheduledAt || !reason) {
     res.status(400).json({ error: "doctorId, scheduledAt, and reason are required." });
@@ -96,12 +96,53 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
   }
 
   const resolvedVisitType: "online" | "offline" = visitType === "offline" ? "offline" : "online";
+  const resolvedPaymentMethod: "cash" | "insurance" = paymentMethod === "insurance" ? "insurance" : "cash";
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor || doctor.status !== "approved") {
       res.status(404).json({ error: "Doctor not found or not available." });
       return;
+    }
+
+    // Fetched up front (rather than after creation, as before) because the
+    // insurance branch below needs the patient's own on-file policy to
+    // validate against — never trust a client-supplied snapshot.
+    const patientDoc = await patientsContainer.item(patientId, patientId).read().then(r => r.resource).catch(() => null);
+
+    let insurancePolicySnapshot: { id: string; provider: string; policyId: string; plan: string | null } | null = null;
+
+    if (resolvedPaymentMethod === "insurance") {
+      if (!insurancePolicyId) {
+        res.status(400).json({ error: "insurancePolicyId is required when paymentMethod is 'insurance'." });
+        return;
+      }
+      const patientPolicy = (patientDoc?.insurance ?? []).find((p: any) => p.id === insurancePolicyId);
+      if (!patientPolicy) {
+        res.status(400).json({ error: "Insurance policy not found on your profile." });
+        return;
+      }
+      if ((patientPolicy.status ?? "pending") !== "active") {
+        res.status(400).json({ error: "This insurance policy hasn't been verified yet." });
+        return;
+      }
+      if (!doctor.clinicId) {
+        res.status(400).json({ error: "This doctor isn't affiliated with a clinic that accepts insurance." });
+        return;
+      }
+      const org = await loadOrgDocForClinicId(doctor.clinicId);
+      const acceptedPolicies = (org?.insurancePolicies ?? []).filter((p: any) => p.clinicId === doctor.clinicId && p.status === "active");
+      const matched = acceptedPolicies.some((p: any) => insuranceNamesMatch(patientPolicy.provider, p.name));
+      if (!matched) {
+        res.status(400).json({ error: "This clinic doesn't accept that insurance policy." });
+        return;
+      }
+      insurancePolicySnapshot = {
+        id: patientPolicy.id,
+        provider: patientPolicy.provider,
+        policyId: patientPolicy.policyId,
+        plan: patientPolicy.plan ?? null,
+      };
     }
 
     const id = generateAppointmentId(doctor.fullName ?? "DOC", scheduledAt);
@@ -119,7 +160,12 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       shareMedicalHistory: !!shareMedicalHistory,
       status: "scheduled",
       paymentStatus: "paid",
-      paymentAmount: paymentAmount ?? doctor.fees ?? 250,
+      // Resolved server-side (never trusted from the client) — same value
+      // it already defaulted to, just authoritative now instead of a client
+      // override being accepted verbatim.
+      paymentAmount: Number(doctor.fees) || 250,
+      paymentMethod: resolvedPaymentMethod,
+      insurancePolicy: insurancePolicySnapshot,
       livekitRoom: resolvedVisitType === "online" ? id : null,
       createdAt: now,
       updatedAt: now,
@@ -129,7 +175,6 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
     await appointmentsContainer.items.create(appointment);
 
     // Log activity (best-effort)
-    const patientDoc = await patientsContainer.item(patientId, patientId).read().then(r => r.resource).catch(() => null);
     let displayName = patientDoc?.fullName ?? patientId;
     if (familyMemberId && patientDoc?.familyMembers) {
       const member = patientDoc.familyMembers.find((m: any) => m.id === familyMemberId);
@@ -1124,56 +1169,81 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
   }
 
   try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) {
-      res.status(404).json({ error: "Appointment not found." });
-      return;
-    }
-
-    const isDoctor = apt.doctorId === userId;
-    const isPatient = apt.patientId === userId;
-    if (!isDoctor && !isPatient) {
-      // Deliberately not isAuthorizedDoctor() — an invited specialist must
-      // never toggle doctorInCall/patientInCall; only the primary doctor
-      // and the patient participate in this presence model.
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const updated: any = { ...apt, updatedAt: now };
-    if (isDoctor) updated.doctorInCall = inCall;
-    if (isPatient) updated.patientInCall = inCall;
-
-    if (updated.doctorInCall && updated.patientInCall && !updated.callStartedAt) {
-      updated.callStartedAt = now;
-    }
-
-    // Only decide completed/cancelled once BOTH sides have reported at least
-    // once — protects against a stale/not-yet-updated client on the other
-    // side (still undefined) being misread as "already left".
-    const bothSidesReported = typeof updated.doctorInCall === "boolean" && typeof updated.patientInCall === "boolean";
-
+    // Doctor and patient can both report presence within milliseconds of
+    // each other (e.g. joining near-simultaneously). A plain read-then-
+    // upsert here is a lost-update race: request B can read the appointment
+    // before request A's write lands, then overwrite it with a copy that's
+    // missing A's flag — doctorInCall/patientInCall never end up true
+    // together, callStartedAt never gets set, and the call is later scored
+    // as a no-show ("cancelled") even though both sides genuinely joined.
+    // Retrying on an ETag mismatch (optimistic concurrency) instead of a
+    // blind upsert closes that race — a losing writer re-reads the
+    // just-written state and reapplies its own flag on top of it.
+    let updated: any;
     let completionAction: "completed" | "cancelled" | null = null;
-    if (
-      !inCall &&
-      bothSidesReported &&
-      !updated.doctorInCall &&
-      !updated.patientInCall &&
-      updated.status !== "completed" &&
-      updated.status !== "cancelled"
-    ) {
-      if (updated.callStartedAt) {
-        updated.status = "completed";
-        completionAction = "completed";
-      } else {
-        updated.status = "cancelled";
-        updated.cancelledReason = "no_show";
-        completionAction = "cancelled";
+    let isDoctor = false;
+    let isPatient = false;
+    let apt: any;
+
+    for (let attempt = 0; ; attempt++) {
+      const { resource: current } = await appointmentsContainer.item(id, id).read();
+      apt = current;
+      if (!apt) {
+        res.status(404).json({ error: "Appointment not found." });
+        return;
+      }
+
+      isDoctor = apt.doctorId === userId;
+      isPatient = apt.patientId === userId;
+      if (!isDoctor && !isPatient) {
+        // Deliberately not isAuthorizedDoctor() — an invited specialist must
+        // never toggle doctorInCall/patientInCall; only the primary doctor
+        // and the patient participate in this presence model.
+        res.status(403).json({ error: "Not authorized." });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      updated = { ...apt, updatedAt: now };
+      if (isDoctor) updated.doctorInCall = inCall;
+      if (isPatient) updated.patientInCall = inCall;
+
+      if (updated.doctorInCall && updated.patientInCall && !updated.callStartedAt) {
+        updated.callStartedAt = now;
+      }
+
+      // Only decide completed/cancelled once BOTH sides have reported at
+      // least once — protects against a stale/not-yet-updated client on the
+      // other side (still undefined) being misread as "already left".
+      const bothSidesReported = typeof updated.doctorInCall === "boolean" && typeof updated.patientInCall === "boolean";
+
+      completionAction = null;
+      if (
+        !inCall &&
+        bothSidesReported &&
+        !updated.doctorInCall &&
+        !updated.patientInCall &&
+        updated.status !== "completed" &&
+        updated.status !== "cancelled"
+      ) {
+        if (updated.callStartedAt) {
+          updated.status = "completed";
+          completionAction = "completed";
+        } else {
+          updated.status = "cancelled";
+          updated.cancelledReason = "no_show";
+          completionAction = "cancelled";
+        }
+      }
+
+      try {
+        await appointmentsContainer.item(id, id).replace(updated, { accessCondition: { type: "IfMatch", condition: apt._etag } });
+        break;
+      } catch (err: any) {
+        if (err.code === 412 && attempt < 5) continue; // someone else wrote first — re-read and retry
+        throw err;
       }
     }
-
-    await appointmentsContainer.items.upsert(updated);
 
     if (completionAction === "completed") {
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
@@ -1537,6 +1607,87 @@ router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: R
   }
 });
 
+// Shared by the four /:id/fhir/* routes below: verifies the caller is the
+// primary doctor or an invited specialist on this specific appointment (the
+// same check /:id/ehr uses), then resolves the appointment's patient's
+// linked external FHIR id. A doctor can never reach an arbitrary patient's
+// external record this way — only one they have a real appointment with.
+async function resolveAppointmentFhirId(
+  id: string,
+  doctorId: string
+): Promise<{ ok: true; fhirPatientId: string | null } | { ok: false; status: number; error: string }> {
+  const { resource: apt } = await appointmentsContainer.item(id, id).read();
+  if (!apt) return { ok: false, status: 404, error: "Appointment not found." };
+  if (!isAuthorizedDoctor(apt, doctorId)) return { ok: false, status: 403, error: "Not authorized." };
+
+  const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+  if (!patient) return { ok: false, status: 404, error: "Patient profile not found." };
+
+  return { ok: true, fhirPatientId: patient.fhirPatientId ?? null };
+}
+
+function handleFhirError(err: unknown, res: Response) {
+  if (err instanceof FhirError) {
+    const status = err.status >= 400 && err.status < 600 ? err.status : 502;
+    res.status(status).json({ error: err.message, operationOutcome: err.operationOutcome });
+    return;
+  }
+  console.error("FHIR integration error:", err);
+  res.status(502).json({ error: "Failed to reach external FHIR server" });
+}
+
+// ─── GET /api/appointments/:id/fhir/encounters ───────────────────────────────
+// ─── GET /api/appointments/:id/fhir/notes ─────────────────────────────────────
+// ─── GET /api/appointments/:id/fhir/observations ──────────────────────────────
+// ─── GET /api/appointments/:id/fhir/context ────────────────────────────────────
+// External-EMR (FHIR) data for the patient of THIS appointment, scoped to a
+// doctor who is actually authorized on it — replaces the old
+// /api/fhir/patients/:fhirId/* routes, which only checked "is a doctor" and
+// let any doctor account pull any patient's external record by id.
+router.get("/:id/fhir/encounters", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const resolved = await resolveAppointmentFhirId(req.params.id, req.session!.getUserId());
+  if (!resolved.ok) { res.status(resolved.status).json({ error: resolved.error }); return; }
+  if (!resolved.fhirPatientId) { res.json({ linked: false, encounters: [] }); return; }
+  try {
+    res.json({ linked: true, encounters: await getFhirEncounters(resolved.fhirPatientId) });
+  } catch (err) {
+    handleFhirError(err, res);
+  }
+});
+
+router.get("/:id/fhir/notes", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const resolved = await resolveAppointmentFhirId(req.params.id, req.session!.getUserId());
+  if (!resolved.ok) { res.status(resolved.status).json({ error: resolved.error }); return; }
+  if (!resolved.fhirPatientId) { res.json({ linked: false, notes: [] }); return; }
+  try {
+    res.json({ linked: true, notes: await getFhirNotes(resolved.fhirPatientId) });
+  } catch (err) {
+    handleFhirError(err, res);
+  }
+});
+
+router.get("/:id/fhir/observations", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const resolved = await resolveAppointmentFhirId(req.params.id, req.session!.getUserId());
+  if (!resolved.ok) { res.status(resolved.status).json({ error: resolved.error }); return; }
+  if (!resolved.fhirPatientId) { res.json({ linked: false, observations: [] }); return; }
+  try {
+    res.json({ linked: true, observations: await getFhirObservations(resolved.fhirPatientId) });
+  } catch (err) {
+    handleFhirError(err, res);
+  }
+});
+
+router.get("/:id/fhir/context", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const resolved = await resolveAppointmentFhirId(req.params.id, req.session!.getUserId());
+  if (!resolved.ok) { res.status(resolved.status).json({ error: resolved.error }); return; }
+  if (!resolved.fhirPatientId) { res.json({ linked: false, conditions: [], medications: [] }); return; }
+  try {
+    res.json({ linked: true, ...(await getFhirContext(resolved.fhirPatientId)) });
+  } catch (err) {
+    handleFhirError(err, res);
+  }
+});
+
 // ─── POST /api/appointments/patient/:patientId/notes ────────────────────────
 // Doctor adds a freestanding clinical note to a patient's record — not tied
 // to any specific appointment/encounter (unlike an EMR addendum). Append-only,
@@ -1613,8 +1764,6 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
       return;
     }
 
-    const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
-    const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
     // Doctors connect from a browser on the same machine → use localhost (avoids Chrome
     // blocking WebRTC from HTTP pages to non-localhost IPs).
     // Patients connect from a physical device on the LAN → use LAN IP.
@@ -1626,7 +1775,7 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
       ? (await doctorsContainer.item(userId, userId).read()).resource?.fullName
       : (await patientsContainer.item(userId, userId).read()).resource?.fullName;
 
-    const at = new AccessToken(apiKey, apiSecret, {
+    const at = new AccessToken(livekitApiKey, livekitApiSecret, {
       identity: userId,
       name:     participantName,
       ttl:      2 * 60 * 60, // 2 hours

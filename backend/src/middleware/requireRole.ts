@@ -25,23 +25,6 @@ export function requireRole(...roles: string[]) {
         return;
       }
 
-      // Dev fallback: if patient role is among the required roles, use mock session
-      if (roles.includes("patient")) {
-        req.session = {
-          getUserId: () => "patient_1",
-          getHandle: () => "mock-handle",
-          getAccessTokenPayload: () => ({}),
-          getSessionDataFromServer: async () => ({}),
-          updateSessionDataInDatabase: async () => {},
-          mergeIntoAccessTokenPayload: async () => {},
-          revokeSession: async () => {},
-          getExpiryTime: () => Date.now() + 3600 * 1000,
-          getAccessToken: () => "mock-token",
-        } as any;
-        next();
-        return;
-      }
-
       res.status(401).json({ error: "Session required" });
     },
   ];

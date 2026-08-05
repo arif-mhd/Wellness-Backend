@@ -171,6 +171,27 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/fee-requests",
+    label: "Fee Requests",
+    icon: (active: boolean) => (
+      <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+        <path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" />
+        <path d="M9 14l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/insurance-verifications",
+    label: "Insurance Verifications",
+    icon: (active: boolean) => (
+      <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/orders",
     label: "Orders",
     icon: (active: boolean) => (

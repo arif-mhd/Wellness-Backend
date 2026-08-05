@@ -81,7 +81,14 @@ function ClinicInsuranceContent() {
     setForm({ name: p.name, network: p.network, discounts: p.discounts, spcContractFileUrl: p.spcContractFileUrl, renewDate: p.renewDate ?? "" });
   }
 
+  // A policy always belongs to exactly one branch — with no branch picked
+  // (viewing "All" on a multi-branch org), there's nothing to attach it to,
+  // so this is blocked here rather than letting the form open and fail at
+  // Save with the raw backend "branchId is required." message.
+  const needsBranchSelection = hasMultipleBranches && !branchId;
+
   function startAdd() {
+    if (needsBranchSelection) return;
     setSelectedId(null);
     setEditing(true);
     setError("");
@@ -201,12 +208,22 @@ function ClinicInsuranceContent() {
           {canManage && (
             <button
               onClick={startAdd}
-              className="px-6 py-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+              disabled={needsBranchSelection}
+              title={needsBranchSelection ? "Select a specific branch below first — a policy belongs to one branch." : undefined}
+              className={`px-6 py-2 text-white text-[13px] font-medium rounded-xl shadow-sm transition-all ${
+                needsBranchSelection
+                  ? "bg-[#B7C1D9] cursor-not-allowed"
+                  : "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              }`}
             >
               Add Insurance
             </button>
           )}
         </div>
+
+        {needsBranchSelection && (
+          <p className="text-[12px] text-[#9EA5AD] -mt-2 mb-4">Select a branch below to add or manage its insurance policies.</p>
+        )}
 
         {/* Branch selector — same ALL / Select Branch pattern used elsewhere in the portal */}
         {hasMultipleBranches && (

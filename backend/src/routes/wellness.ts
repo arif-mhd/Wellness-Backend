@@ -32,8 +32,6 @@ router.post("/analyze-food-image", async (req: SessionRequest, res: Response) =>
     return;
   }
 
-  console.log(`[analyze-food-image] key length=${apiKey.length} prefix=${apiKey.slice(0, 8)}`);
-
   const safeMime = mimeType || "image/jpeg";
 
   const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):

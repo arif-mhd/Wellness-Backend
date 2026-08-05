@@ -13,9 +13,11 @@ const MAX_ATTEMPTS = 5;
 //   "registration"   — blocks if email already exists in patients
 //   "reset"          — blocks if email NOT in patients
 //   "pharmacy_reset" — blocks if email NOT in pharmacies
-//   "login_2fa"      — no existence check (doctor already authenticated)
-//   "enable_2fa"     — no existence check (doctor already authenticated)
-//   "doctor_reset"   — no existence check (used by doctor forgot-password flow)
+//   "login_2fa"          — no existence check (doctor already authenticated)
+//   "enable_2fa"         — no existence check (doctor already authenticated)
+//   "doctor_reset"       — no existence check (used by doctor forgot-password flow)
+//   "clinic_fee_change"  — no existence check (clinic already authenticated)
+//   "clinic_withdrawal"  — no existence check (clinic already authenticated)
 router.post("/send", async (req: Request, res: Response) => {
   try {
     const { email, purpose = "registration" } = req.body;
@@ -111,21 +113,27 @@ router.post("/send", async (req: Request, res: Response) => {
     });
 
     // Map purpose to sendOtpEmail purpose type
-    const emailPurpose: "login" | "enable_2fa" | "registration" | "reset" =
-      purpose === "enable_2fa"   ? "enable_2fa"   :
-      purpose === "registration" ? "registration" :
-      purpose === "reset"        ? "reset"        :
+    const emailPurpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" =
+      purpose === "enable_2fa"       ? "enable_2fa"       :
+      purpose === "registration"     ? "registration"     :
+      purpose === "reset"            ? "reset"            :
+      purpose === "clinic_fee_change" ? "clinic_fee_change" :
+      purpose === "clinic_withdrawal" ? "clinic_withdrawal" :
       "login";
 
     try {
       await sendOtpEmail(normalizedEmail, code, emailPurpose);
     } catch (emailErr: any) {
-      // When using onboarding@resend.dev (sandbox), Resend only delivers to the
-      // account owner's email. Log the OTP so testing can proceed without a verified domain.
-      const isSandbox = (process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev") === "onboarding@resend.dev";
-      if (isSandbox) {
-        console.warn(`[otp/send] SANDBOX — OTP for ${normalizedEmail} is: ${code}`);
+      // In local/dev, Resend's sandbox sender (onboarding@resend.dev) only
+      // delivers to the account owner's email, so log the OTP to let testing
+      // proceed without a verified domain. Gated strictly on NODE_ENV, never
+      // on whether a sender domain happens to be configured — a production
+      // deploy that's missing RESEND_FROM_EMAIL must fail loudly, not
+      // silently degrade to logging real users' OTP codes.
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[otp/send] DEV — email delivery failed, OTP for ${normalizedEmail} is: ${code}`);
       } else {
+        console.error("[otp/send] OTP email delivery failed in production:", emailErr);
         throw emailErr;
       }
     }

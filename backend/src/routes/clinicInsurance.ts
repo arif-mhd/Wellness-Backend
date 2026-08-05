@@ -1,10 +1,64 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
-import { clinicsContainer } from "../config/cosmos";
+import { clinicsContainer, doctorsContainer } from "../config/cosmos";
 import { resolveClinicScope, scopeToClinicIds, hasPermission } from "../utils/clinicScope";
 
 const router = Router();
+
+// Both clinic and patient insurance entries are free text (no shared provider
+// ID exists between "org.insurancePolicies[].name" and
+// "patient.insurance[].provider"), so matching is a best-effort, lenient
+// case-insensitive substring check in both directions — not a strict
+// provider-ID system. Used both to decide what to *offer* a patient at
+// booking and, server-side, to validate what they actually submitted.
+export function insuranceNamesMatch(patientProvider: string, clinicPolicyName: string): boolean {
+  const a = patientProvider.trim().toLowerCase();
+  const b = clinicPolicyName.trim().toLowerCase();
+  if (!a || !b) return false;
+  return b.includes(a) || a.includes(b);
+}
+
+// A real (non-main) branch has no standalone Cosmos document of its own —
+// its data lives nested inside the parent org's own top-level doc, under
+// branches[]. Given only a clinicId (which may be an org's own id, for the
+// main branch, or a real branch's id), there's no cheap direct lookup to the
+// owning org doc without a caller-provided orgId hint (which clinic-staff
+// scopes have, but a doctor/patient-booking context does not) — so this
+// falls back to a query matching either the org's own id or a nested branch
+// id. Infrequent, booking-time-only lookup; not a hot path.
+export async function loadOrgDocForClinicId(clinicId: string): Promise<any | null> {
+  const { resources } = await clinicsContainer.items
+    .query({
+      query: "SELECT * FROM c WHERE c.id = @clinicId OR EXISTS(SELECT VALUE b FROM b IN c.branches WHERE b.id = @clinicId)",
+      parameters: [{ name: "@clinicId", value: clinicId }],
+    })
+    .fetchAll();
+  return resources[0] ?? null;
+}
+
+// ─── GET /api/clinics/insurance-policies/by-doctor/:doctorId ────────────────
+// Patient-facing (not clinic-staff-gated): given a doctor, returns the
+// active insurance policies that doctor's clinic accepts, trimmed to what a
+// patient needs to decide/display — no internal contract file or timestamps.
+router.get("/by-doctor/:doctorId", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const { resource: doctor } = await doctorsContainer.item(req.params.doctorId, req.params.doctorId).read().catch(() => ({ resource: undefined as any }));
+    if (!doctor || !doctor.clinicId) { res.json({ policies: [] }); return; }
+
+    const org = await loadOrgDocForClinicId(doctor.clinicId);
+    if (!org) { res.json({ policies: [] }); return; }
+
+    const policies = (org.insurancePolicies ?? [])
+      .filter((p: any) => p.clinicId === doctor.clinicId && p.status === "active")
+      .map((p: any) => ({ id: p.id, name: p.name, network: p.network ?? "", discounts: p.discounts ?? "" }));
+
+    res.json({ policies });
+  } catch (err) {
+    console.error("Fetch insurance policies by doctor error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 // Every insurance policy lives in a flat array on the ORG's own top-level doc
 // (org.insurancePolicies), regardless of which branch it belongs to — each
