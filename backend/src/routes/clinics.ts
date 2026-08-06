@@ -532,6 +532,7 @@ router.get("/dashboard", requireRole("clinic"), async (req: SessionRequest, res:
       },
       recentAppointments: upcoming.map((a) => ({
         id: a.id,
+        patientId: a.patientId,
         patientName: patientById[a.patientId]?.fullName ?? "Patient",
         patientEmail: patientById[a.patientId]?.email ?? "",
         reason: a.reason ?? "General Consultation",

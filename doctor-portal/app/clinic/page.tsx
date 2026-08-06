@@ -26,6 +26,7 @@ interface ClinicDoctor {
 
 interface RecentAppointment {
   id: string;
+  patientId: string;
   patientName: string;
   patientEmail: string;
   reason: string;
@@ -414,7 +415,7 @@ function ClinicHomeContent() {
                         {parseLocalISO(a.scheduledAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}
                       </span>
                       <button
-                        onClick={() => goToDoctor(a.doctorId)}
+                        onClick={() => router.push(`/clinic/patients/${a.patientId}`)}
                         className="h-[32px] px-[16px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] shrink-0"
                         style={{ fontFamily: "Outfit, sans-serif" }}
                       >
