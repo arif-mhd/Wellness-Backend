@@ -2,21 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Session from "supertokens-web-js/recipe/session";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
-async function adminFetch(path: string, options: RequestInit = {}) {
-  const token = await Session.getAccessToken();
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token ?? ""}`,
-      ...(options.headers ?? {}),
-    },
-  });
-}
+import { apiFetch } from "@/lib/apiFetch";
 
 type NotificationType =
   | "doctor_approval"
@@ -86,9 +72,289 @@ function notificationAvatar(type: NotificationType) {
   );
 }
 
+// ─── Search result types ────────────────────────────────────────────────────
+
+interface SearchResult {
+  type: "doctor" | "clinic" | "patient" | "appointment";
+  id: string;
+  title: string;
+  subtitle: string;
+  status?: string;
+  date?: string;
+  avatarUrl?: string | null;
+  href: string;
+}
+
+interface AdminSearchResults {
+  doctors: SearchResult[];
+  clinics: SearchResult[];
+  patients: SearchResult[];
+  appointments: SearchResult[];
+}
+
+function fmtDate(iso?: string) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch { return ""; }
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  doctor:      "bg-[#5476FC]/10 text-[#5476FC]",
+  clinic:      "bg-emerald-50 text-emerald-600",
+  patient:     "bg-purple-50 text-purple-600",
+  appointment: "bg-amber-50 text-amber-600",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  doctor: "Doctor", clinic: "Clinic", patient: "Patient", appointment: "Appt",
+};
+
+function SearchResultAvatar({ item }: { item: SearchResult }) {
+  if (item.avatarUrl) {
+    return <img src={item.avatarUrl} className="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="" />;
+  }
+  const initials = item.title.slice(0, 2).toUpperCase();
+  const cls = TYPE_COLORS[item.type] ?? "bg-slate-100 text-slate-500";
+  return (
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${cls}`}>
+      {initials}
+    </div>
+  );
+}
+
+function SearchTypeBadge({ type }: { type: string }) {
+  const cls = TYPE_COLORS[type] ?? "bg-slate-100 text-slate-500";
+  return (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${cls}`}>
+      {TYPE_LABELS[type] ?? type}
+    </span>
+  );
+}
+
+// ─── GlobalSearch ────────────────────────────────────────────────────────────
+
+function GlobalSearch() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<AdminSearchResults | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const totalResults = results
+    ? results.doctors.length + results.clinics.length + results.patients.length + results.appointments.length
+    : 0;
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim() || query.trim().length < 2) {
+      setResults(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/admin/search?q=${encodeURIComponent(query.trim())}`);
+        if (res.ok) {
+          const data = await res.json();
+          setResults(data);
+          setOpen(true);
+        }
+      } catch { /* silent */ } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  // Click outside closes dropdown
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function handleNavigate(href: string) {
+    setOpen(false);
+    setQuery("");
+    setResults(null);
+    router.push(href);
+  }
+
+  const showDropdown = open && query.trim().length >= 2;
+
+  return (
+    <div ref={wrapperRef} className="flex-1 max-w-lg mx-auto relative">
+      {/* Search icon / spinner */}
+      <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
+        {loading ? (
+          <div className="w-4 h-4 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        )}
+      </div>
+
+      <input
+        id="topbar-search"
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { if (results && totalResults > 0) setOpen(true); }}
+        onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); setQuery(""); setResults(null); } }}
+        placeholder="Search doctors, clinics, patients…"
+        className="w-full pl-12 pr-10 py-2.5 text-sm bg-[#eef2f7] border-none rounded-full placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white text-slate-700 font-medium transition-all"
+      />
+
+      {/* Clear button */}
+      {query && (
+        <button
+          onClick={() => { setQuery(""); setResults(null); setOpen(false); }}
+          className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
+
+      {/* Dropdown */}
+      {showDropdown && (
+        <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-2xl border border-slate-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-[9999] overflow-hidden">
+          {loading && !results ? (
+            <div className="px-5 py-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-2.5 bg-gray-100 rounded-full w-2/3" />
+                    <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !results || totalResults === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs font-semibold text-slate-400">No results for &ldquo;{query}&rdquo;</p>
+              <p className="text-[10px] text-slate-300 mt-1">Try a doctor name, clinic, or patient email</p>
+            </div>
+          ) : (
+            <div className="max-h-[480px] overflow-y-auto divide-y divide-slate-50">
+
+              {/* Doctors */}
+              {results.doctors.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Doctors</p>
+                  {results.doctors.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left group"
+                    >
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate group-hover:text-[#5476FC] transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{item.subtitle}</p>
+                      </div>
+                      <SearchTypeBadge type={item.type} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Clinics */}
+              {results.clinics.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Clinics</p>
+                  {results.clinics.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left group"
+                    >
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate group-hover:text-emerald-600 transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{item.subtitle}</p>
+                      </div>
+                      <SearchTypeBadge type={item.type} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Patients */}
+              {results.patients.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Patients</p>
+                  {results.patients.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left group"
+                    >
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate group-hover:text-purple-600 transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{item.subtitle}</p>
+                      </div>
+                      <SearchTypeBadge type={item.type} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Appointments */}
+              {results.appointments.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Appointments</p>
+                  {results.appointments.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left group"
+                    >
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate group-hover:text-amber-500 transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{item.subtitle}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <SearchTypeBadge type={item.type} />
+                        {item.date && <span className="text-[9px] text-slate-300">{fmtDate(item.date)}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100">
+                <p className="text-[9px] text-slate-300 text-center">
+                  {totalResults} result{totalResults !== 1 ? "s" : ""} · press <kbd className="bg-white border border-slate-200 px-1 rounded text-[8px]">Esc</kbd> to close
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TopBar ──────────────────────────────────────────────────────────────────
+
 export default function TopBar() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"Unread" | "All">("Unread");
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -99,7 +365,7 @@ export default function TopBar() {
   const fetchNotifications = useCallback(async () => {
     setNotifLoading(true);
     try {
-      const res = await adminFetch("/api/admin/notifications");
+      const res = await apiFetch("/api/admin/notifications");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications ?? []);
@@ -123,7 +389,7 @@ export default function TopBar() {
   async function markAsRead(id: string) {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     try {
-      await adminFetch(`/api/admin/notifications/${id}/read`, { method: "PATCH" });
+      await apiFetch(`/api/admin/notifications/${id}/read`, { method: "PATCH" });
     } catch {
       // optimistic update already applied — next fetch will reconcile if it failed
     }
@@ -157,25 +423,8 @@ export default function TopBar() {
         />
       </div>
 
-      {/* Middle: Pill Search Input */}
-      <div className="flex-1 max-w-lg mx-auto relative">
-        <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          id="topbar-search"
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search Anything with AI"
-          className="w-full pl-12 pr-5 py-2.5 text-sm bg-[#eef2f7] border-none rounded-full placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white text-slate-700 font-medium transition-all"
-        />
-      </div>
+      {/* Middle: Global Search */}
+      <GlobalSearch />
 
       {/* Right: Action Buttons and Notification icons */}
       <div className="flex items-center gap-3">
@@ -253,7 +502,7 @@ export default function TopBar() {
                     <button
                       onClick={async () => {
                         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-                        try { await adminFetch("/api/admin/notifications/read-all", { method: "PATCH" }); } catch {}
+                        try { await apiFetch("/api/admin/notifications/read-all", { method: "PATCH" }); } catch {}
                       }}
                       className="text-[11px] font-bold text-[#6A8BFF] hover:text-[#4f6fe0] transition mb-3"
                     >
@@ -326,4 +575,3 @@ export default function TopBar() {
     </header>
   );
 }
-
