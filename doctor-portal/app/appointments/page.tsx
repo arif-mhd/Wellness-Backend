@@ -29,19 +29,12 @@ function mapToPatient(apt: any, index: number): Patient {
   const isToday = d.getFullYear() === today.getFullYear() &&
                   d.getMonth() === today.getMonth() &&
                   d.getDate() === today.getDate();
+  // The backend now auto-cancels any appointment whose scheduled day has
+  // fully passed without completing (see autoExpireStaleAppointments) — so
+  // apt.status is authoritative here, no elapsed-time guessing needed.
   let status: Patient["status"] = "Scheduled";
   if (apt.status === "in_progress") status = "Waiting";
   else if (apt.status === "completed" || apt.status === "cancelled") status = "Completed";
-  else if (apt.status === "scheduled") {
-    // The backend never auto-flips status when a slot's time passes — it only
-    // changes via an explicit doctor action (starting/ending a call). A
-    // "scheduled" appointment whose time is well past is effectively a missed
-    // consultation; treat it as Completed here so its Consult Now button
-    // greys out instead of staying live for an appointment that already happened.
-    const PAST_DUE_GRACE_MINUTES = 60;
-    const minutesPast = (Date.now() - d.getTime()) / 60000;
-    if (minutesPast > PAST_DUE_GRACE_MINUTES) status = "Completed";
-  }
 
   const preVisitForm = apt.preVisitData ? {
     isQuestionnaire: true,

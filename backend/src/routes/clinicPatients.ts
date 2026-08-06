@@ -8,6 +8,7 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 
 const router = Router();
 
@@ -16,15 +17,6 @@ function calcAge(dob: string | null | undefined): number | null {
   const birth = new Date(dob);
   if (isNaN(birth.getTime())) return null;
   return Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-}
-
-// If an appointment was never progressed (still 'scheduled') but its time
-// has already passed, report it as 'completed' for display purposes.
-function effectiveStatus(apt: { status: string; scheduledAt: string }): string {
-  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) {
-    return "completed";
-  }
-  return apt.status;
 }
 
 // Resolves display identity (name/email/dob/avatar/height/weight/bloodGroup/gender)
@@ -74,6 +66,7 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         query: `SELECT * FROM c WHERE ${clause} ORDER BY c.scheduledAt DESC`,
         parameters,
       });
+      await autoExpireStaleAppointments(appointments);
     }
 
     const patientIds = Array.from(new Set(appointments.map((a) => a.patientId).filter(Boolean)));
@@ -137,7 +130,7 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         summary: latest?.reason ?? "—",
         lastConsult: latest?.scheduledAt ?? null,
         doctors,
-        consultations: sorted.map((a) => ({ reason: a.reason, date: a.scheduledAt, status: effectiveStatus(a) })),
+        consultations: sorted.map((a) => ({ reason: a.reason, date: a.scheduledAt, status: a.status })),
         nextAppointmentId: nextUpcoming?.id ?? null,
         isNew,
       };
@@ -182,6 +175,7 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
           ...(familyMemberId ? [{ name: "@familyMemberId", value: familyMemberId }] : []),
         ],
       });
+      await autoExpireStaleAppointments(appointments);
     }
 
     if (appointments.length === 0) {
@@ -210,7 +204,7 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
       age,
       reason: a.reason ?? "General Consultation",
       scheduledAt: a.scheduledAt,
-      status: effectiveStatus(a),
+      status: a.status,
     }));
 
     res.json({
