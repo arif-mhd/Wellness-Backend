@@ -427,6 +427,14 @@ router.post(
 
 // ── PUT /api/patients/insurance ──────────────────────────────────────────────
 // Body: { insurance: InsuranceItem[] }
+// A policy's status now gates real behavior (booking eligibility, per the
+// insurance-verification workflow), so this can no longer just trust
+// whatever status the client sends — that would let a patient self-approve.
+// Reconciled against the currently-stored array instead: a brand-new entry
+// (or one whose provider/policyId/plan changed) is always forced back to
+// "pending"; an unchanged existing entry keeps whatever status Wellness
+// Admin already set for it (active/rejected/pending), ignoring the client's
+// value entirely.
 router.put("/insurance", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
@@ -438,7 +446,18 @@ router.put("/insurance", requireRole("patient"), async (req: SessionRequest, res
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    await patientsContainer.items.upsert({ ...existing, insurance, updatedAt: new Date().toISOString() });
+    const currentInsurance: any[] = (existing as any).insurance ?? [];
+    const reconciled = (Array.isArray(insurance) ? insurance : []).map((item: any) => {
+      const prior = currentInsurance.find((p) => p.id === item.id);
+      const unchanged = prior && prior.provider === item.provider && prior.policyId === item.policyId && (prior.plan ?? null) === (item.plan ?? null);
+      return {
+        ...item,
+        status: unchanged ? prior.status : "pending",
+        ...(unchanged ? {} : { rejectionReason: null, reviewedBy: null, reviewedAt: null }),
+      };
+    });
+
+    await patientsContainer.items.upsert({ ...existing, insurance: reconciled, updatedAt: new Date().toISOString() });
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Insurance update error:", err);

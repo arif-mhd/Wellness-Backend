@@ -9,15 +9,14 @@ import {
   doctorsContainer,
   queryDocuments,
 } from "../config/cosmos";
+import { livekitApiKey, livekitApiSecret } from "../config/livekit";
 
 const router = Router();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeChatToken(userId: string, channel: string, name?: string): Promise<string> {
-  const apiKey    = process.env.LIVEKIT_API_KEY    || "devkey";
-  const apiSecret = process.env.LIVEKIT_API_SECRET || "devsecret0000000000000000000000";
-  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name, ttl: 4 * 60 * 60 });
+  const at = new AccessToken(livekitApiKey, livekitApiSecret, { identity: userId, name, ttl: 4 * 60 * 60 });
   at.addGrant({ roomJoin: true, room: channel, canPublish: true, canSubscribe: true, canPublishData: true });
   return at.toJwt();
 }

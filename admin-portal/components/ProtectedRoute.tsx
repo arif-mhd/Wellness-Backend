@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { doesSessionExist } from "supertokens-web-js/recipe/session";
 
 export default function ProtectedRoute({
   children,
@@ -12,8 +13,13 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
-    // Temporarily bypass authentication session check for frontend-only design/testing branch
-    setChecking(false);
+    doesSessionExist().then((exists) => {
+      if (!exists) {
+        router.replace("/auth/login");
+      } else {
+        setChecking(false);
+      }
+    });
   }, [router]);
 
   if (checking) {

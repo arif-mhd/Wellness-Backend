@@ -1,22 +1,25 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { patientsContainer } from "../config/cosmos";
 import { FhirError } from "../services/fhirClient";
 import {
-  searchFhirPatients,
-  getFhirPatient,
   getFhirEncounters,
   getFhirNotes,
   getFhirObservations,
-  getFhirContext,
 } from "../services/fhirService";
 
 // Read-only proxy to an external EMR's FHIR API (HAPI public sandbox today,
 // standing in for the clinic's Cortex FHIR endpoint — see config/fhir.ts).
-// Doctors use this to pull a patient's history from the external EMR for
-// context during a consult. This is entirely separate from, and does not
-// modify, the platform's own /api/appointments/:id/emr note-taking flow.
+//
+// Doctor-facing access to a PATIENT'S external record lives in
+// appointments.ts (GET /api/appointments/:id/fhir/*) instead of here — those
+// routes verify the calling doctor is actually authorized on a specific
+// appointment before resolving that patient's fhirPatientId server-side.
+// This file used to also expose /patients/search and /patients/:fhirId/*
+// directly to any doctor account with no such check (any doctor could look
+// up or free-text-search any patient's external record); those routes have
+// been removed. Only the patient's own self-service lookup remains here.
 const router = Router();
 
 function handleFhirError(err: unknown, res: Response) {
@@ -52,63 +55,6 @@ router.get("/me", requireRole("patient"), async (req: SessionRequest, res: Respo
     ]);
 
     res.json({ linked: true, encounters, notes, observations });
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/search ────────────────────────────────────────────
-router.get("/patients/search", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    const { given, family, identifier } = req.query as Record<string, string>;
-    res.json(await searchFhirPatients({ given, family, identifier }));
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/:fhirId ───────────────────────────────────────────
-router.get("/patients/:fhirId", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    res.json(await getFhirPatient(req.params.fhirId));
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/:fhirId/encounters ────────────────────────────────
-router.get("/patients/:fhirId/encounters", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    res.json(await getFhirEncounters(req.params.fhirId));
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/:fhirId/notes ─────────────────────────────────────
-// Merged DocumentReference + Composition — the "doctor notes" resources.
-router.get("/patients/:fhirId/notes", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    res.json(await getFhirNotes(req.params.fhirId));
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/:fhirId/observations ──────────────────────────────
-router.get("/patients/:fhirId/observations", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    res.json(await getFhirObservations(req.params.fhirId));
-  } catch (err) {
-    handleFhirError(err, res);
-  }
-});
-
-// ─── GET /api/fhir/patients/:fhirId/context ───────────────────────────────────
-// Conditions + MedicationRequests — background context for the notes above.
-router.get("/patients/:fhirId/context", requireRole("doctor"), async (req: Request, res: Response) => {
-  try {
-    res.json(await getFhirContext(req.params.fhirId));
   } catch (err) {
     handleFhirError(err, res);
   }

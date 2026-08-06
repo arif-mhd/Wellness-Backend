@@ -643,6 +643,15 @@ router.get("/reviews", requireRole("clinic"), async (req: SessionRequest, res: R
   }
 });
 
+// Strips fields that mainBranchFrom()/branchAsPublicClinic() legitimately
+// include for the clinic's OWN authenticated /me view (payout configuration,
+// an internal address-verification document) but that a public,
+// unauthenticated directory listing/profile has no business exposing.
+function omitInternalFields<T extends { paymentSettings?: unknown; addressProofFileUrl?: unknown }>(shape: T) {
+  const { paymentSettings, addressProofFileUrl, ...rest } = shape;
+  return rest;
+}
+
 // ─── GET /api/clinics ─────────────────────────────────────────────────────────
 // Public directory — approved clinics only. Mirrors GET /api/doctors.
 // clinicsContainer also stores branch senior-staff login docs (they carry
@@ -662,10 +671,10 @@ router.get("/", async (_req: Request, res: Response) => {
       .fetchAll();
 
     const clinics = orgs.flatMap((org: any) => [
-      org,
+      omitInternalFields({ ...mainBranchFrom(org), clinicName: org.clinicName || org.fullName, fullName: org.clinicName || org.fullName }),
       ...(org.branches ?? [])
         .filter((b: any) => b.status === "active")
-        .map((b: any) => branchAsPublicClinic(org, b)),
+        .map((b: any) => omitInternalFields(branchAsPublicClinic(org, b))),
     ]);
 
     res.json({ clinics });
@@ -690,7 +699,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       .catch(() => ({ resource: undefined as any }));
 
     if (direct && direct.status === "approved" && !direct.branchId) {
-      res.json({ clinic: direct });
+      res.json({ clinic: omitInternalFields({ ...mainBranchFrom(direct), clinicName: direct.clinicName || direct.fullName, fullName: direct.clinicName || direct.fullName }) });
       return;
     }
 
@@ -708,7 +717,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ clinic: branchAsPublicClinic(org, branch) });
+    res.json({ clinic: omitInternalFields(branchAsPublicClinic(org, branch)) });
   } catch (err) {
     console.error("Fetch clinic error:", err);
     res.status(500).json({ error: "Internal server error." });

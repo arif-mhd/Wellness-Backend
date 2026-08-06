@@ -114,6 +114,12 @@ export const articlesContainer: Container = db.container("articles");
 /** OTP codes — partition key: /email (short-lived, auto-TTL 600s) */
 export const otpCodesContainer: Container = db.container("otpCodes");
 
+/** Clinic fee change requests — partition key: /orgId (pending admin approval before a rate takes effect) */
+export const feeChangeRequestsContainer: Container = db.container("feeChangeRequests");
+
+/** Clinic withdrawal requests — partition key: /orgId (bookkeeping only — no real payment rail) */
+export const withdrawalRequestsContainer: Container = db.container("withdrawalRequests");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -156,6 +162,8 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "adminNotifications",     partitionKey: { paths: ["/id"] } },
     { id: "articles",               partitionKey: { paths: ["/id"] } },
     { id: "otpCodes",               partitionKey: { paths: ["/email"] }, defaultTtl: 600 },
+    { id: "feeChangeRequests",      partitionKey: { paths: ["/orgId"] } },
+    { id: "withdrawalRequests",     partitionKey: { paths: ["/orgId"] } },
   ];
 
   for (const spec of required) {

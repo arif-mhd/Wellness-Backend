@@ -10,7 +10,7 @@ export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Wellness Central <on
 export async function sendOtpEmail(
   to: string,
   code: string,
-  purpose: "login" | "enable_2fa" | "registration" | "reset" = "login"
+  purpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" = "login"
 ): Promise<void> {
   const subject =
     purpose === "enable_2fa"
@@ -19,6 +19,10 @@ export async function sendOtpEmail(
       ? "Reset your Wellness password"
       : purpose === "registration"
       ? "Your Wellness verification code"
+      : purpose === "clinic_fee_change"
+      ? "Your Wellness – Confirm Consultation Fee Change"
+      : purpose === "clinic_withdrawal"
+      ? "Your Wellness – Confirm Withdrawal Request"
       : "Your Wellness – Login Verification Code";
 
   const purposeLabel =
@@ -28,6 +32,10 @@ export async function sendOtpEmail(
       ? "reset your password"
       : purpose === "registration"
       ? "complete your registration"
+      : purpose === "clinic_fee_change"
+      ? "confirm your consultation fee change request"
+      : purpose === "clinic_withdrawal"
+      ? "confirm your withdrawal request"
       : "complete your login";
 
   const { error } = await resend.emails.send({

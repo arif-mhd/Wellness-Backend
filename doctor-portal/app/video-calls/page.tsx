@@ -473,14 +473,19 @@ function VideoCallInner() {
           setFhirLoading(true);
           try {
             const [encRes, notesRes, obsRes] = await Promise.all([
-              apiFetch(`/api/fhir/patients/${fhirId}/encounters`),
-              apiFetch(`/api/fhir/patients/${fhirId}/notes`),
-              apiFetch(`/api/fhir/patients/${fhirId}/observations`),
+              apiFetch(`/api/appointments/${appointmentId}/fhir/encounters`),
+              apiFetch(`/api/appointments/${appointmentId}/fhir/notes`),
+              apiFetch(`/api/appointments/${appointmentId}/fhir/observations`),
+            ]);
+            const [encJson, notesJson, obsJson] = await Promise.all([
+              encRes.ok ? encRes.json() : null,
+              notesRes.ok ? notesRes.json() : null,
+              obsRes.ok ? obsRes.json() : null,
             ]);
             setFhirData({
-              encounters: encRes.ok ? await encRes.json() : [],
-              notes:      notesRes.ok ? await notesRes.json() : [],
-              observations: obsRes.ok ? await obsRes.json() : [],
+              encounters: encJson?.encounters ?? [],
+              notes:      notesJson?.notes ?? [],
+              observations: obsJson?.observations ?? [],
             });
           } catch {
             setFhirData(null);

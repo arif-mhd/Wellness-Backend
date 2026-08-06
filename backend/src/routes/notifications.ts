@@ -8,7 +8,7 @@ const router = Router();
 // GET /api/notifications
 // Retrieves notifications for the current user (patient).
 router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
-  const patientId = (req.query.user_id as string) || req.session!.getUserId();
+  const patientId = req.session!.getUserId();
   const unreadOnly = req.query.unread_only === "true";
   const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
 
@@ -52,7 +52,7 @@ router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
 // PATCH /api/notifications/:id/read
 // Marks a specific notification as read.
 router.patch("/:id/read", verifySession(), async (req: SessionRequest, res: Response) => {
-  const patientId = (req.query.user_id as string) || req.session!.getUserId();
+  const patientId = req.session!.getUserId();
   const { id } = req.params;
 
   try {
@@ -96,7 +96,7 @@ router.patch("/:id/read", verifySession(), async (req: SessionRequest, res: Resp
 // PATCH /api/notifications/read-all
 // Marks all notifications for a patient as read.
 router.patch("/read-all", verifySession(), async (req: SessionRequest, res: Response) => {
-  const patientId = (req.query.user_id as string) || req.session!.getUserId();
+  const patientId = req.session!.getUserId();
 
   try {
     const { resources } = await notificationsContainer.items

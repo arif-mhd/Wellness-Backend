@@ -21,8 +21,11 @@ import clinicBranchesRouter from "./routes/clinicBranches";
 import clinicFeedbackRouter from "./routes/clinicFeedback";
 import clinicInsuranceRouter from "./routes/clinicInsurance";
 import clinicPermissionsRouter from "./routes/clinicPermissions";
+import clinicPaymentsRouter from "./routes/clinicPayments";
+import adminFeeRequestsRouter from "./routes/adminFeeRequests";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
+import adminInsuranceVerificationsRouter from "./routes/adminInsuranceVerifications";
 import appointmentsRouter from "./routes/appointments";
 import wellnessRouter from "./routes/wellness";
 import pregnancyRouter from "./routes/pregnancy";
@@ -104,18 +107,21 @@ app.use("/api/clinics/branches", clinicBranchesRouter);
 app.use("/api/clinics/feedback", clinicFeedbackRouter);
 app.use("/api/clinics/insurance-policies", clinicInsuranceRouter);
 app.use("/api/clinics/permissions", clinicPermissionsRouter);
+app.use("/api/clinics/payments", clinicPaymentsRouter);
 
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);
 
 // Admin clinic management (requires admin role)
 app.use("/api/admin/clinics", adminClinicsRouter);
+app.use("/api/admin/fee-requests", adminFeeRequestsRouter);
 
 // Patient self-registration + profile updates (public register, rest require patient role)
 app.use("/api/patients", patientsRouter);
 
 // Admin patient management (requires admin role)
 app.use("/api/admin/patients", adminPatientsRouter);
+app.use("/api/admin/insurance-verifications", adminInsuranceVerificationsRouter);
 
 // Appointment booking + LiveKit tokens (patient + doctor roles)
 app.use("/api/appointments", appointmentsRouter);

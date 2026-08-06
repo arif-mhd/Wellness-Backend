@@ -664,6 +664,30 @@ router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest
   }
 });
 
+// Shapes a doctor document down to the fields the public/patient-facing
+// directory actually needs — excludes Emirates ID, DOB, bank details,
+// address, and other identity/financial fields that have no business being
+// visible to an unauthenticated caller browsing the doctor list.
+function toPublicDoctor(doc: any) {
+  return {
+    id: doc.id,
+    fullName: doc.fullName,
+    specialty: doc.specialty,
+    avatarUrl: doc.avatarUrl,
+    fees: doc.fees,
+    bio: doc.bio,
+    rating: doc.rating,
+    experience: doc.experience,
+    languages: doc.languages,
+    license: doc.license,
+    clinicId: doc.clinicId ?? null,
+    clinicName: doc.clinicName ?? null,
+    isOnline: doc.isOnline,
+    status: doc.status,
+    consultationTimeLimitMins: doc.consultationTimeLimitMins,
+  };
+}
+
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors.
 // Optional ?clinicId= filters to just that clinic's roster (used by the
@@ -681,7 +705,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
 
-    res.json({ doctors: resources });
+    res.json({ doctors: resources.map(toPublicDoctor) });
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
