@@ -34,17 +34,6 @@ function FilterPill({ label, active, onClick, activeClass = "bg-[#24292E] text-w
   );
 }
 
-function TimeFilter({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-[12px] font-medium transition-colors ${active ? "text-[#24292E] font-bold" : "text-[#A7AAB4] hover:text-[#24292E]"}`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function AvatarPlaceholder({ avatarUrl, name, size = "w-10 h-10 text-sm" }: { avatarUrl?: string | null; name?: string; size?: string }) {
   if (avatarUrl) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -86,7 +75,6 @@ function PatientsListContent() {
 
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("ALL");
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -104,8 +92,6 @@ function PatientsListContent() {
 
   const filtered = useMemo(() => {
     return patients.filter((p) => {
-      if (activeTab === "NEW" && !p.isNew) return false;
-
       if (timeFilter !== "All") {
         const today = new Date();
         const weekStart = new Date(today);
@@ -136,11 +122,11 @@ function PatientsListContent() {
 
       return true;
     });
-  }, [patients, activeTab, timeFilter, searchQuery]);
+  }, [patients, timeFilter, searchQuery]);
 
   const selectedPatient = patients.find((p) => p.id === selectedId) ?? filtered[0] ?? null;
 
-  useEffect(() => { setCurrentPage(1); }, [activeTab, timeFilter, searchQuery]);
+  useEffect(() => { setCurrentPage(1); }, [timeFilter, searchQuery]);
 
   useEffect(() => {
     if (!selectedId && filtered.length > 0) setSelectedId(filtered[0].id);
@@ -220,32 +206,29 @@ function PatientsListContent() {
 
           {/* Top Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+            {/* Time-range pills — replaces the old All / New pills */}
             <div className="flex flex-wrap items-center gap-2">
-              <FilterPill label="All" active={activeTab === "ALL"} onClick={() => setActiveTab("ALL")} />
-              <FilterPill label="New" active={activeTab === "NEW"} onClick={() => setActiveTab("NEW")} />
+              <FilterPill label="All"        active={timeFilter === "All"}        onClick={() => setTimeFilter("All")} />
+              <FilterPill label="Today"      active={timeFilter === "Today"}      onClick={() => setTimeFilter("Today")} />
+              <FilterPill label="This Week"  active={timeFilter === "This Week"}  onClick={() => setTimeFilter("This Week")} />
+              <FilterPill label="This month" active={timeFilter === "This month"} onClick={() => setTimeFilter("This month")} />
             </div>
 
-            <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="relative w-full sm:w-auto">
-                  <input
-                    type="text"
-                    placeholder="Search all"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full sm:w-64 h-10 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-[13px] outline-none focus:border-[#5476FC] text-[#24292E] placeholder-[#A7AAB4]"
-                  />
-                  <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A7AAB4]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <TimeFilter label="All" active={timeFilter === "All"} onClick={() => setTimeFilter("All")} />
-                <TimeFilter label="Today" active={timeFilter === "Today"} onClick={() => setTimeFilter("Today")} />
-                <TimeFilter label="This Week" active={timeFilter === "This Week"} onClick={() => setTimeFilter("This Week")} />
-                <TimeFilter label="This month" active={timeFilter === "This month"} onClick={() => setTimeFilter("This month")} />
+            {/* Search bar */}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search all"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full sm:w-64 h-10 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-[13px] outline-none focus:border-[#5476FC] text-[#24292E] placeholder-[#A7AAB4]"
+                />
+                <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A7AAB4]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>
             </div>
           </div>
+
 
           {/* Table List */}
           <div className="w-full flex flex-col gap-3 pb-4 mt-2">
