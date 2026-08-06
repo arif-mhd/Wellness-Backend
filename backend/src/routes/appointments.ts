@@ -16,6 +16,7 @@ import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
 import { getActorClinicIds, getActorPermissionState, hasPermission } from "../utils/clinicScope";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
+import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
@@ -218,31 +219,9 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       );
     }
 
-    // Auto-cancel scheduled appointments whose date has fully passed (before today midnight UTC).
-    // This runs lazily on each fetch rather than requiring a cron job.
-    const startOfToday = new Date();
-    startOfToday.setUTCHours(0, 0, 0, 0);
-    const stale = appointments.filter(
-      (apt) => apt.status === "scheduled" && new Date(apt.scheduledAt) < startOfToday
-    );
-    if (stale.length > 0) {
-      const cancelledAt = new Date().toISOString();
-      await Promise.all(
-        stale.map((apt) =>
-          appointmentsContainer.items.upsert({
-            ...apt,
-            status: "cancelled",
-            cancelledReason: "auto_expired",
-            updatedAt: cancelledAt,
-          })
-        )
-      );
-      stale.forEach((apt) => {
-        apt.status = "cancelled";
-        apt.cancelledReason = "auto_expired";
-        apt.updatedAt = cancelledAt;
-      });
-    }
+    // Auto-cancel appointments whose scheduled day has fully passed without
+    // ever completing (still "scheduled" or stuck "in_progress").
+    await autoExpireStaleAppointments(appointments);
 
     // Enrich with doctor name (and, when the doctor belongs to a clinic, the clinic name)
     const enriched = await Promise.all(
@@ -290,6 +269,10 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
       query: "SELECT * FROM c WHERE c.doctorId = @doctorId ORDER BY c.scheduledAt DESC",
       parameters: [{ name: "@doctorId", value: doctorId }],
     });
+
+    // Auto-cancel appointments whose scheduled day has fully passed without
+    // ever completing (still "scheduled" or stuck "in_progress").
+    await autoExpireStaleAppointments(appointments);
 
     const enriched = await Promise.all(
       appointments.map(async (apt) => {
@@ -807,7 +790,8 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       return;
     }
 
-    const updated = { ...apt, status: "cancelled", updatedAt: new Date().toISOString() };
+    const cancelledReason = isPatient ? "cancelled_by_patient" : isClinic ? "cancelled_by_clinic" : "cancelled_by_doctor";
+    const updated = { ...apt, status: "cancelled", cancelledReason, updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
 
     const now = new Date().toISOString();

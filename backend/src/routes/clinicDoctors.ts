@@ -20,13 +20,21 @@ import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds,
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Loads a doctor by id and confirms it belongs to the calling clinic.
-// Returns null (and has already sent a 404) if not found or not owned —
-// deliberately the same response either way, so a clinic can't probe for
-// the existence of another clinic's doctor.
-async function getOwnedDoctorOr404(clinicId: string, doctorId: string, res: Response) {
+// Aggregate-safe doctor ownership check — verifies the target doctor
+// belongs to ANY clinic/branch the caller can act as (getActorClinicIds),
+// rather than one single resolved branch scope. Needed for every doctor-
+// detail endpoint, since a clinic admin can reach a specific doctor's page
+// from an aggregate (no ?branchId=) view — e.g. the Home dashboard's "New
+// Appointments"/"Doctors Available" cards, which never carry a branchId
+// unless the admin is currently drilled into one specific branch's own
+// dashboard. Using resolveClinicScope's single-branch mode here would 400
+// with "branchId is required" for exactly that (very common) navigation
+// path. Same fix already applied to :id/verify-slots and
+// :id/absences/:absenceId/status below.
+async function getOwnedDoctorAnyBranch(actorId: string, doctorId: string, res: Response) {
+  const allowedClinicIds = await getActorClinicIds(actorId);
   const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read().catch(() => ({ resource: undefined as any }));
-  if (!doctor || doctor.clinicId !== clinicId) {
+  if (!doctor || !allowedClinicIds.includes(doctor.clinicId)) {
     res.status(404).json({ error: "Doctor not found." });
     return null;
   }
@@ -248,11 +256,9 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 
 // ─── GET /api/clinics/doctors/:id ────────────────────────────────────────────
 router.get("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  const clinicId = scope.scopeId;
+  const actorId = req.session!.getUserId();
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
     const [populated] = await populateDoctorStats([doctor]);
     res.json({ doctor: populated });
@@ -264,13 +270,12 @@ router.get("/:id", requireRole("clinic"), async (req: SessionRequest, res: Respo
 
 // ─── PATCH /api/clinics/doctors/:id ──────────────────────────────────────────
 router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_doctors")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
     res.status(403).json({ error: "You don't have permission to manage doctors." });
     return;
   }
-  const clinicId = scope.scopeId;
   const {
     fullName, bio, eligibility, specialty, license, qualification, specializations,
     address, languages, fees, consultationRates, paymentSettings,
@@ -278,7 +283,7 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
   } = req.body;
 
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const updated = {
@@ -316,20 +321,19 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
 
 // ─── PATCH /api/clinics/doctors/:id/online-status ────────────────────────────
 router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_doctors")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
     res.status(403).json({ error: "You don't have permission to manage doctors." });
     return;
   }
-  const clinicId = scope.scopeId;
   const { isOnline } = req.body;
   if (typeof isOnline !== "boolean") {
     res.status(400).json({ error: "isOnline must be a boolean." });
     return;
   }
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
     await doctorsContainer.items.upsert({ ...doctor, isOnline, updatedAt: new Date().toISOString() });
     res.json({ status: "OK", isOnline });
@@ -344,20 +348,19 @@ router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionReq
 // only ever known to whoever typed it into this request — nothing is stored
 // or returned by this endpoint or any other.
 router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_doctors")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
     res.status(403).json({ error: "You don't have permission to manage doctors." });
     return;
   }
-  const clinicId = scope.scopeId;
   const { password } = req.body;
   if (!password || password.length < 8) {
     res.status(400).json({ error: "password must be at least 8 characters." });
     return;
   }
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const result = await EmailPassword.updateEmailOrPassword({
@@ -374,7 +377,7 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
       action: "Doctor Credentials Reset",
       details: `Dr. ${doctor.fullName ?? doctor.id} credentials reset by clinic`,
       performedBy: "Clinic",
-      performedById: scope.actorId,
+      performedById: actorId,
       entityType: "doctor",
       entityId: doctor.id,
     });
@@ -391,20 +394,19 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
 // pending-verification step, since the clinic is the authority for its own
 // doctors (unlike the legacy self-registered-doctor + admin-verifies flow).
 router.put("/:id/slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_schedules")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_schedules")) {
     res.status(403).json({ error: "You don't have permission to manage schedules." });
     return;
   }
-  const clinicId = scope.scopeId;
   const { slots } = req.body;
   if (!Array.isArray(slots)) {
     res.status(400).json({ error: "slots must be an array." });
     return;
   }
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
     await doctorsContainer.items.upsert({ ...doctor, slots, updatedAt: new Date().toISOString() });
     res.json({ status: "OK", slots });
@@ -474,20 +476,19 @@ router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionReque
 
 // ─── POST /api/clinics/doctors/:id/absences ──────────────────────────────────
 router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_schedules")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_schedules")) {
     res.status(403).json({ error: "You don't have permission to manage schedules." });
     return;
   }
-  const clinicId = scope.scopeId;
   const { startDate, endDate, reason, fileUrl, fileName } = req.body;
   if (!startDate || !endDate || !reason) {
     res.status(400).json({ error: "startDate, endDate, and reason are required." });
     return;
   }
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const rangeStart = new Date(new Date(startDate).getTime() - 30 * 60 * 1000).toISOString();
@@ -543,15 +544,14 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
 
 // ─── DELETE /api/clinics/doctors/:id/absences/:absenceId ────────────────────
 router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_schedules")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_schedules")) {
     res.status(403).json({ error: "You don't have permission to manage schedules." });
     return;
   }
-  const clinicId = scope.scopeId;
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const updatedAbsences = (doctor.absences ?? []).filter((a: any) => a.id !== req.params.absenceId);
@@ -621,11 +621,9 @@ router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (re
 
 // ─── GET /api/clinics/doctors/:id/consultations ──────────────────────────────
 router.get("/:id/consultations", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  const clinicId = scope.scopeId;
+  const actorId = req.session!.getUserId();
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const appts = await queryDocuments<any>(appointmentsContainer, {
@@ -672,11 +670,9 @@ router.get("/:id/consultations", requireRole("clinic"), async (req: SessionReque
 
 // ─── GET /api/clinics/doctors/:id/reviews ────────────────────────────────────
 router.get("/:id/reviews", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  const clinicId = scope.scopeId;
+  const actorId = req.session!.getUserId();
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     const reviews = await queryDocuments<any>(feedbackContainer, {
@@ -700,15 +696,14 @@ router.get("/:id/reviews", requireRole("clinic"), async (req: SessionRequest, re
 // Soft-delete: data is preserved so patients retain access to appointment
 // history, but the doctor's account is deactivated and all sessions revoked.
 router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-  if (!hasPermission(scope, "manage_doctors")) {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
     res.status(403).json({ error: "You don't have permission to manage doctors." });
     return;
   }
-  const clinicId = scope.scopeId;
   try {
-    const doctor = await getOwnedDoctorOr404(clinicId, req.params.id, res);
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
 
     await doctorsContainer.items.upsert({
@@ -724,7 +719,7 @@ router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Re
       action: "Doctor Removed",
       details: `Dr. ${doctor.fullName ?? doctor.id} removed by clinic`,
       performedBy: "Clinic",
-      performedById: scope.actorId,
+      performedById: actorId,
       entityType: "doctor",
       entityId: doctor.id,
     });

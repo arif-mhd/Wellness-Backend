@@ -129,12 +129,23 @@ router.post("/bookings", requireRole("patient"), async (req: SessionRequest, res
 });
 
 // ─── GET /api/lab/bookings ────────────────────────────────────────────────────
+// Optional ?profileId= filters to bookings that include at least one item for
+// that specific profile (account owner or a family member) — matches the same
+// active-profile scoping used for appointments.
 router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters: any[] = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.forPatientId = @profileId)";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.createdAt DESC";
     const { resources } = await labBookingsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-      parameters: [{ name: "@pid", value: patientId }],
+      query,
+      parameters,
     }, { partitionKey: patientId }).fetchAll();
     res.json(resources);
   } catch (err) {

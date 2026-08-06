@@ -8,6 +8,7 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 
 const router = Router();
 
@@ -17,17 +18,6 @@ function calcAge(dob: string | null | undefined): number | null {
   if (isNaN(birth.getTime())) return null;
   const diffMs = Date.now() - birth.getTime();
   return Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
-}
-
-// If an appointment was never explicitly progressed (still 'scheduled') but
-// its scheduled time is already in the past, treat it as 'completed' for
-// display purposes. Only 'scheduled' is coerced — in_progress, completed,
-// and cancelled are returned as-is.
-function effectiveStatus(apt: { status: string; scheduledAt: string }): string {
-  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) {
-    return "completed";
-  }
-  return apt.status;
 }
 
 // ─── GET /api/clinics/appointments ───────────────────────────────────────────
@@ -48,6 +38,9 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         query: `SELECT * FROM c WHERE ${clause} ORDER BY c.scheduledAt DESC`,
         parameters,
       });
+      // Auto-cancel appointments whose scheduled day has fully passed
+      // without ever completing (still "scheduled" or stuck "in_progress").
+      await autoExpireStaleAppointments(appointments);
     }
 
     const doctorIds = Array.from(new Set(appointments.map((a) => a.doctorId).filter(Boolean)));
@@ -91,10 +84,11 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         }
       }
 
-      const status = effectiveStatus(apt);
-      const primaryDiagnosis = status === "completed"
-        ? (apt.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded")
-        : "Pending";
+      const status = apt.status;
+      const primaryDiagnosis =
+        status === "completed" ? (apt.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded") :
+        status === "cancelled" ? "—" :
+        "Pending";
 
       return {
         ...apt,
