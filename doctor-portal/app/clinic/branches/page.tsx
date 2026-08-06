@@ -68,6 +68,7 @@ export default function ClinicBranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [addName, setAddName] = useState("");
@@ -184,7 +185,7 @@ export default function ClinicBranchesPage() {
                       return (
                         <div
                           key={b.id}
-                          onClick={() => setSelectedId(b.id)}
+                          onClick={() => { setSelectedId(b.id); setShowMobilePanel(true); }}
                           className={`rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
                             }`}
                         >
@@ -323,8 +324,31 @@ export default function ClinicBranchesPage() {
 
         {/* ── Right: Branch Details panel ──────────────── */}
         {selected && (
-          <div className="w-full xl:w-[300px] bg-white rounded-2xl p-5 flex flex-col gap-4 shrink-0 border border-[#E4E8F0] shadow-sm">
-            <h2 className="text-[#24292E] text-[15px] font-semibold">Branch Details</h2>
+          <>
+            {/* Overlay for mobile */}
+            {showMobilePanel && (
+              <div
+                className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+                onClick={() => setShowMobilePanel(false)}
+              />
+            )}
+            <div className={`
+              ${showMobilePanel ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"}
+              xl:relative xl:flex xl:w-[300px] xl:shrink-0 xl:rounded-2xl xl:max-h-none xl:overflow-visible xl:shadow-sm
+              w-full bg-white border-t xl:border border-[#E4E8F0] flex flex-col
+            `}>
+              {/* Drag handle — mobile only */}
+              <div className="xl:hidden w-full flex justify-center pt-4 pb-1">
+                <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+              </div>
+              <button
+                className="xl:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                onClick={() => setShowMobilePanel(false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+              <div className="p-5 flex flex-col gap-4 w-full">
+                <h2 className="text-[#24292E] text-[15px] font-semibold">Branch Details</h2>
             <div className="h-px bg-[#EBEEF5]" />
 
             <div className="flex items-center gap-3">
@@ -410,6 +434,8 @@ export default function ClinicBranchesPage() {
               </p>
             )}
           </div>
+          </div>
+          </>
         )}
       </div>
 

@@ -82,6 +82,7 @@ export default function ClinicAccountsPage() {
   const [staffLoaded, setStaffLoaded] = useState(false);
 
   const [selected, setSelected] = useState<Selected>(null);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [access, setAccess] = useState<Record<string, boolean>>({});
   const [loadingAccess, setLoadingAccess] = useState(false);
   const [savingAccess, setSavingAccess] = useState(false);
@@ -138,6 +139,7 @@ export default function ClinicAccountsPage() {
     setSelected(next);
     setAccess({});
     setSaveNote("");
+    if (next) setShowMobilePanel(true);
     // A branch itself has no single permissions doc — it's a bulk-apply
     // target, not an account — so there's nothing to fetch for it. Every
     // toggle starts "on" (default-allow) until Save for all users overwrites.
@@ -308,8 +310,28 @@ export default function ClinicAccountsPage() {
       </div>
 
       {/* Right: Access panel */}
-      <div className="w-full lg:w-[420px] lg:shrink-0 mt-6 lg:mt-0">
-        <div className="bg-[#EEF0FC] rounded-[24px] p-5 md:p-7 shadow-sm flex flex-col gap-6 lg:sticky lg:top-4">
+      {showMobilePanel && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+          onClick={() => setShowMobilePanel(false)}
+        />
+      )}
+      <div className={`
+        ${showMobilePanel ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"}
+        lg:relative lg:flex lg:w-[420px] lg:shrink-0 lg:mt-0 lg:rounded-[24px] lg:max-h-none lg:overflow-visible lg:shadow-sm lg:bg-transparent lg:border-0
+        w-full mt-6 bg-[#EEF0FC] border-t lg:border-[#EEF0FC]
+      `}>
+        {/* Drag handle — mobile only */}
+        <div className="lg:hidden w-full flex justify-center pt-4 pb-1">
+          <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+        </div>
+        <button
+          className="lg:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+          onClick={() => setShowMobilePanel(false)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <div className="p-5 md:p-7 flex flex-col gap-6 w-full lg:bg-[#EEF0FC] lg:rounded-[24px] lg:sticky lg:top-4">
           {!selected ? (
             <p className="text-[#838B95] text-sm text-center py-16">Select a branch, doctor, or staff account to manage access.</p>
           ) : (
