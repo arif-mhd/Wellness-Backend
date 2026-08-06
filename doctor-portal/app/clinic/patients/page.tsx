@@ -78,6 +78,7 @@ function PatientsListContent() {
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [reminderState, setReminderState] = useState<Record<string, "idle" | "sending" | "sent" | "error">>({});
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
@@ -149,7 +150,10 @@ function PatientsListContent() {
     const state = reminderState[p.id] ?? "idle";
     return (
       <div
-        onClick={() => setSelectedId(p.id)}
+        onClick={() => {
+          setSelectedId(p.id);
+          setShowMobileDetails(true);
+        }}
         className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${isSelected ? "bg-[#F4F7FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
@@ -305,8 +309,29 @@ function PatientsListContent() {
 
         {/* ── Right: Patient Details Card ──────────────── */}
         {selectedPatient && (
-          <div className="w-full xl:w-[320px] bg-[#EEF0F8] rounded-3xl p-6 flex flex-col shrink-0 border border-[#E4E8F0] shadow-sm relative">
-            <h2 className="text-[#24292E] text-[16px] font-bold mb-6">Patient Details</h2>
+          <>
+            {showMobileDetails && (
+              <div 
+                className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+                onClick={() => setShowMobileDetails(false)}
+              />
+            )}
+            <div className={`
+              ${showMobileDetails ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"} 
+              xl:relative xl:flex xl:w-[320px] xl:rounded-3xl xl:z-auto xl:max-h-none xl:overflow-visible xl:pb-6 xl:shadow-sm
+              w-full bg-[#EEF0F8] p-6 flex-col shrink-0 border border-[#E4E8F0] transition-transform duration-300
+            `}>
+              <div className="xl:hidden w-full flex justify-center mb-4 pb-2">
+                <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+              </div>
+              <button 
+                className="xl:hidden absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-white transition-colors"
+                onClick={() => setShowMobileDetails(false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+
+              <h2 className="text-[#24292E] text-[16px] font-bold mb-6">Patient Details</h2>
 
             {/* Profile snippet */}
             <div className="flex items-center gap-4 mb-6">
@@ -376,6 +401,7 @@ function PatientsListContent() {
               <p className="text-[11px] text-[#A7AAB4]">No upcoming appointment to remind about.</p>
             )}
           </div>
+          </>
         )}
 
       </div>

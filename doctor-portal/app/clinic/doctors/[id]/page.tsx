@@ -397,7 +397,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const displayName = doctor.fullName?.startsWith("Dr.") ? doctor.fullName : `Dr. ${doctor.fullName}`;
 
   return (
-    <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <div className="px-4 sm:px-8 py-6 sm:py-8 overflow-y-auto overflow-x-hidden h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
 
       {/* ── Page Header ── */}
       <div className="flex items-center gap-3 mb-6">
@@ -416,7 +416,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {/* ── Top Profile Card ── */}
-      <div className="bg-[#EEF0F6] rounded-2xl p-7 relative w-full flex flex-col lg:flex-row gap-12 lg:gap-24 mb-6 shadow-sm border border-[#E4E8F0]">
+      <div className="bg-[#EEF0F6] rounded-2xl p-5 sm:p-7 relative w-full flex flex-col lg:flex-row gap-8 lg:gap-24 mb-6 shadow-sm border border-[#E4E8F0]">
 
         {can("manage_doctors") && (
           <button onClick={editing ? undefined : startEditing} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center text-[#24292E] hover:text-[#5476FC] bg-white rounded-lg shadow-sm border border-[#E4E8F0] transition-colors">
@@ -454,7 +454,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <input placeholder="Weight" value={eWeight} onChange={(e) => setEWeight(e.target.value)} className={inputCls} />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-3">
+            <div className="grid grid-cols-2 gap-x-4 sm:gap-x-12 gap-y-3">
               {[
                 { label: "Gender", val: doctor.gender ?? "—" },
                 { label: "Date of Birth", val: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—" },
@@ -474,7 +474,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
         {/* Column 3: Credentials */}
         <div className="flex flex-col flex-1">
           <h3 className="text-[#24292E] text-[14px] font-bold mb-4">Credentials</h3>
-          <div className="flex flex-col gap-3 pr-8">
+          <div className="flex flex-col gap-3 pr-0 sm:pr-8">
             <div className="flex justify-between items-center text-[12px]">
               <span className="text-[#676E76]">Name</span>
               <div className="flex items-center gap-2">
@@ -501,12 +501,12 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-6 border-b border-[#EBEEF5] pb-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6 border-b border-[#EBEEF5] pb-4">
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-2.5 rounded-full text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
+            className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
                 ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-[1.02]"
                 : "bg-white text-[#676E76] border border-[#E4E8F0] hover:border-[#5476FC] hover:text-[#5476FC] shadow-sm"
               }`}
@@ -534,7 +534,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
 
             <div>
               <h3 className="text-[#24292E] text-[14px] font-bold mb-4">Personal Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="flex flex-col gap-2">
                   {[
                     { label: "Gender", val: doctor.gender ?? "—" },
@@ -590,7 +590,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {TIMING_DAYS.map(({ label, dow }) => {
                   const daySlots = (doctor.slots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
                   const isOpen = daySlots.length > 0;
@@ -611,23 +611,23 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
 
           {/* Action Buttons */}
           {can("manage_doctors") && (
-            <div className="flex justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
-              <button onClick={handleDelete} disabled={deleting} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
+            <div className="flex flex-wrap justify-center sm:justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
+              <button onClick={handleDelete} disabled={deleting} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
                 {deleting ? "REMOVING..." : "DELETE"}
               </button>
               {editing ? (
-                <button onClick={() => setEditing(false)} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                <button onClick={() => setEditing(false)} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
                   CANCEL
                 </button>
               ) : (
-                <button onClick={startEditing} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                <button onClick={startEditing} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
                   EDIT
                 </button>
               )}
               <button
                 onClick={editing ? handleSave : undefined}
                 disabled={!editing || savingDoc}
-                className="px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
+                className="px-6 sm:px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
               >
                 {savingDoc ? "SAVING..." : "SAVE"}
               </button>
@@ -642,15 +642,15 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex flex-col xl:flex-row gap-6 items-start">
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {["All", "Upcoming", "Past"].map((t) => (
                   <button key={t} onClick={() => setConsultFilter(t)} className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${consultFilter === t ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}>{t}</button>
                 ))}
               </div>
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text" placeholder="Search all" value={consultSearch} onChange={(e) => setConsultSearch(e.target.value)}
-                  className="w-56 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+                  className="w-full sm:w-56 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
                 />
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>

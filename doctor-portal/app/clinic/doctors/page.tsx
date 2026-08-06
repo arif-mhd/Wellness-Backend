@@ -142,6 +142,7 @@ function ManageDoctorsContent() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [showSelectBranchModal, setShowSelectBranchModal] = useState(false);
@@ -222,7 +223,10 @@ function ManageDoctorsContent() {
 
     return (
       <div
-        onClick={() => setSelectedId(doc.id)}
+        onClick={() => {
+          setSelectedId(doc.id);
+          setShowMobileDetails(true);
+        }}
         className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
@@ -284,12 +288,12 @@ function ManageDoctorsContent() {
         {/* ── Left: Main Content ───────────────────────────── */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
             <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Manage Doctors</h1>
           </div>
 
           {hasMultipleBranches && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => router.push("/clinic/doctors")}
                 className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${!branchId ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}
@@ -330,29 +334,31 @@ function ManageDoctorsContent() {
 
           {/* Department filters */}
           {departments.length > 0 && (
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="text-[12px] font-semibold text-[#24292E]">Department filters</span>
-              {departments.map((dept) => (
-                <label key={dept} className="flex items-center gap-1.5 text-[12px] text-[#344054] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={deptFilters.size === 0 || deptFilters.has(dept)}
-                    onChange={() => {
-                      setDeptFilters((prev) => {
-                        const next = new Set(prev.size === 0 ? departments : prev);
-                        if (next.has(dept)) next.delete(dept); else next.add(dept);
-                        return next.size === departments.length ? new Set() : next;
-                      });
-                    }}
-                    className="accent-[#5476FC]"
-                  />
-                  {dept.toUpperCase()}
-                </label>
-              ))}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-[12px] font-semibold text-[#24292E]">Department filters</span>
+                {departments.map((dept) => (
+                  <label key={dept} className="flex items-center gap-1.5 text-[12px] text-[#344054] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={deptFilters.size === 0 || deptFilters.has(dept)}
+                      onChange={() => {
+                        setDeptFilters((prev) => {
+                          const next = new Set(prev.size === 0 ? departments : prev);
+                          if (next.has(dept)) next.delete(dept); else next.add(dept);
+                          return next.size === departments.length ? new Set() : next;
+                        });
+                      }}
+                      className="accent-[#5476FC]"
+                    />
+                    {dept.toUpperCase()}
+                  </label>
+                ))}
+              </div>
               {can("manage_doctors") && (
                 <button
                   onClick={handleAddDoctorClick}
-                  className="ml-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center"
+                  className="w-full sm:w-auto sm:ml-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2.5 sm:py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center shrink-0"
                 >
                   Add Doctor
                 </button>
@@ -368,26 +374,26 @@ function ManageDoctorsContent() {
               <FilterPill label="Offline/Clinic" active={activeFilter === "Offline"} onClick={() => setActiveFilter("Offline")} activeClass="bg-[#EAECEF] text-[#24292E] border border-[#C8D0DA]" />
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 min-w-[200px] sm:w-auto">
                 <input
                   type="text"
                   placeholder="Search all"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full sm:w-60 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+                  className="w-full sm:w-60 h-10 sm:h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
                 />
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>
               {departments.length === 0 && can("manage_doctors") && (
                 <button
                   onClick={handleAddDoctorClick}
-                  className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2 rounded-xl shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center whitespace-nowrap"
+                  className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium px-5 py-2.5 sm:py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center whitespace-nowrap shrink-0"
                 >
                   Add Doctor
                 </button>
               )}
-              <button className="text-[#676E76] hover:text-black transition-colors">
+              <button className="text-[#676E76] hover:text-black transition-colors shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="4" x2="3" y2="4" /><line x1="21" y1="12" x2="11" y2="12" /><line x1="21" y1="20" x2="15" y2="20" /></svg>
               </button>
             </div>
@@ -439,9 +445,29 @@ function ManageDoctorsContent() {
 
         {/* ── Right: Doctor Details Card ──────────────── */}
         {selectedDoctor && (
-          <div className="w-full xl:w-[320px] bg-[#EEF0F6] rounded-2xl p-5 flex flex-col shrink-0 border border-[#E4E8F0] shadow-sm relative">
+          <>
+            {showMobileDetails && (
+              <div 
+                className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+                onClick={() => setShowMobileDetails(false)}
+              />
+            )}
+            <div className={`
+              ${showMobileDetails ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"} 
+              xl:relative xl:flex xl:w-[320px] xl:rounded-2xl xl:z-auto xl:max-h-none xl:overflow-visible xl:pb-5 xl:shadow-sm
+              w-full bg-[#EEF0F6] p-5 flex-col shrink-0 border border-[#E4E8F0] transition-transform duration-300
+            `}>
+              <div className="xl:hidden w-full flex justify-center mb-4 pb-2">
+                <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+              </div>
+              <button 
+                className="xl:hidden absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-white transition-colors"
+                onClick={() => setShowMobileDetails(false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
 
-            <h2 className="text-[#24292E] text-[15px] font-bold mb-5">Doctor Details</h2>
+              <h2 className="text-[#24292E] text-[15px] font-bold mb-5">Doctor Details</h2>
 
             {/* Profile snippet */}
             <div className="flex items-center gap-3 mb-6">
@@ -512,6 +538,7 @@ function ManageDoctorsContent() {
             </div>
 
           </div>
+          </>
         )}
 
       </div>
