@@ -120,7 +120,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
+    <div className="flex h-screen bg-[#F7F9FC] overflow-x-hidden relative font-sans">
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
           className="absolute"
@@ -132,7 +132,8 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      <div className="z-50 h-full flex flex-col justify-between lg:z-10">
+      {/* On desktop, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
+      <div className="shrink-0 lg:z-10">
         <ClinicSidebar />
       </div>
 

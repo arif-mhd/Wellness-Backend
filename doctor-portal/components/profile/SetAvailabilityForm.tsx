@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
 
 interface SetAvailabilityFormProps {
@@ -95,6 +95,35 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
   const [hoveredDay, setHoveredDay] = useState<DayKey | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dragMode, setDragMode] = useState<"add" | "remove">("add");
+
+  const scrollContainerRefWeek = useRef<HTMLDivElement>(null);
+  const scrollContainerRefDay = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let minHour = 9;
+    const slotsToUse = initialAvailability ?? selectedSlots;
+    if (slotsToUse && slotsToUse.length > 0) {
+      let foundMin = 24;
+      for (const slot of slotsToUse) {
+        const parts = slot.split("-");
+        if (parts.length === 2) {
+          const hour = parseInt(parts[1].split(":")[0], 10);
+          if (hour < foundMin) foundMin = hour;
+        }
+      }
+      if (foundMin !== 24) minHour = foundMin;
+    }
+
+    if (viewMode === "week" && scrollContainerRefWeek.current) {
+      const rowHeight = 45; // 44 minHeight + 1 border
+      const headerHeight = 20; // just some padding to show it clearly
+      scrollContainerRefWeek.current.scrollTop = Math.max(0, minHour * rowHeight - headerHeight);
+    } else if (viewMode === "day" && scrollContainerRefDay.current) {
+      const rowHeight = 53; // 52 minHeight + 1 border
+      const headerHeight = 20;
+      scrollContainerRefDay.current.scrollTop = Math.max(0, minHour * rowHeight - headerHeight);
+    }
+  }, [viewMode, initialAvailability]);
 
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const monthLabel = useMemo(() => formatMonthYear(weekDates), [weekDates]);
@@ -254,7 +283,8 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
           {/* ═══ WEEK VIEW ═══════════════════════════════════════════════ */}
           {viewMode === "week" && (
             <div
-              className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none"
+              ref={scrollContainerRefWeek}
+              className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none scroll-smooth"
               style={{ maxHeight: "calc(100vh - 350px)", overflowY: "auto" }}
               onMouseLeave={() => setDragging(false)}
               onMouseUp={() => setDragging(false)}
@@ -336,7 +366,8 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
 
               {/* Single-day column grid */}
               <div
-                className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none"
+                ref={scrollContainerRefDay}
+                className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none scroll-smooth"
                 style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}
                 onMouseLeave={() => setDragging(false)}
                 onMouseUp={() => setDragging(false)}

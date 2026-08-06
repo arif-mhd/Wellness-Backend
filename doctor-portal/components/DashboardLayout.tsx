@@ -438,7 +438,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const visibleNotifications = notifTab === "Unread" ? notifications.filter((n) => !n.isRead) : notifications;
 
   return (
-    <div className="flex h-screen bg-[#F7F9FC] overflow-hidden relative font-sans">
+    <div className="flex h-screen bg-[#F7F9FC] overflow-x-hidden relative font-sans">
       {/* Decorative Blur Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
@@ -459,9 +459,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* Sidebar */}
+      {/* Sidebar — on desktop participates in flex layout; on mobile the aside is fixed so it overlays the full screen */}
       {!isVideoCall && (
-        <div className="z-50 h-full flex flex-col justify-between lg:z-10">
+        <div className="shrink-0 lg:z-10 h-full">
           <Sidebar />
         </div>
       )}

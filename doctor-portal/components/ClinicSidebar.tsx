@@ -190,9 +190,11 @@ export default function ClinicSidebar() {
     router.replace("/auth/login");
   }
 
-  const labelCls = open
-    ? "opacity-100 max-w-[160px] ml-3"
-    : "opacity-0 max-w-0 ml-0 pointer-events-none";
+  const labelCls = [
+    "transition-[max-width,opacity,margin] duration-300 ease-in-out",
+    open ? "lg:opacity-100 lg:max-w-[160px] lg:ml-3" : "lg:opacity-0 lg:max-w-0 lg:ml-0 lg:pointer-events-none",
+    "opacity-100 max-w-[160px] ml-3"
+  ].join(" ");
 
   return (
     <>
@@ -203,33 +205,44 @@ export default function ClinicSidebar() {
         />
       )}
       <aside
-        style={{ willChange: "width, transform" }}
         className={[
-          "z-50 h-full shrink-0 flex flex-col justify-between",
-          "bg-[#F5F7FB] border-r border-[#EBEEF5] overflow-hidden select-none",
-          "transition-all duration-300 ease-in-out",
-          "fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full",
-          open ? "w-[255px]" : "w-[80px]",
+          "z-50 shrink-0 flex flex-col justify-between",
+          "bg-[#F5F7FB] border-r border-[#EBEEF5] select-none",
+          "transition-[transform,width] duration-300 ease-in-out",
+          // Mobile: cover the entire viewport using inset-0 (top+right+bottom+left=0)
+          // Desktop: sit in the left column of the flex layout
+          "fixed lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
+          isMobileOpen ? "inset-0" : "inset-0 -translate-x-full",
+          open ? "lg:w-[255px]" : "lg:w-[80px]",
+          "overflow-hidden",
         ].join(" ")}
       >
-      <div className="flex flex-col gap-2 w-full min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 w-full">
         <div className="relative flex items-center h-[72px] px-5 w-full shrink-0">
           <img
             src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
             alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"}`}
+            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[100px] ${open ? "lg:opacity-100 lg:max-w-[100px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"}`}
           />
           <button
-            onClick={toggle}
-            title={open ? "Collapse sidebar" : "Expand sidebar"}
+            onClick={() => {
+              if (window.innerWidth < 1024) setIsMobileOpen(false);
+              else toggle();
+            }}
+            title="Toggle sidebar"
             className="absolute right-5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-[#3D4B5A] hover:bg-gray-50 hover:text-[#5476FC] transition-colors shrink-0 z-20"
           >
-            {open ? <CollapseIcon /> : <HamburgerIcon />}
+            <span className="hidden lg:block">{open ? <CollapseIcon /> : <HamburgerIcon />}</span>
+            <span className="block lg:hidden">
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </span>
           </button>
         </div>
 
-        <nav className={`flex flex-col gap-1 w-full overflow-y-auto ${open ? "px-4" : "px-3"}`}>
+        <nav
+          className={`flex flex-col gap-2 w-full flex-1 min-h-0 overflow-y-auto px-4 pb-4 ${open ? "lg:px-4" : "lg:px-3"}`}
+          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+        >
           {NAV_ITEMS.map(({ href, label, Icon }) => {
             const active = pathname === href;
             return (
@@ -237,9 +250,11 @@ export default function ClinicSidebar() {
                 key={href}
                 href={withBranch(href)}
                 title={open ? undefined : label}
+                onClick={() => setIsMobileOpen(false)}
                 className={[
                   "flex items-center py-3 transition-[background,box-shadow,padding] duration-150 rounded-[92px] overflow-hidden",
-                  open ? "px-4" : "px-3 justify-center",
+                  "px-4",
+                  open ? "lg:px-4" : "lg:px-3 lg:justify-center",
                   active
                     ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                     : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
@@ -248,7 +263,7 @@ export default function ClinicSidebar() {
                 <span className="shrink-0 w-5 h-5 flex items-center justify-center">
                   <Icon active={active} />
                 </span>
-                <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin] duration-300 ease-in-out ${labelCls}`}>
+                <span className={`text-sm font-medium whitespace-nowrap overflow-hidden ${labelCls}`}>
                   {label}
                 </span>
               </Link>
@@ -257,7 +272,7 @@ export default function ClinicSidebar() {
         </nav>
       </div>
 
-      <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 ${open ? "px-5" : "px-3 items-center"}`}>
+      <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 px-5 shrink-0 ${open ? "lg:px-5" : "lg:px-3 lg:items-center"}`}>
         {[
           { href: "/clinic/settings", label: "Settings", Icon: SettingsIcon },
           { href: "/clinic/help", label: "Help & Support", Icon: HelpIcon },
@@ -266,18 +281,19 @@ export default function ClinicSidebar() {
             key={href}
             href={href}
             title={open ? undefined : label}
-            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors ${open ? "px-3" : "justify-center px-2"}`}
+            onClick={() => setIsMobileOpen(false)}
+            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors px-3 ${open ? "lg:px-3" : "lg:justify-center lg:px-2"}`}
           >
             <span className="shrink-0 w-5 h-5 flex items-center justify-center">
               <Icon />
             </span>
-            <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin] duration-300 ease-in-out ${labelCls}`}>
+            <span className={`text-sm font-medium whitespace-nowrap overflow-hidden ${labelCls}`}>
               {label}
             </span>
           </Link>
         ))}
 
-        <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
+        <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 flex-row ${open ? "lg:flex-row" : "lg:flex-col"}`}>
           <Link href="/clinic/profile" className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:shadow-[0_0_0_4px_rgba(84,118,252,0.25)] transition-shadow">
               {clinicAvatar ? (
@@ -290,7 +306,7 @@ export default function ClinicSidebar() {
               )}
             </div>
 
-            <div className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"}`}>
+            <div className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[120px] ${open ? "lg:opacity-100 lg:max-w-[120px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"}`}>
               <span className="text-[#24292E] font-medium text-sm truncate hover:text-[#5476FC] transition-colors">{clinicName || "Clinic"}</span>
               <span className="text-[#9EA5AD] text-xs truncate">{clinicEmail}</span>
             </div>
