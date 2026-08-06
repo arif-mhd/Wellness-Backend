@@ -63,6 +63,9 @@ export default function ClinicFeedbackPage() {
   const [savingReply, setSavingReply] = useState(false);
   const [replyError, setReplyError] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   useEffect(() => {
     setLoading(true);
     apiFetch("/api/clinics/feedback")
@@ -128,6 +131,12 @@ export default function ClinicFeedbackPage() {
     if (sortKey === key) setSortDir((d) => (d === 1 ? -1 : 1));
     else { setSortKey(key); setSortDir(-1); }
   };
+
+  useEffect(() => { setCurrentPage(1); }, [activeTab, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil((activeTab === "clinic" ? sortedReviews.length : sortedDoctors.length) / ITEMS_PER_PAGE));
+  const paginatedReviews = sortedReviews.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginatedDoctors = sortedDoctors.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const selectedDoctor = doctorGroups.find((g) => g.id === selectedDoctorId) ?? null;
   const selectedReview = selectedDoctor?.reviews.find((r) => r.id === selectedReviewId) ?? null;
@@ -217,7 +226,7 @@ export default function ClinicFeedbackPage() {
             <div className="text-center py-10 text-[#838B95] text-sm">No reviews yet.</div>
           ) : (
             <div className="flex flex-col gap-3">
-              {sortedReviews.map((r) => (
+              {paginatedReviews.map((r) => (
                 <div
                   key={r.id}
                   onClick={() => viewReview(r)}
@@ -238,13 +247,43 @@ export default function ClinicFeedbackPage() {
                   <span className="text-[12px] text-[#676E76] text-center">{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>
                 </div>
               ))}
+              
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                  >
+                    <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                    <button
+                      key={pg}
+                      onClick={() => setCurrentPage(pg)}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${currentPage === pg ? "bg-[#5476FC] text-white shadow-sm" : "text-[#9EA5AD] hover:text-[#5476FC]"}`}
+                    >
+                      {pg}
+                    </button>
+                  ))}
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                  >
+                    <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                </div>
+              )}
             </div>
           )
         ) : sortedDoctors.length === 0 ? (
           <div className="text-center py-10 text-[#838B95] text-sm">No reviews yet.</div>
         ) : (
           <div className="flex flex-col gap-3">
-            {sortedDoctors.map((g) => (
+            {paginatedDoctors.map((g) => (
               <div
                 key={g.id}
                 onClick={() => viewDoctor(g)}
@@ -262,6 +301,36 @@ export default function ClinicFeedbackPage() {
                 <span className="text-[12px] text-[#676E76] text-center">{new Date(g.lastDate).toLocaleDateString("en-GB")}</span>
               </div>
             ))}
+            
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                >
+                  <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M4 8L1 4.5L4 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    onClick={() => setCurrentPage(pg)}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${currentPage === pg ? "bg-[#5476FC] text-white shadow-sm" : "text-[#9EA5AD] hover:text-[#5476FC]"}`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-7 h-7 rounded-full border border-[#EBEEF5] bg-white flex items-center justify-center text-[#9EA5AD] hover:text-[#5476FC] hover:border-[#5476FC] transition-all disabled:opacity-40"
+                >
+                  <svg width="5" height="9" viewBox="0 0 5 9" fill="none"><path d="M1 8L4 4.5L1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
