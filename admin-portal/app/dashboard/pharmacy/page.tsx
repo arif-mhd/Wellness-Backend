@@ -110,6 +110,8 @@ function ManagePharmacyPageInner() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [approvedPharmacies, setApprovedPharmacies] = useState<Pharmacy[]>([]);
   const [pendingPharmacies, setPendingPharmacies] = useState<Pharmacy[]>([]);
@@ -185,6 +187,13 @@ function ManagePharmacyPageInner() {
   const displayedPharmacies: Pharmacy[] =
     activeTab === "onboard" ? approvedPharmacies : pendingPharmacies;
 
+  const filteredPharmacies = displayedPharmacies.filter(p =>
+    !search ||
+    (p.pharmacyName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.email ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.ownerName ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
   const selectedPharmacy = displayedPharmacies.find((p) => p.id === selectedPharmacyId) ?? null;
 
   return (
@@ -246,11 +255,39 @@ function ManagePharmacyPageInner() {
                   </span>
                 </button>
 
-                <button className="w-9 h-9 ml-2 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
+                {/* Collapsible search */}
+                <div className="ml-2 flex items-center gap-1">
+                  {searchOpen && (
+                    <div className="flex items-center bg-white border border-slate-200 rounded-full px-3 h-9 shadow-sm animate-in slide-in-from-right-2 duration-200">
+                      <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                      </svg>
+                      <input
+                        autoFocus
+                        value={search}
+                        onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                        onKeyDown={e => { if (e.key === "Escape") { setSearch(""); setSearchOpen(false); } }}
+                        placeholder="Search pharmacies…"
+                        className="ml-2 text-[12px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-40"
+                      />
+                      {search && (
+                        <button onClick={() => setSearch("")} className="ml-1 text-slate-400 hover:text-slate-600">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch(""); }}
+                    className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -289,13 +326,13 @@ function ManagePharmacyPageInner() {
             {/* Main Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[400px] flex flex-col justify-between">
               <div className="overflow-x-auto">
-                {displayedPharmacies.length === 0 ? (
+                {filteredPharmacies.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                     <svg className="w-12 h-12 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <p className="text-sm font-semibold">
-                      No {activeTab === "onboard" ? "approved" : "pending"} pharmacies
+                      {search ? `No pharmacies match "${search}"` : `No ${activeTab === "onboard" ? "approved" : "pending"} pharmacies`}
                     </p>
                   </div>
                 ) : (
@@ -344,7 +381,7 @@ function ManagePharmacyPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedPharmacies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pharmacy) => {
+                      {filteredPharmacies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pharmacy) => {
                         const isSelected = selectedPharmacyId === pharmacy.id;
                         return (
                           <tr
@@ -412,16 +449,14 @@ function ManagePharmacyPageInner() {
               </div>
 
               {/* Pagination Controls */}
-              {displayedPharmacies.length > 0 && (
+              {filteredPharmacies.length > 0 && (
                 <div className="mt-6 border-t border-slate-50 pt-5">
-                {displayedPharmacies.length > 0 && (
                   <Pagination 
                     currentPage={currentPage} 
-                    totalPages={Math.ceil(displayedPharmacies.length / itemsPerPage)} 
+                    totalPages={Math.ceil(filteredPharmacies.length / itemsPerPage)} 
                     onPageChange={setCurrentPage} 
                   />
-                )}
-              </div>
+                </div>
               )}
             </div>
           </div>
