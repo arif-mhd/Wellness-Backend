@@ -215,13 +215,13 @@ export default function LoginPage() {
               </div>
 
               {/* Buttons Row */}
-              <div className="flex gap-4 pt-4 justify-start">
+              <div className="flex flex-row gap-3 pt-4 w-full">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-3.5 px-2 rounded-xl font-medium font-outfit text-sm shadow-md shadow-blue-500/20 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                 >
-                  <span>{loading ? "Signing in…" : "Clinic/Doctor Login"}</span>
+                  <span>{loading ? "Signing in…" : "Login"}</span>
                   {!loading && (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -231,9 +231,9 @@ export default function LoginPage() {
 
                 <Link
                   href="/auth/signup"
-                  className="bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] px-8 py-3.5 rounded-[0.8rem] font-medium font-outfit text-sm flex items-center justify-center transition-all hover:translate-y-[-1px] active:translate-y-[0px] duration-150"
+                  className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] py-3.5 px-2 rounded-xl font-medium font-outfit text-sm flex items-center justify-center transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                 >
-                  Register Your Clinic
+                  Register Clinic
                 </Link>
               </div>
             </form>
