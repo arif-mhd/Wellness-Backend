@@ -137,8 +137,8 @@ export default function ManagePatientsPage() {
 
   const filtered = patients.filter(p =>
     !search ||
-    p.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
+    (p.fullName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const selectedPatient = filtered.find(p => p.id === selectedId) ?? null;
