@@ -49,6 +49,16 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or display
+// formatting (and same-day comparisons near midnight) silently shift by the
+// browser's timezone offset.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function buildSlotAppointment(a: any): SlotAppointment {
   return {
     id: a.id,
@@ -120,7 +130,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
       setAllAppointmentsRaw(all ?? []);
       const today = new Date();
       const todays: SlotAppointment[] = (all ?? [])
-        .filter((a: any) => a.status !== "cancelled" && isSameDay(new Date(a.scheduledAt), today))
+        .filter((a: any) => a.status !== "cancelled" && isSameDay(parseLocalTime(a.scheduledAt), today))
         .map(buildSlotAppointment);
       setAppointments(todays);
       if (!selectedId && todays.length > 0) setSelectedId(todays[0].id);
@@ -453,7 +463,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
                       </span>
                     </div>
                     <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-1">
-                      {new Date(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {parseLocalTime(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
                   <div className="flex justify-end items-center shrink-0">
@@ -510,7 +520,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
                           {visit.reason || "Consultation"}
                         </span>
                         <span className="text-[#9EA5AD] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] mt-1">
-                          {new Date(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          {parseLocalTime(visit.scheduledAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                     </div>

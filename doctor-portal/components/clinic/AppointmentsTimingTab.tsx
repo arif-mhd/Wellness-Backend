@@ -15,6 +15,15 @@ interface Appointment {
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or hour/minute
+// reads and display formatting silently shift by the browser's timezone.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function Avatar({ name }: { name: string }) {
   return (
     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-semibold shrink-0 text-sm">
@@ -52,7 +61,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
     return appointments
       .filter((a) => a.status !== "cancelled")
       .filter((a) => {
-        const d = new Date(a.scheduledAt);
+        const d = parseLocalTime(a.scheduledAt);
         if (quickFilter === "today" && d.toDateString() !== now.toDateString()) return false;
         if (quickFilter === "week") {
           const weekStart = new Date(now);
@@ -163,7 +172,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
                   </div>
                 </div>
                 <span className="text-[12px] text-gray-500 whitespace-nowrap shrink-0">
-                  {new Date(a.scheduledAt).toLocaleDateString("en-GB")}, {new Date(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  {parseLocalTime(a.scheduledAt).toLocaleDateString("en-GB")}, {parseLocalTime(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
                   {canManage && (

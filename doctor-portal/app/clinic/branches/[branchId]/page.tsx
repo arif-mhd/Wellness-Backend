@@ -7,6 +7,15 @@ import ClinicComingSoon from "@/components/ClinicComingSoon";
 import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or display
+// formatting silently shifts by the browser's timezone offset.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 interface TrendPoint { label: string; count: number; }
 
 interface Branch {
@@ -883,7 +892,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     </div>
                   </div>
                   <span className="text-[12px] text-[#676E76]">
-                    {new Date(a.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {parseLocalTime(a.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               ))}

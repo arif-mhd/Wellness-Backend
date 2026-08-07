@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or display
+// formatting silently shifts it by the browser's timezone offset.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 interface PatientProfileModalProps {
   patient: Patient;
   onClose: () => void;
@@ -173,7 +182,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
           const mapped: RealConsultation[] = patientApts.map((a: any) => {
             const bookedD = new Date(a.createdAt || a.scheduledAt);
-            const scheduledD = new Date(a.scheduledAt);
+            const scheduledD = parseLocalTime(a.scheduledAt);
             const isCompleted = a.status === 'completed' || !!a.emr;
             const completedD = isCompleted ? new Date(a.updatedAt || a.emr?.savedAt || a.scheduledAt) : null;
 

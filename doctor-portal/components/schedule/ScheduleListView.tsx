@@ -30,6 +30,15 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or the "Today"
+// filter can misjudge the day near timezone-shifted boundaries.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 export default function ScheduleListView({
   items,
   selectedItemId,
@@ -60,7 +69,7 @@ export default function ScheduleListView({
 
     if (dateFilter === "Today") {
       const today = new Date();
-      result = result.filter((i) => isSameDay(new Date(i.scheduledAt), today));
+      result = result.filter((i) => isSameDay(parseLocalTime(i.scheduledAt), today));
     }
 
     if (sortField) {

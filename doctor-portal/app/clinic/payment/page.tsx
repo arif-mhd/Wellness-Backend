@@ -125,9 +125,18 @@ function QuickFilterPills({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or the quick
+// filters below can misjudge "Today"/"This Week" near timezone boundaries.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function within(date: string, range: string): boolean {
   if (range === "All") return true;
-  const d = new Date(date);
+  const d = parseLocalTime(date);
   const now = new Date();
   if (range === "Today") return d.toDateString() === now.toDateString();
   if (range === "This Week") { const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0, 0, 0, 0); return d >= start; }

@@ -5,6 +5,17 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — handing it to `new Date()` as-is makes JS treat it as UTC,
+// so toLocaleTimeString/toLocaleDateString then shift it again by the
+// browser's own timezone, showing the wrong time. Strip the "Z" first, same
+// pattern used everywhere else in doctor-portal (e.g. app/dashboard/page.tsx).
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 interface PatientDetail {
   name: string;
   email: string;
@@ -196,7 +207,7 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                       </div>
 
                       {paginated.map((consult) => {
-                        const dateObj = new Date(consult.scheduledAt);
+                        const dateObj = parseLocalTime(consult.scheduledAt);
                         return (
                           <div key={consult.id} className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm hover:border-[#8AA0FF] transition-all">
 
