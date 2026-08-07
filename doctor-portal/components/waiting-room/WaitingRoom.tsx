@@ -121,6 +121,10 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
 
   const [preVisitPatient, setPreVisitPatient] = useState<Patient | null>(null);
 
+  // Mobile master-detail states
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"emr" | "details">("emr");
+
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
@@ -197,6 +201,8 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
 
   const handleOpenEmr = (apt: SlotAppointment) => {
     setSelectedId(apt.id);
+    setShowMobileDetail(true);
+    setMobileTab("emr");
   };
 
   // Resolves the full patient/appointment record for a given visit's
@@ -393,7 +399,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full flex-1">
 
         {/* Left Column: Waiting Lists */}
-        <div className="w-full lg:w-[324px] flex flex-col gap-6 shrink-0">
+        <div className={`w-full lg:w-[324px] flex-col gap-6 shrink-0 ${showMobileDetail ? "hidden lg:flex" : "flex"}`}>
 
           <div className="flex flex-col gap-3">
             <h2 className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px] px-1">
@@ -424,10 +430,45 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
           </div>
         </div>
 
-        {/* Middle Column: Selected EMR History (falls back to this doctor's
-            own recent consultations across all patients when nothing's
-            selected, or the selected patient has no history yet) */}
-        <div className="flex-1 min-w-0 bg-white rounded-[12px] border border-gray-100 p-8 flex flex-col gap-5">
+        {/* Right Wrapper: Groups EMR and Details for Mobile master-detail logic */}
+        <div className={`flex-1 flex-col lg:flex-row gap-8 min-w-0 w-full ${showMobileDetail ? "flex" : "hidden lg:flex"}`}>
+          
+          {/* Mobile-only Navigation Header */}
+          <div className="lg:hidden flex flex-col gap-4 w-full">
+            <button
+              onClick={() => setShowMobileDetail(false)}
+              className="flex items-center gap-2 text-[#5476FC] font-semibold text-[15px] hover:text-[#3d5fe0] transition-colors w-fit"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Queue
+            </button>
+            
+            <div className="flex bg-white rounded-[12px] p-1 border border-gray-100 shadow-sm">
+              <button
+                onClick={() => setMobileTab("emr")}
+                className={`flex-1 py-2 rounded-[8px] text-[14px] font-medium transition-all ${
+                  mobileTab === "emr" ? "bg-[#5476FC] text-white shadow-sm" : "text-[#676E76] hover:bg-gray-50"
+                }`}
+              >
+                EMR
+              </button>
+              <button
+                onClick={() => setMobileTab("details")}
+                className={`flex-1 py-2 rounded-[8px] text-[14px] font-medium transition-all ${
+                  mobileTab === "details" ? "bg-[#5476FC] text-white shadow-sm" : "text-[#676E76] hover:bg-gray-50"
+                }`}
+              >
+                Details
+              </button>
+            </div>
+          </div>
+
+          {/* Middle Column: Selected EMR History (falls back to this doctor's
+              own recent consultations across all patients when nothing's
+              selected, or the selected patient has no history yet) */}
+          <div className={`flex-1 min-w-0 bg-white rounded-[12px] border border-gray-100 p-8 flex-col gap-5 ${mobileTab === 'emr' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="flex justify-between items-center pb-2 border-b border-gray-50">
             <span className="text-[#24292E] font-medium text-[16px] leading-[1.2] tracking-[-0.32px]">
               EMR
@@ -539,7 +580,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
         </div>
 
         {/* Right Column: Selected Patient Details Card */}
-        <div className="w-full lg:w-[372px] shrink-0 bg-[#F5F6FA] border border-white rounded-[12px] p-6 flex flex-col gap-6">
+        <div className={`w-full lg:w-[372px] shrink-0 bg-[#F5F6FA] border border-white rounded-[12px] p-6 flex-col gap-6 ${mobileTab === 'details' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="flex flex-col gap-1">
             <h3 className="text-[#24292E] font-medium text-[20px] leading-[1.5] tracking-[-0.4px]">
               Patient Details
@@ -613,6 +654,8 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
               </div>
             </>
           )}
+        </div>
+        
         </div>
 
       </div>

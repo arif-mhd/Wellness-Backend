@@ -416,10 +416,10 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
             <img
               src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain"
+              className="w-[91px] h-[30px] object-contain hidden sm:block"
               alt="Wellness Central"
             />
-            <span className="text-[0.68rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
+            <span className="hidden sm:inline-block text-[0.68rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
               Clinic
             </span>
           </div>

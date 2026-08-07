@@ -33,8 +33,9 @@ export default function NewAppointmentsTable({
             Diagnosis
           </div>
           {/* Date/Action col */}
-          <div className="flex-shrink-0 w-[293px] text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-            Date and Time
+          <div className="flex-shrink-0 w-[293px] flex items-center justify-between text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+            <span>Date and Time</span>
+            <span>Action</span>
           </div>
         </div>
 
@@ -87,22 +88,21 @@ export default function NewAppointmentsTable({
               </div>
 
               {/* Diagnosis Column — flexible */}
-              <div className="w-full md:flex-1 md:min-w-0 flex items-center gap-1.5 px-2">
-                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none">
+              <div className="w-full md:flex-1 md:min-w-0 flex items-start md:items-center gap-2 px-0 flex-col md:flex-row mt-2 md:mt-0">
+                <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Diagnosis</span>
+                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none max-w-full truncate">
                   {patient.diagnosis}
                 </span>
-                <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] truncate flex-1 min-w-0">
-                  {patient.description}
-                </p>
               </div>
 
               {/* Date + Action Column — 293px */}
               <div
-                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2"
+                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Left: status or date */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2 min-w-0">
+                  <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Date & Time</span>
                   {isWaiting ? (
                     <div className="flex items-center gap-2">
                       {/* Animated pulsing dot matching Figma F4A308 */}

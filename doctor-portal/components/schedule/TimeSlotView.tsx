@@ -340,7 +340,7 @@ export default function TimeSlotView() {
       </div>
 
       {/* ── Two-column layout: calendar + task panel ─────────────────────── */}
-      <div className="flex gap-6 items-start w-full">
+      <div className="flex flex-col xl:flex-row gap-6 items-start w-full">
         {/* Left: calendar grid */}
         <div className="flex-1 min-w-0">
 
@@ -620,7 +620,7 @@ export default function TimeSlotView() {
         </div>
 
         {/* Right: Task panel */}
-        <div className="w-[280px] shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-sm flex flex-col gap-4 max-h-[500px] overflow-y-auto">
+        <div className="w-full xl:w-[280px] shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-sm flex flex-col gap-4 max-h-[500px] overflow-y-auto">
           {/* Tasks header */}
           <div className="flex items-center justify-between">
             <span

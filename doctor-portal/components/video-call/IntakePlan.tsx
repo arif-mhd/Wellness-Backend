@@ -504,6 +504,7 @@ export default function IntakePlan({
   onScheduleFollowUp,
 }: ConsultationNotesProps) {
   const activeTab = openSection ?? "reasonForVisit";
+  const [showMobileModal, setShowMobileModal] = useState(false);
 
   const updateSection = (key: keyof EmrSections, value: string) => {
     onChange({ ...sections, [key]: value });
@@ -578,9 +579,9 @@ export default function IntakePlan({
       )}
 
       {/* ── Left-nav + content ─────────────────────────────────────────────── */}
-      <div className="flex gap-4 w-full">
+      <div className="flex flex-col lg:flex-row gap-4 w-full">
         {/* Left nav */}
-        <div className="w-[220px] flex-shrink-0 flex flex-col gap-2">
+        <div className="w-full lg:w-[220px] flex-shrink-0 flex flex-col gap-2">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             const hasContent = tab.key === "visitInformation"
@@ -590,7 +591,10 @@ export default function IntakePlan({
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => onToggleSection(tab.key)}
+                onClick={() => {
+                  onToggleSection(tab.key);
+                  setShowMobileModal(true);
+                }}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left text-[13px] font-medium transition-colors ${
                   isActive
                     ? "bg-[#5476FC] text-white shadow-[0_2px_8px_rgba(84,118,252,0.25)]"
@@ -607,30 +611,40 @@ export default function IntakePlan({
         </div>
 
         {/* Active tab content */}
-        <div className="flex-1 min-w-0 bg-white rounded-xl border border-[#5476FC]/30 ring-1 ring-[#5476FC]/10 px-5 py-5">
-          {activeTab === "visitInformation" ? (
-            <VisitInformationTab visitInfo={visitInfo} onChange={onVisitInfoChange} />
-          ) : activeTabDef?.subFields ? (
-            <SubFieldsTab
-              title={activeTabDef.title}
-              subFields={activeTabDef.subFields}
-              value={sections[activeTab as keyof EmrSections] ?? ""}
-              onChange={(v) => updateSection(activeTab as keyof EmrSections, v)}
-              hint={activeTab === "historyOfPresentIllness" && sections.historyOfPresentIllness.trim() ? "Pre-filled from past visit — edit as needed" : undefined}
-              onScheduleFollowUp={onScheduleFollowUp}
-            />
-          ) : activeTabDef ? (
-            <div className="flex flex-col gap-3">
-              <span className="text-slate-800 text-[14px] font-bold">{activeTabDef.title}</span>
-              <textarea
+        <div className={`fixed inset-0 z-[100] bg-black/40 p-4 lg:static lg:z-auto lg:bg-transparent lg:p-0 lg:block lg:flex-1 lg:min-w-0 ${showMobileModal ? "flex items-center justify-center" : "hidden lg:block"}`}>
+          <div className="relative w-full max-h-[90vh] overflow-y-auto bg-white rounded-xl lg:border lg:border-[#5476FC]/30 lg:ring-1 lg:ring-[#5476FC]/10 p-5 pt-12 lg:pt-5 lg:max-h-none lg:overflow-visible shadow-xl lg:shadow-none">
+            <button 
+              type="button"
+              onClick={() => setShowMobileModal(false)}
+              className="lg:hidden absolute top-4 right-4 flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 shadow-sm border border-gray-100 text-gray-500 hover:bg-gray-100 z-10"
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            
+            {activeTab === "visitInformation" ? (
+              <VisitInformationTab visitInfo={visitInfo} onChange={onVisitInfoChange} />
+            ) : activeTabDef?.subFields ? (
+              <SubFieldsTab
+                title={activeTabDef.title}
+                subFields={activeTabDef.subFields}
                 value={sections[activeTab as keyof EmrSections] ?? ""}
-                onChange={(e) => updateSection(activeTab as keyof EmrSections, e.target.value)}
-                placeholder={activeTabDef.placeholder}
-                rows={activeTabDef.rows ?? 5}
-                className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] placeholder-[#9EA5AD] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none leading-relaxed"
+                onChange={(v) => updateSection(activeTab as keyof EmrSections, v)}
+                hint={activeTab === "historyOfPresentIllness" && sections.historyOfPresentIllness.trim() ? "Pre-filled from past visit — edit as needed" : undefined}
+                onScheduleFollowUp={onScheduleFollowUp}
               />
-            </div>
-          ) : null}
+            ) : activeTabDef ? (
+              <div className="flex flex-col gap-3">
+                <span className="text-slate-800 text-[14px] font-bold">{activeTabDef.title}</span>
+                <textarea
+                  value={sections[activeTab as keyof EmrSections] ?? ""}
+                  onChange={(e) => updateSection(activeTab as keyof EmrSections, e.target.value)}
+                  placeholder={activeTabDef.placeholder}
+                  rows={activeTabDef.rows ?? 5}
+                  className="w-full p-3 rounded-lg bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] placeholder-[#9EA5AD] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all resize-none leading-relaxed"
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

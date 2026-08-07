@@ -58,7 +58,7 @@ export default function TaskDetailsCard({ task, onToggleComplete, onAction }: Ta
     <div className="flex flex-col bg-[#F5F6FA] border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm min-h-[580px] justify-between">
       <div className="flex flex-col gap-5">
         {/* Header with Priority Badge */}
-        <div className="flex justify-between items-center w-full">
+        <div className="flex justify-between items-center w-full pr-10 xl:pr-0">
           <h3 className="text-[#24292E] font-medium text-[20px] tracking-[-0.4px]" style={{ fontFamily: "Outfit, sans-serif" }}>
             Task Details
           </h3>

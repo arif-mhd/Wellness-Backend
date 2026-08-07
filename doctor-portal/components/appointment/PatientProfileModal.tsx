@@ -156,6 +156,8 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
   const [consultations, setConsultations] = useState<RealConsultation[]>([]);
   const [selectedConsultation, setSelectedConsultation] = useState<RealConsultation | null>(null);
   const [loadingConsultations, setLoadingConsultations] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Freestanding clinical notes (not tied to a specific appointment)
   const [clinicalNotes, setClinicalNotes] = useState<{ id: string; text: string; doctorId: string; doctorName: string; createdAt: string }[]>([]);
@@ -523,78 +525,120 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   </div>
                 ) : consultations.length === 0 ? (
                   <p className="text-[#9EA5AD] text-[13px] text-center py-6">No consultations recorded yet.</p>
-                ) : consultations.map((c) => {
-                  const isSelected = selectedConsultation?.id === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setSelectedConsultation(c)}
-                      className={`w-full flex items-center justify-between gap-4 px-4 py-3 rounded-[12px] text-left transition-all duration-200 ${
-                        isSelected ? "bg-[#EDF0FF]" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
-                          {c.title}
+                ) : (
+                  <>
+                    {consultations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((c) => {
+                      const isSelected = selectedConsultation?.id === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => setSelectedConsultation(c)}
+                          className={`w-full flex items-start justify-between gap-4 px-4 py-3 rounded-[12px] text-left transition-all duration-200 ${
+                            isSelected ? "bg-[#EDF0FF]" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex flex-col gap-0.5 min-w-0 w-full">
+                            <span className="text-[#24292E] text-[14px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
+                              {c.title}
+                            </span>
+                            <span className="text-[#777F86] text-[12px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
+                              {c.ref}
+                            </span>
+                            
+                            {isSelected && (
+                              <div className="flex flex-col gap-0.5 min-w-0 mt-3 animate-fade-in">
+                                <div className="flex items-center gap-2">
+                                  {c.doctorAvatar ? (
+                                    <img src={c.doctorAvatar} alt={c.doctor} className="w-[21px] h-[21px] rounded-full object-cover flex-shrink-0" />
+                                  ) : (
+                                    <div className="w-[21px] h-[21px] rounded-full bg-[#5476FC] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
+                                      {c.doctor.replace("Dr. ", "").slice(0,1)}
+                                    </div>
+                                  )}
+                                  <span className="text-[#24292E] text-[13px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
+                                    {c.doctor}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col gap-0.5 mt-1 text-[#9EA5AD] text-[11px] font-normal leading-[1.5]">
+                                  <span>Booked: {c.bookedAt}</span>
+                                  <span>Scheduled: {c.scheduledFor}</span>
+                                  {c.completedAt && <span>Completed: {c.completedAt}</span>}
+                                </div>
+                                {/* EMR badge */}
+                                {c.emr ? (
+                                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold w-fit">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+                                    Notes recorded
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 text-[10px] font-semibold w-fit">
+                                    No notes yet
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={`flex-shrink-0 transition-transform duration-200 mt-1 ${isSelected ? "rotate-[-90deg]" : "rotate-90"}`}>
+                            <path d="M5.25 10.5L8.75 7L5.25 3.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      );
+                    })}
+                    
+                    {consultations.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-xs text-[#9EA5AD]">
+                          Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, consultations.length)} of {consultations.length}
                         </span>
-                        <span className="text-[#777F86] text-[12px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
-                          {c.ref}
-                        </span>
-                        <div className="flex items-center gap-2 mt-1">
-                          {c.doctorAvatar ? (
-                            <img src={c.doctorAvatar} alt={c.doctor} className="w-[21px] h-[21px] rounded-full object-cover flex-shrink-0" />
-                          ) : (
-                            <div className="w-[21px] h-[21px] rounded-full bg-[#5476FC] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
-                              {c.doctor.replace("Dr. ", "").slice(0,1)}
-                            </div>
-                          )}
-                          <span className="text-[#24292E] text-[13px] font-normal leading-[1.5] tracking-[-0.28px] truncate">
-                            {c.doctor}
-                          </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-2 py-1 rounded border border-gray-200 text-xs text-[#383F45] disabled:opacity-50"
+                          >
+                            Prev
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage((p) => Math.min(Math.ceil(consultations.length / itemsPerPage), p + 1))}
+                            disabled={currentPage === Math.ceil(consultations.length / itemsPerPage)}
+                            className="px-2 py-1 rounded border border-gray-200 text-xs text-[#383F45] disabled:opacity-50"
+                          >
+                            Next
+                          </button>
                         </div>
-                        <div className="flex flex-col gap-0.5 mt-1 text-[#9EA5AD] text-[11px] font-normal leading-[1.5]">
-                          <span>Booked: {c.bookedAt}</span>
-                          <span>Scheduled: {c.scheduledFor}</span>
-                          {c.completedAt && <span>Completed: {c.completedAt}</span>}
-                        </div>
-                        {/* EMR badge */}
-                        {c.emr ? (
-                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold w-fit">
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
-                            Notes recorded
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 text-[10px] font-semibold w-fit">
-                            No notes yet
-                          </span>
-                        )}
                       </div>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 rotate-[-90deg]">
-                        <path d="M5.25 10.5L8.75 7L5.25 3.5" stroke="#65799D" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  );
-                })}
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
             {/* Right: Consultation Details */}
-            <div className="flex-1 min-w-0 bg-[#EBEEF5] border border-white rounded-[12px] flex flex-col overflow-hidden">
+            <div className={`fixed inset-0 z-[100] bg-black/40 p-4 lg:static lg:z-auto lg:bg-transparent lg:p-0 lg:block lg:flex-1 ${!selectedConsultation ? 'hidden' : 'flex items-center justify-center'}`}>
+              <div className="w-full max-h-[85vh] lg:max-h-none lg:h-auto min-w-0 bg-[#EBEEF5] border border-white rounded-[12px] flex flex-col overflow-hidden shadow-xl lg:shadow-none">
 
-              {/* Detail header */}
-              <div className="flex items-center justify-between px-8 py-6 bg-white rounded-t-[12px]">
-                <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-                  Consultation Details
-                </span>
-                <button
-                  onClick={() => setShowAddendumBox((v) => !v)}
-                  disabled={!selectedConsultation}
-                  className="flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 disabled:opacity-50"
-                  style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
-                >
-                  Add Addendum
-                </button>
-              </div>
+                {/* Detail header */}
+                <div className="flex items-center justify-between px-6 py-5 lg:px-8 lg:py-6 bg-white rounded-t-[12px] flex-shrink-0 border-b border-gray-100">
+                  <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                    Consultation Details
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAddendumBox((v) => !v)}
+                      disabled={!selectedConsultation}
+                      className="flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 disabled:opacity-50"
+                      style={{ background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)" }}
+                    >
+                      Add Addendum
+                    </button>
+                    <button 
+                      onClick={() => setSelectedConsultation(null)}
+                      className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                  </div>
+                </div>
 
               {showAddendumBox && selectedConsultation && (
                 <div className="flex flex-col gap-3 bg-[#F8FAFC] border-b border-gray-100 p-6">
@@ -883,6 +927,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}
