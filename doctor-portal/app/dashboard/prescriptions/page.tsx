@@ -20,6 +20,7 @@ interface RawTask {
   patientAvatarUrl: string | null;
   patientAge: number | null;
   appointmentId: string;
+  visitType?: "online" | "offline";
 }
 
 function formatTime(iso: string) {
@@ -62,6 +63,7 @@ export default function PrescriptionsTasksPage() {
         patientAvatar: t.patientAvatarUrl ?? "/patient-avatar-1.png",
         patientBio: "",
         appointmentId: t.appointmentId,
+        visitType: t.visitType === "offline" ? "offline" : "online",
       }));
 
       setTasks(mapped);
@@ -76,11 +78,8 @@ export default function PrescriptionsTasksPage() {
   const handleSelectTask = (task: TaskItem) => setSelectedTaskId(task.id);
 
   const handleAction = (task: TaskItem) => {
-    if (task.type === "upcoming_consultation") {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    } else {
-      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    }
+    const route = task.type === "upcoming_consultation" && task.visitType !== "offline" ? "/appointments/consult" : "/appointments/complete-emr";
+    router.push(`${route}?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
   };
 
   const activeTask = hoveredTask || tasks.find((t) => t.id === selectedTaskId) || null;

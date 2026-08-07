@@ -161,8 +161,8 @@ function TwoFactorInner() {
 
       <div className="relative z-10 w-full max-w-[1380px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center flex-1 py-6">
 
-        {/* Left: image */}
-        <div className="w-full flex justify-center select-none">
+        {/* Left: image — desktop only, not needed on mobile */}
+        <div className="hidden md:flex w-full justify-center select-none">
           <div className="relative w-full max-h-[82vh] aspect-[4/5] md:aspect-[0.8] rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.06)] border-4 border-white/80 group">
             <div className="absolute inset-0 bg-indigo-900/5 group-hover:bg-indigo-900/0 transition-colors duration-500 z-10" />
             <Image

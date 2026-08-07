@@ -16,6 +16,7 @@ export interface TaskItem {
   patientAvatar: string;
   patientBio: string;
   appointmentId?: string;
+  visitType?: "online" | "offline";
 }
 
 interface TaskDetailsCardProps {

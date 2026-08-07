@@ -20,6 +20,7 @@ interface Task {
   summary: string;
   patientName: string;
   appointmentId: string;
+  visitType?: "online" | "offline";
 }
 
 const HOURS_SLOT = [
@@ -200,6 +201,7 @@ export default function TimeSlotView() {
             summary: t.summary,
             patientName: t.patientName,
             appointmentId: t.appointmentId,
+            visitType: t.visitType === "offline" ? "offline" : "online",
           }))
         );
       }
@@ -213,11 +215,8 @@ export default function TimeSlotView() {
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const goToTask = (task: Task) => {
-    if (task.type === "pending_emr") {
-      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    } else {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    }
+    const route = task.type === "pending_emr" || task.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+    router.push(`${route}?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
   };
 
   const handleCellClick = (dayOfWeek: number, timeStr: string) => {

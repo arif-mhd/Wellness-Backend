@@ -34,6 +34,7 @@ interface SlotAppointment {
   preVisitData: any | null;
   familyMemberId?: string | null;
   accountOwnerName?: string;
+  visitType?: "online" | "offline";
   profileRelationship?: string;
 }
 
@@ -69,6 +70,7 @@ function buildSlotAppointment(a: any): SlotAppointment {
     patientWaitingSince: a.patientWaitingSince ?? null,
     preVisitData: a.preVisitData ?? null,
     familyMemberId: a.familyMemberId ?? null,
+    visitType: a.visitType === "offline" ? "offline" : "online",
     accountOwnerName: a.accountOwnerName,
     profileRelationship: a.profileRelationship,
   };
@@ -195,7 +197,8 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
   };
 
   const handleConnectNow = (apt: SlotAppointment) => {
-    router.push(`/appointments/consult?appointmentId=${apt.id}&patientName=${encodeURIComponent(apt.patientName)}`);
+    const route = apt.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+    router.push(`${route}?appointmentId=${apt.id}&patientName=${encodeURIComponent(apt.patientName)}`);
   };
 
   const mapToPatient = (apt: SlotAppointment): Patient => ({

@@ -29,7 +29,8 @@ interface DoctorRow { id: string; fullName: string; specialty?: string | null; a
 interface DoctorSummary { id: string; fullName: string; avatarUrl?: string | null; fees?: string | null; totalEarnings: number; cashEarnings: number; insuranceEarnings: number; }
 interface HistoryRow {
   id: string; patientName: string; patientAge: number | null; patientEmail: string;
-  diagnosis: string; date: string; earning: number; status: string; doctorId: string; paymentMethod: "cash" | "insurance";
+  diagnosis: string; date: string; earning: number; status: string; doctorId: string;
+  paymentMethod: "cash" | "insurance" | "pay_at_clinic"; paymentStatus?: string;
 }
 
 const HISTORY_FILTERS: { key: string; label: string }[] = [
@@ -140,6 +141,7 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
   const [range, setRange] = useState("All");
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -154,6 +156,15 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
     } catch { setRows([]); }
     finally { setLoading(false); }
   }, [filter, branchId, doctorId]);
+
+  const handleMarkPaid = useCallback(async (id: string) => {
+    setMarkingPaidId(id);
+    try {
+      const res = await apiFetch(`/api/appointments/${id}/mark-paid`, { method: "PATCH" });
+      if (res.ok) await fetchHistory();
+    } catch { /* best-effort */ }
+    finally { setMarkingPaidId(null); }
+  }, [fetchHistory]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
@@ -208,9 +219,22 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
                 <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-medium shrink-0 ${DIAGNOSIS_COLORS[row.diagnosis] ?? "bg-[#F1F3F7] text-[#676E76]"}`}>
                   {row.diagnosis}
                 </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${row.paymentMethod === "insurance" ? "bg-[#E9F6EE] text-[#179353]" : "bg-[#F1F3F7] text-[#676E76]"}`}>
-                  {row.paymentMethod === "insurance" ? "Insurance" : "Cash"}
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
+                  row.paymentMethod === "insurance" ? "bg-[#E9F6EE] text-[#179353]" :
+                  row.paymentMethod === "pay_at_clinic" ? "bg-[#FFF7ED] text-[#C2761D]" :
+                  "bg-[#F1F3F7] text-[#676E76]"
+                }`}>
+                  {row.paymentMethod === "insurance" ? "Insurance" : row.paymentMethod === "pay_at_clinic" ? "Pay at Clinic" : "Cash"}
                 </span>
+                {row.paymentMethod === "pay_at_clinic" && row.paymentStatus !== "paid" && (
+                  <button
+                    onClick={() => handleMarkPaid(row.id)}
+                    disabled={markingPaidId === row.id}
+                    className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 bg-[#5476FC] text-white hover:bg-[#4065FB] disabled:opacity-50 transition-colors"
+                  >
+                    {markingPaidId === row.id ? "Marking…" : "Mark Paid"}
+                  </button>
+                )}
                 {row.status === "cancelled" && <span className="text-[10.5px] text-[#F25252] font-medium shrink-0">Cancelled</span>}
               </div>
               <span className="text-[12px] text-[#676E76]">{row.date ? new Date(row.date).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>

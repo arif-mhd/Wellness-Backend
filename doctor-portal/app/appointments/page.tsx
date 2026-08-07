@@ -81,6 +81,7 @@ function mapToPatient(apt: any, index: number): Patient {
       : undefined,
     accountOwnerName: apt.familyMemberId ? apt.accountOwnerName : undefined,
     profileRelationship: apt.familyMemberId ? apt.profileRelationship : undefined,
+    visitType: apt.visitType === 'offline' ? 'offline' : 'online',
   };
 }
 import NewAppointmentsTable from "@/components/appointment/NewAppointmentsTable";
@@ -126,7 +127,8 @@ export default function AppointmentsPage() {
   }, [fetchAppointments]);
 
   const startConsult = (patient: Patient) => {
-    router.push(`/appointments/consult?appointmentId=${patient.id}&patientName=${encodeURIComponent(patient.name)}`);
+    const route = patient.visitType === 'offline' ? '/appointments/complete-emr' : '/appointments/consult';
+    router.push(`${route}?appointmentId=${patient.id}&patientName=${encodeURIComponent(patient.name)}`);
   };
 
   // Success Toast state

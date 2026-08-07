@@ -20,6 +20,7 @@ interface Task {
   desc: string;
   appointmentId: string;
   patientName: string;
+  visitType?: "online" | "offline";
 }
 
 interface PatientRow {
@@ -30,6 +31,7 @@ interface PatientRow {
   status: string;
   scheduledAt: string;
   updatedAt: string;
+  visitType?: "online" | "offline";
 }
 
 const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -231,6 +233,7 @@ export default function DashboardPage() {
           status:      a.status,
           scheduledAt: a.scheduledAt,
           updatedAt:   a.updatedAt ?? a.scheduledAt,
+          visitType:   a.visitType === "offline" ? "offline" : "online",
         }));
         setPatients(rows);
         if (rows.length > 0) setSelectedPatientId(rows[0].id);
@@ -247,6 +250,7 @@ export default function DashboardPage() {
           desc: `${t.patientName} — ${t.summary}`,
           appointmentId: t.appointmentId,
           patientName: t.patientName,
+          visitType: t.visitType === "offline" ? "offline" : "online",
         }));
         setTasks(mapped);
         setPendingEmrCount(counts?.pendingEmr ?? 0);
@@ -395,11 +399,8 @@ export default function DashboardPage() {
   ) : null;
 
   const goToTask = (task: Task) => {
-    if (task.type === "pending_emr") {
-      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    } else {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    }
+    const route = task.type === "pending_emr" || task.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+    router.push(`${route}?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
   };
 
   const upcomingCount       = tasks.length - pendingEmrCount;
@@ -624,7 +625,8 @@ export default function DashboardPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (p.status === "completed") return;
-                            router.push(`/appointments/consult?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
+                            const route = p.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+                            router.push(`${route}?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
                           }}
                           disabled={p.status === "completed"}
                           className={`h-[32px] px-[13px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all ${
