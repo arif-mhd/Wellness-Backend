@@ -71,8 +71,9 @@ export default function TaskListTable({
     <div className="flex flex-col bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm min-h-[580px] justify-between select-none">
       <div className="flex flex-col gap-6">
         {/* Filter Tabs & Search & Filter Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Filter Tabs & Search & Filter Controls */}
+        <div className="flex items-center justify-between gap-2 w-full overflow-hidden">
+          <div className="flex items-center gap-2.5 flex-nowrap overflow-x-auto pb-1 sm:pb-0 w-full md:w-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
             {filters.map((filter) => {
               const isActive = activeFilter === filter;
               return (
@@ -82,23 +83,23 @@ export default function TaskListTable({
                     setActiveFilter(filter);
                     setCurrentPage(1); // Reset to page 1 on filter change
                   }}
-                  className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-[-0.24px] border transition-all duration-200 ${
+                  className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-[-0.24px] border transition-all duration-200 shrink-0 ${
                     isActive
                       ? "bg-[#24292E] text-white border-transparent shadow-sm"
                       : "bg-white text-[#676E76] border-[#EBEEF5] hover:bg-gray-50 hover:text-[#24292E]"
                   }`}
                   style={{ fontFamily: "Outfit, sans-serif" }}
                 >
-                  {filter === "ALL" ? "ALL" : filter}
+                  {filter === "ALL" ? "All" : filter}
                 </button>
               );
             })}
 
             {/* Interactive Search toggle */}
-            <div className="flex items-center gap-2 relative">
+            <div className="flex items-center gap-2 relative shrink-0">
               <button
                 onClick={() => setShowSearchInput(!showSearchInput)}
-                className={`p-2.5 rounded-full border transition-all ${
+                className={`p-2.5 rounded-full border transition-all shrink-0 ${
                   showSearchInput || searchQuery
                     ? "bg-[#F5F6FA] border-[#EBEEF5] text-[#24292E]"
                     : "bg-white border-[#EBEEF5] text-[#676E76] hover:bg-gray-50"
@@ -132,7 +133,7 @@ export default function TaskListTable({
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="bg-[#F5F6FA] border border-[#EBEEF5] text-[#24292E] placeholder-[#9EA5AD] text-xs rounded-full px-4 py-2 outline-none w-40 focus:w-48 transition-all"
+                  className="bg-[#F5F6FA] border border-[#EBEEF5] text-[#24292E] placeholder-[#9EA5AD] text-xs rounded-full px-4 py-2 outline-none w-32 sm:w-40 focus:w-48 transition-all shrink-0"
                   style={{ fontFamily: "Outfit, sans-serif" }}
                   autoFocus
                 />
@@ -141,7 +142,7 @@ export default function TaskListTable({
           </div>
 
           {/* Right Action Menu Icon */}
-          <button className="self-end sm:self-center p-2.5 rounded-full border border-[#EBEEF5] text-[#676E76] hover:bg-gray-50 hover:text-[#24292E] transition-all">
+          <button className="shrink-0 p-2.5 rounded-full border border-[#EBEEF5] text-[#676E76] hover:bg-gray-50 hover:text-[#24292E] transition-all">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M2.667 4h10.666M4.667 8h6.666M6.667 12h2.666" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>

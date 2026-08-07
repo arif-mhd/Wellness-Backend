@@ -213,7 +213,7 @@ export default function ScheduleListView({
                 <div
                   key={item.id}
                   onClick={() => onSelectItem(item)}
-                  className="group grid grid-cols-1 md:grid-cols-[1.8fr_2.2fr_1.2fr_1fr] gap-4 items-center p-3 rounded-2xl cursor-pointer border border-transparent transition-all duration-300 bg-white hover:bg-[#ECEFFE]/80"
+                  className="group flex flex-col md:grid md:grid-cols-[1.8fr_2.2fr_1.2fr_1fr] gap-3 md:gap-4 md:items-center p-4 md:p-3 rounded-2xl cursor-pointer border border-[#EBEEF5] md:border-transparent transition-all duration-300 bg-white shadow-[0px_2px_8px_rgba(0,0,0,0.04)] md:shadow-none hover:bg-[#ECEFFE]/80 mb-3 md:mb-0"
                 >
                   {/* Name column */}
                   <div className="flex items-center gap-3">
@@ -267,15 +267,19 @@ export default function ScheduleListView({
                   </div>
 
                   {/* Action Column */}
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end w-full md:w-auto mt-2 md:mt-0">
                     {item.actionType === "Consult Now" ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onConsultClick?.(item);
                         }}
-                        className="text-[#5879FC] hover:text-[#4065FB] font-bold text-xs whitespace-nowrap transition-colors py-1.5 px-3"
-                        style={{ fontFamily: "Outfit, sans-serif" }}
+                        className={`whitespace-nowrap shrink-0 h-[32px] px-4 rounded-xl text-xs font-semibold tracking-[-0.24px] transition-all duration-300 ${
+                          isSelected
+                            ? "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
+                            : "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)] border-transparent md:bg-none md:bg-white md:text-[#24292E] md:border-gray-200 md:shadow-none md:group-hover:bg-gradient-to-b md:group-hover:text-white md:group-hover:border-transparent md:group-hover:shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
+                        }`}
+                        style={{ backgroundImage: "linear-gradient(to bottom, #8AA0FF, #5476FC)", fontFamily: "Outfit, sans-serif" }}
                       >
                         Consult Now
                       </button>
@@ -291,9 +295,9 @@ export default function ScheduleListView({
                         className={`whitespace-nowrap shrink-0 h-[32px] px-4 rounded-xl text-xs font-semibold tracking-[-0.24px] transition-all duration-300 ${
                           isSelected
                             ? "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
-                            : "bg-white text-[#24292E] border border-gray-200 group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:text-white group-hover:border-transparent group-hover:shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
+                            : "bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)] border-transparent md:bg-none md:bg-white md:text-[#24292E] md:border-gray-200 md:shadow-none md:group-hover:bg-gradient-to-b md:group-hover:text-white md:group-hover:border-transparent md:group-hover:shadow-[0_4px_12px_rgba(88,121,252,0.25)] hover:from-[#758FFF] hover:to-[#4065FB]"
                         }`}
-                        style={{ fontFamily: "Outfit, sans-serif" }}
+                        style={{ backgroundImage: "linear-gradient(to bottom, #8AA0FF, #5476FC)", fontFamily: "Outfit, sans-serif" }}
                       >
                         Reschedule
                       </button>

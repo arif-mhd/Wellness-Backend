@@ -122,8 +122,16 @@ export default function PrescriptionsTasksPage() {
           </div>
 
           {/* Right Column: Detailed Card (Fixed Width 372px) */}
-          <div className="w-full xl:w-[372px] xl:shrink-0 self-start">
-            <TaskDetailsCard task={activeTask} onAction={handleAction} />
+          <div className={`fixed inset-0 z-[100] bg-black/40 p-4 xl:static xl:z-auto xl:bg-transparent xl:p-0 xl:block xl:w-[372px] xl:shrink-0 self-start ${!selectedTaskId ? 'hidden xl:block' : 'flex items-center justify-center xl:block'}`}>
+            <div className="relative w-full max-h-[90vh] xl:max-h-none overflow-y-auto xl:overflow-visible rounded-[24px]">
+              <button 
+                onClick={() => setSelectedTaskId(null)}
+                className="xl:hidden absolute top-4 right-4 flex items-center justify-center w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 text-gray-500 hover:bg-gray-50 z-10"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <TaskDetailsCard task={activeTask} onAction={handleAction} />
+            </div>
           </div>
         </div>
       </div>

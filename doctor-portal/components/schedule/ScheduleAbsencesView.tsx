@@ -442,7 +442,7 @@ export default function ScheduleAbsencesView() {
       )}
 
       {/* Double Column Layout: Calendar + Right Log Panel */}
-      <div className="flex gap-6 items-start w-full">
+      <div className="flex flex-col xl:flex-row gap-6 items-start w-full">
         {/* Left Column: Calendar Grid Card */}
         <div className="flex-1 min-w-0 bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm flex flex-col gap-5">
           
@@ -700,7 +700,7 @@ export default function ScheduleAbsencesView() {
         </div>
 
         {/* Right Column: Absence Log Sidebar Panel */}
-        <div className="w-[280px] shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-sm flex flex-col gap-4">
+        <div className="w-full xl:w-[280px] shrink-0 bg-white border border-[#EBEEF5] rounded-[24px] p-5 shadow-sm flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <span
               className="text-[#24292E] font-semibold text-[15px] tracking-[-0.3px]"
