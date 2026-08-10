@@ -7,14 +7,13 @@ import {
   appointmentsContainer,
   patientsContainer,
   doctorsContainer,
-  clinicsContainer,
   queryDocuments,
   notificationsContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
-import { getActorClinicIds, getActorPermissionState, hasPermission } from "../utils/clinicScope";
+import { getActorClinicIds, getActorPermissionState, hasPermission, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
@@ -35,6 +34,32 @@ function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
   // If they have an invite, allow them (even if status is pending, as they
   // might be loading EMR concurrently with the join process).
   return apt.specialistInvite?.doctorId === doctorId;
+}
+
+// A doctor's clinicId may point either at an org's own top-level document
+// (main branch) or at a branch nested inside that org's branches[] array
+// (real branches have no standalone Cosmos doc of their own). A plain
+// clinicsContainer.item(clinicId, clinicId).read() only ever finds the
+// former — for a branch-assigned doctor it 404s and silently leaves the
+// appointment's clinicName blank. Resolve through the org doc + the same
+// mainBranchFrom/branchAsPublicClinic shaping used everywhere else that
+// needs to display a branch's identity.
+async function resolveDoctorClinicDisplay(clinicId: string | null | undefined): Promise<{ name: string | null; address: string | null }> {
+  if (!clinicId) return { name: null, address: null };
+  try {
+    const org = await loadOrgDocForClinicId(clinicId);
+    if (!org) return { name: null, address: null };
+    if (org.id === clinicId) {
+      const main = mainBranchFrom(org);
+      return { name: main.name ?? null, address: main.address ?? null };
+    }
+    const branch = (org.branches ?? []).find((b: any) => b.id === clinicId);
+    if (!branch) return { name: null, address: null };
+    const shaped = branchAsPublicClinic(org, branch);
+    return { name: shaped.clinicName ?? null, address: shaped.address ?? null };
+  } catch {
+    return { name: null, address: null };
+  }
 }
 
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
@@ -97,7 +122,10 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
   }
 
   const resolvedVisitType: "online" | "offline" = visitType === "offline" ? "offline" : "online";
-  const resolvedPaymentMethod: "cash" | "insurance" = paymentMethod === "insurance" ? "insurance" : "cash";
+  // In-person visits are paid at the clinic, not through the app — never let
+  // a client-supplied paymentMethod override that, regardless of what's sent.
+  const resolvedPaymentMethod: "cash" | "insurance" | "pay_at_clinic" =
+    resolvedVisitType === "offline" ? "pay_at_clinic" : paymentMethod === "insurance" ? "insurance" : "cash";
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -160,7 +188,10 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       reason,
       shareMedicalHistory: !!shareMedicalHistory,
       status: "scheduled",
-      paymentStatus: "paid",
+      // Online visits are mock-paid in-app at booking time; in-person visits
+      // are paid at the clinic and only marked paid afterward (see
+      // PATCH /:id/mark-paid) — never counted as earned until that happens.
+      paymentStatus: resolvedVisitType === "offline" ? "pending" : "paid",
       // Resolved server-side (never trusted from the client) — same value
       // it already defaulted to, just authoritative now instead of a client
       // override being accepted verbatim.
@@ -228,15 +259,7 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       appointments.map(async (apt) => {
         try {
           const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-          let clinicName: string | null = null;
-          let clinicAddress: string | null = null;
-          if (doctor?.clinicId) {
-            try {
-              const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
-              clinicName = clinic?.fullName ?? null;
-              clinicAddress = clinic?.address ?? null;
-            } catch { /* clinic lookup best-effort */ }
-          }
+          const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
           return {
             ...apt,
             doctorName: doctor?.fullName ?? "Unknown Doctor",
@@ -463,6 +486,7 @@ router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, r
           patientAvatarUrl,
           patientAge,
           appointmentId: apt.id,
+          visitType: apt.visitType === "offline" ? "offline" : "online",
         };
       })
     );
@@ -741,19 +765,14 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
     let enriched = apt;
     try {
       const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-      let clinicName: string | null = null;
-      if (doctor?.clinicId) {
-        try {
-          const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
-          clinicName = clinic?.fullName ?? null;
-        } catch { /* best-effort */ }
-      }
+      const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
       enriched = {
         ...apt,
         doctorName: doctor?.fullName ?? apt.doctorName,
         doctorSpecialty: doctor?.specialty ?? apt.doctorSpecialty,
         doctorAvatarUrl: doctor?.avatarUrl ?? apt.doctorAvatarUrl,
         clinicName,
+        clinicAddress: clinicAddress ?? apt.clinicAddress ?? null,
       };
     } catch { /* fall back to the raw doc if doctor lookup fails */ }
 
@@ -853,6 +872,51 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
     console.error("Cancel appointment error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/appointments/:id/mark-paid ──────────────────────────────────
+// In-person ("pay at clinic") appointments are booked with paymentStatus
+// "pending" — nothing is actually collected through the app. Once the
+// doctor or clinic front desk collects payment at the visit, this flips it
+// to "paid" so it counts toward the clinic's earnings. Online appointments
+// are already paid at booking and never need this.
+router.patch("/:id/mark-paid", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+
+    const isDoctor = apt.doctorId === userId;
+    let isClinic = false;
+    if (!isDoctor && apt.clinicId) {
+      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
+    }
+    if (!isDoctor && !isClinic) {
+      res.status(403).json({ error: "Not authorized." });
+      return;
+    }
+    if (isClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
+      res.status(403).json({ error: "You don't have permission to manage appointments." });
+      return;
+    }
+    if (apt.paymentMethod !== "pay_at_clinic") {
+      res.status(400).json({ error: "Only in-person appointments can be marked paid this way." });
+      return;
+    }
+
+    const updated = { ...apt, paymentStatus: "paid", updatedAt: new Date().toISOString() };
+    await appointmentsContainer.items.upsert(updated);
+
+    res.json({ status: "OK", appointment: updated });
+  } catch (err) {
+    console.error("Mark appointment paid error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

@@ -6,8 +6,6 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { label: "Profile",          href: "/dashboard/profile" },
   { label: "Notification",     href: "/dashboard/profile/notifications" },
-  { label: "Privacy",          href: "/dashboard/profile/privacy" },
-  { label: "Info",             href: "/dashboard/profile/info" },
   { label: "Payments",         href: "/dashboard/profile/payments" },
   { label: "Account Settings", href: "/dashboard/profile/account-settings" },
 ];
@@ -24,18 +22,6 @@ function getIcon(label: string) {
       return (
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
           <path d="M14.6693 13.334H1.33594V12.0007H2.0026V7.35492C2.0026 4.02964 4.6889 1.33398 8.0026 1.33398C11.3163 1.33398 14.0026 4.02964 14.0026 7.35492V12.0007H14.6693V13.334ZM3.33594 12.0007H12.6693V7.35492C12.6693 4.76602 10.5799 2.66732 8.0026 2.66732C5.42528 2.66732 3.33594 4.76602 3.33594 7.35492V12.0007ZM6.33594 14.0007H9.66927C9.66927 14.9211 8.92307 15.6673 8.0026 15.6673C7.08214 15.6673 6.33594 14.9211 6.33594 14.0007Z" fill="currentColor"/>
-        </svg>
-      );
-    case "Privacy":
-      return (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
-          <path d="M8 0.666016L13.4779 1.88334C13.783 1.95112 14 2.22166 14 2.53413V9.19195C14 10.5293 13.3316 11.7783 12.2188 12.5201L8 15.3327L3.7812 12.5201C2.66841 11.7783 2 10.5293 2 9.19195V2.53413C2 2.22166 2.21702 1.95112 2.52205 1.88334L8 0.666016ZM8 2.03188L3.33333 3.06891V9.19195C3.33333 10.0835 3.77893 10.9161 4.5208 11.4107L8 13.7302L11.4792 11.4107C12.2211 10.9161 12.6667 10.0835 12.6667 9.19195V3.06891L8 2.03188ZM8 4.66602C8.7364 4.66602 9.33333 5.26297 9.33333 5.99935C9.33333 6.49258 9.06553 6.92322 8.6674 7.15388L8.66667 9.99935H7.33333L7.33327 7.15428C6.9348 6.92375 6.66667 6.49285 6.66667 5.99935C6.66667 5.26297 7.2636 4.66602 8 4.66602Z" fill="currentColor"/>
-        </svg>
-      );
-    case "Info":
-      return (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
-          <path d="M8 4C8.55227 4 9 3.55229 9 3C9 2.44771 8.55227 2 8 2C7.44773 2 7 2.44771 7 3C7 3.55229 7.44773 4 8 4ZM6 6.66667H7.33333V12H6V13.3333H10V12H8.66667V5.33333H6V6.66667Z" fill="currentColor"/>
         </svg>
       );
     case "Payments":

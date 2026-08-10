@@ -18,6 +18,7 @@ const MAX_ATTEMPTS = 5;
 //   "doctor_reset"       — no existence check (used by doctor forgot-password flow)
 //   "clinic_fee_change"  — no existence check (clinic already authenticated)
 //   "clinic_withdrawal"  — no existence check (clinic already authenticated)
+//   "sos_access"         — no existence check (doctor already authenticated, SOS record access)
 router.post("/send", async (req: Request, res: Response) => {
   try {
     const { email, purpose = "registration" } = req.body;
@@ -113,12 +114,13 @@ router.post("/send", async (req: Request, res: Response) => {
     });
 
     // Map purpose to sendOtpEmail purpose type
-    const emailPurpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" =
+    const emailPurpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" | "sos_access" =
       purpose === "enable_2fa"       ? "enable_2fa"       :
       purpose === "registration"     ? "registration"     :
       purpose === "reset"            ? "reset"            :
       purpose === "clinic_fee_change" ? "clinic_fee_change" :
       purpose === "clinic_withdrawal" ? "clinic_withdrawal" :
+      purpose === "sos_access"        ? "sos_access"        :
       "login";
 
     try {

@@ -14,6 +14,7 @@ import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
 import clinicsRouter from "./routes/clinics";
 import adminClinicsRouter from "./routes/adminClinics";
+import adminEarningsRouter from "./routes/adminEarnings";
 import clinicDoctorsRouter from "./routes/clinicDoctors";
 import clinicAppointmentsRouter from "./routes/clinicAppointments";
 import clinicPatientsRouter from "./routes/clinicPatients";
@@ -118,6 +119,7 @@ app.use("/api/clinics", clinicsRouter);
 // Admin clinic management (requires admin role)
 app.use("/api/admin/clinics", adminClinicsRouter);
 app.use("/api/admin/fee-requests", adminFeeRequestsRouter);
+app.use("/api/admin/earnings", adminEarningsRouter);
 
 // Patient self-registration + profile updates (public register, rest require patient role)
 app.use("/api/patients", patientsRouter);

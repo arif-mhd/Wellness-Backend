@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
+import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
@@ -465,6 +466,33 @@ router.put("/insurance", requireRole("patient"), async (req: SessionRequest, res
   }
 });
 
+// ── PUT /api/patients/emergency-contacts ─────────────────────────────────────
+// Body: { emergencyContacts: { id, name, phone }[] } — whole-list replace,
+// same convention as /allergies and /insurance.
+router.put("/emergency-contacts", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { emergencyContacts } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    await patientsContainer.items.upsert({
+      ...existing,
+      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Emergency contacts update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── POST /api/patients/family/:memberId/avatar ───────────────────────────────
 // Uploads a family member's avatar to blob storage and stores the URL on the member object.
 router.post(
@@ -709,6 +737,74 @@ router.put("/family/:memberId/fitness-profile", requireRole("patient"), async (r
   }
 });
 
+// ── GET /api/patients/sessions ───────────────────────────────────────────────
+// Lists this patient's active login sessions. No device/browser info is
+// captured anywhere at login time, so entries are limited to when each
+// session was created and when it expires — still genuinely real via
+// SuperTokens, just not an "iPhone - Dubai" style list.
+router.get("/sessions", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const currentHandle = req.session!.getHandle();
+    const handles = await Session.getAllSessionHandlesForUser(userId);
+
+    const sessions = (
+      await Promise.all(
+        handles.map(async (handle) => {
+          const info = await Session.getSessionInformation(handle);
+          if (!info) return null;
+          return {
+            sessionHandle: handle,
+            timeCreated: info.timeCreated,
+            expiry: info.expiry,
+            isCurrentSession: handle === currentHandle,
+          };
+        })
+      )
+    )
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .sort((a, b) => b.timeCreated - a.timeCreated);
+
+    res.json({ sessions });
+  } catch (err) {
+    console.error("List sessions error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/patients/sessions/:handle ────────────────────────────────────
+// Revokes a single session. Only ever revokes a handle confirmed to belong
+// to the caller — never trusts a client-supplied handle outright.
+router.delete("/sessions/:handle", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { handle } = req.params;
+    const ownHandles = await Session.getAllSessionHandlesForUser(userId);
+    if (!ownHandles.includes(handle)) {
+      res.status(404).json({ error: "Session not found." });
+      return;
+    }
+    await Session.revokeSession(handle);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Revoke session error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/patients/sessions/revoke-all ───────────────────────────────────
+// Signs out every device, including the caller's own current session.
+router.post("/sessions/revoke-all", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    await Session.revokeAllSessionsForUser(userId);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Revoke all sessions error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /api/patients/2fa/status ────────────────────────────────────────────
 router.get("/2fa/status", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const userId = req.session!.getUserId();
@@ -812,11 +908,11 @@ router.delete("/me", requireRole("patient"), async (req: SessionRequest, res: Re
 // ── PUT /api/patients/notification-preferences ───────────────────────────────
 // Stores push notification toggle states and the device's Expo push token so
 // the backend can respect per-type opt-outs when sending notifications.
-// Body: { preferences: { appointments, messages, health, orders, system }, expoPushToken? }
+// Body: { preferences: { appointments, messages, health, orders, system }, emailFrequency?, expoPushToken? }
 router.put("/notification-preferences", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
-    const { preferences, expoPushToken } = req.body;
+    const { preferences, emailFrequency, expoPushToken } = req.body;
 
     if (!preferences || typeof preferences !== "object") {
       res.status(400).json({ error: "preferences object is required" });
@@ -829,6 +925,7 @@ router.put("/notification-preferences", requireRole("patient"), async (req: Sess
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
+    const allowedEmailFreq = ["instant", "hourly", "never"];
     const updated = {
       ...existing,
       notificationPreferences: {
@@ -837,6 +934,7 @@ router.put("/notification-preferences", requireRole("patient"), async (req: Sess
         health:       Boolean(preferences.health       ?? true),
         orders:       Boolean(preferences.orders       ?? true),
         system:       Boolean(preferences.system       ?? false),
+        emailFrequency: allowedEmailFreq.includes(emailFrequency) ? emailFrequency : "instant",
         updatedAt:    new Date().toISOString(),
       },
       ...(expoPushToken !== undefined && { expoPushToken }),

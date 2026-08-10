@@ -92,7 +92,7 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
   { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon },
   { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon },
   { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
-  { href: "/dashboard/wallet", label: "Payment", Icon: PaymentIcon },
+  { href: "/dashboard/profile/payments", label: "Payment", Icon: PaymentIcon },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────

@@ -91,6 +91,12 @@ router.get("/me", requireRole("clinic_pending", "clinic"), async (req: SessionRe
             licenseNumber: branch.licenseNumber ?? null,
             dohLicense: branch.dohLicense ?? null,
             address: branch.address ?? clinic.address ?? null,
+            description: branch.description ?? clinic.description ?? null,
+            city: branch.city ?? clinic.city ?? null,
+            postalCode: branch.postalCode ?? clinic.postalCode ?? null,
+            country: branch.country ?? clinic.country ?? null,
+            website: branch.website ?? clinic.website ?? null,
+            yearEstablished: branch.yearEstablished ?? clinic.yearEstablished ?? null,
             consultationRates: branch.consultationRates ?? [],
             paymentSettings: branch.paymentSettings ?? null,
             insurances: org.insurances ?? [],
@@ -231,6 +237,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
     insurances,
     // Clinic / company information
     licenseNumber, dohLicense, address, addressProofFileUrl,
+    description, city, postalCode, country, website, yearEstablished,
     consultationRates, paymentSettings, bio, clinicImageUrl,
     // Timeslots
     slots,
@@ -275,7 +282,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       };
       await clinicsContainer.items.upsert(updatedUser);
 
-      const branchFieldsProvided = [licenseNumber, dohLicense, address, addressProofFileUrl, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
+      const branchFieldsProvided = [licenseNumber, dohLicense, address, addressProofFileUrl, description, city, postalCode, country, website, yearEstablished, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
       const isMainBranchUser = clinic.branchId === clinic.orgId;
       let updatedBranch: any = isMainBranchUser
         ? mainBranchFrom(org)
@@ -290,6 +297,12 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
           dohLicense:          dohLicense          ?? org.dohLicense,
           address:             address             ?? org.address,
           addressProofFileUrl: addressProofFileUrl ?? org.addressProofFileUrl,
+          description:         description         ?? org.description,
+          city:                city                ?? org.city,
+          postalCode:          postalCode          ?? org.postalCode,
+          country:             country             ?? org.country,
+          website:             website             ?? org.website,
+          yearEstablished:     yearEstablished     ?? org.yearEstablished,
           consultationRates:   consultationRates   ?? org.consultationRates,
           paymentSettings:     paymentSettings     ?? org.paymentSettings,
           bio:                 bio                 ?? org.bio,
@@ -308,6 +321,12 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
             dohLicense:          dohLicense          ?? b.dohLicense,
             address:             address             ?? b.address,
             addressProofFileUrl: addressProofFileUrl ?? b.addressProofFileUrl,
+            description:         description         ?? b.description,
+            city:                city                ?? b.city,
+            postalCode:          postalCode          ?? b.postalCode,
+            country:             country             ?? b.country,
+            website:             website             ?? b.website,
+            yearEstablished:     yearEstablished     ?? b.yearEstablished,
             consultationRates:   consultationRates   ?? b.consultationRates,
             paymentSettings:     paymentSettings     ?? b.paymentSettings,
             bio:                 bio                 ?? b.bio,
@@ -341,6 +360,12 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
           licenseNumber: updatedBranch?.licenseNumber ?? null,
           dohLicense: updatedBranch?.dohLicense ?? null,
           address: updatedBranch?.address ?? updatedUser.address ?? null,
+          description: updatedBranch?.description ?? null,
+          city: updatedBranch?.city ?? null,
+          postalCode: updatedBranch?.postalCode ?? null,
+          country: updatedBranch?.country ?? null,
+          website: updatedBranch?.website ?? null,
+          yearEstablished: updatedBranch?.yearEstablished ?? null,
           consultationRates: updatedBranch?.consultationRates ?? [],
           paymentSettings: updatedBranch?.paymentSettings ?? null,
           insurances: org.insurances ?? [],
@@ -371,6 +396,12 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       dohLicense:            dohLicense            ?? clinic.dohLicense,
       address:               address               ?? clinic.address,
       addressProofFileUrl:   addressProofFileUrl   ?? clinic.addressProofFileUrl,
+      description:           description           ?? clinic.description,
+      city:                  city                  ?? clinic.city,
+      postalCode:            postalCode            ?? clinic.postalCode,
+      country:               country               ?? clinic.country,
+      website:               website               ?? clinic.website,
+      yearEstablished:       yearEstablished       ?? clinic.yearEstablished,
       consultationRates:     consultationRates     ?? clinic.consultationRates,
       paymentSettings:       paymentSettings       ?? clinic.paymentSettings,
       bio:                   bio                   ?? clinic.bio,

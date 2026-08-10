@@ -98,33 +98,26 @@ export default function ClinicSettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadClinic = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
     try {
       const res = await apiFetch("/api/clinics/me");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLoadError(body.error ?? `Failed to load clinic profile (${res.status}).`);
+        return;
+      }
       const data = await res.json();
       const cli = data.clinic ?? data;
       setClinic(cli);
       setFormData(buildFormData(cli));
-    } catch {
-      // If endpoint doesn't exist or fails, provide a mock layout so UI works perfectly
-      const mockClinic = {
-        name: "Wellness Central Clinic",
-        registrationNumber: "REG-908123-AE",
-        email: "contact@wellnesscentral.ae",
-        description: "Leading multi-specialty clinic providing excellent healthcare services to the community with a focus on holistic wellness and patient care.",
-        phone: "+971 50 123 4567",
-        address: "Healthcare City, Bldg 4",
-        city: "Dubai",
-        postalCode: "12345",
-        country: "UAE",
-        website: "https://wellnesscentral.ae",
-        yearEstablished: "2015"
-      };
-      setClinic(mockClinic);
-      setFormData(buildFormData(mockClinic));
+    } catch (e: any) {
+      setLoadError(e?.message ?? "Network error — could not load clinic profile.");
     } finally {
       setLoading(false);
     }
@@ -132,8 +125,11 @@ export default function ClinicSettingsPage() {
 
   useEffect(() => { loadClinic(); }, [loadClinic]);
 
-  const saveSection = async (patch: Partial<FormData>) => {
-    if (!formData) return;
+  // Returns whether the save actually succeeded — callers use this to decide
+  // whether to close the edit panel (keep it open with the draft + error
+  // visible on failure, so nothing the clinic typed is silently lost).
+  const saveSection = async (patch: Partial<FormData>): Promise<boolean> => {
+    if (!formData) return false;
     setSaving(true);
     setSaveError("");
     const merged = { ...formData, ...patch };
@@ -143,17 +139,18 @@ export default function ClinicSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(merged),
       });
-      if (res.ok) {
-        setFormData(merged);
-        await loadClinic();
-      } else {
-         setFormData(merged);
-         setClinic(prev => prev ? { ...prev, ...merged } : prev);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(body.error ?? `Failed to save changes (${res.status}).`);
+        return false;
       }
-    } catch {
-      // Mock update fallback for demonstration
-      setFormData(merged);
-      setClinic(prev => prev ? { ...prev, ...merged } : prev);
+      const savedClinic = body.clinic ?? body;
+      setClinic(prev => (prev ? { ...prev, ...savedClinic } : savedClinic));
+      setFormData(buildFormData(savedClinic));
+      return true;
+    } catch (e: any) {
+      setSaveError(e?.message ?? "Network error — changes were not saved.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -169,18 +166,26 @@ export default function ClinicSettingsPage() {
       const fd = new FormData();
       fd.append("logo", file);
       const res = await apiFetch("/api/clinics/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (data.urls?.logo || data.urls?.avatar) {
-        const logoUrl = data.urls.logo || data.urls.avatar;
-        await apiFetch("/api/clinics/profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ logoUrl }),
-        });
-        setClinic((prev) => prev ? { ...prev, logoUrl } : prev);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Upload failed (${res.status}).`);
       }
-    } catch {
-      alert("Logo upload failed.");
+      const data = await res.json();
+      const logoUrl = data.urls?.logo || data.urls?.avatar;
+      if (!logoUrl) throw new Error("Upload succeeded but no logo URL was returned.");
+
+      const saveRes = await apiFetch("/api/clinics/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl }),
+      });
+      if (!saveRes.ok) {
+        const body = await saveRes.json().catch(() => ({}));
+        throw new Error(body.error ?? `Failed to save logo (${saveRes.status}).`);
+      }
+      setClinic((prev) => prev ? { ...prev, logoUrl } : prev);
+    } catch (e: any) {
+      alert(e?.message ?? "Logo upload failed.");
     } finally {
       setLogoUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -191,6 +196,23 @@ export default function ClinicSettingsPage() {
     return (
       <div className="flex items-center justify-center py-20 h-full">
         <div className="w-8 h-8 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError && !clinic) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20 h-full text-center px-6">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+        </div>
+        <p className="text-[#24292E] text-[14px] font-medium max-w-[360px]">{loadError}</p>
+        <button
+          onClick={() => loadClinic()}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] transition-all"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -279,7 +301,7 @@ export default function ClinicSettingsPage() {
               <div className="w-[200px] ml-auto">
                 <InlineEditBtns
                   onCancel={() => setEditDesc(false)}
-                  onSave={async () => { await saveSection({ description: draftDesc }); setEditDesc(false); }}
+                  onSave={async () => { if (await saveSection({ description: draftDesc })) setEditDesc(false); }}
                 />
               </div>
             </div>
@@ -312,7 +334,7 @@ export default function ClinicSettingsPage() {
                 <div className="mt-auto pt-2">
                   <InlineEditBtns
                     onCancel={() => setEditContact(false)}
-                    onSave={async () => { await saveSection(draftContact); setEditContact(false); }}
+                    onSave={async () => { if (await saveSection(draftContact)) setEditContact(false); }}
                   />
                 </div>
               </div>
@@ -354,7 +376,7 @@ export default function ClinicSettingsPage() {
                 <div className="mt-auto pt-2">
                   <InlineEditBtns
                     onCancel={() => setEditLocation(false)}
-                    onSave={async () => { await saveSection(draftLocation); setEditLocation(false); }}
+                    onSave={async () => { if (await saveSection(draftLocation)) setEditLocation(false); }}
                   />
                 </div>
               </div>
@@ -395,7 +417,7 @@ export default function ClinicSettingsPage() {
               <div className="w-[200px] ml-auto mt-2">
                 <InlineEditBtns
                   onCancel={() => setEditOperational(false)}
-                  onSave={async () => { await saveSection(draftOperational); setEditOperational(false); }}
+                  onSave={async () => { if (await saveSection(draftOperational)) setEditOperational(false); }}
                 />
               </div>
             </div>

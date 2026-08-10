@@ -9,6 +9,7 @@ import ScheduleListView, { ScheduleItem } from "@/components/schedule/ScheduleLi
 import ScheduleCalendarView, { CalendarAppointment } from "@/components/schedule/ScheduleCalendarView";
 import TimeSlotView from "@/components/schedule/TimeSlotView";
 import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
+import RescheduleModal from "@/components/schedule/RescheduleModal";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -36,6 +37,7 @@ export default function SchedulesDashboardPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [reschedulingItem, setReschedulingItem] = useState<ScheduleItem | null>(null);
 
   // Load appointments
   const fetchAppointments = useCallback(async () => {
@@ -205,7 +207,7 @@ export default function SchedulesDashboardPage() {
               items={filteredListItems}
               selectedItemId={selectedItemId}
               onSelectItem={handleSelectItem}
-              onRescheduleClick={(item) => console.log("Rescheduling:", item.patientName)}
+              onRescheduleClick={(item) => setReschedulingItem(item)}
               onConsultClick={(item) => handleConsultClick(item.id)}
             />
           ) : (
@@ -215,6 +217,14 @@ export default function SchedulesDashboardPage() {
             />
           )}
         </div>
+
+        {reschedulingItem && (
+          <RescheduleModal
+            appointment={reschedulingItem}
+            onClose={() => setReschedulingItem(null)}
+            onRescheduled={() => fetchAppointments()}
+          />
+        )}
       </div>
     </ProtectedRoute>
   );

@@ -1077,41 +1077,18 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                                   {report.name}
                                 </span>
                               </div>
-                              {report.status === "Pending" ? (
-                                <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                                  Report Pending
-                                </span>
-                              ) : (
-                                <span className="px-[8px] py-[6px] rounded-[12px] bg-[#1DA877] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                                  Report Available
-                                </span>
-                              )}
+                              {/* Doctor-recommended labs have no real result/report data or
+                                  attachment anywhere in this system yet — always shown as
+                                  Pending rather than fabricating a downloadable report. */}
+                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
+                                Report Pending
+                              </span>
                             </div>
 
                             {/* Description */}
                             <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
                               {report.description}
                             </p>
-
-                            {/* Actions for Available reports */}
-                            {report.status === "Available" && (
-                              <div className="flex items-center gap-4 pl-[48px] mt-1">
-                                <button
-                                  onClick={() => router.push(`/appointments/patient-details/lab-reports?id=${patient.id}`)}
-                                  className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
-                                  type="button"
-                                >
-                                  View Report
-                                </button>
-                                <button
-                                  onClick={() => alert(`Downloading ${report.name}...`)}
-                                  className="text-[#24292E] hover:text-[#5476FC] font-semibold text-[13px] underline transition-colors"
-                                  type="button"
-                                >
-                                  Download Report
-                                </button>
-                              </div>
-                            )}
                           </div>
                           {i < labReports.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
                         </React.Fragment>
