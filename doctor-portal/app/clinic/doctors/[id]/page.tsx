@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
@@ -397,6 +398,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const displayName = doctor.fullName?.startsWith("Dr.") ? doctor.fullName : `Dr. ${doctor.fullName}`;
 
   return (
+    <DesktopOnlyWrapper>
     <div className="px-4 sm:px-8 py-6 sm:py-8 overflow-y-auto overflow-x-hidden h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
 
       {/* ── Page Header ── */}
@@ -836,6 +838,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       )}
 
     </div>
+    </DesktopOnlyWrapper>
   );
 }
 

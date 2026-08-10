@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -235,6 +236,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
 
   return (
     <ProtectedRoute>
+      <DesktopOnlyWrapper>
       <div className="w-full space-y-7 pb-12 font-sans animate-in fade-in duration-300">
 
         {/* Top Header */}
@@ -530,6 +532,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+      </DesktopOnlyWrapper>
     </ProtectedRoute>
   );
 }

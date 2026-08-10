@@ -9,6 +9,7 @@ import ScheduleListView, { ScheduleItem } from "@/components/schedule/ScheduleLi
 import ScheduleCalendarView, { CalendarAppointment } from "@/components/schedule/ScheduleCalendarView";
 import TimeSlotView from "@/components/schedule/TimeSlotView";
 import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -197,10 +198,15 @@ export default function SchedulesDashboardPage() {
         {/* Main Content: switches based on active tab and view */}
         <div className="w-full">
           {activeTab === "Time slot" ? (
-            <TimeSlotView />
+            <DesktopOnlyWrapper>
+              <TimeSlotView />
+            </DesktopOnlyWrapper>
           ) : activeTab === "Schedule Absences" ? (
-            <ScheduleAbsencesView />
+            <DesktopOnlyWrapper>
+              <ScheduleAbsencesView />
+            </DesktopOnlyWrapper>
           ) : activeView === "list" ? (
+            // Appointments list is available on all screen sizes
             <ScheduleListView
               items={filteredListItems}
               selectedItemId={selectedItemId}
@@ -209,10 +215,12 @@ export default function SchedulesDashboardPage() {
               onConsultClick={(item) => handleConsultClick(item.id)}
             />
           ) : (
-            <ScheduleCalendarView
-              appointments={calendarAppointments}
-              onConsultClick={(appt) => handleConsultClick(appt.id)}
-            />
+            <DesktopOnlyWrapper>
+              <ScheduleCalendarView
+                appointments={calendarAppointments}
+                onConsultClick={(appt) => handleConsultClick(appt.id)}
+              />
+            </DesktopOnlyWrapper>
           )}
         </div>
       </div>
