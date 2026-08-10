@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
 import DoctorsTimingTab from "@/components/clinic/DoctorsTimingTab";
 import AppointmentsTimingTab from "@/components/clinic/AppointmentsTimingTab";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 interface BranchOption { id: string; name: string; status: string; }
 
@@ -196,6 +197,7 @@ function ClinicSchedulesContent() {
       )}
 
       {activeTab === "clinic-timing" && (
+        <DesktopOnlyWrapper>
         <>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-6 text-sm text-center">
@@ -216,6 +218,7 @@ function ClinicSchedulesContent() {
 
           {saving && <div className="text-center text-xs text-[#A0A8B0] mt-4">Saving...</div>}
         </>
+        </DesktopOnlyWrapper>
       )}
 
       {activeTab === "appointments" && (
@@ -223,7 +226,9 @@ function ClinicSchedulesContent() {
       )}
 
       {activeTab === "doctors-timing" && (
-        <DoctorsTimingTab qs={qs} />
+        <DesktopOnlyWrapper>
+          <DoctorsTimingTab qs={qs} />
+        </DesktopOnlyWrapper>
       )}
     </div>
   );

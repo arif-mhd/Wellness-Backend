@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import ClinicCompanyInfoForm from "@/components/profile/ClinicCompanyInfoForm";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 const DAY_KEY_TO_DOW: Record<string, number> = {
   SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
@@ -170,6 +171,7 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
   }
 
   return (
+    <DesktopOnlyWrapper>
     <div className="px-4 md:px-8 pb-12" style={{ fontFamily: "Outfit, sans-serif" }}>
       <div className="flex items-center gap-3 mb-6 mt-2">
         <button
@@ -217,5 +219,6 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
         )}
       </div>
     </div>
+    </DesktopOnlyWrapper>
   );
 }
