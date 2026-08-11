@@ -3,7 +3,6 @@
 import { useEffect, useState, use, useMemo } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
-import ClinicComingSoon from "@/components/ClinicComingSoon";
 import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
 
@@ -34,7 +33,13 @@ interface Branch {
   todayHours: string;
   weeklyHours: { label: string; hours: string }[];
   patientsTrend: TrendPoint[];
+  licenseNumber?: string | null;
+  dohLicense?: string | null;
 }
+
+interface InsurancePolicy { id: string; name: string; network?: string; status: string; }
+interface PaymentSummary { totalEarnings: number; balance: number; }
+interface FeedbackSummary { avgRating: number; total: number; }
 
 interface OtherInfoRow { id: string; label: string; value: string; }
 
@@ -123,6 +128,24 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function StatBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[#676E76] text-[11px]">{label}</span>
+      <span className="text-[#24292E] text-[18px] font-medium">{value}</span>
+    </div>
+  );
+}
+
+function ManageLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-5 py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all">
+      {label}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+    </Link>
+  );
+}
+
 function formatLanguages(languages: string[] | string | null | undefined) {
   if (Array.isArray(languages)) return languages.join(", ") || "—";
   if (typeof languages === "string") return languages.trim() || "—";
@@ -173,6 +196,13 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [apptsLoaded, setApptsLoaded] = useState(false);
+
+  const [insurancePolicies, setInsurancePolicies] = useState<InsurancePolicy[]>([]);
+  const [insuranceLoaded, setInsuranceLoaded] = useState(false);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [paymentLoaded, setPaymentLoaded] = useState(false);
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [feedbackLoaded, setFeedbackLoaded] = useState(false);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [addStep, setAddStep] = useState(1);
@@ -232,7 +262,37 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
         .catch(() => setAppointments([]))
         .finally(() => setApptsLoaded(true));
     }
-  }, [activeTab, branchId, usersLoaded, doctorsLoaded, apptsLoaded]);
+    // Licenses tab shows each doctor's license number, so it needs the same
+    // roster the Doctors tab loads — fetch it here too if not already loaded.
+    if (activeTab === "Licenses" && !doctorsLoaded) {
+      apiFetch(`/api/clinics/doctors?branchId=${branchId}`)
+        .then((r) => r.json())
+        .then((data) => setDoctors(Array.isArray(data.doctors) ? data.doctors : []))
+        .catch(() => setDoctors([]))
+        .finally(() => setDoctorsLoaded(true));
+    }
+    if (activeTab === "Insurances" && !insuranceLoaded) {
+      apiFetch(`/api/clinics/insurance-policies?branchId=${branchId}`)
+        .then((r) => r.json())
+        .then((data) => setInsurancePolicies(Array.isArray(data.policies) ? data.policies : []))
+        .catch(() => setInsurancePolicies([]))
+        .finally(() => setInsuranceLoaded(true));
+    }
+    if (activeTab === "Payments" && !paymentLoaded) {
+      apiFetch(`/api/clinics/payments/summary?branchId=${branchId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => setPaymentSummary(data ? { totalEarnings: data.totalEarnings ?? 0, balance: data.balance ?? 0 } : null))
+        .catch(() => setPaymentSummary(null))
+        .finally(() => setPaymentLoaded(true));
+    }
+    if (activeTab === "Rating and Performance" && !feedbackLoaded) {
+      apiFetch(`/api/clinics/feedback?branchId=${branchId}`)
+        .then((r) => r.json())
+        .then((data) => setFeedbackSummary({ avgRating: data.avgRating ?? 0, total: data.total ?? 0 }))
+        .catch(() => setFeedbackSummary({ avgRating: 0, total: 0 }))
+        .finally(() => setFeedbackLoaded(true));
+    }
+  }, [activeTab, branchId, usersLoaded, doctorsLoaded, apptsLoaded, insuranceLoaded, paymentLoaded, feedbackLoaded]);
 
   useEffect(() => {
     if (!selectedUserId && users.length > 0) setSelectedUserId(users[0].id);
@@ -901,8 +961,157 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
         </div>
       )}
 
-      {!["Users/Managers", "Doctors", "Appointments"].includes(activeTab) && (
-        <ClinicComingSoon title={activeTab} description="This section is coming soon." />
+      {/* Licenses tab */}
+      {activeTab === "Licenses" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <h2 className="text-[#24292E] text-[15px] font-semibold mb-5">Licenses</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="p-4 rounded-xl border border-[#E4E8F0] flex flex-col gap-1">
+              <span className="text-[#676E76] text-[11px]">Branch License Number</span>
+              <span className="text-[#24292E] text-[13px] font-medium">{branch.licenseNumber || "—"}</span>
+            </div>
+            <div className="p-4 rounded-xl border border-[#E4E8F0] flex flex-col gap-1">
+              <span className="text-[#676E76] text-[11px]">DOH License</span>
+              <span className="text-[#24292E] text-[13px] font-medium">{branch.dohLicense || "—"}</span>
+            </div>
+          </div>
+
+          <h3 className="text-[#24292E] text-[13px] font-semibold mb-3">Doctor Licenses</h3>
+          {!doctorsLoaded ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
+          ) : doctors.length === 0 ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">No doctors added to this branch yet.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {doctors.map((doc) => {
+                const displayName = doc.fullName?.startsWith("Dr.") ? doc.fullName : `Dr. ${doc.fullName}`;
+                return (
+                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E4E8F0]">
+                    <div className="flex items-center gap-3">
+                      <AvatarPlaceholder name={displayName} avatarUrl={doc.avatarUrl} size="w-9 h-9" />
+                      <span className="text-[#24292E] text-[13px] font-medium">{displayName}</span>
+                    </div>
+                    <span className="text-[#676E76] text-[12px]">{doc.license || "No license on file"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Timings tab */}
+      {activeTab === "Timings" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Timings</h2>
+            <ManageLink href={`/clinic/schedules?branchId=${branchId}`} label="Manage Schedules" />
+          </div>
+          <div className="flex flex-col gap-2.5 max-w-sm">
+            {(branch.weeklyHours ?? []).map((row) => (
+              <div key={row.label} className="flex items-center justify-between">
+                <span className="text-[#676E76] text-[12px]">{row.label}</span>
+                <span className="text-[#24292E] text-[12px] font-medium text-right">{row.hours}</span>
+              </div>
+            ))}
+            {(!branch.weeklyHours || branch.weeklyHours.length === 0) && (
+              <div className="text-center text-sm text-[#A0A8B0] py-8">No hours set for this branch yet.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Insurances tab */}
+      {activeTab === "Insurances" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Insurances</h2>
+            <ManageLink href={`/clinic/insurance?branchId=${branchId}`} label="Manage Insurance" />
+          </div>
+          {!insuranceLoaded ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
+          ) : insurancePolicies.length === 0 ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">No insurance policies added for this branch yet.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {insurancePolicies.map((p) => (
+                <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E4E8F0]">
+                  <div className="flex flex-col">
+                    <span className="text-[#24292E] text-[13px] font-medium">{p.name}</span>
+                    {p.network && <span className="text-[#A0A8B0] text-[11px]">{p.network}</span>}
+                  </div>
+                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${p.status === "active" ? "bg-[#E2F8EB] text-[#179353]" : "bg-[#F5F5F5] text-[#707070]"}`}>
+                    {p.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Payments tab */}
+      {activeTab === "Payments" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Payments</h2>
+            <ManageLink href={`/clinic/payment?branchId=${branchId}`} label="Manage Payments" />
+          </div>
+          {!paymentLoaded ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
+          ) : paymentSummary ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+              <StatBlock label="Total Earnings" value={`$${paymentSummary.totalEarnings.toLocaleString()}`} />
+              <StatBlock label="Available Balance" value={`$${paymentSummary.balance.toLocaleString()}`} />
+            </div>
+          ) : (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">You don&apos;t have permission to view payments for this branch.</div>
+          )}
+        </div>
+      )}
+
+      {/* Analytics tab */}
+      {activeTab === "Analytics" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Analytics</h2>
+            <ManageLink href={`/clinic/analytics?branchId=${branchId}`} label="View Full Analytics" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatBlock label="Doctors" value={String(branch.doctorCount)} />
+            <StatBlock label="Consultations Today" value={String(branch.consultationsToday)} />
+            <StatBlock label="Revenue This Month" value={`$${branch.revenueThisMonth.toLocaleString()}`} />
+            <StatBlock label="Revenue Last Month" value={`$${branch.revenueLastMonth.toLocaleString()}`} />
+          </div>
+          <div className="mt-6 bg-[#F9FAFC] rounded-xl p-4 border border-[#E4E8F0]">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[#24292E] text-[12px] font-semibold">Patients</span>
+              <span className="text-[#707070] text-[10px]">Last 8 Days</span>
+            </div>
+            <MiniTrendChart data={branch.patientsTrend ?? []} height={90} />
+          </div>
+        </div>
+      )}
+
+      {/* Rating and Performance tab */}
+      {activeTab === "Rating and Performance" && (
+        <div className="bg-white rounded-xl border border-[#E4E8F0] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Rating and Performance</h2>
+            <ManageLink href={`/clinic/feedback?branchId=${branchId}`} label="View All Feedback" />
+          </div>
+          {!feedbackLoaded ? (
+            <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
+          ) : (
+            <div className="flex items-center gap-8">
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-[#24292E] text-[32px] font-semibold">{feedbackSummary?.avgRating ?? 0}</span>
+                <StarRating rating={feedbackSummary?.avgRating ?? 0} />
+              </div>
+              <StatBlock label="Total Reviews" value={String(feedbackSummary?.total ?? 0)} />
+            </div>
+          )}
+        </div>
       )}
 
       {/* Add branch user modal */}

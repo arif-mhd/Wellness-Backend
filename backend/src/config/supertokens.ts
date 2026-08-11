@@ -5,6 +5,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
 import { patientsContainer } from "./cosmos";
+import { devFallbackOrThrow } from "../utils/env";
 
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
@@ -48,14 +49,14 @@ export function initSuperTokens(): void {
     framework: "express",
     supertokens: {
       // This is the SuperTokens Core server you'll run via Docker
-      connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || "http://localhost:3567",
+      connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || devFallbackOrThrow("SUPERTOKENS_CONNECTION_URI", "http://localhost:3567"),
     },
     appInfo: {
       appName: "Wellness",
       // The URL of THIS backend
-      apiDomain: process.env.API_DOMAIN || `http://localhost:${process.env.PORT || 3001}`,
+      apiDomain: process.env.API_DOMAIN || devFallbackOrThrow("API_DOMAIN", `http://localhost:${process.env.PORT || 3001}`),
       // Primary frontend (doctor portal). CORS handles the rest.
-      websiteDomain: process.env.WEBSITE_DOMAIN || process.env.DOCTOR_PORTAL_URL || "http://localhost:3002",
+      websiteDomain: process.env.WEBSITE_DOMAIN || process.env.DOCTOR_PORTAL_URL || devFallbackOrThrow("WEBSITE_DOMAIN", "http://localhost:3002"),
       apiBasePath: "/auth",
       websiteBasePath: "/auth",
     },

@@ -111,6 +111,11 @@ export default function DashboardPage() {
   const [todayCount, setTodayCount]           = useState(0);
   const [consultationChange, setConsultationChange] = useState<{ value: number; direction: "up" | "down" | "none" } | null>(null);
 
+  // Revenue — same client-side computation the Analytics page already does
+  // from this same appointments list (completed this month vs last month).
+  const [revenueThisMonth, setRevenueThisMonth] = useState(0);
+  const [revenueChange, setRevenueChange] = useState<{ value: number; direction: "up" | "down" | "none" } | null>(null);
+
   // Waiting — patients with status "in_progress" (actively in a call)
   const [waitingCount, setWaitingCount]       = useState(0);
   const [waitingAvatars, setWaitingAvatars]   = useState<string[]>([]);
@@ -217,6 +222,26 @@ export default function DashboardPage() {
         setTotalAppointments(all.length);
         setTodayCount(todays.length);
         setConsultationChange(pctChange(todays.length, yesterdays.length));
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+
+        const isCompleted = (a: any) => a.status === "completed" || a.status === "Completed";
+        const revenueInMonth = (year: number, month: number) =>
+          all
+            .filter((a) => isCompleted(a) && a.scheduledAt)
+            .filter((a) => {
+              const d = parseLocalTime(a.scheduledAt);
+              return d.getFullYear() === year && d.getMonth() === month;
+            })
+            .reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
+
+        const thisMonthRevenue = revenueInMonth(currentYear, currentMonth);
+        const prevMonthRevenue = revenueInMonth(prevMonthDate.getFullYear(), prevMonthDate.getMonth());
+        setRevenueThisMonth(thisMonthRevenue);
+        setRevenueChange(pctChange(thisMonthRevenue, prevMonthRevenue));
 
         setWaitingCount(waitingNow.length);
         setWaitingAvatars(
@@ -534,18 +559,47 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Card 3: Revenue — no backend endpoint, show unavailable */}
+          {/* Card 3: Revenue — computed client-side from the same appointments
+              list as Consultations/Tasks above, same logic as the Analytics page */}
           <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
             <div className="flex justify-between items-center w-full">
               <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Revenue
               </span>
             </div>
-            <div className="text-[#A0A8B0] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Not available
+            <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {dataLoaded
+                ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(revenueThisMonth)
+                : "—"}
             </div>
-            <div className="text-[#C0C8D0] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Revenue data coming soon
+            <div className="flex items-center gap-1">
+              {!dataLoaded || revenueChange === null ? (
+                <span className="text-[#A0A8B0] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>Calculating...</span>
+              ) : revenueChange.direction === "none" ? (
+                <span className="text-[#707070] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>0% change from last month</span>
+              ) : revenueChange.direction === "up" ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M4.08301 9.91671L9.91634 4.08337" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4.08301 4.08337H9.91634V9.91671" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <span className="text-[#179353] font-medium mr-1">{revenueChange.value}% Increase</span>
+                    <span className="text-[#707070]">from last month</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M4.08366 4.08337L9.91699 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9.91699 4.08337L9.91699 9.91671L4.08366 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <span className="text-[#F25252] font-medium mr-1">{revenueChange.value}% Decrease</span>
+                    <span className="text-[#707070]">from last month</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

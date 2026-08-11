@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface Review {
@@ -50,7 +51,9 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
 
 type SortKey = "name" | "rating" | "date";
 
-export default function ClinicFeedbackPage() {
+function ClinicFeedbackContent() {
+  const searchParams = useSearchParams();
+  const branchId = searchParams.get("branchId");
   const [activeTab, setActiveTab] = useState<"clinic" | "doctors">("clinic");
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,12 +71,13 @@ export default function ClinicFeedbackPage() {
 
   useEffect(() => {
     setLoading(true);
-    apiFetch("/api/clinics/feedback")
+    const qs = branchId ? `?branchId=${branchId}` : "";
+    apiFetch(`/api/clinics/feedback${qs}`)
       .then((r) => r.json())
       .then((data) => setReviews(Array.isArray(data.reviews) ? data.reviews : []))
       .catch(() => setReviews([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [branchId]);
 
   // Group reviews by the doctor they're about — powers both the Doctors tab
   // and the right-hand "Rating and Reviews" detail panel (always shows the
@@ -425,5 +429,13 @@ export default function ClinicFeedbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ClinicFeedbackPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicFeedbackContent />
+    </Suspense>
   );
 }

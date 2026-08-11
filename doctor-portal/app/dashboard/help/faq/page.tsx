@@ -14,42 +14,42 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     id: 1,
     question: "How do I reset my password?",
-    answer: "To reset your password, click on the \"Forgot Password\" link on the login page, enter your email or phone number, and follow the instructions sent to your inbox.",
+    answer: "Click \"Forgot Password\" on the login page, enter your registered email, and follow the reset link sent to your inbox.",
   },
   {
     id: 2,
-    question: "How can I schedule an appointment?",
-    answer: "You can schedule an appointment by logging into your account, navigating to the \"Appointments\" section, and selecting your preferred date and time from the available slots.",
+    question: "How can I reschedule a patient's appointment?",
+    answer: "Open \"Schedules\" from the sidebar, find the appointment in the list, and click \"Reschedule\" to pick a new available date and time.",
   },
   {
     id: 3,
-    question: "How do I update my personal information?",
-    answer: "To update your personal details, log into your account, go to the \"Profile\" section, and make the necessary changes to your information.",
+    question: "What happens if I can't complete a patient's EMR right after a consultation?",
+    answer: "It appears as a pending task on your Home dashboard until you complete it — open the task any time from there to finish the EMR for that visit.",
   },
   {
     id: 4,
-    question: "Can I cancel or reschedule an appointment?",
-    answer: "Yes, you can cancel or reschedule an appointment up to 24 hours before the scheduled time by going to the \"Appointments\" section and selecting \"Reschedule\" or \"Cancel.\"",
+    question: "How do I mark myself unavailable for a period of time?",
+    answer: "Go to \"Schedules\" → \"Schedule Absences\", select the date range, and confirm — any conflicting appointments will prompt you to reschedule them first.",
   },
   {
     id: 5,
-    question: "How do I update my personal information?",
-    answer: "To update your personal details, log into your account, go to the \"Profile\" section, and make the necessary changes to your information.",
+    question: "How do I access a patient's SOS emergency records?",
+    answer: "Open \"SOS\" from the sidebar, verify your medical license number, confirm the one-time code sent to your registered email, then enter the SOS code the patient shared with you.",
   },
   {
     id: 6,
-    question: "How can I schedule an appointment?",
-    answer: "You can schedule an appointment by logging into your account, navigating to the \"Appointments\" section, and selecting your preferred date and time from the available slots.",
+    question: "How do I withdraw my earnings?",
+    answer: "Go to \"Payment\" in your profile, review your available balance, and submit a withdrawal request — you'll confirm it with a one-time code sent to your email.",
   },
   {
     id: 7,
-    question: "Can I cancel or reschedule an appointment?",
-    answer: "Yes, you can cancel or reschedule an appointment up to 24 hours before the scheduled time by going to the \"Appointments\" section and selecting \"Reschedule\" or \"Cancel.\"",
+    question: "How do I enable two-factor authentication?",
+    answer: "Go to \"Account Settings\", turn on \"Enable 2FA\", and confirm with the one-time code sent to your registered email. You'll be asked for a fresh code each time you log in afterward.",
   },
   {
     id: 8,
-    question: "Can I cancel or reschedule an appointment?",
-    answer: "Yes, you can cancel or reschedule an appointment up to 24 hours before the scheduled time by going to the \"Appointments\" section and selecting \"Reschedule\" or \"Cancel.\"",
+    question: "How do I raise a support ticket?",
+    answer: "Click \"Raise an Issue\" on this Help & Support page, choose a category, describe your issue, and submit — our support team will respond here.",
   },
 ];
 

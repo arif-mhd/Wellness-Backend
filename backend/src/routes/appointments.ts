@@ -13,10 +13,12 @@ import {
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
-import { getActorClinicIds, getActorPermissionState, hasPermission, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
+import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
+import { resolveAppointmentActor } from "../utils/appointmentAuth";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
+import { devFallbackOrThrow } from "../utils/env";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 
@@ -63,7 +65,7 @@ async function resolveDoctorClinicDisplay(clinicId: string | null | undefined): 
 }
 
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
-  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
   const at = new AccessToken(livekitApiKey, livekitApiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
@@ -71,7 +73,7 @@ function makeLivekitToken(userId: string, room: string, name?: string): { token:
 
 async function sendLivekitData(room: string, payload: Record<string, unknown>): Promise<void> {
   try {
-    const wsUrl   = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const wsUrl   = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
     const httpUrl = wsUrl.replace(/^wss?:\/\//, "https://");
     const svc = new RoomServiceClient(httpUrl, livekitApiKey, livekitApiSecret);
     const data = Buffer.from(JSON.stringify(payload));
@@ -794,20 +796,9 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const isDoctor = apt.doctorId === userId;
-    const isPatient = apt.patientId === userId;
-    let isClinic = false;
-    if (!isDoctor && !isPatient && apt.clinicId) {
-      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!isPatient && !isDoctor && !isClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-    if (isClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
-      res.status(403).json({ error: "You don't have permission to manage appointments." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { requireManagePermission: true });
+    if (!actor) return;
+    const { isDoctor, isPatient, isClinic } = actor;
 
     const cancelledReason = isPatient ? "cancelled_by_patient" : isClinic ? "cancelled_by_clinic" : "cancelled_by_doctor";
     const updated = { ...apt, status: "cancelled", cancelledReason, updatedAt: new Date().toISOString() };
@@ -893,19 +884,9 @@ router.patch("/:id/mark-paid", verifySession(), async (req: SessionRequest, res:
       return;
     }
 
-    const isDoctor = apt.doctorId === userId;
-    let isClinic = false;
-    if (!isDoctor && apt.clinicId) {
-      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!isDoctor && !isClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-    if (isClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
-      res.status(403).json({ error: "You don't have permission to manage appointments." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { checkPatient: false, requireManagePermission: true });
+    if (!actor) return;
+
     if (apt.paymentMethod !== "pay_at_clinic") {
       res.status(400).json({ error: "Only in-person appointments can be marked paid this way." });
       return;
@@ -938,20 +919,9 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const callerIsDoctor = apt.doctorId === userId;
-    const callerIsPatient = apt.patientId === userId;
-    let callerIsClinic = false;
-    if (!callerIsDoctor && !callerIsPatient && apt.clinicId) {
-      callerIsClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!callerIsPatient && !callerIsDoctor && !callerIsClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-    if (callerIsClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
-      res.status(403).json({ error: "You don't have permission to manage appointments." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { requireManagePermission: true });
+    if (!actor) return;
+    const { isDoctor: callerIsDoctor, isClinic: callerIsClinic } = actor;
 
     const newDate = new Date(scheduledAt);
     if (isNaN(newDate.getTime())) {
@@ -1293,6 +1263,27 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
       }
     }
 
+    // Doctor's presence just flipped true for the first time on this
+    // appointment — notify the patient to join, since the call only counts
+    // as a genuine no-show (auto-cancelled) once the doctor eventually
+    // leaves without the patient ever having joined too (see above).
+    if (isDoctor && inCall && apt.doctorInCall !== true) {
+      const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
+      const doctorName = docDoc?.fullName ?? "Doctor";
+      const doctorJoinedNotification = {
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
+        patientId: apt.patientId,
+        profileId: apt.familyMemberId ?? apt.patientId,
+        title: "Doctor Has Joined",
+        body: `Dr. ${doctorName} has joined your appointment — please join soon to avoid the appointment being cancelled as a no-show.`,
+        type: "doctor_joined",
+        referenceId: id,
+        isRead: false,
+        sentAt: new Date().toISOString(),
+      };
+      await notificationsContainer.items.create(doctorJoinedNotification);
+    }
+
     if (completionAction === "completed") {
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       logActivity({
@@ -1390,15 +1381,9 @@ router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Res
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const isDoctor = apt.doctorId === userId;
-    let isClinic = false;
-    if (!isDoctor && apt.clinicId) {
-      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!isDoctor && !isClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { checkPatient: false });
+    if (!actor) return;
+    const { isClinic } = actor;
 
     const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
     const doctorName = docDoc?.fullName ?? "Doctor";
@@ -1815,8 +1800,8 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
     // Doctors connect from a browser on the same machine → use localhost (avoids Chrome
     // blocking WebRTC from HTTP pages to non-localhost IPs).
     // Patients connect from a physical device on the LAN → use LAN IP.
-    const wsUrlDoctor  = process.env.LIVEKIT_WS_URL_DOCTOR  || "ws://localhost:7880";
-    const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const wsUrlDoctor  = process.env.LIVEKIT_WS_URL_DOCTOR  || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
+    const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_PATIENT", "ws://localhost:7880");
     const wsUrl = isDoctor ? wsUrlDoctor : wsUrlPatient;
 
     const participantName = isDoctor

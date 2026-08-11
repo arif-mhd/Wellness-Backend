@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch, API_URL } from "@/lib/apiFetch";
 import Session from "supertokens-web-js/recipe/session";
 
@@ -539,12 +540,16 @@ function WithdrawModal({
 }
 
 // ─── Main page ───────────────────────────────────────────────────────────
-export default function ClinicPaymentPage() {
+function ClinicPaymentContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"clinics" | "doctors">("clinics");
   const [email, setEmail] = useState("");
   const [hasBranches, setHasBranches] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  // Deep-linked from a branch's own page (e.g. the branch drill-down's
+  // Payments tab "Manage Payments" link) — pre-scope to that branch instead
+  // of opening on the aggregate "Overall" view.
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(() => searchParams.get("branchId"));
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
 
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
@@ -881,5 +886,13 @@ export default function ClinicPaymentPage() {
         <DoctorShareModal current={summary.doctorSharePercent} onSubmit={submitDoctorShare} onClose={() => setShowDoctorShare(false)} />
       )}
     </div>
+  );
+}
+
+export default function ClinicPaymentPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicPaymentContent />
+    </Suspense>
   );
 }

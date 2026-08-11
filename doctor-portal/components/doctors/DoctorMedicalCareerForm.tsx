@@ -255,8 +255,8 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
               )}
             </button>
             <p className="text-[11px] text-[#676E76] leading-relaxed">
-              Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been
-              the industry's standard dummy text ever since the 1500s.
+              Add a clear, professional headshot — this is shown to patients across the app when they book with this doctor.
+              JPG or PNG, optional.
             </p>
           </div>
         </div>
