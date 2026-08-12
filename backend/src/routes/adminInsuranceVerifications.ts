@@ -3,6 +3,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { patientsContainer, notificationsContainer } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
+import { sendPushToUser } from "../utils/pushNotifications";
 
 const router = Router();
 
@@ -70,7 +71,7 @@ async function reviewPolicy(
     insurance[idx] = { ...insurance[idx], status: newStatus, reviewedBy: adminId, reviewedAt: now, rejectionReason: reason };
     await patientsContainer.items.upsert({ ...patient, insurance, updatedAt: now });
 
-    await notificationsContainer.items.create({
+    const insuranceNotification = {
       id: "notif_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8),
       patientId,
       title: newStatus === "active" ? "Insurance Verified" : "Insurance Not Verified",
@@ -82,7 +83,9 @@ async function reviewPolicy(
       referenceId: insuranceId,
       isRead: false,
       sentAt: now,
-    });
+    };
+    await notificationsContainer.items.create(insuranceNotification);
+    await sendPushToUser(insuranceNotification.patientId, insuranceNotification.title, insuranceNotification.body, { type: insuranceNotification.type, referenceId: insuranceNotification.referenceId });
 
     logActivity({
       source: "admin",
