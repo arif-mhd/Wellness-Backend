@@ -213,7 +213,8 @@ export default function OrdersPage() {
 
             {/* Table */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 min-h-[600px] flex flex-col justify-between">
-              <div className="overflow-x-auto">
+              <>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-full">
                   <thead>
                     <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
@@ -286,6 +287,68 @@ export default function OrdersPage() {
                   </tbody>
                 </table>
               </div>
+
+              <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                {!loading && paginated.length === 0 && (
+                  <div className="py-16 text-center text-slate-400 text-[13px] font-medium">
+                    {search ? "No orders match your search." : "No pharmacy orders yet."}
+                  </div>
+                )}
+                {paginated.map(o => {
+                  const isSelected = selectedId === o.id;
+                  const shortId = `ORD-${o.id.slice(-5).toUpperCase()}`;
+                  return (
+                    <div
+                      key={o.id}
+                      onClick={() => setSelectedId(isSelected ? null : o.id)}
+                      className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] font-semibold text-slate-500">{shortId}</span>
+                        <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-50 ${statusColor(o.status)}`}>
+                          {statusLabel(o.status)}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-1">
+                        <div>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Patient</p>
+                          <p className="text-[13px] font-medium text-slate-800 leading-tight">{o.patientName}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Pharmacy</p>
+                          <p className="text-[13px] font-medium text-slate-800 leading-tight">{o.pharmacyName}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-slate-50">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Date</span>
+                          <span className="text-[12px] text-slate-700 font-medium">{formatDate(o.createdAt)}</span>
+                        </div>
+                        <div className="flex flex-col text-center">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Payment</span>
+                          <span className="text-[12px] font-medium text-[#6A8BFF]">{o.payment_method === "mock" ? "Mock" : o.payment_method}</span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Amount</span>
+                          <span className="text-[12px] text-slate-700 font-medium">AED {o.total_amount.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 w-full">
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelectedId(o.id); }}
+                          className="bg-white border border-slate-200 text-slate-700 text-[12px] font-medium px-6 py-2.5 rounded-full shadow-sm w-full transition-colors active:bg-slate-50 flex items-center justify-center"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              </>
 
               {/* Pagination */}
               <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">

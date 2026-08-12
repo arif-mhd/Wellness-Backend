@@ -259,11 +259,11 @@ function GlobalSearch() {
         id="topbar-search-btn"
         onClick={() => setSearchExpanded(true)}
         aria-label="Open search"
-        className={`w-10 h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-[#5476FC] hover:bg-blue-50 shadow-sm transition-all active:scale-95 ${
-          searchExpanded ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100 ml-0"
+        className={`w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-[#5476FC] hover:bg-blue-50 shadow-sm transition-all active:scale-95 ${
+          searchExpanded ? "opacity-0 pointer-events-none !w-0 !border-0 overflow-hidden" : "opacity-100 ml-0"
         }`}
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </button>
@@ -394,8 +394,11 @@ function GlobalSearch() {
 
 // ─── TopBar ──────────────────────────────────────────────────────────────────
 
+import { useSidebar } from "./SidebarContext";
+
 export default function TopBar() {
   const router = useRouter();
+  const { setIsMobileOpen } = useSidebar();
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"Unread" | "All">("Unread");
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -453,43 +456,55 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header className="h-20 bg-transparent flex items-center justify-between px-8 shrink-0 z-40 w-full relative">
+    <header className="h-16 md:h-20 bg-transparent flex items-center justify-between px-4 md:px-8 shrink-0 z-40 w-full relative">
 
-      {/* Left: Logo */}
-      <div className="flex items-center w-[200px]">
-        <img
-          src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-          className="w-[100px] object-contain"
-          alt="Wellness Central"
-        />
+      {/* Left: Hamburger (Mobile) + Logo */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsMobileOpen(true)}
+          className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+          aria-label="Open sidebar"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="hidden md:flex items-center lg:w-[200px]">
+          <img
+            src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
+            className="w-[100px] object-contain"
+            alt="Wellness Central"
+          />
+        </div>
       </div>
 
       {/* Right: Search + Action Buttons + Notifications */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 md:gap-3">
         <button
           onClick={() => router.push("/dashboard/emergencies")}
-          className="bg-gradient-to-b from-[#FF6B6B] to-[#E84949] hover:from-[#FF7A7A] hover:to-[#D63D3D] text-white px-5 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2.5 shadow-[0_4px_10px_rgba(232,73,73,0.2)] transition-all active:scale-95 select-none"
+          className="bg-gradient-to-b from-[#FF6B6B] to-[#E84949] hover:from-[#FF7A7A] hover:to-[#D63D3D] text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl text-[12px] md:text-[13px] font-medium flex items-center gap-1.5 md:gap-2.5 shadow-[0_4px_10px_rgba(232,73,73,0.2)] transition-all active:scale-95 select-none whitespace-nowrap shrink-0"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          SOS Records
+          <span className="hidden sm:inline">SOS Records</span>
+          <span className="sm:hidden">SOS</span>
         </button>
 
         {/* Global Search */}
         <GlobalSearch />
 
         {/* Notification Bell Wrapper */}
-        <div className="relative" ref={notificationsRef}>
+        <div className="relative shrink-0" ref={notificationsRef}>
           <button
             id="topbar-notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`w-10 h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center transition-all active:scale-95 shadow-sm ${
+            className={`w-9 h-9 md:w-10 md:h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center transition-all active:scale-95 shadow-sm ${
               showNotifications ? "text-blue-500 bg-blue-50 ring-2 ring-blue-500/20" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
             }`}
             aria-label="Notifications"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             {unreadCount > 0 && (
@@ -604,10 +619,10 @@ export default function TopBar() {
         {/* Message / Chat Bubble */}
         <button
           id="topbar-messages"
-          className="w-10 h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm relative transition-all active:scale-95"
+          className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm relative transition-all active:scale-95"
           aria-label="Messages"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full" />

@@ -164,7 +164,8 @@ export default function ManageLabServicePage() {
 
             {/* Main Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[600px] flex flex-col justify-between">
-              <div className="overflow-x-auto">
+              <>
+              <div className="hidden md:block overflow-x-auto">
                 {loading ? (
                   <div className="py-20 text-center text-[13px] text-slate-400">Loading labs…</div>
                 ) : displayedLabs.length === 0 ? (
@@ -215,6 +216,49 @@ export default function ManageLabServicePage() {
                   </table>
                 )}
               </div>
+              <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                {loading ? (
+                  <div className="py-20 text-center text-[13px] text-slate-400">Loading labs…</div>
+                ) : displayedLabs.length === 0 ? (
+                  <div className="py-20 text-center text-[13px] text-slate-400">
+                    {labs.length === 0 ? "No lab services onboarded yet." : "No labs match your search."}
+                  </div>
+                ) : (
+                  displayedLabs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((lab) => {
+                    const isSelected = selectedLabId === lab.id;
+                    return (
+                      <div
+                        key={lab.id}
+                        onClick={() => setSelectedLabId(lab.id)}
+                        className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50/70' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar lab={lab} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-semibold text-slate-800 truncate">{lab.name}</p>
+                            <p className="text-[12px] font-semibold text-slate-400 truncate">{lab.email}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-50">
+                          <div className="flex flex-col text-center">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Total Tests</span>
+                            <span className="text-[13px] text-slate-500 font-medium">{lab.totalTests.toLocaleString()}</span>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Rating</span>
+                            <span className="text-[13px] text-slate-500 font-medium flex items-center justify-center"><StarRating rating={lab.rating} /></span>
+                          </div>
+                          <div className="flex flex-col text-center">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Added</span>
+                            <span className="text-[13px] text-slate-500 font-medium">{fmtDate(lab.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              </>
 
               {/* Pagination Controls */}
               <div className="mt-6 border-t border-slate-50 pt-5">

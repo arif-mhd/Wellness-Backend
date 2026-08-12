@@ -4,7 +4,6 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -276,9 +275,7 @@ export default function ClinicDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   return (
     <ProtectedRoute>
-      <DesktopOnlyWrapper>
         <ClinicDetailInner id={id} />
-      </DesktopOnlyWrapper>
     </ProtectedRoute>
   );
 }
