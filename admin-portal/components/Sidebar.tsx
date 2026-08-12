@@ -254,7 +254,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
 
   const { profile } = useAdminProfile();
   const adminName = profile.name;
@@ -263,9 +263,11 @@ export default function Sidebar() {
 
   const toggle = () => setOpen(!open);
 
-  const labelCls = open
-    ? "opacity-100 max-w-[180px] ml-3"
-    : "opacity-0 max-w-0 ml-0 pointer-events-none";
+  const labelCls = [
+    "transition-[max-width,opacity,margin] duration-300 ease-in-out",
+    open ? "lg:opacity-100 lg:max-w-[180px] lg:ml-3" : "lg:opacity-0 lg:max-w-0 lg:ml-0 lg:pointer-events-none",
+    "opacity-100 max-w-[180px] ml-3"
+  ].join(" ");
 
   async function handleSignOut() {
     try {
@@ -277,38 +279,54 @@ export default function Sidebar() {
   }
 
   return (
-    <aside
-      style={{ willChange: "width" }}
-      className={[
-        "relative z-30 h-screen shrink-0 flex flex-col justify-between sticky top-0",
-        "bg-white border-r border-slate-100 overflow-hidden select-none",
-        "transition-[width] duration-300 ease-in-out shadow-[4px_0_24px_rgba(0,0,0,0.03)]",
-        open ? "w-[260px]" : "w-[80px]",
-      ].join(" ")}
-    >
-      {/* ── TOP ──────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-h-0 gap-1 w-full">
+    <>
+      {/* Mobile backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-[#1E1E1E]/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+      <aside
+        style={{ willChange: "width" }}
+        className={[
+          "z-50 shrink-0 flex flex-col justify-between",
+          "bg-white border-r border-slate-100 select-none",
+          "transition-[transform,width] duration-300 ease-in-out shadow-[4px_0_24px_rgba(0,0,0,0.03)]",
+          "fixed lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
+          isMobileOpen ? "inset-0" : "inset-0 -translate-x-full",
+          open ? "lg:w-[260px]" : "lg:w-[80px]",
+          "overflow-y-auto lg:overflow-hidden lg:h-screen lg:sticky lg:top-0",
+        ].join(" ")}
+      >
+        {/* ── TOP ──────────────────────────────────────────────────────────────── */}
+        <div className="flex flex-col flex-1 min-h-0 gap-1 w-full">
 
-        {/* Header: logo + toggle */}
-        <div className="relative shrink-0 flex items-center h-[72px] px-5 w-full border-b border-slate-50">
-          {/* Logo — fades in/out with sidebar */}
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
-            alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${
-              open ? "opacity-100 max-w-[150px]" : "opacity-0 max-w-0 pointer-events-none"
-            }`}
-          />
-
-          {/* Toggle button — always visible */}
-          <button
-            onClick={toggle}
-            title={open ? "Collapse sidebar" : "Expand sidebar"}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#6A8BFF] transition-colors shrink-0 z-20"
-          >
-            {open ? <CollapseIcon /> : <HamburgerIcon />}
-          </button>
-        </div>
+          {/* Header: logo + toggle */}
+          <div className="relative shrink-0 flex items-center h-[72px] px-5 w-full border-b border-slate-50">
+            {/* Logo — fades in/out with sidebar */}
+            <img
+              src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
+              alt="Wellness Central"
+              className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[150px] ${
+                open ? "lg:opacity-100 lg:max-w-[150px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
+              }`}
+            />
+            {/* Toggle button — always visible */}
+            <button
+              onClick={() => {
+                if (window.innerWidth < 1024) setIsMobileOpen(false);
+                else toggle();
+              }}
+              title={open ? "Collapse sidebar" : "Expand sidebar"}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#6A8BFF] transition-colors shrink-0 z-20"
+            >
+              <span className="hidden lg:block">{open ? <CollapseIcon /> : <HamburgerIcon />}</span>
+              <span className="block lg:hidden">
+                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </span>
+            </button>
+          </div>
 
         {/* Nav links */}
         <nav className={`flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col gap-0.5 w-full pt-3 pb-3 ${open ? "px-4" : "px-3"}`}>
@@ -322,6 +340,7 @@ export default function Sidebar() {
                 key={href}
                 href={href}
                 title={open ? undefined : label}
+                onClick={() => setIsMobileOpen(false)}
                 className={[
                   "flex items-center py-2.5 transition-all duration-150 rounded-[92px] overflow-hidden shrink-0",
                   open ? "px-4" : "px-3 justify-center",
@@ -385,5 +404,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

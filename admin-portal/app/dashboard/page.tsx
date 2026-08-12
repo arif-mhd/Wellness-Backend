@@ -971,7 +971,7 @@ export default function AdminDashboardPage() {
           <SectionHeader title="Tasks" count={taskCounts?.total} />
           <div className="bg-white rounded-3xl shadow-sm border border-[#eef2f7] overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-8 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+            <div className="hidden md:grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-8 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-medium text-slate-400 uppercase tracking-widest">
               <span>Task</span>
               <span>Summary</span>
               <span>Time</span>
@@ -990,37 +990,37 @@ export default function AdminDashboardPage() {
                   <div
                     key={task.id}
                     onClick={() => router.push(task.link)}
-                    className="grid grid-cols-[2fr_3fr_2fr_auto] gap-4 px-8 py-4 items-center hover:bg-slate-50/40 transition-colors cursor-pointer"
+                    className="flex flex-col md:grid md:grid-cols-[2fr_3fr_2fr_auto] gap-3 md:gap-4 p-4 md:px-8 md:py-4 items-start md:items-center hover:bg-slate-50/40 transition-colors cursor-pointer md:border-b-0 border-b border-slate-50 last:border-0"
                   >
                     {/* Task Name & Email */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 md:gap-4 w-full">
                       <div className="w-7 h-7 rounded-full bg-[#4F83FD]/10 text-[#4F83FD] flex items-center justify-center shrink-0 shadow-sm">
                         {TASK_TYPE_ICON[task.type]}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-800 truncate">{task.title}</p>
                         {task.email && <p className="text-xs text-slate-400 truncate">{task.email}</p>}
                       </div>
+                      <p className="text-xs text-slate-400 font-medium md:hidden shrink-0">{formatTaskTime(task.createdAt)}</p>
                     </div>
 
                     {/* Summary & Badge */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 md:pl-0 w-full pl-10">
                       {task.priority && (
                         <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-red-100 text-red-600 uppercase tracking-wider shrink-0">
                           {task.priority}
                         </span>
                       )}
-                      <p className="text-sm text-slate-600 truncate">{task.summary}</p>
+                      <p className="text-[13px] md:text-sm text-slate-600 line-clamp-2 md:truncate">{task.summary}</p>
                     </div>
 
-                    {/* Time */}
-                    <p className="text-xs text-slate-400 font-medium">{formatTaskTime(task.createdAt)}</p>
+                    {/* Time (Desktop) */}
+                    <p className="hidden md:block text-xs text-slate-400 font-medium">{formatTaskTime(task.createdAt)}</p>
 
-                    {/* Action */}
-                    <div className="flex items-center gap-3 pr-2">
+                    <div className="flex items-center justify-end w-full md:w-auto md:pr-2 pt-3 md:pt-0 border-t border-slate-50 md:border-t-0 mt-1 md:mt-0 pl-10 md:pl-0">
                       <button
                         onClick={(e) => { e.stopPropagation(); router.push(task.link); }}
-                        className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2 rounded-xl text-[12px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95 duration-150"
+                        className="w-full md:w-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white px-5 py-2.5 md:py-2 rounded-xl text-[12px] font-medium shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition-all active:scale-95 duration-150"
                       >
                         Review
                       </button>

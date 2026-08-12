@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
-import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 import OwnersPersonalInfoForm from "@/components/profile/OwnersPersonalInfoForm";
 import InsurancesForm from "@/components/profile/InsurancesForm";
 import ClinicCompanyInfoForm from "@/components/profile/ClinicCompanyInfoForm";
@@ -184,7 +183,6 @@ export default function AddClinicPage() {
 
   return (
     <ProtectedRoute>
-      <DesktopOnlyWrapper>
       <div className="max-w-[1440px] mx-auto space-y-7 pb-12 font-sans px-1 animate-in fade-in duration-300">
 
         <div className="flex items-center gap-4">
@@ -273,7 +271,6 @@ export default function AddClinicPage() {
         </div>
 
       </div>
-      </DesktopOnlyWrapper>
     </ProtectedRoute>
   );
 }
