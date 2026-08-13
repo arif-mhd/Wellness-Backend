@@ -5,12 +5,20 @@ import { notificationsContainer } from "../config/cosmos";
 
 const router = Router();
 
-// GET /api/notifications
-// Retrieves notifications for the current user (patient).
+// GET /api/notifications?limit=20&offset=0
+// Retrieves notifications for the current user (patient), newest first,
+// paginated — the app shows a page at a time with a "view older" action
+// that bumps the offset, rather than ever fetching a patient's full history
+// in one call.
 router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const unreadOnly = req.query.unread_only === "true";
   const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+  const rawLimit = parseInt(req.query.limit as string, 10);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+  const rawOffset = parseInt(req.query.offset as string, 10);
+  const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
   try {
     let query = "SELECT * FROM c WHERE c.patientId = @patientId";
@@ -24,13 +32,20 @@ router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
       parameters.push({ name: "@profileId", value: profileId });
     }
 
-    query += " ORDER BY c.sentAt DESC";
+    // Fetch one extra row past the page size so we can tell the client
+    // whether a further "view older" page actually exists, without a
+    // separate COUNT query.
+    query += " ORDER BY c.sentAt DESC OFFSET @offset LIMIT @fetchLimit";
+    parameters.push({ name: "@offset", value: offset as any }, { name: "@fetchLimit", value: (limit + 1) as any });
 
     const { resources } = await notificationsContainer.items
       .query({ query, parameters })
       .fetchAll();
 
-    const mapped = resources.map((doc: any) => ({
+    const hasMore = resources.length > limit;
+    const page = hasMore ? resources.slice(0, limit) : resources;
+
+    const mapped = page.map((doc: any) => ({
       id: doc.id,
       user_id: doc.patientId,
       profile_id: doc.profileId ?? doc.patientId,
@@ -42,7 +57,7 @@ router.get("/", verifySession(), async (req: SessionRequest, res: Response) => {
       sent_at: doc.sentAt,
     }));
 
-    res.json(mapped);
+    res.json({ notifications: mapped, hasMore });
   } catch (err) {
     console.error("Get notifications error:", err);
     res.status(500).json({ error: "Internal server error." });
