@@ -492,7 +492,12 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
           return slotStart < absEnd && slotEnd > absStart;
         });
 
-        if (!isAbsent) {
+        // Skip slots that have already started — relevant when the
+        // requested date is today; a no-op for future dates since
+        // slotStart is always ahead of "now" for those.
+        const isPast = slotStart <= new Date();
+
+        if (!isAbsent && !isPast) {
           intervals.push(`${h}:${m}`);
         }
         cursor += duration;
