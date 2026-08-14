@@ -120,6 +120,9 @@ export const feeChangeRequestsContainer: Container = db.container("feeChangeRequ
 /** Clinic withdrawal requests — partition key: /orgId (bookkeeping only — no real payment rail) */
 export const withdrawalRequestsContainer: Container = db.container("withdrawalRequests");
 
+/** Push notification tokens — partition key: /userId (one doc per user, holds every device's Expo push token) */
+export const pushTokensContainer: Container = db.container("pushTokens");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -164,6 +167,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "otpCodes",               partitionKey: { paths: ["/email"] }, defaultTtl: 600 },
     { id: "feeChangeRequests",      partitionKey: { paths: ["/orgId"] } },
     { id: "withdrawalRequests",     partitionKey: { paths: ["/orgId"] } },
+    { id: "pushTokens",             partitionKey: { paths: ["/userId"] } },
   ];
 
   for (const spec of required) {

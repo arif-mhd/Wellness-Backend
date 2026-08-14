@@ -15,6 +15,7 @@ import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
 import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
 import { resolveAppointmentActor } from "../utils/appointmentAuth";
+import { sendPushToUser } from "../utils/pushNotifications";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
@@ -833,6 +834,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
         sentAt: now,
       };
       await notificationsContainer.items.create(patientNotification);
+      await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
     } else {
       // Notify doctor
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
@@ -848,6 +850,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
         sentAt: now,
       };
       await notificationsContainer.items.create(doctorNotification);
+      await sendPushToUser(doctorNotification.patientId, doctorNotification.title, doctorNotification.body, { type: doctorNotification.type, referenceId: doctorNotification.referenceId });
     }
 
     logActivity({
@@ -1051,6 +1054,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
         sentAt: now,
       };
       await notificationsContainer.items.create(patientNotification);
+      await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
     } else {
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
@@ -1065,6 +1069,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
         sentAt: now,
       };
       await notificationsContainer.items.create(doctorNotification);
+      await sendPushToUser(doctorNotification.patientId, doctorNotification.title, doctorNotification.body, { type: doctorNotification.type, referenceId: doctorNotification.referenceId });
     }
 
     logActivity({
@@ -1282,6 +1287,7 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
         sentAt: new Date().toISOString(),
       };
       await notificationsContainer.items.create(doctorJoinedNotification);
+      await sendPushToUser(doctorJoinedNotification.patientId, doctorJoinedNotification.title, doctorJoinedNotification.body, { type: doctorJoinedNotification.type, referenceId: doctorJoinedNotification.referenceId });
     }
 
     if (completionAction === "completed") {
@@ -1414,6 +1420,7 @@ router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Res
       sentAt: new Date().toISOString(),
     };
     await notificationsContainer.items.create(patientNotification);
+    await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
 
     logActivity({
       source: isClinic ? "clinic" : "doctor",
@@ -1968,6 +1975,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
         sentAt: now,
       };
       await notificationsContainer.items.create(notification);
+      await sendPushToUser(notification.patientId, notification.title, notification.body, { type: notification.type, referenceId: notification.referenceId });
 
       // Notify doctor via LiveKit that the patient accepted
       await sendLivekitData(apt.livekitRoom, {
