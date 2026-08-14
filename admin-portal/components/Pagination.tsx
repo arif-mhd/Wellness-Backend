@@ -15,13 +15,13 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
   }
 
   let visiblePages = pages;
-  if (totalPages > 7) {
-    if (currentPage <= 4) {
-      visiblePages = [...pages.slice(0, 5), -1, totalPages];
-    } else if (currentPage >= totalPages - 3) {
-      visiblePages = [1, -1, ...pages.slice(totalPages - 5)];
+  if (totalPages > 5) {
+    if (currentPage <= 3) {
+      visiblePages = [...pages.slice(0, 3), -1, totalPages];
+    } else if (currentPage >= totalPages - 2) {
+      visiblePages = [1, -1, ...pages.slice(totalPages - 3)];
     } else {
-      visiblePages = [1, -1, currentPage - 1, currentPage, currentPage + 1, -1, totalPages];
+      visiblePages = [1, -1, currentPage, -1, totalPages];
     }
   }
 

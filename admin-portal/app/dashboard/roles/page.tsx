@@ -307,7 +307,7 @@ export default function RolesPage() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="hidden xl:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
@@ -356,6 +356,54 @@ export default function RolesPage() {
                     </table>
                   </div>
 
+                  <div className="xl:hidden flex flex-col gap-4">
+                    {filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(user => {
+                      const isSelected = selectedId === user.id;
+                      return (
+                        <div
+                          key={user.id}
+                          onClick={() => selectUserWithGuard(user)}
+                          className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <UserAvatar user={user} size="md" />
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{user.name}</p>
+                              <p className="text-[12px] text-slate-400 font-medium truncate">{user.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Date Joined</span>
+                              <span className="text-[12px] text-slate-700 font-medium">{formatDate(user.dateJoined)}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Emirates ID</span>
+                              <span className="text-[12px] text-slate-500 font-medium">{user.emiratesId ?? "—"}</span>
+                            </div>
+                          </div>
+                          {activeTab === "Doctors" && (
+                            <div className="flex items-center justify-between mt-1">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Speciality</span>
+                                <span className="text-[12px] text-slate-700 font-medium">{user.specialty ?? "—"}</span>
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); selectUserWithGuard(user); }}
+                            className="mt-1 text-[11px] font-semibold px-4 py-2 rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors w-full"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {/* Pagination */}
               {filteredUsers.length > 0 && (
                 <Pagination 
@@ -370,7 +418,9 @@ export default function RolesPage() {
 
           {/* RIGHT: Details + Access Controls */}
           {selected && draftPerms && (
-            <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="xl:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto xl:static xl:z-auto xl:max-h-none xl:col-span-4 bg-white rounded-t-[2rem] xl:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] xl:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t xl:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 xl:slide-in-from-right-3 duration-300">
 
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">
@@ -473,6 +523,7 @@ export default function RolesPage() {
                 </p>
               )}
             </div>
+            </>
           )}
         </div>
       </div>

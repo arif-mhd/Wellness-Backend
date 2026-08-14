@@ -216,7 +216,7 @@ function ManagePharmacyPageInner() {
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Pharmacy</h1>
               <button
                 onClick={() => router.push("/dashboard/pharmacy/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap md:whitespace-normal transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -226,8 +226,8 @@ function ManagePharmacyPageInner() {
             </div>
 
             {/* Filter / Tabs Row */}
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => { setActiveTab("onboard"); setSelectedPharmacyId(null); }}
                   className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${
@@ -537,144 +537,147 @@ function ManagePharmacyPageInner() {
                 </div>
               )}
             </div>
-          </div>
+            
+            {/* RIGHT — Pharmacy Details Panel */}
+            {selectedPharmacy && (
+              <>
+                <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }} />
+                <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
-          {/* RIGHT — Pharmacy Details Panel */}
-          {selectedPharmacy && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+                  {/* Header */}
+                  <div className="flex items-center justify-between pb-4">
+                    <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Pharmacy Details</h2>
+                    <button
+                      onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }}
+                      className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
+                      aria-label="Close details"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Pharmacy Details</h2>
-                <button
-                  onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }}
-                  className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
-                  aria-label="Close details"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+                  {/* Profile Header */}
+                  <div className="mb-8 mt-2 flex items-center gap-4">
+                    <Avatar pharmacy={selectedPharmacy} size="lg" />
+                    <div>
+                      <h3 className="text-[14px] font-semibold text-slate-800">{selectedPharmacy.pharmacyName}</h3>
+                      <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPharmacy.email}</p>
+                    </div>
+                  </div>
 
-              {/* Profile Header */}
-              <div className="mb-8 mt-2 flex items-center gap-4">
-                <Avatar pharmacy={selectedPharmacy} size="lg" />
-                <div>
-                  <h3 className="text-[14px] font-semibold text-slate-800">{selectedPharmacy.pharmacyName}</h3>
-                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPharmacy.email}</p>
-                </div>
-              </div>
-
-              {/* Details List */}
-              <div className="space-y-5 mb-8 px-1">
-                {selectedPharmacy.tradeLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Trade License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
-                  </div>
-                )}
-                {selectedPharmacy.healthAuthorityLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Health Authority License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">Owner</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.ownerName}</span>
-                </div>
-                {selectedPharmacy.manager && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-semibold">Manager</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.manager}</span>
-                  </div>
-                )}
-                {selectedPharmacy.pharmacistLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Pharmacist License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
-                  </div>
-                )}
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-                  <span className="text-[11px] text-slate-400 font-semibold w-1/2">Location</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.phone}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">License No.</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.licenseNumber}</span>
-                </div>
-                {selectedPharmacy.emiratesId && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Approve/Reject actions for pending pharmacies */}
-              {selectedPharmacy.status === "pending_approval" && (
-                <div className="mb-4 space-y-3">
-                  {showRejectInput ? (
-                    <>
-                      <textarea
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        placeholder="Reason for rejection…"
-                        rows={3}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => { setShowRejectInput(false); setRejectReason(""); }}
-                          className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => rejectPharmacy(selectedPharmacy.id)}
-                          disabled={actionLoading}
-                          className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition disabled:opacity-60"
-                        >
-                          {actionLoading ? "…" : "Confirm Reject"}
-                        </button>
+                  {/* Details List */}
+                  <div className="space-y-5 mb-8 px-1">
+                    {selectedPharmacy.tradeLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Trade License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowRejectInput(true)}
-                        className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => approvePharmacy(selectedPharmacy.id)}
-                        disabled={actionLoading}
-                        className="flex-1 py-2.5 rounded-xl bg-[#6A8BFF] text-white text-sm font-semibold hover:bg-[#5a7ae6] transition disabled:opacity-60 shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
-                      >
-                        {actionLoading ? "…" : "Approve"}
-                      </button>
+                    )}
+                    {selectedPharmacy.healthAuthorityLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Health Authority License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">Owner</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.ownerName}</span>
+                    </div>
+                    {selectedPharmacy.manager && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 font-semibold">Manager</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.manager}</span>
+                      </div>
+                    )}
+                    {selectedPharmacy.pharmacistLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Pharmacist License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
+                      <span className="text-[11px] text-slate-400 font-semibold w-1/2">Location</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">Contact Number</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.phone}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">License No.</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.licenseNumber}</span>
+                    </div>
+                    {selectedPharmacy.emiratesId && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Approve/Reject actions for pending pharmacies */}
+                  {selectedPharmacy.status === "pending_approval" && (
+                    <div className="mb-4 space-y-3">
+                      {showRejectInput ? (
+                        <>
+                          <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Reason for rejection…"
+                            rows={3}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { setShowRejectInput(false); setRejectReason(""); }}
+                              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => rejectPharmacy(selectedPharmacy.id)}
+                              disabled={actionLoading}
+                              className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition disabled:opacity-60"
+                            >
+                              {actionLoading ? "…" : "Confirm Reject"}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowRejectInput(true)}
+                            className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-[13px] font-semibold hover:bg-red-50 transition"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => approvePharmacy(selectedPharmacy.id)}
+                            disabled={actionLoading}
+                            className="flex-1 py-2.5 rounded-xl bg-[#179353] text-white text-[13px] font-semibold hover:bg-[#138048] shadow-[0_4px_10px_rgba(23,147,83,0.2)] transition disabled:opacity-60"
+                          >
+                            {actionLoading ? "…" : "Approve"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* View Detailed Profile button — for approved pharmacies */}
-              {selectedPharmacy.status === "approved" && (
-                <button
-                  onClick={() => router.push(`/dashboard/pharmacy/${selectedPharmacy.id}`)}
-                  className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
-                >
-                  View Detailed Profile
-                </button>
-              )}
-            </div>
-          )}
+                  {/* Link to pharmacy profile */}
+                  {selectedPharmacy.status === "approved" && (
+                    <button
+                      onClick={() => router.push(`/dashboard/pharmacy/${selectedPharmacy.id}`)}
+                      className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
+                    >
+                      View Profile
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </ProtectedRoute>

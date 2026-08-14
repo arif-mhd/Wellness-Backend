@@ -122,13 +122,13 @@ export default function ManageLabServicePage() {
           {/* LEFT COLUMN */}
           <div className={`${selectedLab ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
             {/* Top Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-start sm:items-center justify-between gap-4">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">
                 Manage Lab Services
               </h1>
               <button
                 onClick={() => router.push("/dashboard/lab-service/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap md:whitespace-normal transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -216,7 +216,7 @@ export default function ManageLabServicePage() {
                   </table>
                 )}
               </div>
-              <div className="md:hidden flex flex-col divide-y divide-slate-100">
+              <div className="md:hidden flex flex-col gap-4">
                 {loading ? (
                   <div className="py-20 text-center text-[13px] text-slate-400">Loading labs…</div>
                 ) : displayedLabs.length === 0 ? (
@@ -230,7 +230,7 @@ export default function ManageLabServicePage() {
                       <div
                         key={lab.id}
                         onClick={() => setSelectedLabId(lab.id)}
-                        className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50/70' : ''}`}
+                        className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
                       >
                         <div className="flex items-center gap-3">
                           <Avatar lab={lab} size="md" />
@@ -239,16 +239,16 @@ export default function ManageLabServicePage() {
                             <p className="text-[12px] font-semibold text-slate-400 truncate">{lab.email}</p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-50">
-                          <div className="flex flex-col text-center">
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 mt-2 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider">Total Tests</span>
                             <span className="text-[13px] text-slate-500 font-medium">{lab.totalTests.toLocaleString()}</span>
                           </div>
-                          <div className="flex flex-col items-center">
+                          <div className="flex flex-col items-end">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider">Rating</span>
-                            <span className="text-[13px] text-slate-500 font-medium flex items-center justify-center"><StarRating rating={lab.rating} /></span>
+                            <span className="text-[13px] text-slate-500 font-medium flex items-center"><StarRating rating={lab.rating} /></span>
                           </div>
-                          <div className="flex flex-col text-center">
+                          <div className="flex flex-col col-span-2">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider">Added</span>
                             <span className="text-[13px] text-slate-500 font-medium">{fmtDate(lab.createdAt)}</span>
                           </div>
@@ -275,7 +275,9 @@ export default function ManageLabServicePage() {
 
           {/* RIGHT — Lab Details Panel */}
           {selectedLab && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+              <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedLabId(null)} />
+              <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
                 <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Lab Details</h2>
@@ -328,13 +330,14 @@ export default function ManageLabServicePage() {
                   { label: "Contact Number", value: selectedLab.contactNumber },
                   { label: "Email ID", value: selectedLab.email },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2 shrink-0">{label}</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{value || "—"}</span>
+                  <div key={label} className="flex flex-col sm:flex-row sm:items-start justify-between gap-1">
+                    <span className="text-[11px] text-slate-400 font-semibold">{label}</span>
+                    <span className="text-[12px] text-slate-800 font-medium sm:text-right">{value || "—"}</span>
                   </div>
                 ))}
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

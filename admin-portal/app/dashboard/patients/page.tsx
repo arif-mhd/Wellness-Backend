@@ -186,7 +186,7 @@ export default function ManagePatientsPage() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
