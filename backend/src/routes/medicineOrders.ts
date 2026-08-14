@@ -133,8 +133,12 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
   }
 });
 
-// ─── GET /api/pharmacy/orders ─────────────────────────────────────────────────
-router.get("/orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+// ─── GET /api/pharmacy/my-orders ──────────────────────────────────────────────
+// Named "my-orders" rather than "orders" — pharmacy.ts's staff-only "/orders"
+// route (requireRole("pharmacy")) is mounted before this router at the same
+// /api/pharmacy base, so a patient-scoped "/orders" here would be permanently
+// shadowed and unreachable. See index.ts's mount order for both routers.
+router.get("/my-orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
