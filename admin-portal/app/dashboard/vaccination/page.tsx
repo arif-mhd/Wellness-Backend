@@ -74,7 +74,7 @@ export default function ManageVaccinationPage() {
   }, []);
 
   const filtered = vaccines.filter(v =>
-    v.name.toLowerCase().includes(search.toLowerCase()) ||
+    (v.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (v.manufacturer ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (v.vaccineType ?? "").toLowerCase().includes(search.toLowerCase())
   );
@@ -160,7 +160,7 @@ export default function ManageVaccinationPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paged.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(vaccine => {
+                      {paged.map(vaccine => {
                         const isSelected = selectedVaccineId === vaccine.id;
                         return (
                           <tr
