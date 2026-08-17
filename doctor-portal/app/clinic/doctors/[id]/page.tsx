@@ -38,6 +38,7 @@ interface Doctor {
   languages?: string[] | string | null;
   fees?: number | null;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
   avatarUrl?: string | null;
   slots?: Slot[];
   bio?: string | null;
@@ -180,6 +181,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [togglingOnline, setTogglingOnline] = useState(false);
+  const [togglingTwoFA, setTogglingTwoFA] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [savingDoc, setSavingDoc] = useState(false);
@@ -348,6 +350,24 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
     }
   };
 
+  const handleToggleTwoFA = async () => {
+    if (!doctor) return;
+    const next = !doctor.twoFactorEnabled;
+    setTogglingTwoFA(true);
+    setDoctor((prev) => (prev ? { ...prev, twoFactorEnabled: next } : prev));
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/2fa/${next ? "enable" : "disable"}${qs}`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      window.alert("Failed to update 2FA.");
+      setDoctor((prev) => (prev ? { ...prev, twoFactorEnabled: !next } : prev));
+    } finally {
+      setTogglingTwoFA(false);
+    }
+  };
+
   const openSlotEditor = () => {
     setSlotDraft(doctor?.slots ? doctor.slots.map((s) => ({ ...s })) : []);
     setShowSlotEditor(true);
@@ -506,6 +526,18 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <div className="flex justify-between items-center text-[12px]">
                 <span className="text-[#676E76]">Password</span>
                 <button onClick={handleResetPassword} className="text-[#5476FC] font-bold hover:underline">Reset</button>
+              </div>
+            )}
+            {can("manage_doctors") && (
+              <div className="flex justify-between items-center text-[12px]">
+                <span className="text-[#676E76]">Two-Factor Authentication</span>
+                <button
+                  onClick={handleToggleTwoFA}
+                  disabled={togglingTwoFA}
+                  className={`font-bold hover:underline disabled:opacity-50 ${doctor.twoFactorEnabled ? "text-[#E84949]" : "text-[#5476FC]"}`}
+                >
+                  {togglingTwoFA ? "Updating…" : doctor.twoFactorEnabled ? "Disable" : "Enable"}
+                </button>
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
-import { patientsContainer } from "./cosmos";
+import { patientsContainer, doctorsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
 
 // Browser-based portals that are allowed to make CORS requests.
@@ -122,7 +122,13 @@ export function initSuperTokens(): void {
               return response;
             },
 
-            // Block sign-in for patients whose account has been deactivated by an admin.
+            // Block sign-in for patients whose account has been deactivated by an
+            // admin, and doctors whose account has been deleted by their clinic.
+            // Without this, a deleted doctor's SuperTokens credentials keep
+            // working indefinitely — deletion only ever soft-deleted the Cosmos
+            // doctor doc (preserving appointment history for patients) and
+            // revoked sessions active at that moment, but never stopped a
+            // fresh sign-in afterward.
             signInPOST: async (input) => {
               if (originalImplementation.signInPOST === undefined) {
                 throw new Error("signInPOST not defined");
@@ -142,7 +148,20 @@ export function initSuperTokens(): void {
                     } as any;
                   }
                 } catch {
-                  // Not a patient (doctor/admin/pharmacy) or no profile doc yet — allow sign-in.
+                  // Not a patient (doctor/admin/pharmacy) or no profile doc yet.
+                }
+
+                try {
+                  const { resource: doctor } = await doctorsContainer.item(userId, userId).read();
+                  if (doctor && doctor.status === "deleted") {
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "This account no longer exists. Please contact your clinic.",
+                    } as any;
+                  }
+                } catch {
+                  // Not a doctor or no profile doc yet — allow sign-in.
                 }
               }
 

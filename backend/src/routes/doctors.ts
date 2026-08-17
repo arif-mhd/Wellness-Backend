@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
-import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer, clinicsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -754,46 +754,9 @@ router.get("/:id/reviews", async (req: Request, res: Response) => {
   }
 });
 
-// ─── POST /api/doctors/change-password ──────────────────────────────────────
-router.post("/change-password", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  const { currentPassword, newPassword } = req.body;
-
-  if (!currentPassword || !newPassword) {
-    res.status(400).json({ error: "currentPassword and newPassword are required" });
-    return;
-  }
-  if (newPassword.length < 8) {
-    res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
-    return;
-  }
-
-  try {
-    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
-    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
-      res.status(403).json({ error: "You don't have permission to manage account settings." });
-      return;
-    }
-
-    const signInResult = await EmailPassword.signIn("public", doctor.email, currentPassword);
-    if (signInResult.status !== "OK") {
-      res.status(403).json({ error: "WRONG_PASSWORD" });
-      return;
-    }
-
-    const tokenResult = await EmailPassword.createResetPasswordToken("public", doctorId, doctor.email);
-    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
-
-    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
-    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED" }); return; }
-
-    res.json({ status: "OK" });
-  } catch (err) {
-    console.error("Doctor change-password error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// NOTE: doctors no longer have a self-service change-password endpoint —
+// only their clinic can reset a doctor's credentials, via
+// POST /api/clinics/doctors/:id/reset-password.
 
 // ─── PATCH /api/doctors/notifications ───────────────────────────────────────
 router.patch("/notifications", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
@@ -822,6 +785,11 @@ router.patch("/notifications", requireRole("doctor"), async (req: SessionRequest
 });
 
 // ─── POST /api/doctors/reset-password ───────────────────────────────────────
+// Despite the path, this is the shared reset-password step for BOTH doctor
+// portal account types — doctors and clinic admin/staff both land on the
+// same reset-password screen there. Previously only checked doctorsContainer,
+// so a clinic account could verify a reset OTP successfully and then still
+// fail here with USER_NOT_FOUND — permanently unable to complete a reset.
 router.post("/reset-password", async (req: Request, res: Response) => {
   try {
     const { email, newPassword } = req.body;
@@ -840,16 +808,18 @@ router.post("/reset-password", async (req: Request, res: Response) => {
 
     if (!otpDocs.length) { res.status(403).json({ error: "OTP_NOT_VERIFIED" }); return; }
 
-    const { resources: doctorDocs } = await doctorsContainer.items
-      .query({
-        query: "SELECT c.id FROM c WHERE c.email = @email",
-        parameters: [{ name: "@email", value: normalizedEmail }],
-      })
-      .fetchAll();
+    const emailQuery = {
+      query: "SELECT c.id FROM c WHERE c.email = @email",
+      parameters: [{ name: "@email", value: normalizedEmail }],
+    };
+    const [{ resources: doctorDocs }, { resources: clinicDocs }] = await Promise.all([
+      doctorsContainer.items.query(emailQuery).fetchAll(),
+      clinicsContainer.items.query(emailQuery).fetchAll(),
+    ]);
 
-    if (!doctorDocs.length) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+    const supertokensId = doctorDocs[0]?.id ?? clinicDocs[0]?.id;
+    if (!supertokensId) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
 
-    const supertokensId = doctorDocs[0].id;
     const tokenResult = await EmailPassword.createResetPasswordToken("public", supertokensId, normalizedEmail);
     if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
 
@@ -877,68 +847,16 @@ router.get("/2fa/status", requireRole("doctor"), async (req: SessionRequest, res
   }
 });
 
-// ─── POST /api/doctors/2fa/enable ────────────────────────────────────────────
-router.post("/2fa/enable", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  try {
-    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
-    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
-      res.status(403).json({ error: "You don't have permission to manage account settings." });
-      return;
-    }
-    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
-    res.json({ status: "OK", twoFactorEnabled: true });
-  } catch (err) {
-    console.error("2FA enable error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
+// NOTE: doctors no longer have self-service 2FA enable/disable endpoints —
+// only their clinic can toggle a doctor's 2FA, via
+// POST /api/clinics/doctors/:id/2fa/enable|disable. GET /2fa/status above
+// stays doctor-accessible — it's read-only and the login flow itself
+// depends on it to decide whether to route into the 2FA challenge.
 
-// ─── POST /api/doctors/2fa/disable ───────────────────────────────────────────
-router.post("/2fa/disable", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  try {
-    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) { res.status(404).json({ error: "Doctor profile not found." }); return; }
-    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
-      res.status(403).json({ error: "You don't have permission to manage account settings." });
-      return;
-    }
-    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
-    res.json({ status: "OK", twoFactorEnabled: false });
-  } catch (err) {
-    console.error("2FA disable error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── DELETE /api/doctors/me ──────────────────────────────────────────────────
-// Marks the doctor's account as deleted in Cosmos DB and revokes all sessions.
-// Data is preserved so patients retain access to their appointment history.
-router.delete("/me", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
-  const doctorId = req.session!.getUserId();
-  try {
-    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
-    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
-    if (!hasDoctorPermission(doctor, "manage_account_settings")) {
-      res.status(403).json({ error: "You don't have permission to manage account settings." });
-      return;
-    }
-
-    await doctorsContainer.items.upsert({
-      ...doctor,
-      status: "deleted",
-      deletedAt: new Date().toISOString(),
-    });
-
-    await req.session!.revokeSession();
-    res.json({ status: "OK" });
-  } catch (err) {
-    console.error("Doctor delete-account error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// NOTE: doctors no longer have a self-service account-delete endpoint — only
+// their clinic can remove a doctor's account, via
+// DELETE /api/clinics/doctors/:id (which also revokes every active session,
+// not just the one that made the request).
 
 export default router;
 
