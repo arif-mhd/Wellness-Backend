@@ -651,9 +651,11 @@ router.get("/search", requireRole("doctor"), async (req: SessionRequest, res: Re
 
 // ─── PATCH /api/doctors/online-status ───────────────────────────────────────
 // Doctor toggles their online/offline visibility in the patient app.
+// isManualOverride: true  → doctor explicitly set the status (overrides schedule)
+// isManualOverride: false → doctor reverted to automatic schedule-based mode
 router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
-  const { isOnline } = req.body;
+  const { isOnline, isManualOverride } = req.body;
   if (typeof isOnline !== "boolean") {
     res.status(400).json({ error: "isOnline must be a boolean." });
     return;
@@ -661,13 +663,19 @@ router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
-    await doctorsContainer.items.upsert({ ...doctor, isOnline, updatedAt: new Date().toISOString() });
-    res.json({ status: "OK", isOnline });
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      isOnline,
+      isManualOverride: typeof isManualOverride === "boolean" ? isManualOverride : (doctor.isManualOverride ?? false),
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ status: "OK", isOnline, isManualOverride: typeof isManualOverride === "boolean" ? isManualOverride : (doctor.isManualOverride ?? false) });
   } catch (err) {
     console.error("Update online status error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
 
 // Shapes a doctor document down to the fields the public/patient-facing
 // directory actually needs — excludes Emirates ID, DOB, bank details,
