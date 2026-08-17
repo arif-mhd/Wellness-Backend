@@ -8,7 +8,9 @@ interface AllConsultationsTableProps {
   selectedPatientId: string | undefined;
   onSelectPatient: (patient: Patient) => void;
   onConsult: (patient: Patient) => void;
-  onViewPreVisitForm?: (patient: Patient) => void;
+  onSendReminder?: (patient: Patient) => void;
+  /** Set of appointment IDs for which a reminder has already been sent */
+  remindedIds?: Set<string>;
   activeTab: "All" | "Upcoming" | "Past";
   /** When true, completed appointments are faded (used in the "All" tab) */
   fadeCompleted?: boolean;
@@ -19,7 +21,8 @@ export default function AllConsultationsTable({
   selectedPatientId,
   onSelectPatient,
   onConsult,
-  onViewPreVisitForm,
+  onSendReminder,
+  remindedIds,
   activeTab,
   fadeCompleted = false,
 }: AllConsultationsTableProps) {
@@ -60,7 +63,7 @@ export default function AllConsultationsTable({
             ) : (
               <div className="flex items-center justify-between w-full">
                 <span>Date and Time</span>
-                <span>Action</span>
+                <span className="text-center w-[100px]">Action</span>
               </div>
             )}
           </div>
@@ -168,35 +171,45 @@ export default function AllConsultationsTable({
                     </div>
 
                     {/* Action button */}
-                    {patient.status === "Completed" ? (
-                      <button
-                        disabled
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
-                        style={{ minWidth: "100px" }}
-                      >
-                        Consult Now
-                      </button>
-                    ) : isSelected && patient.status !== "Waiting" ? (
-                      <button
-                        onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none"
-                        style={{
-                          background:
-                            "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
-                          minWidth: "130px",
-                        }}
-                      >
-                        View&nbsp;Pre-Visit Form
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onConsult(patient)}
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#24292E] font-medium text-[13px] leading-5 hover:bg-[#F5F6FA] transition-colors duration-150 select-none shadow-sm"
-                        style={{ minWidth: "100px" }}
-                      >
-                        Consult Now
-                      </button>
-                    )}
+                    {(() => {
+                      const reminded = remindedIds?.has(patient.id) ?? false;
+                      if (patient.status === "Completed") {
+                        return (
+                          <button
+                            disabled
+                            className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
+                            style={{ minWidth: "100px" }}
+                          >
+                            Consult Now
+                          </button>
+                        );
+                      }
+                      if (isSelected && patient.status !== "Waiting") {
+                        return (
+                          <button
+                            onClick={() => onSendReminder?.(patient)}
+                            disabled={reminded}
+                            className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{
+                              background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
+                              minWidth: "100px",
+                            }}
+                            title={reminded ? "Reminder already sent" : "Send appointment reminder to patient"}
+                          >
+                            {reminded ? "Reminded ✓" : "Remind"}
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={() => onConsult(patient)}
+                          className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#24292E] font-medium text-[13px] leading-5 hover:bg-[#F5F6FA] transition-colors duration-150 select-none shadow-sm"
+                          style={{ minWidth: "100px" }}
+                        >
+                          Consult Now
+                        </button>
+                      );
+                    })()}
                   </>
                 )}
               </div>

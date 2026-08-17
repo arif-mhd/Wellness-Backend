@@ -569,6 +569,7 @@ function ConsultRoom() {
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Follow-up Date</label>
               <input
                 type="date"
+                max="9999-12-31"
                 value={followUpDate}
                 onChange={e => setFollowUpDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}

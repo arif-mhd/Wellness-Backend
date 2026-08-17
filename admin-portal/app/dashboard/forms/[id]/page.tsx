@@ -60,7 +60,7 @@ function FieldPreview({ field, onUpdate }: { field: FormField; onUpdate: (u: Par
   switch (field.type) {
     case 'heading':
       return <input value={field.label} onChange={e => onUpdate({ label: e.target.value })} className="text-[18px] font-medium text-slate-800 bg-transparent border-b-2 border-[#6A8BFF]/30 focus:outline-none focus:border-[#6A8BFF] w-full pb-1 transition" placeholder="Section Heading" />;
-    case 'date': return <input type="date" className={base} />;
+    case 'date': return <input type="date" max="9999-12-31" className={base} />;
     case 'time': return <input type="time" className={base} />;
     case 'number': return <input type="number" placeholder={field.placeholder} className={base} />;
     case 'phone': return <input type="tel" placeholder={field.placeholder} className={base} />;
@@ -104,7 +104,7 @@ function FieldPreview({ field, onUpdate }: { field: FormField; onUpdate: (u: Par
       return (
         <div className="bg-[#f8fafd] rounded-xl p-4 border border-slate-100">
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" className={base} />
+            <input type="date" max="9999-12-31" className={base} />
             <input type="time" className={base} />
           </div>
         </div>

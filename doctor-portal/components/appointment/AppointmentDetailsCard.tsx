@@ -11,6 +11,8 @@ interface AppointmentDetailsCardProps {
   onViewProfile?: (patient: Patient) => void;
   onViewPreVisitForm?: (patient: Patient) => void;
   onSendReminder?: (patient: Patient) => void;
+  /** True once the reminder has been sent for this patient — disables the button permanently */
+  reminderSent?: boolean;
   activeTab?: "All" | "Upcoming" | "Past";
 }
 
@@ -21,6 +23,7 @@ export default function AppointmentDetailsCard({
   onViewProfile,
   onViewPreVisitForm,
   onSendReminder,
+  reminderSent,
   activeTab,
 }: AppointmentDetailsCardProps) {
   const router = useRouter();
@@ -217,10 +220,19 @@ export default function AppointmentDetailsCard({
               <span>Chat with Patient</span>
             </button>
 
+            <button
+              onClick={() => onSendReminder?.(patient)}
+              disabled={reminderSent}
+              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[14px] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-[#8AA0FF] disabled:to-[#5476FC] disabled:shadow-none"
+              title={reminderSent ? "Reminder already sent" : "Send appointment reminder to patient"}
+            >
+              {reminderSent ? "Reminder Sent ✓" : "Send Reminder"}
+            </button>
+
             {/* View Pre-visit Form Button */}
             <button
               onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
-              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:shadow-md hover:from-[#758FFF] hover:to-[#4065FB] text-white font-semibold text-[13px] transition-all duration-200"
+              className="flex w-full justify-center items-center py-3 rounded-[12px] bg-white border border-[#EBEEF5] hover:bg-[#F5F6FA] text-[#24292E] font-semibold text-[13px] transition-all duration-200 shadow-sm"
             >
               View Pre-Visit Form
             </button>

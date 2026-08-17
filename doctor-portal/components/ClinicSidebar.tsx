@@ -211,8 +211,8 @@ export default function ClinicSidebar() {
           "bg-[#F5F7FB] border-r border-[#EBEEF5] select-none",
           "transition-[transform,width] duration-300 ease-in-out",
           // Mobile: cover the entire viewport using inset-0 (top+right+bottom+left=0)
-          // Desktop: sit in the left column of the flex layout
-          "fixed lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
+          // Desktop: sit in the left column of the flex layout, stretched to full height
+          "fixed lg:relative lg:h-full lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
           isMobileOpen ? "inset-0" : "inset-0 -translate-x-full",
           open ? "lg:w-[255px]" : "lg:w-[80px]",
           "overflow-hidden",

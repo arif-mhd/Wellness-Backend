@@ -477,7 +477,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <select value={eGender} onChange={(e) => setEGender(e.target.value)} className={inputCls}>
                 <option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
               </select>
-              <input type="date" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
+              <input type="date" max="9999-12-31" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
               <select value={eBloodGroup} onChange={(e) => setEBloodGroup(e.target.value)} className={inputCls}>
                 <option value="">Blood Group</option>
                 {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => <option key={bg} value={bg}>{bg}</option>)}

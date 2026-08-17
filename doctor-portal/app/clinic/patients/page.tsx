@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 interface PatientRow {
   id: string;
   patientId: string;
@@ -84,6 +86,17 @@ function PatientsListContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
+  // Only doctors are allowed to send reminders — clinic admins and senior staff
+  // (whose SuperTokens role is "clinic" / "clinic_pending") see the button
+  // disabled with an explanatory tooltip.
+  const [isDoctor, setIsDoctor] = useState(false);
+  useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => { setIsDoctor((data.roles ?? []).includes("doctor")); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     setLoadError("");
     apiFetch(`/api/clinics/patients${qs}`)
@@ -144,7 +157,7 @@ function PatientsListContent() {
   }, [filtered, selectedId]);
 
   const sendReminder = async (p: PatientRow) => {
-    if (!p.nextAppointmentId) return;
+    if (!p.nextAppointmentId || !isDoctor) return;
     setReminderState((s) => ({ ...s, [p.id]: "sending" }));
     try {
       const res = await apiFetch(`/api/appointments/${p.nextAppointmentId}/remind`, { method: "POST" });
@@ -197,11 +210,15 @@ function PatientsListContent() {
           <div className="w-full md:flex-1 flex items-center justify-start md:justify-end md:pr-2 col-span-2 sm:col-span-1">
             <button
               onClick={(e) => { e.stopPropagation(); sendReminder(p); }}
-              disabled={!p.nextAppointmentId || state === "sending"}
+              disabled={!p.nextAppointmentId || !isDoctor || state === "sending" || state === "sent"}
               className="w-full md:w-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-6 py-2 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              title={p.nextAppointmentId ? "Send a reminder about their next appointment" : "No upcoming appointment to remind about"}
+              title={
+                !isDoctor ? "Only doctors can send reminders"
+                : p.nextAppointmentId ? "Send a reminder about their next appointment"
+                : "No upcoming appointment to remind about"
+              }
             >
-              {state === "sending" ? "Sending..." : state === "sent" ? "Sent" : state === "error" ? "Retry" : "Remind"}
+              {state === "sending" ? "Sending..." : state === "sent" ? "Sent ✓" : "Remind"}
             </button>
           </div>
         </div>
@@ -400,14 +417,17 @@ function PatientsListContent() {
             {selectedPatient.nextAppointmentId ? (
               <>
                 <p className="text-[11px] text-[#676E76] mb-3">
-                  Sends a reminder about their next upcoming appointment with your clinic.
+                  {isDoctor
+                    ? "Sends a reminder about their next upcoming appointment with your clinic."
+                    : "Only doctors can send appointment reminders to patients."}
                 </p>
                 <button
                   onClick={() => sendReminder(selectedPatient)}
-                  disabled={selectedReminderState === "sending"}
-                  className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                  disabled={!isDoctor || selectedReminderState === "sending" || selectedReminderState === "sent"}
+                  className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!isDoctor ? "Only doctors can send reminders" : undefined}
                 >
-                  {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent" : "Remind for consultation"}
+                  {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent ✓" : "Remind for consultation"}
                 </button>
                 {selectedReminderState === "error" && <p className="text-[11px] text-red-600 mt-2">Failed to send. Try again.</p>}
               </>

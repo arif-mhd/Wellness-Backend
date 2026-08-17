@@ -151,7 +151,7 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Date of Birth</label>
-            <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className={inputCls} />
+            <input type="date" max="9999-12-31" value={dob} onChange={(e) => setDob(e.target.value)} className={inputCls} />
           </div>
         </div>
 

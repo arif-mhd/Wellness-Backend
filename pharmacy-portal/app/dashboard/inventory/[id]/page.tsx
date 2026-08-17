@@ -489,7 +489,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Expiry Date</label>
-                  <input type="date" value={editing.expiryDate ?? ""}
+                  <input type="date" max="9999-12-31" value={editing.expiryDate ?? ""}
                     onChange={e => setEditing(prev => prev ? { ...prev, expiryDate: e.target.value } : prev)}
                     className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
