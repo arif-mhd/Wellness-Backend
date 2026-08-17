@@ -7,7 +7,9 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
-import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
+import { getClinicAppointmentsData } from "./clinicAppointments";
+import { getClinicFeedbackData } from "./clinicFeedback";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -178,7 +180,7 @@ router.post("/register", async (req: Request, res: Response) => {
     const clinicDoc = {
       id: supertokensId,   // Cosmos id = ST userId
       supertokens_id: supertokensId,
-      status: "pending_approval",
+      status: "details_pending",
       email,
       clinicName,
       // The owner's own personal name — collected later in the complete-profile
@@ -409,6 +411,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       slots:                 slots                 ?? clinic.slots,
       isMultiBranchOrg:      isMultiBranchOrg       ?? clinic.isMultiBranchOrg,
       branches:              branches               ?? clinic.branches,
+      status:                "pending_approval",
       profileCompletedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -441,141 +444,177 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
 // whole doctor roster instead of one doctor. This is entirely separate from
 // (and doesn't touch) the doctor-portal's own /api/appointments/doctor/tasks.
 // Must come before GET /:id below, or Express would match "dashboard" as an id.
+// Extracted so the /analytics route (below, gated by the view_analytics
+// permission) can reuse the exact same computation without duplicating it —
+// this route itself stays open to every staff member, same as before.
+async function computeClinicDashboard(scope: ClinicScope) {
+  const clinicIds = scopeToClinicIds(scope);
+
+  let clinicDoctors: any[] = [];
+  if (clinicIds.length > 0) {
+    const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
+    const { resources } = await doctorsContainer.items
+      .query({
+        query: `SELECT * FROM c WHERE ${clause} AND c.status = 'approved'`,
+        parameters,
+      })
+      .fetchAll();
+    clinicDoctors = resources;
+  }
+  const doctorIds: string[] = clinicDoctors.map((d: any) => d.id);
+  const doctorNameById: Record<string, string> = {};
+  clinicDoctors.forEach((d: any) => { doctorNameById[d.id] = d.fullName ?? "Doctor"; });
+
+  let appointments: any[] = [];
+  if (doctorIds.length > 0) {
+    appointments = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT * FROM c WHERE c.doctorId IN (${doctorIds.map((_, i) => `@d${i}`).join(", ")})`,
+      parameters: doctorIds.map((id, i) => ({ name: `@d${i}`, value: id })),
+    });
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now); startOfToday.setUTCHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday); startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+  const startOfYesterday = new Date(startOfToday); startOfYesterday.setUTCDate(startOfYesterday.getUTCDate() - 1);
+  const startOfThisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+
+  const inRange = (iso: string, start: Date, end: Date) => {
+    const t = new Date(iso).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+
+  const nonCancelled = appointments.filter((a) => a.status !== "cancelled");
+  const consultationsToday = nonCancelled.filter((a) => inRange(a.scheduledAt, startOfToday, startOfTomorrow)).length;
+  const consultationsYesterday = nonCancelled.filter((a) => inRange(a.scheduledAt, startOfYesterday, startOfToday)).length;
+
+  const sumRevenue = (start: Date, end: Date) =>
+    nonCancelled
+      .filter((a) => inRange(a.scheduledAt, start, end))
+      .reduce((sum, a) => sum + (a.paymentAmount ?? 0), 0);
+  const revenueThisMonth = sumRevenue(startOfThisMonth, startOfNextMonth);
+  const revenueLastMonth = sumRevenue(startOfLastMonth, startOfThisMonth);
+
+  const waitingAppointments = appointments.filter(
+    (a) => a.patientWaitingSince && a.status !== "completed" && a.status !== "cancelled"
+  );
+
+  const upcoming = appointments
+    .filter((a) => a.status === "scheduled" && new Date(a.scheduledAt).getTime() >= now.getTime())
+    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+    .slice(0, 5);
+
+  const missingDocs = appointments.filter((a) => a.status === "completed" && !a.emr);
+
+  // Last 8 days of consultation volume, for the "Patients This Month" trend card.
+  const patientsTrend = Array.from({ length: 8 }, (_, idx) => {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - (7 - idx));
+    const dateStr = d.toISOString().slice(0, 10);
+    const count = nonCancelled.filter((a) => a.scheduledAt?.slice(0, 10) === dateStr).length;
+    return { label: d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }), count };
+  });
+
+  // Batch-fetch patient details needed for waiting list + recent appointments + missing-doc tasks
+  const patientIds = Array.from(new Set([
+    ...waitingAppointments.map((a) => a.patientId),
+    ...upcoming.map((a) => a.patientId),
+    ...missingDocs.map((a) => a.patientId),
+  ].filter(Boolean)));
+  const patientById: Record<string, any> = {};
+  await Promise.all(patientIds.map(async (pid) => {
+    try {
+      const { resource } = await patientsContainer.item(pid, pid).read();
+      if (resource) patientById[pid] = resource;
+    } catch { /* skip */ }
+  }));
+
+  const tasks: any[] = [];
+  for (const d of clinicDoctors) {
+    if (d.slotsPending) {
+      tasks.push({
+        type: "doctor_schedule_pending",
+        label: `${d.fullName ?? "A doctor"} submitted a schedule change awaiting your approval`,
+        doctorId: d.id,
+        doctorName: d.fullName ?? "Doctor",
+      });
+    }
+  }
+  for (const a of missingDocs) {
+    tasks.push({
+      type: "missing_documentation",
+      label: `Missing consultation notes — ${patientById[a.patientId]?.fullName ?? "a patient"} with ${doctorNameById[a.doctorId] ?? "a doctor"}`,
+      doctorId: a.doctorId,
+      doctorName: doctorNameById[a.doctorId] ?? "Doctor",
+      appointmentId: a.id,
+    });
+  }
+
+  return {
+    consultationsToday,
+    consultationsYesterday,
+    revenueThisMonth,
+    revenueLastMonth,
+    patientsWaiting: {
+      count: waitingAppointments.length,
+      patients: waitingAppointments.slice(0, 3).map((a) => ({
+        name: patientById[a.patientId]?.fullName ?? "Patient",
+        avatarUrl: patientById[a.patientId]?.avatarUrl ?? null,
+      })),
+    },
+    recentAppointments: upcoming.map((a) => ({
+      id: a.id,
+      patientId: a.patientId,
+      patientName: patientById[a.patientId]?.fullName ?? "Patient",
+      patientEmail: patientById[a.patientId]?.email ?? "",
+      reason: a.reason ?? "General Consultation",
+      doctorId: a.doctorId,
+      doctorName: doctorNameById[a.doctorId] ?? "Doctor",
+      scheduledAt: a.scheduledAt,
+    })),
+    tasks: { total: tasks.length, items: tasks },
+    patientsTrend,
+  };
+}
+
 router.get("/dashboard", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return;
-  const clinicIds = scopeToClinicIds(scope);
-
   try {
-    let clinicDoctors: any[] = [];
-    if (clinicIds.length > 0) {
-      const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
-      const { resources } = await doctorsContainer.items
-        .query({
-          query: `SELECT * FROM c WHERE ${clause} AND c.status = 'approved'`,
-          parameters,
-        })
-        .fetchAll();
-      clinicDoctors = resources;
-    }
-    const doctorIds: string[] = clinicDoctors.map((d: any) => d.id);
-    const doctorNameById: Record<string, string> = {};
-    clinicDoctors.forEach((d: any) => { doctorNameById[d.id] = d.fullName ?? "Doctor"; });
-
-    let appointments: any[] = [];
-    if (doctorIds.length > 0) {
-      appointments = await queryDocuments<any>(appointmentsContainer, {
-        query: `SELECT * FROM c WHERE c.doctorId IN (${doctorIds.map((_, i) => `@d${i}`).join(", ")})`,
-        parameters: doctorIds.map((id, i) => ({ name: `@d${i}`, value: id })),
-      });
-    }
-
-    const now = new Date();
-    const startOfToday = new Date(now); startOfToday.setUTCHours(0, 0, 0, 0);
-    const startOfTomorrow = new Date(startOfToday); startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
-    const startOfYesterday = new Date(startOfToday); startOfYesterday.setUTCDate(startOfYesterday.getUTCDate() - 1);
-    const startOfThisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-    const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-
-    const inRange = (iso: string, start: Date, end: Date) => {
-      const t = new Date(iso).getTime();
-      return t >= start.getTime() && t < end.getTime();
-    };
-
-    const nonCancelled = appointments.filter((a) => a.status !== "cancelled");
-    const consultationsToday = nonCancelled.filter((a) => inRange(a.scheduledAt, startOfToday, startOfTomorrow)).length;
-    const consultationsYesterday = nonCancelled.filter((a) => inRange(a.scheduledAt, startOfYesterday, startOfToday)).length;
-
-    const sumRevenue = (start: Date, end: Date) =>
-      nonCancelled
-        .filter((a) => inRange(a.scheduledAt, start, end))
-        .reduce((sum, a) => sum + (a.paymentAmount ?? 0), 0);
-    const revenueThisMonth = sumRevenue(startOfThisMonth, startOfNextMonth);
-    const revenueLastMonth = sumRevenue(startOfLastMonth, startOfThisMonth);
-
-    const waitingAppointments = appointments.filter(
-      (a) => a.patientWaitingSince && a.status !== "completed" && a.status !== "cancelled"
-    );
-
-    const upcoming = appointments
-      .filter((a) => a.status === "scheduled" && new Date(a.scheduledAt).getTime() >= now.getTime())
-      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-      .slice(0, 5);
-
-    const missingDocs = appointments.filter((a) => a.status === "completed" && !a.emr);
-
-    // Last 8 days of consultation volume, for the "Patients This Month" trend card.
-    const patientsTrend = Array.from({ length: 8 }, (_, idx) => {
-      const d = new Date(now);
-      d.setUTCDate(d.getUTCDate() - (7 - idx));
-      const dateStr = d.toISOString().slice(0, 10);
-      const count = nonCancelled.filter((a) => a.scheduledAt?.slice(0, 10) === dateStr).length;
-      return { label: d.toLocaleDateString("en-US", { month: "short", day: "2-digit" }), count };
-    });
-
-    // Batch-fetch patient details needed for waiting list + recent appointments + missing-doc tasks
-    const patientIds = Array.from(new Set([
-      ...waitingAppointments.map((a) => a.patientId),
-      ...upcoming.map((a) => a.patientId),
-      ...missingDocs.map((a) => a.patientId),
-    ].filter(Boolean)));
-    const patientById: Record<string, any> = {};
-    await Promise.all(patientIds.map(async (pid) => {
-      try {
-        const { resource } = await patientsContainer.item(pid, pid).read();
-        if (resource) patientById[pid] = resource;
-      } catch { /* skip */ }
-    }));
-
-    const tasks: any[] = [];
-    for (const d of clinicDoctors) {
-      if (d.slotsPending) {
-        tasks.push({
-          type: "doctor_schedule_pending",
-          label: `${d.fullName ?? "A doctor"} submitted a schedule change awaiting your approval`,
-          doctorId: d.id,
-          doctorName: d.fullName ?? "Doctor",
-        });
-      }
-    }
-    for (const a of missingDocs) {
-      tasks.push({
-        type: "missing_documentation",
-        label: `Missing consultation notes — ${patientById[a.patientId]?.fullName ?? "a patient"} with ${doctorNameById[a.doctorId] ?? "a doctor"}`,
-        doctorId: a.doctorId,
-        doctorName: doctorNameById[a.doctorId] ?? "Doctor",
-        appointmentId: a.id,
-      });
-    }
-
-    res.json({
-      consultationsToday,
-      consultationsYesterday,
-      revenueThisMonth,
-      revenueLastMonth,
-      patientsWaiting: {
-        count: waitingAppointments.length,
-        patients: waitingAppointments.slice(0, 3).map((a) => ({
-          name: patientById[a.patientId]?.fullName ?? "Patient",
-          avatarUrl: patientById[a.patientId]?.avatarUrl ?? null,
-        })),
-      },
-      recentAppointments: upcoming.map((a) => ({
-        id: a.id,
-        patientId: a.patientId,
-        patientName: patientById[a.patientId]?.fullName ?? "Patient",
-        patientEmail: patientById[a.patientId]?.email ?? "",
-        reason: a.reason ?? "General Consultation",
-        doctorId: a.doctorId,
-        doctorName: doctorNameById[a.doctorId] ?? "Doctor",
-        scheduledAt: a.scheduledAt,
-      })),
-      tasks: { total: tasks.length, items: tasks },
-      patientsTrend,
-    });
+    res.json(await computeClinicDashboard(scope));
   } catch (err) {
     console.error("Clinic dashboard fetch error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/clinics/analytics ───────────────────────────────────────────────
+// Same underlying data as /dashboard + /appointments + /feedback, combined
+// into one response — but unlike those three (which stay open to every staff
+// member for their own unrelated pages: Home, the main Appointments list, the
+// main Feedback page, Branch Detail tabs), this route is gated by the
+// view_analytics permission, since the Analytics page is the one place that
+// permission is actually meant to restrict.
+router.get("/analytics", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
+  if (!scope) return;
+  if (!hasPermission(scope, "view_analytics")) { res.status(403).json({ error: "Not authorized." }); return; }
+  try {
+    const [dashboard, appointmentsData, feedbackData] = await Promise.all([
+      computeClinicDashboard(scope),
+      getClinicAppointmentsData(scope),
+      getClinicFeedbackData(scope),
+    ]);
+    res.json({
+      dashboard,
+      appointments: appointmentsData.appointments,
+      reviews: feedbackData.reviews,
+      avgRating: feedbackData.avgRating,
+    });
+  } catch (err) {
+    console.error("Clinic analytics fetch error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

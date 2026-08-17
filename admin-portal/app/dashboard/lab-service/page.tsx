@@ -90,7 +90,7 @@ export default function ManageLabServicePage() {
         const { labs: data } = await res.json();
         const list: LabService[] = data ?? [];
         setLabs(list);
-        setSelectedLabId((prev) => prev ?? list[0]?.id ?? null);
+        // removed
       }
     } catch {
       setLabs([]);
@@ -159,6 +159,20 @@ export default function ManageLabServicePage() {
                     : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   }
                 </button>
+              </div>
+            </div>
+
+            {/* Text Filter Row */}
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4 mb-2">
+              <div className="flex items-center gap-8 flex-1">
+                {["Name", "Total Tests", "Rating", "Date Added"].map((label) => (
+                  <span key={label} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                    {label}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                ))}
               </div>
             </div>
 

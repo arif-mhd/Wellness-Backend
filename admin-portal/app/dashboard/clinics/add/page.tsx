@@ -198,7 +198,7 @@ export default function AddClinicPage() {
           <h1 className="text-[24px] font-medium text-[#1e293b] tracking-tight">Add Clinic</h1>
         </div>
 
-        <div className="flex items-center justify-between px-2 w-full max-w-5xl pt-2 mb-2 flex-wrap gap-y-3">
+        <div className="flex items-center justify-start md:justify-between px-2 w-full max-w-5xl pt-2 mb-2 flex-wrap gap-x-6 gap-y-3">
           {STEPS.map((s) => {
             const isActive = step === s.key;
             const isDone = step > s.key;

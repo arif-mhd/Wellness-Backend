@@ -186,11 +186,11 @@ function InsuranceVerificationsPageInner() {
                 <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">Patient</th>
-                        <th className="pb-4 pt-1 font-medium">Provider</th>
-                        <th className="pb-4 pt-1 font-medium">Policy ID</th>
-                        <th className="pb-4 pt-1 font-medium">Status</th>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2">Patient</th>
+                        <th className="pb-4 pt-1 font-semibold">Provider</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Policy ID</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -201,12 +201,12 @@ function InsuranceVerificationsPageInner() {
                           className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
                         >
                           <td className="py-3.5 px-2">
-                            <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.patientName}</p>
+                            <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.patientName}</p>
                             <p className="text-[11px] text-slate-400">{r.patientEmail}</p>
                           </td>
                           <td className="py-3.5 text-[12px] text-slate-600 font-medium">{r.provider}</td>
-                          <td className="py-3.5 text-[12px] text-slate-500">{r.policyId}</td>
-                          <td className="py-3.5"><StatusBadge status={r.status} /></td>
+                          <td className="py-3.5 text-[12px] text-slate-500 text-center">{r.policyId}</td>
+                          <td className="py-3.5 text-center"><StatusBadge status={r.status} /></td>
                         </tr>
                       ))}
                     </tbody>

@@ -79,7 +79,7 @@ export default function ManageEmergenciesPage() {
       const data = await res.json();
       const list: Emergency[] = data.emergencies ?? [];
       setEmergencies(list);
-      setSelectedId((prev) => prev ?? list[0]?.id ?? null);
+      // removed
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {
@@ -120,9 +120,9 @@ export default function ManageEmergenciesPage() {
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Emergencies</h1>
             </div>
 
-            {/* Tabs + Search + Date */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            {/* Tabs + Search */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   onClick={() => setActiveTab("SOS")}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-semibold transition-all ${activeTab === "SOS" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
@@ -135,7 +135,7 @@ export default function ManageEmergenciesPage() {
                 >
                   Past Emergency Requests
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                   {searchOpen && (
                     <input
                       autoFocus
@@ -143,12 +143,12 @@ export default function ManageEmergenciesPage() {
                       value={search}
                       onChange={e => setSearch(e.target.value)}
                       placeholder="Search emergencies…"
-                      className="w-44 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
+                      className="w-full sm:w-44 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
                     />
                   )}
                   <button
                     onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearch(""); }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
+                    className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
                   >
                     {searchOpen
                       ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -157,14 +157,10 @@ export default function ManageEmergenciesPage() {
                   </button>
                 </div>
               </div>
-              <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
-                Today
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-              </button>
             </div>
 
             {/* Column headers */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1 mb-2">
               <div className="flex items-center gap-10 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>

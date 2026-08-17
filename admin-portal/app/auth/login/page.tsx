@@ -1,12 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import { signIn, signOut } from "supertokens-web-js/recipe/emailpassword";
+import STGeneralError from "supertokens-web-js/utils/error";
 import Image from "next/image";
 import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+// Shared by the post-signIn redirect and the "you're already logged in"
+// prompt below. Uses `router.replace` (not `push`) so this intermediate
+// step never lingers as a Back target once the user is in.
+async function goToLanding(router: ReturnType<typeof useRouter>, email: string) {
+  try {
+    const twoFaRes = await fetch(`${API_URL}/api/admin/dashboard/2fa/status`, { credentials: "include" });
+    if (twoFaRes.ok) {
+      const twoFaData = await twoFaRes.json();
+      if (twoFaData.twoFactorEnabled === true) {
+        router.replace(`/auth/two-factor?email=${encodeURIComponent(email)}`);
+        return;
+      }
+    }
+  } catch {
+    // If 2FA check fails, fall through to dashboard
+  }
+  router.replace("/dashboard");
+}
 
 export default function LoginPage() {
   const [email, setEmail]               = useState("");
@@ -15,7 +35,38 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe]     = useState(false);
   const [error, setError]               = useState("");
   const [loading, setLoading]           = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
+
+  // Landing on this page (via Back/Forward, a stale tab, or a typed URL)
+  // while a session is still valid server-side must never just silently
+  // show the login form as if signed out — that's exactly how Forward could
+  // later walk back into the dashboard without a real login. Ask instead.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+        if (cancelled) return;
+        if (res.ok) {
+          const wantsLogout = window.confirm("You're already logged in. Do you want to log out?");
+          if (cancelled) return;
+          if (wantsLogout) {
+            try { await signOut(); } catch { /* ignore */ }
+            setCheckingSession(false);
+          } else {
+            const data = await res.json().catch(() => ({}));
+            await goToLanding(router, data?.profile?.email ?? "");
+          }
+        } else {
+          setCheckingSession(false);
+        }
+      } catch {
+        if (!cancelled) setCheckingSession(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,22 +82,7 @@ export default function LoginPage() {
       });
 
       if (response.status === "OK") {
-        // ── Check if this admin has 2FA enabled ─────────────────────────────
-        try {
-          const twoFaRes = await fetch(`${API_URL}/api/admin/dashboard/2fa/status`, {
-            credentials: "include",
-          });
-          if (twoFaRes.ok) {
-            const twoFaData = await twoFaRes.json();
-            if (twoFaData.twoFactorEnabled === true) {
-              router.push(`/auth/two-factor?email=${encodeURIComponent(email)}`);
-              return;
-            }
-          }
-        } catch {
-          // If 2FA check fails, fall through to dashboard
-        }
-        router.push("/dashboard");
+        await goToLanding(router, email);
       } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
         setError("Invalid email or password. Please try again.");
       } else if (response.status === "FIELD_ERROR") {
@@ -54,13 +90,28 @@ export default function LoginPage() {
       } else {
         setError("Sign in is not allowed right now. Please contact support.");
       }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
+    } catch (err) {
+      // The backend can reject sign-in with a GENERAL_ERROR (e.g. a deleted
+      // account) — that arrives here as a thrown STGeneralError carrying the
+      // real message, and must not be papered over with the network-failure text.
+      if (STGeneralError.isThisError(err)) {
+        setError(err.message);
+      } else {
+        setError("Cannot reach the server. Make sure the backend is running.");
+      }
     } finally {
       setLoading(false);
     }
   }
 
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#f3f4fd] via-[#f8f9ff] to-[#f0f4ff] flex items-center justify-center p-6 md:p-12">

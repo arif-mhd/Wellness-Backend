@@ -162,8 +162,8 @@ export default function OrdersPage() {
           <div className={`${selected ? "xl:col-span-8" : "xl:col-span-12"} flex flex-col gap-5`}>
 
             {/* Tabs & Search */}
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-1 gap-4">
+              <div className="flex flex-wrap items-center gap-2">
                 {(["All", "Pharmacy", "Lab", "Radiology"] as const).map(tab => (
                   <button
                     key={tab}
@@ -177,13 +177,13 @@ export default function OrdersPage() {
                     {tab}
                   </button>
                 ))}
-                <div className="relative ml-2">
+                <div className="relative w-full sm:w-auto mt-2 sm:mt-0 ml-0 sm:ml-2">
                   <input
                     type="text"
                     value={search}
                     onChange={e => { setSearch(e.target.value); setPage(1); }}
                     placeholder="Search orders…"
-                    className="w-40 pl-9 pr-3 py-2 bg-white border border-slate-100 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
+                    className="w-full sm:w-40 pl-9 pr-3 py-2 bg-white border border-slate-100 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
                   />
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -194,7 +194,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Filter row */}
-            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none mt-4 mb-2">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none mt-4 mb-2">
               <div className="flex items-center gap-5 flex-wrap flex-1">
                 {["Name", "Order Type", "Pharmacy", "Doctor", "Patient", "Date range", "Payment type", "Status"].map(f => (
                   <span key={f} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">

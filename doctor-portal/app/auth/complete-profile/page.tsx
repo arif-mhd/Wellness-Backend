@@ -213,7 +213,6 @@ function CompleteProfileContent() {
         dohLicense:           mainCompanyInfo?.dohLicense || null,
         address:              mainCompanyInfo?.address || null,
         addressProofFileUrl:  fileUrls.addressProof || null,
-        consultationRates:    mainCompanyInfo?.consultationRates ?? [],
         paymentSettings:      mainCompanyInfo?.paymentSettings || null,
         bio:                  mainCompanyInfo?.bio || null,
         clinicImageUrl:       fileUrls.logo || null,
@@ -272,7 +271,6 @@ function CompleteProfileContent() {
           dohLicense:           b.dohLicense || null,
           address:              b.address || null,
           addressProofFileUrl:  fileUrls.addressProof || null,
-          consultationRates:    b.consultationRates ?? [],
           paymentSettings:      b.paymentSettings || null,
           bio:                  b.bio || null,
           clinicImageUrl:       fileUrls.logo || null,
@@ -289,7 +287,6 @@ function CompleteProfileContent() {
         dohLicense:           mainCompanyInfo?.dohLicense || null,
         address:              mainCompanyInfo?.address || null,
         addressProofFileUrl:  mainFileUrls.addressProof || null,
-        consultationRates:    mainCompanyInfo?.consultationRates ?? [],
         paymentSettings:      mainCompanyInfo?.paymentSettings || null,
         bio:                  mainCompanyInfo?.bio || null,
         clinicImageUrl:       mainFileUrls.logo || null,
@@ -388,12 +385,29 @@ function CompleteProfileContent() {
           <div className="lg:col-span-8">
             {phase === "owner" && (
               <OwnersPersonalInfoForm
-                initialEmail={emailParam}
+                initialFullName={ownerInfo?.fullName}
+                initialEmail={ownerInfo?.email || emailParam}
+                initialPhone={ownerInfo?.contactNumber}
+                initialGender={ownerInfo?.gender}
+                initialDob={ownerInfo?.dateOfBirth}
+                initialEmiratesIdOrPassport={ownerInfo?.emiratesIdOrPassport}
+                initialPositionInClinic={ownerInfo?.positionInClinic}
+                initialBloodGroup={ownerInfo?.bloodGroup}
+                initialMaritalStatus={ownerInfo?.maritalStatus}
+                initialHeight={ownerInfo?.height}
+                initialWeight={ownerInfo?.weight}
+                initialLanguages={ownerInfo?.languages}
+                initialOtherInfo={ownerInfo?.otherInfo}
                 onSubmit={handleStep1Submit}
               />
             )}
             {phase === "insurances" && (
-              <InsurancesForm onSubmit={handleStep2Submit} onGoBack={() => setPhase("owner")} />
+              <InsurancesForm
+                initialInsurances={insuranceInfo?.insurances}
+                initialSpcVerified={insuranceInfo?.spcVerified}
+                onSubmit={handleStep2Submit}
+                onGoBack={() => setPhase("owner")}
+              />
             )}
             {phase === "branchCount" && (
               <BranchCountForm
@@ -405,6 +419,11 @@ function CompleteProfileContent() {
               isMultiBranch ? (
                 <ClinicCompanyInfoForm
                   key={`ci-${branchIndex}`}
+                  initialLicenseNumber={branchDrafts[branchIndex]?.licenseNumber}
+                  initialDohLicense={branchDrafts[branchIndex]?.dohLicense}
+                  initialAddress={branchDrafts[branchIndex]?.address}
+                  initialPaymentSettings={branchDrafts[branchIndex]?.paymentSettings}
+                  initialBio={branchDrafts[branchIndex]?.bio}
                   onSubmit={handleCompanyInfoSubmit}
                   onGoBack={handleCompanyInfoGoBack}
                   branchName={currentBranchName}
@@ -414,6 +433,11 @@ function CompleteProfileContent() {
               ) : (
                 <ClinicCompanyInfoForm
                   key="ci-single"
+                  initialLicenseNumber={mainCompanyInfo?.licenseNumber}
+                  initialDohLicense={mainCompanyInfo?.dohLicense}
+                  initialAddress={mainCompanyInfo?.address}
+                  initialPaymentSettings={mainCompanyInfo?.paymentSettings}
+                  initialBio={mainCompanyInfo?.bio}
                   onSubmit={handleCompanyInfoSubmit}
                   onGoBack={handleCompanyInfoGoBack}
                 />

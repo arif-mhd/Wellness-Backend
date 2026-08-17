@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import ScheduleTabs from "@/components/schedule/ScheduleTabs";
 import ScheduleListView, { ScheduleItem } from "@/components/schedule/ScheduleListView";
 import ScheduleCalendarView, { CalendarAppointment } from "@/components/schedule/ScheduleCalendarView";
@@ -174,7 +173,6 @@ export default function SchedulesDashboardPage() {
   };
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Header */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
@@ -234,6 +232,5 @@ export default function SchedulesDashboardPage() {
           />
         )}
       </div>
-    </ProtectedRoute>
   );
 }

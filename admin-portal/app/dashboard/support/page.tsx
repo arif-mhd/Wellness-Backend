@@ -96,8 +96,6 @@ function SupportPageInner() {
         setTickets(data);
         if (targetId && data.some((t: Ticket) => t.id === targetId)) {
           setSelectedId(targetId);
-        } else if (data.length > 0 && !selectedId) {
-          setSelectedId(data[0].id);
         }
       }
     } catch {

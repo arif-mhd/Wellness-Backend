@@ -41,7 +41,7 @@ export default function SignupPage() {
       });
 
       if (response.status === "OK") {
-        router.push("/dashboard");
+        router.replace("/dashboard");
       } else if (response.status === "FIELD_ERROR") {
         setError(response.formFields[0]?.error || "Please check your input.");
       } else {

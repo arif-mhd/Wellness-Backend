@@ -147,6 +147,7 @@ export default function ClinicProfilePage() {
   }, []);
 
   async function handleLogout() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     try { await signOut(); } catch { /* ignore */ }
     router.replace("/auth/login");
   }

@@ -153,7 +153,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
           {/* Row 1: Date Range & Appointment Status */}
           <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Date Range</h3>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <input
                     type="date"
@@ -177,7 +177,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
 
           <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Appointment Status</h3>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <select
                     value={status}
@@ -209,7 +209,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
           {/* Row 2: Payment Status & Patient Demographics */}
           <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Payment Status</h3>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <select
                     value={paymentStatus}
@@ -245,7 +245,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
 
           <div className="bg-white rounded-[1.5rem] p-7 shadow-sm border border-slate-50">
              <h3 className="text-[11px] font-medium text-slate-800 mb-4 tracking-tight">Appointment Duration</h3>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <select
                     value={durationMins}

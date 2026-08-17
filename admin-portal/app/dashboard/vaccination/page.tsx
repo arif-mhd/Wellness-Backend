@@ -67,7 +67,7 @@ export default function ManageVaccinationPage() {
       .then(r => r.json())
       .then(data => {
         setVaccines(Array.isArray(data) ? data : []);
-        if (data?.length) setSelectedVaccineId(data[0].id);
+        // removed
       })
       .catch(() => setVaccines([]))
       .finally(() => setLoading(false));
@@ -133,7 +133,7 @@ export default function ManageVaccinationPage() {
             </div>
 
             {/* Sort row */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-2">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-2">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Name <DoubleCaret /></span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Type <DoubleCaret /></span>

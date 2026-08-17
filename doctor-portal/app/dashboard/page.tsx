@@ -1,6 +1,5 @@
 "use client";
 
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -459,7 +458,7 @@ export default function DashboardPage() {
   })();
 
   return (
-    <ProtectedRoute>
+    <>
       {inviteModalContent}
       <div className="px-4 md:px-8 pb-12 select-none">
 
@@ -858,6 +857,6 @@ export default function DashboardPage() {
         </div>
 
       </div>
-    </ProtectedRoute>
+    </>
   );
 }

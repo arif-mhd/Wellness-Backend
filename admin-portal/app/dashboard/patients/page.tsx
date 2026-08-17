@@ -123,9 +123,6 @@ export default function ManagePatientsPage() {
       );
 
       setPatients(patientsWithStats);
-      if (patientsWithStats.length > 0 && !selectedId) {
-        setSelectedId(patientsWithStats[0].id);
-      }
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {
@@ -159,18 +156,18 @@ export default function ManagePatientsPage() {
           <div className={`${selectedPatient ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
 
             {/* Top Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Patients</h1>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 bg-white border border-slate-100 rounded-full px-4 h-10 shadow-sm">
-                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 bg-white border border-slate-100 rounded-full px-4 h-10 shadow-sm flex-1 md:flex-none">
+                  <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search patients…"
-                    className="text-[13px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-36"
+                    className="text-[13px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-full md:w-36"
                   />
                 </div>
                 <button

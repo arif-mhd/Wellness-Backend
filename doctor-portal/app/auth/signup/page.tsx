@@ -122,6 +122,10 @@ export default function SignupPage() {
         setStep(2);
         setTimeLeft(600);
         setOtp1(""); setOtp2(""); setOtp3(""); setOtp4(""); setOtp5(""); setOtp6("");
+        // Step 3's own "Email" field defaults to the same address already
+        // verified here, rather than asking for it a second time — still
+        // editable if the clinic wants a different public-facing contact.
+        setEmail(value.toLowerCase());
       } else if (res.status === 409) {
         setError("An account with this email already exists. Please log in.");
       } else if (res.status === 429) {
