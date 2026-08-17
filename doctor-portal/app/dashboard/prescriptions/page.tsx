@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskListTable from "@/components/tasks/TaskListTable";
 import TaskDetailsCard, { TaskItem } from "@/components/tasks/TaskDetailsCard";
 
@@ -85,7 +84,6 @@ export default function PrescriptionsTasksPage() {
   const activeTask = hoveredTask || tasks.find((t) => t.id === selectedTaskId) || null;
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Title */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
@@ -134,6 +132,5 @@ export default function PrescriptionsTasksPage() {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
   );
 }

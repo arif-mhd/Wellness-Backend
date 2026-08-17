@@ -16,6 +16,13 @@ interface OwnersPersonalInfoFormProps {
   initialGender?: string;
   initialDob?: string;
   initialEmiratesIdOrPassport?: string;
+  initialPositionInClinic?: string;
+  initialBloodGroup?: string;
+  initialMaritalStatus?: string;
+  initialHeight?: string;
+  initialWeight?: string;
+  initialLanguages?: string[];
+  initialOtherInfo?: OtherInfoRow[];
   onSubmit: (data: any) => void;
 }
 
@@ -35,6 +42,13 @@ export default function OwnersPersonalInfoForm({
   initialGender = "",
   initialDob = "",
   initialEmiratesIdOrPassport = "",
+  initialPositionInClinic = "",
+  initialBloodGroup = "",
+  initialMaritalStatus = "",
+  initialHeight = "",
+  initialWeight = "",
+  initialLanguages = [],
+  initialOtherInfo,
   onSubmit,
 }: OwnersPersonalInfoFormProps) {
   const [fullName, setFullName] = useState(initialFullName);
@@ -45,18 +59,20 @@ export default function OwnersPersonalInfoForm({
   const [email, setEmail] = useState(initialEmail);
   const [gender, setGender] = useState(initialGender);
   const [dob, setDob] = useState(initialDob);
-  const [positionInClinic, setPositionInClinic] = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [maritalStatus, setMaritalStatus] = useState("");
-  const [height, setHeight] = useState("");
-  const [weight, setWeight] = useState("");
+  const [positionInClinic, setPositionInClinic] = useState(initialPositionInClinic);
+  const [bloodGroup, setBloodGroup] = useState(initialBloodGroup);
+  const [maritalStatus, setMaritalStatus] = useState(initialMaritalStatus);
+  const [height, setHeight] = useState(initialHeight);
+  const [weight, setWeight] = useState(initialWeight);
 
-  const [languages, setLanguages] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>(initialLanguages);
   const [langInput, setLangInput] = useState("");
   const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
 
-  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>([{ id: "1", label: "", value: "" }]);
+  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>(
+    initialOtherInfo && initialOtherInfo.length > 0 ? initialOtherInfo : [{ id: "1", label: "", value: "" }]
+  );
 
   const [formError, setFormError] = useState("");
 

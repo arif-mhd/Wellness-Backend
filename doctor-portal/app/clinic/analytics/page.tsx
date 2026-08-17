@@ -84,6 +84,7 @@ function ClinicAnalyticsContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     apiFetch("/api/clinics/branches")
@@ -93,26 +94,22 @@ function ClinicAnalyticsContent() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setLoadError("");
     try {
-      const [dashRes, apptRes, feedbackRes] = await Promise.all([
-        apiFetch(`/api/clinics/dashboard${qs}`),
-        apiFetch(`/api/clinics/appointments${qs}`),
-        apiFetch(`/api/clinics/feedback${qs}`),
-      ]);
-
-      if (dashRes.ok) setDashboard(await dashRes.json());
-      if (apptRes.ok) {
-        const data = await apptRes.json();
-        setAppointments(data.appointments ?? []);
+      const res = await apiFetch(`/api/clinics/analytics${qs}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLoadError(res.status === 403 ? "Not authorized to view analytics." : body.error ?? "Failed to load analytics.");
+        return;
       }
-      if (feedbackRes.ok) {
-        const data = await feedbackRes.json();
-        setReviews(data.reviews ?? []);
-        setAvgRating(data.avgRating ?? 0);
-      }
+      const data = await res.json();
+      setDashboard(data.dashboard ?? null);
+      setAppointments(data.appointments ?? []);
+      setReviews(data.reviews ?? []);
+      setAvgRating(data.avgRating ?? 0);
     } catch (err) {
       console.error("Error fetching analytics data:", err);
+      setLoadError("Could not reach the server.");
     } finally {
       setLoading(false);
     }
@@ -163,6 +160,10 @@ function ClinicAnalyticsContent() {
           </svg>
         </div>
       </div>
+
+      {loadError && (
+        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Branch selector — same ALL / Select Branch pattern used on Appointments/Doctors */}
       {hasMultipleBranches && (

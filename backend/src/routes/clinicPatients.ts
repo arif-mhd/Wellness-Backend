@@ -7,7 +7,7 @@ import {
   patientsContainer,
   queryDocuments,
 } from "../config/cosmos";
-import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, hasPermission } from "../utils/clinicScope";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 
 const router = Router();
@@ -56,6 +56,7 @@ function resolveIdentity(patient: any, familyMemberId: string | null) {
 router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_patients")) { res.status(403).json({ error: "Not authorized." }); return; }
   const clinicIds = scopeToClinicIds(scope);
 
   try {
@@ -151,6 +152,7 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return;
+  if (!hasPermission(scope, "manage_patients")) { res.status(403).json({ error: "Not authorized." }); return; }
   const clinicIds = scopeToClinicIds(scope);
   const { patientId } = req.params;
   const familyMemberId = typeof req.query.member === "string" ? req.query.member : null;

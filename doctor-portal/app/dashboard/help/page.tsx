@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface SupportTicket {
   id: string;
@@ -109,7 +108,7 @@ export default function HelpSupportPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <>
       <div className="px-4 md:px-10 pb-12 select-none flex flex-col gap-8 relative">
 
         {/* Page title */}
@@ -516,6 +515,6 @@ export default function HelpSupportPage() {
           </div>
         </div>
       )}
-    </ProtectedRoute>
+    </>
   );
 }

@@ -3,19 +3,27 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
+// Every route that mounts this layout (dashboard/*, appointments/*,
+// video-calls/*) is protected here in one place, rather than relying on
+// each page to remember to wrap itself — several previously didn't
+// (messages, profile, account-settings, notifications, payments, the
+// whole appointments/video-calls trees), letting them render unguarded.
 export default function SharedDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
-    </SidebarProvider>
+    <ProtectedRoute>
+      <SidebarProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </SidebarProvider>
+    </ProtectedRoute>
   );
 }
 

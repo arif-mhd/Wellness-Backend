@@ -560,7 +560,7 @@ function ClinicPaymentContent() {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [doctorSummary, setDoctorSummary] = useState<DoctorSummary | null>(null);
 
-  const [editingFee, setEditingFee] = useState<{ targetType: "clinic" | "doctor"; label: string; currentValue: string } | null>(null);
+  const [editingFee, setEditingFee] = useState<{ targetType: "doctor"; label: string; currentValue: string } | null>(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showBankAccount, setShowBankAccount] = useState(false);
   const [showDoctorShare, setShowDoctorShare] = useState(false);
@@ -625,19 +625,6 @@ function ClinicPaymentContent() {
   // calls above already thread through. Without this, submitting from a
   // multi-branch clinic 400s with "branchId is required."
   const branchQuery = selectedBranchId ? `?branchId=${selectedBranchId}` : "";
-
-  const submitClinicFee = async (category: string, newValue: string): Promise<{ ok: boolean; error?: string }> => {
-    if (!summary) return { ok: false, error: "No fee data loaded." };
-    const newRates = summary.consultationRates.map((r) => (r.category === category ? { ...r, price: newValue } : r));
-    try {
-      const r = await apiFetch(`/api/clinics/payments/fee-change-request${branchQuery}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "clinic", newRates }),
-      });
-      const d = await r.json();
-      return r.ok ? { ok: true } : { ok: false, error: d.error };
-    } catch { return { ok: false, error: "Network error." }; }
-  };
 
   const submitDoctorFee = async (doctorId: string, newValue: string): Promise<{ ok: boolean; error?: string }> => {
     // No branchId here on purpose — a doctor's fee is scoped to that
@@ -736,29 +723,6 @@ function ClinicPaymentContent() {
               )}
             </div>
           )}
-
-          {/* Consultation fees */}
-          <div className="mb-8">
-            <h2 className="text-[#383F45] text-[15px] font-medium mb-3">Consultation Fees</h2>
-            {isAggregateView ? (
-              <p className="text-[12px] text-[#9EA5AD]">Select a specific branch above to view or edit its consultation fees.</p>
-            ) : summaryLoading ? (
-              <p className="text-[12px] text-[#9EA5AD]">Loading…</p>
-            ) : !summary || summary.consultationRates.length === 0 ? (
-              <p className="text-[12px] text-[#9EA5AD]">No consultation fees configured yet. Add them from your <a href="/clinic/profile" className="text-[#5476FC] font-semibold hover:underline">Company Info profile</a>.</p>
-            ) : (
-              <div className="flex flex-wrap gap-4">
-                {summary.consultationRates.map((rate) => (
-                  <div key={rate.category} className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4">
-                    <span className="text-[13px] font-medium text-[#24292E]">{rate.category}: {rate.price}</span>
-                    <button onClick={() => setEditingFee({ targetType: "clinic", label: rate.category, currentValue: rate.price })} className="text-[#5476FC] text-[12px] font-semibold hover:underline">
-                      Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Earnings */}
           <div className="mb-8">
@@ -863,7 +827,7 @@ function ClinicPaymentContent() {
           currentValue={editingFee.currentValue}
           email={email}
           onClose={() => setEditingFee(null)}
-          onSubmit={(newValue) => editingFee.targetType === "clinic" ? submitClinicFee(editingFee.label, newValue) : submitDoctorFee(selectedDoctor!.id, newValue)}
+          onSubmit={(newValue) => submitDoctorFee(selectedDoctor!.id, newValue)}
         />
       )}
 

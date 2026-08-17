@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
 import EhrPanel from "@/components/video-call/EhrPanel";
 
@@ -246,7 +245,6 @@ export default function SOSPage() {
   };
 
   return (
-    <ProtectedRoute>
       <div className="min-h-[calc(100vh-100px)] flex flex-col justify-center items-center px-4 py-8 select-none font-outfit">
         {step === "license" && (
           <div className="w-full max-w-[624px] bg-white rounded-2xl border border-[#EBEEF5] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 transition-all duration-300">
@@ -469,6 +467,5 @@ export default function SOSPage() {
           <EhrPanel open={true} onClose={handleResetFlow} loading={false} data={{ ...ehrData, preVisitData: null }} />
         )}
       </div>
-    </ProtectedRoute>
   );
 }

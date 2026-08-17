@@ -75,6 +75,7 @@ function PatientsListContent() {
 
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -84,10 +85,19 @@ function PatientsListContent() {
   const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
+    setLoadError("");
     apiFetch(`/api/clinics/patients${qs}`)
-      .then((r) => r.json())
-      .then((data) => setPatients(Array.isArray(data.patients) ? data.patients : []))
-      .catch(() => setPatients([]))
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          setLoadError(r.status === 403 ? "Not authorized to view patients." : body.error ?? "Failed to load patients.");
+          setPatients([]);
+          return;
+        }
+        const data = await r.json();
+        setPatients(Array.isArray(data.patients) ? data.patients : []);
+      })
+      .catch(() => { setLoadError("Could not reach the server."); setPatients([]); })
       .finally(() => setLoading(false));
   }, [qs]);
 
@@ -207,6 +217,10 @@ function PatientsListContent() {
         {/* ── Left: Main Content ───────────────────────────── */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-bold tracking-tight">Patients</h1>
+
+          {loadError && (
+            <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{loadError}</div>
+          )}
 
           {/* Top Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
