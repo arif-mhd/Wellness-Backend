@@ -118,6 +118,8 @@ export default function ProfilePage() {
   const [draftBio, setDraftBio] = useState("");
   const [draftPersonal, setDraftPersonal] = useState({ phone: "", gender: "", maritalStatus: "" });
   const [draftDetails, setDraftDetails] = useState({ dateOfBirth: "", bloodGroup: "", height: "", weight: "", address: "", postalCode: "" });
+  const [detailsHeightError, setDetailsHeightError] = useState("");
+  const [detailsWeightError, setDetailsWeightError] = useState("");
   const [draftFees, setDraftFees] = useState<Record<string, string>>({});
 
   const [editLang, setEditLang] = useState(false);
@@ -423,14 +425,45 @@ export default function ProfilePage() {
                 <div className="flex flex-col gap-3">
                   <EditableFieldRow label="Date of Birth" value={draftDetails.dateOfBirth} onChange={v => setDraftDetails(p => ({ ...p, dateOfBirth: v }))} />
                   <EditableFieldRow label="Blood Group" value={draftDetails.bloodGroup} onChange={v => setDraftDetails(p => ({ ...p, bloodGroup: v }))} />
-                  <EditableFieldRow label="Height (cm)" value={draftDetails.height} onChange={v => setDraftDetails(p => ({ ...p, height: v }))} />
-                  <EditableFieldRow label="Weight (kg)" value={draftDetails.weight} onChange={v => setDraftDetails(p => ({ ...p, weight: v }))} />
+                  {/* Height with validation */}
+                  <div className="flex flex-col gap-1">
+                    <EditableFieldRow
+                      label="Height (cm)"
+                      value={draftDetails.height}
+                      onChange={v => {
+                        const digits = v.replace(/\D/g, "");
+                        const num = parseInt(digits, 10);
+                        setDraftDetails(p => ({ ...p, height: digits }));
+                        if (digits && num > 250) setDetailsHeightError("Height must not exceed 250 cm");
+                        else setDetailsHeightError("");
+                      }}
+                    />
+                    {detailsHeightError && <span className="text-red-500 text-xs">{detailsHeightError}</span>}
+                  </div>
+                  {/* Weight with validation */}
+                  <div className="flex flex-col gap-1">
+                    <EditableFieldRow
+                      label="Weight (kg)"
+                      value={draftDetails.weight}
+                      onChange={v => {
+                        const digits = v.replace(/\D/g, "");
+                        const num = parseInt(digits, 10);
+                        setDraftDetails(p => ({ ...p, weight: digits }));
+                        if (digits && num > 250) setDetailsWeightError("Weight must not exceed 250 kg");
+                        else setDetailsWeightError("");
+                      }}
+                    />
+                    {detailsWeightError && <span className="text-red-500 text-xs">{detailsWeightError}</span>}
+                  </div>
                   <EditableFieldRow label="Address" value={draftDetails.address} onChange={v => setDraftDetails(p => ({ ...p, address: v }))} />
                   <EditableFieldRow label="Postal Code" value={draftDetails.postalCode} onChange={v => setDraftDetails(p => ({ ...p, postalCode: v }))} />
                 </div>
                 <InlineEditBtns
-                  onCancel={() => setEditDetails(false)}
-                  onSave={async () => { await saveSection(draftDetails); setEditDetails(false); }}
+                  onCancel={() => { setEditDetails(false); setDetailsHeightError(""); setDetailsWeightError(""); }}
+                  onSave={async () => {
+                    if (detailsHeightError || detailsWeightError) return;
+                    await saveSection(draftDetails); setEditDetails(false);
+                  }}
                 />
               </>
             ) : (

@@ -56,6 +56,8 @@ export default function PersonalInformationForm({
   const [dob, setDob] = useState(initialDob);
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [heightError, setHeightError] = useState("");
+  const [weightError, setWeightError] = useState("");
   const [maritalStatus, setMaritalStatus] = useState("");
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
@@ -636,9 +638,16 @@ export default function PersonalInformationForm({
               type="text"
               placeholder="Height (in cm)*"
               value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setHeight(digits);
+                if (digits && num > 250) setHeightError("Height must not exceed 250 cm");
+                else setHeightError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${heightError ? "border-red-400" : "border-transparent"}`}
             />
+            {heightError && <span className="text-red-500 text-xs mt-1 block">{heightError}</span>}
           </div>
         </div>
 
@@ -651,9 +660,16 @@ export default function PersonalInformationForm({
               type="text"
               placeholder="Weight (in kg)*"
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setWeight(digits);
+                if (digits && num > 250) setWeightError("Weight must not exceed 250 kg");
+                else setWeightError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${weightError ? "border-red-400" : "border-transparent"}`}
             />
+            {weightError && <span className="text-red-500 text-xs mt-1 block">{weightError}</span>}
           </div>
 
           {/* Custom Marital Status Dropdown */}

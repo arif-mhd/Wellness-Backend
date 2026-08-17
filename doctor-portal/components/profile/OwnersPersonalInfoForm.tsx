@@ -50,6 +50,8 @@ export default function OwnersPersonalInfoForm({
   const [maritalStatus, setMaritalStatus] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [heightError, setHeightError] = useState("");
+  const [weightError, setWeightError] = useState("");
 
   const [languages, setLanguages] = useState<string[]>([]);
   const [langInput, setLangInput] = useState("");
@@ -251,20 +253,38 @@ export default function OwnersPersonalInfoForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Height (e.g. 175 cm)"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            type="text"
-            placeholder="Weight (e.g. 70 kg)"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            className={inputCls}
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              placeholder="Height (e.g. 175 cm)"
+              value={height}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setHeight(digits);
+                if (digits && num > 250) setHeightError("Height must not exceed 250 cm");
+                else setHeightError("");
+              }}
+              className={inputCls}
+            />
+            {heightError && <span className="text-red-500 text-xs mt-0.5">{heightError}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              placeholder="Weight (e.g. 70 kg)"
+              value={weight}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setWeight(digits);
+                if (digits && num > 250) setWeightError("Weight must not exceed 250 kg");
+                else setWeightError("");
+              }}
+              className={inputCls}
+            />
+            {weightError && <span className="text-red-500 text-xs mt-0.5">{weightError}</span>}
+          </div>
         </div>
 
         {/* Languages — typeahead multi-select */}
