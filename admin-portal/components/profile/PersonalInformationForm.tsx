@@ -44,6 +44,7 @@ export default function PersonalInformationForm({
   const [fullName, setFullName] = useState(initialName);
   const [bio, setBio] = useState("");
   const [contactNumber, setContactNumber] = useState(initialPhone);
+  const [phoneError, setPhoneError] = useState("");
   const [emiratesId, setEmiratesId] = useState(initialEmiratesId);
   const [emiratesIdFile, setEmiratesIdFile] = useState<File | null>(null);
   const [email, setEmail] = useState(initialEmail);
@@ -200,10 +201,23 @@ export default function PersonalInformationForm({
       setFormError("Full name is required.");
       return;
     }
+    const phoneDigits = contactNumber.replace(/\D/g, "");
     if (!contactNumber.trim()) {
+      setPhoneError("Contact number is required.");
       setFormError("Contact number is required.");
       return;
     }
+    if (/[a-zA-Z]/.test(contactNumber)) {
+      setPhoneError("Phone number must not contain letters.");
+      setFormError("Phone number must not contain letters.");
+      return;
+    }
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      setPhoneError("Phone number must have 7–15 digits.");
+      setFormError("Phone number must have 7–15 digits.");
+      return;
+    }
+    setPhoneError("");
     if (!emiratesId.trim()) {
       setFormError("Emirates ID is required.");
       return;
@@ -345,14 +359,25 @@ export default function PersonalInformationForm({
 
         {/* CONTACT NUMBER & EMIRATES ID INPUTS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="flex flex-col gap-1">
             <input
-              type="text"
-              placeholder="Contact Number*"
+              type="tel"
+              placeholder="Contact Number* (e.g. +971501234567)"
               value={contactNumber}
-              onChange={(e) => setContactNumber(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (/[a-zA-Z]/.test(raw)) return;
+                setContactNumber(raw);
+                const digits = raw.replace(/\D/g, "");
+                if (!raw.trim()) setPhoneError("Contact number is required.");
+                else if (digits.length < 7 || digits.length > 15) setPhoneError("Phone number must have 7–15 digits.");
+                else setPhoneError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${phoneError ? "border-red-300 bg-red-50" : "border-transparent"}`}
             />
+            {phoneError && (
+              <span className="text-[11px] text-red-500 font-medium pl-1">{phoneError}</span>
+            )}
           </div>
           <div>
             <input

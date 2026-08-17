@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface Step3BasicDetailsProps {
   clinicName: string;
   setClinicName: (value: string) => void;
@@ -25,8 +27,30 @@ export default function Step3BasicDetails({
   onSubmit,
   onGoBack,
 }: Step3BasicDetailsProps) {
+  const [phoneError, setPhoneError] = useState("");
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (/[a-zA-Z]/.test(raw)) return; // block alphabets completely
+    setPhone(raw);
+    const digits = raw.replace(/\D/g, "");
+    if (!raw.trim()) setPhoneError("Phone number is required.");
+    else if (digits.length < 7 || digits.length > 15) setPhoneError("Phone number must have 7–15 digits.");
+    else setPhoneError("");
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const digits = phone.replace(/\D/g, "");
+    if (!phone.trim()) { setPhoneError("Phone number is required."); return; }
+    if (/[a-zA-Z]/.test(phone)) { setPhoneError("Phone number must not contain letters."); return; }
+    if (digits.length < 7 || digits.length > 15) { setPhoneError("Phone number must have 7–15 digits."); return; }
+    setPhoneError("");
+    onSubmit(e);
+  };
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col">
+    <form onSubmit={handleSubmit} className="flex flex-col">
       <h2 className="text-2xl md:text-[1.65rem] font-normal tracking-tight text-gray-800 font-marcellus mb-2 text-center">
         Fill in Your Clinic&apos;s Basic Details
       </h2>
@@ -61,13 +85,18 @@ export default function Step3BasicDetails({
         {/* Phone Number */}
         <div>
           <input
-            type="text"
+            type="tel"
             required
-            placeholder="Clinic Phone Number*"
+            placeholder="Clinic Phone Number* (e.g. +971501234567)"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full bg-[#f3f4fd] border-0 rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit"
+            onChange={handlePhoneChange}
+            className={`w-full bg-[#f3f4fd] border rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit ${
+              phoneError ? "border-red-300 bg-red-50" : "border-transparent"
+            }`}
           />
+          {phoneError && (
+            <p className="text-[11px] text-red-500 font-medium mt-1 pl-1">{phoneError}</p>
+          )}
         </div>
       </div>
 
