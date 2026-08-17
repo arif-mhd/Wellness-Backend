@@ -103,34 +103,34 @@ export default function Sidebar() {
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
-  const [isOnline, setIsOnline] = useState(true);
-  const [togglingOnline, setTogglingOnline] = useState(false);
-  const [isManualOverride, setIsManualOverride] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isManuallyOffline, setIsManuallyOffline] = useState(false);
   const [scheduleSlots, setScheduleSlots] = useState<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>([]);
-  const [autoOnline, setAutoOnline] = useState(false);
   const { can } = useDoctorPermissions();
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.perm || can(item.perm));
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);
 
-  // ── Helper: check if current time is within any active slot for today ──
-  function computeAutoOnline(slots: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]): boolean {
+  // ── Helper: is current time within any active schedule slot for today? ──
+  function computeScheduleOnline(s: typeof scheduleSlots): boolean {
     const now = new Date();
     const todayDow = now.getDay();
     const nowMins = now.getHours() * 60 + now.getMinutes();
-    return slots.some((slot) => {
+    return s.some((slot) => {
       if (!slot.isActive || slot.dayOfWeek !== todayDow) return false;
       const [sh, sm] = slot.startTime.split(":").map(Number);
       const [eh, em] = slot.endTime.split(":").map(Number);
-      const startMins = sh * 60 + sm;
-      const endMins = eh * 60 + em;
-      return nowMins >= startMins && nowMins < endMins;
+      return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
     });
   }
 
+  // ── Initial load: doctor profile + schedule slots ──
   useEffect(() => {
-    // Fetch doctor profile
+    // Use closure vars so whichever fetch resolves second has both pieces
+    let manuallyOff = false;
+    let loadedSlots: typeof scheduleSlots = [];
+
     apiFetch("/api/doctors/me")
       .then(r => r.json())
       .then(data => {
@@ -138,66 +138,55 @@ export default function Sidebar() {
         setDoctorName(d.fullName ?? "");
         setDoctorEmail(d.email ?? "");
         setDoctorAvatar(d.avatarUrl ?? "");
-        // isManualOverride = true means the doctor explicitly set it, use that value
-        const manualOverride = d.isManualOverride ?? false;
-        setIsManualOverride(manualOverride);
-        setIsOnline(d.isOnline !== false);
+        manuallyOff = d.isManuallyOffline ?? false;
+        setIsManuallyOffline(manuallyOff);
+        // Effective: in schedule AND not on a manual break
+        setIsOnline(!manuallyOff && computeScheduleOnline(loadedSlots));
       })
       .catch(() => {});
 
-    // Fetch schedule slots for auto-detection
     apiFetch("/api/doctors/slots")
       .then(r => r.json())
       .then(data => {
-        const slots = data.slots ?? [];
-        setScheduleSlots(slots);
-        setAutoOnline(computeAutoOnline(slots));
+        loadedSlots = data.slots ?? [];
+        setScheduleSlots(loadedSlots);
+        setIsOnline(!manuallyOff && computeScheduleOnline(loadedSlots));
       })
       .catch(() => {});
   }, []);
 
-  // ── Re-check schedule every minute ──
+  // ── Poll API every 30s to stay in sync with dashboard toggle changes ──
+  useEffect(() => {
+    const pollId = setInterval(() => {
+      apiFetch("/api/doctors/me")
+        .then(r => r.json())
+        .then(data => {
+          const d = data.doctor ?? {};
+          setIsManuallyOffline(d.isManuallyOffline ?? false);
+          setIsOnline(d.isOnline !== false);
+        })
+        .catch(() => {});
+    }, 30_000);
+    return () => clearInterval(pollId);
+  }, []);
+
+  // ── Re-compute from schedule every 60s (only when not manually on break) ──
   useEffect(() => {
     if (scheduleSlots.length === 0) return;
-    const interval = setInterval(() => {
-      const newAutoOnline = computeAutoOnline(scheduleSlots);
-      setAutoOnline(newAutoOnline);
-      // If not in manual override mode, auto-sync the online status
-      if (!isManualOverride) {
-        setIsOnline(newAutoOnline);
+    const id = setInterval(() => {
+      if (!isManuallyOffline) {
+        const effective = computeScheduleOnline(scheduleSlots);
+        setIsOnline(effective);
+        // Silently sync to backend
+        apiFetch("/api/doctors/online-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isOnline: effective, isManuallyOffline: false }),
+        }).catch(() => {});
       }
-    }, 60_000); // every 60 seconds
-    return () => clearInterval(interval);
-  }, [scheduleSlots, isManualOverride]);
-
-  async function handleOnlineToggle() {
-    const next = !isOnline;
-    setTogglingOnline(true);
-    try {
-      await apiFetch("/api/doctors/online-status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: next, isManualOverride: true }),
-      });
-      setIsOnline(next);
-      setIsManualOverride(true); // doctor has explicitly set their status
-    } catch { /* keep current state on error */ }
-    setTogglingOnline(false);
-  }
-
-  async function handleRevertToAuto() {
-    setTogglingOnline(true);
-    try {
-      await apiFetch("/api/doctors/online-status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: autoOnline, isManualOverride: false }),
-      });
-      setIsOnline(autoOnline);
-      setIsManualOverride(false);
-    } catch { /* keep current state on error */ }
-    setTogglingOnline(false);
-  }
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [scheduleSlots, isManuallyOffline]);
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }
@@ -324,65 +313,22 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {/* Online / Offline toggle */}
-        <div className="flex flex-col gap-1.5">
-          {/* Main toggle button */}
-          <button
-            onClick={handleOnlineToggle}
-            disabled={togglingOnline}
-            title={isOnline ? "Go Offline" : "Go Online"}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2 w-full transition-colors ${
-              isOnline
-                ? "bg-[#ECFDF5] hover:bg-[#D1FAE5]"
-                : "bg-[#F1F5F9] hover:bg-[#E2E8F0]"
-            } lg:justify-start ${open ? "lg:justify-start" : "lg:justify-center"} ${togglingOnline ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-              isOnline ? "bg-[#22C55E] shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" : "bg-[#94A3B8]"
-            }`} />
-            <span
-              className={`text-xs font-semibold whitespace-nowrap overflow-hidden opacity-100 max-w-[160px] ${
-                open ? "lg:opacity-100 lg:max-w-[160px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
-              } ${isOnline ? "text-[#16A34A]" : "text-[#64748B]"} transition-[max-width,opacity] duration-300 ease-in-out`}
-            >
-              {togglingOnline ? "Updating…" : isOnline ? "Online" : "Offline"}
-            </span>
-            {/* Manual override badge */}
-            {isManualOverride && open && (
-              <span className="ml-auto text-[9px] font-bold bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                Manual
-              </span>
-            )}
-          </button>
-
-          {/* Schedule-based status indicator + revert-to-auto button */}
-          {open && (
-            <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${
-              autoOnline ? "bg-[#F0FDF4]" : "bg-[#F8FAFC]"
-            }`}>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  autoOnline ? "bg-[#22C55E]" : "bg-[#CBD5E1]"
-                }`} />
-                <span className="text-[10px] font-medium text-[#64748B]">
-                  Schedule: <span className={autoOnline ? "text-[#16A34A] font-semibold" : "text-[#94A3B8] font-semibold"}>
-                    {autoOnline ? "In hours" : "Off hours"}
-                  </span>
-                </span>
-              </div>
-              {isManualOverride && (
-                <button
-                  onClick={handleRevertToAuto}
-                  disabled={togglingOnline}
-                  className="text-[9px] font-bold text-[#5476FC] hover:text-[#3B59E3] transition-colors disabled:opacity-50"
-                  title="Revert to automatic schedule-based status"
-                >
-                  Auto
-                </button>
-              )}
-            </div>
-          )}
+        {/* Online / Offline — reflects current effective status (set by schedule or manual break) */}
+        <div
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 w-full ${
+            isOnline ? "bg-[#ECFDF5]" : "bg-[#F1F5F9]"
+          } ${open ? "" : "lg:justify-center"}`}
+        >
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+            isOnline ? "bg-[#22C55E] shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" : "bg-[#94A3B8]"
+          }`} />
+          <span className={`text-xs font-semibold whitespace-nowrap overflow-hidden opacity-100 max-w-[160px] ${
+            open ? "lg:opacity-100 lg:max-w-[160px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
+          } ${isOnline ? "text-[#16A34A]" : "text-[#64748B]"} transition-[max-width,opacity] duration-300 ease-in-out`}>
+            {isOnline ? "Online" : "Offline"}
+          </span>
         </div>
+
 
         {/* Profile row */}
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 flex-row ${open ? "lg:flex-row" : "lg:flex-col"}`}>

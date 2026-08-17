@@ -96,6 +96,7 @@ export default function DashboardPage() {
   const [slots, setSlots]               = useState<SlotDef[]>([]);
   const [isAvailable, setIsAvailable]   = useState(true);
   const [togglingAvailable, setTogglingAvailable] = useState(false);
+  const [isManuallyOffline, setIsManuallyOffline] = useState(false);
 
   // Appointments
   const [patients, setPatients]               = useState<PatientRow[]>([]);
@@ -169,18 +170,35 @@ export default function DashboardPage() {
   }, [pollForInvite]);
 
   const handleAvailabilityToggle = useCallback(async () => {
-    const next = !isAvailable;
+    const goingOnBreak = isAvailable; // currently "available" → going on break
     setTogglingAvailable(true);
     try {
+      let newIsOnline: boolean;
+      if (goingOnBreak) {
+        // Doctor taking a break — go offline
+        newIsOnline = false;
+      } else {
+        // Doctor resuming — back to schedule: online only if within working hours now
+        const now = new Date();
+        const todayDow = now.getDay();
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        newIsOnline = slots.some(s => {
+          if (!s.isActive || s.dayOfWeek !== todayDow) return false;
+          const [sh, sm] = s.startTime.split(":").map(Number);
+          const [eh, em] = s.endTime.split(":").map(Number);
+          return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
+        });
+      }
       await apiFetch("/api/doctors/online-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: next }),
+        body: JSON.stringify({ isOnline: newIsOnline, isManuallyOffline: goingOnBreak }),
       });
-      setIsAvailable(next);
+      setIsManuallyOffline(goingOnBreak);
+      setIsAvailable(!goingOnBreak); // toggle ON = following schedule
     } catch { /* keep current state on error */ }
     setTogglingAvailable(false);
-  }, [isAvailable]);
+  }, [isAvailable, slots]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -191,11 +209,13 @@ export default function DashboardPage() {
         setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
       }
 
-      // Online/available status (same source of truth as the sidebar toggle)
+      // Online/available: toggle shows whether doctor is following schedule (ON) or on a break (OFF)
       const doctorRes = await apiFetch("/api/doctors/me");
       if (doctorRes.ok) {
         const { doctor } = await doctorRes.json();
-        setIsAvailable(doctor?.isOnline !== false); // default true if not set
+        const manuallyOff = doctor?.isManuallyOffline ?? false;
+        setIsManuallyOffline(manuallyOff);
+        setIsAvailable(!manuallyOff); // toggle ON = following schedule; toggle OFF = on break
       }
 
       // Appointments
