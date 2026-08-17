@@ -186,6 +186,7 @@ export default function ClinicSidebar() {
   );
 
   async function handleSignOut() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     try { await signOut(); } catch { /* ignore */ }
     router.replace("/auth/login");
   }

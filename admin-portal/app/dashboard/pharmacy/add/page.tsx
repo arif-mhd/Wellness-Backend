@@ -47,6 +47,7 @@ export default function AddPharmacyPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Pharmacy form
@@ -61,7 +62,18 @@ export default function AddPharmacyPage() {
   const [activeProductIdx, setActiveProductIdx] = useState(0);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    if (name === "phone") {
+      // Block alphabets entirely
+      if (/[a-zA-Z]/.test(value)) return;
+      setForm(prev => ({ ...prev, phone: value }));
+      const digits = value.replace(/\D/g, "");
+      if (!value.trim()) setPhoneError("Contact number is required.");
+      else if (digits.length < 7 || digits.length > 15) setPhoneError("Phone number must have 7–15 digits.");
+      else setPhoneError("");
+      return;
+    }
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleProductChange = (
@@ -89,6 +101,14 @@ export default function AddPharmacyPage() {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
+
+    // Phone validation
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (!form.phone.trim()) { setPhoneError("Contact number is required."); return; }
+    if (/[a-zA-Z]/.test(form.phone)) { setPhoneError("Phone number must not contain letters."); return; }
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) { setPhoneError("Phone number must have 7–15 digits."); return; }
+    setPhoneError("");
+
     setIsSubmitting(true);
 
     try {
@@ -199,7 +219,6 @@ export default function AddPharmacyPage() {
                   {[
                     { label: "Pharmacy Name *", name: "pharmacyName", placeholder: "e.g. Apollo Pharmacy", required: true },
                     { label: "Email Address *", name: "email", type: "email", placeholder: "pharmacy@example.com", required: true },
-                    { label: "Contact Number *", name: "phone", type: "tel", placeholder: "+971 50 000 0000", required: true },
                     { label: "Website", name: "website", type: "url", placeholder: "https://pharmacy.com" },
                   ].map(({ label, name, type = "text", placeholder, required }) => (
                     <div key={name} className="flex flex-col gap-1.5">
@@ -211,6 +230,19 @@ export default function AddPharmacyPage() {
                       />
                     </div>
                   ))}
+                  {/* Contact Number with validation */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={labelCls}>Contact Number *</label>
+                    <input
+                      type="tel" name="phone" required
+                      value={form.phone} onChange={handleFormChange}
+                      placeholder="+971 50 000 0000"
+                      className={`${inputCls} ${phoneError ? "ring-2 ring-red-300 border-red-300 bg-red-50" : ""}`}
+                    />
+                    {phoneError && (
+                      <span className="text-[11px] text-red-500 font-semibold">{phoneError}</span>
+                    )}
+                  </div>
                   <div className="sm:col-span-2 flex flex-col gap-1.5">
                     <label className={labelCls}>Location / Address *</label>
                     <input type="text" name="location" required value={form.location} onChange={handleFormChange} placeholder="Street, City, Country" className={inputCls} />

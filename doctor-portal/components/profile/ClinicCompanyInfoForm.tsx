@@ -3,12 +3,6 @@
 import { useState, useRef } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
 
-interface RateRow {
-  id: string;
-  category: string;
-  price: string;
-}
-
 interface ClinicCompanyInfoFormProps {
   onSubmit: (data: any) => void;
   onGoBack: () => void;
@@ -25,6 +19,8 @@ interface ClinicCompanyInfoFormProps {
   initialLicenseNumber?: string;
   initialDohLicense?: string;
   initialAddress?: string;
+  initialPaymentSettings?: string;
+  initialBio?: string;
 }
 
 const inputCls =
@@ -69,6 +65,7 @@ function VerifyField({
 export default function ClinicCompanyInfoForm({
   onSubmit, onGoBack, branchName, onBranchNameChange, heading,
   initialLicenseNumber = "", initialDohLicense = "", initialAddress = "",
+  initialPaymentSettings = "", initialBio = "",
 }: ClinicCompanyInfoFormProps) {
   const [licenseNumber, setLicenseNumber] = useState(initialLicenseNumber);
   const [licenseVerified, setLicenseVerified] = useState(false);
@@ -79,9 +76,8 @@ export default function ClinicCompanyInfoForm({
   const [addressProofFile, setAddressProofFile] = useState<File | null>(null);
   const [addressVerified, setAddressVerified] = useState(false);
 
-  const [rates, setRates] = useState<RateRow[]>([{ id: "1", category: "Category 1", price: "" }]);
-  const [paymentSettings, setPaymentSettings] = useState("");
-  const [bio, setBio] = useState("");
+  const [paymentSettings, setPaymentSettings] = useState(initialPaymentSettings);
+  const [bio, setBio] = useState(initialBio);
   const [clinicImage, setClinicImage] = useState<File | null>(null);
   const [clinicImagePreview, setClinicImagePreview] = useState<string | null>(null);
 
@@ -114,18 +110,6 @@ export default function ClinicCompanyInfoForm({
     }
   };
 
-  const addRateRow = () => {
-    setRates((rows) => [...rows, { id: Date.now().toString(), category: `Category ${rows.length + 1}`, price: "" }]);
-  };
-
-  const updateRateRow = (id: string, field: keyof Omit<RateRow, "id">, val: string) => {
-    setRates((rows) => rows.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
-  };
-
-  const removeRateRow = (id: string) => {
-    setRates((rows) => rows.filter((r) => r.id !== id));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -141,7 +125,6 @@ export default function ClinicCompanyInfoForm({
       dohLicense,
       address,
       addressProofFile,
-      consultationRates: rates.filter((r) => r.category.trim() && r.price.trim()).map(({ id, ...rest }) => rest),
       paymentSettings,
       bio,
       clinicImage,
@@ -220,35 +203,6 @@ export default function ClinicCompanyInfoForm({
             >
               {addressVerified ? "VERIFIED" : "VERIFY"}
             </button>
-          </div>
-        </div>
-
-        {/* Consultation Rates */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <h4 className="text-base font-semibold text-gray-700">Consultation Rates</h4>
-            <button type="button" onClick={addRateRow} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-              Add Category
-            </button>
-          </div>
-          <div className="space-y-3">
-            {rates.map((row) => (
-              <div key={row.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                <input type="text" placeholder="Category" value={row.category} onChange={(e) => updateRateRow(row.id, "category", e.target.value)} className={inputCls} />
-                <div className="flex items-center gap-2">
-                  <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-4 py-3.5 border border-transparent">
-                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">AED</span>
-                    <input type="text" placeholder="Add Price" value={row.price} onChange={(e) => updateRateRow(row.id, "price", e.target.value)} className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit" />
-                  </div>
-                  {rates.length > 1 && (
-                    <button type="button" onClick={() => removeRateRow(row.id)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0" aria-label="Remove category">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 

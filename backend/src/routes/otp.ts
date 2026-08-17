@@ -55,9 +55,17 @@ router.post("/send", async (req: Request, res: Response) => {
         query: "SELECT c.id FROM c WHERE c.email = @email",
         parameters: [{ name: "@email", value: normalizedEmail }],
       };
+      // Deleted doctors are excluded here so the reset flow's own existence
+      // check (EMAIL_NOT_FOUND) agrees with what login itself will say —
+      // otherwise a deleted account still passes this check and only then
+      // hits the "account no longer exists" rejection at sign-in.
+      const doctorQuery = {
+        query: "SELECT c.id FROM c WHERE c.email = @email AND (NOT IS_DEFINED(c.status) OR c.status != 'deleted')",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      };
       const [{ resources: patients }, { resources: doctors }, { resources: clinics }] = await Promise.all([
         patientsContainer.items.query(emailQuery).fetchAll(),
-        doctorsContainer.items.query(emailQuery).fetchAll(),
+        doctorsContainer.items.query(doctorQuery).fetchAll(),
         clinicsContainer.items.query(emailQuery).fetchAll(),
       ]);
       if (patients.length === 0 && doctors.length === 0 && clinics.length === 0) {

@@ -16,6 +16,13 @@ interface OwnersPersonalInfoFormProps {
   initialGender?: string;
   initialDob?: string;
   initialEmiratesIdOrPassport?: string;
+  initialPositionInClinic?: string;
+  initialBloodGroup?: string;
+  initialMaritalStatus?: string;
+  initialHeight?: string;
+  initialWeight?: string;
+  initialLanguages?: string[];
+  initialOtherInfo?: OtherInfoRow[];
   onSubmit: (data: any) => void;
 }
 
@@ -35,27 +42,37 @@ export default function OwnersPersonalInfoForm({
   initialGender = "",
   initialDob = "",
   initialEmiratesIdOrPassport = "",
+  initialPositionInClinic = "",
+  initialBloodGroup = "",
+  initialMaritalStatus = "",
+  initialHeight = "",
+  initialWeight = "",
+  initialLanguages = [],
+  initialOtherInfo,
   onSubmit,
 }: OwnersPersonalInfoFormProps) {
   const [fullName, setFullName] = useState(initialFullName);
   const [contactNumber, setContactNumber] = useState(initialPhone);
+  const [phoneError, setPhoneError] = useState("");
   const [ownerId, setOwnerId] = useState(initialEmiratesIdOrPassport);
   const [ownerIdVerified, setOwnerIdVerified] = useState(false);
   const [email, setEmail] = useState(initialEmail);
   const [gender, setGender] = useState(initialGender);
   const [dob, setDob] = useState(initialDob);
-  const [positionInClinic, setPositionInClinic] = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [maritalStatus, setMaritalStatus] = useState("");
-  const [height, setHeight] = useState("");
-  const [weight, setWeight] = useState("");
+  const [positionInClinic, setPositionInClinic] = useState(initialPositionInClinic);
+  const [bloodGroup, setBloodGroup] = useState(initialBloodGroup);
+  const [maritalStatus, setMaritalStatus] = useState(initialMaritalStatus);
+  const [height, setHeight] = useState(initialHeight);
+  const [weight, setWeight] = useState(initialWeight);
 
-  const [languages, setLanguages] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>(initialLanguages);
   const [langInput, setLangInput] = useState("");
   const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
 
-  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>([{ id: "1", label: "", value: "" }]);
+  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>(
+    initialOtherInfo && initialOtherInfo.length > 0 ? initialOtherInfo : [{ id: "1", label: "", value: "" }]
+  );
 
   const [formError, setFormError] = useState("");
 
@@ -80,11 +97,27 @@ export default function OwnersPersonalInfoForm({
     setOtherInfo((rows) => rows.filter((r) => r.id !== id));
   };
 
+  const validatePhone = (value: string): string => {
+    if (!value.trim()) return "Contact number is required.";
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 7 || digits.length > 15) return "Phone number must have 7–15 digits.";
+    if (/[a-zA-Z]/.test(value)) return "Phone number must not contain letters.";
+    return "";
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (/[a-zA-Z]/.test(raw)) return;
+    setContactNumber(raw);
+    setPhoneError(validatePhone(raw));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName.trim()) { setFormError("Full name is required."); return; }
-    if (!contactNumber.trim()) { setFormError("Contact number is required."); return; }
+    const phoneErr = validatePhone(contactNumber);
+    if (phoneErr) { setPhoneError(phoneErr); setFormError(phoneErr); return; }
     if (!ownerId.trim()) { setFormError("Owner/Staff Emirates ID is required."); return; }
     if (!email.trim()) { setFormError("Email ID is required."); return; }
     if (!gender) { setFormError("Gender is required."); return; }
@@ -136,13 +169,18 @@ export default function OwnersPersonalInfoForm({
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Contact Number*"
-            value={contactNumber}
-            onChange={(e) => setContactNumber(e.target.value)}
-            className={inputCls}
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="tel"
+              placeholder="Contact Number* (e.g. +971501234567)"
+              value={contactNumber}
+              onChange={handlePhoneChange}
+              className={`${inputCls} ${phoneError ? "border border-red-300 bg-red-50" : ""}`}
+            />
+            {phoneError && (
+              <span className="text-[11px] text-red-500 font-medium pl-1">{phoneError}</span>
+            )}
+          </div>
           <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
             <input
               type="text"

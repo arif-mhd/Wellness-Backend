@@ -123,7 +123,7 @@ function TwoFactorInner() {
       });
       const data = await res.json();
       if (data.verified) {
-        router.push("/dashboard");
+        router.replace("/dashboard");
         return;
       }
       switch (data.reason) {

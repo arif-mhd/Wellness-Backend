@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface TicketComment {
   id: string;
@@ -390,7 +389,6 @@ function TicketContent() {
 
 export default function TicketInformationPage() {
   return (
-    <ProtectedRoute>
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[300px]">
           <span className="text-[#9EA5AD] text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Loading...</span>
@@ -398,6 +396,5 @@ export default function TicketInformationPage() {
       }>
         <TicketContent />
       </Suspense>
-    </ProtectedRoute>
   );
 }

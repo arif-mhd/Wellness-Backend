@@ -78,6 +78,7 @@ export default function AddLabServicePage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [activeTestTab, setActiveTestTab] = useState(0);
 
   const [form, setForm] = useState({
@@ -90,7 +91,17 @@ export default function AddLabServicePage() {
   const [tests, setTests] = useState<LabTestForm[]>([emptyTest()]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "contactNumber") {
+      if (/[a-zA-Z]/.test(value)) return;
+      setForm({ ...form, contactNumber: value });
+      const digits = value.replace(/\D/g, "");
+      if (!value.trim()) setPhoneError("Contact number is required.");
+      else if (digits.length < 7 || digits.length > 15) setPhoneError("Phone number must have 7–15 digits.");
+      else setPhoneError("");
+      return;
+    }
+    setForm({ ...form, [name]: value });
   };
 
   const updateTest = (idx: number, field: keyof LabTestForm, value: any) => {
@@ -132,6 +143,14 @@ export default function AddLabServicePage() {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError("");
+
+    // Phone validation
+    const phoneDigits = form.contactNumber.replace(/\D/g, "");
+    if (!form.contactNumber.trim()) { setPhoneError("Contact number is required."); setIsSubmitting(false); return; }
+    if (/[a-zA-Z]/.test(form.contactNumber)) { setPhoneError("Phone number must not contain letters."); setIsSubmitting(false); return; }
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) { setPhoneError("Phone number must have 7–15 digits."); setIsSubmitting(false); return; }
+    setPhoneError("");
+
     try {
       // Step 1: Create the lab
       const labRes = await adminFetch("/api/admin/lab", {
@@ -211,7 +230,18 @@ export default function AddLabServicePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Lab Name" required><input className={inputCls} name="name" value={form.name} onChange={handleChange} required placeholder="e.g. LifeCare Diagnostics" /></Field>
                   <Field label="Email Address" required><input className={inputCls} type="email" name="email" value={form.email} onChange={handleChange} required placeholder="lab@example.com" /></Field>
-                  <Field label="Contact Number" required><input className={inputCls} type="tel" name="contactNumber" value={form.contactNumber} onChange={handleChange} required placeholder="+971 4 000 0000" /></Field>
+                  <Field label="Contact Number" required>
+                    <div className="flex flex-col gap-1">
+                      <input
+                        className={`${inputCls} ${phoneError ? "ring-2 ring-red-300 border-red-300 bg-red-50" : ""}`}
+                        type="tel" name="contactNumber" value={form.contactNumber}
+                        onChange={handleChange} required placeholder="+971 4 000 0000"
+                      />
+                      {phoneError && (
+                        <span className="text-[11px] text-red-500 font-semibold">{phoneError}</span>
+                      )}
+                    </div>
+                  </Field>
                   <Field label="Website"><input className={inputCls} type="url" name="website" value={form.website} onChange={handleChange} placeholder="https://lab.com" /></Field>
                   <div className="sm:col-span-2">
                     <Field label="Location / Address" required><input className={inputCls} name="location" value={form.location} onChange={handleChange} required placeholder="Street, City, Country" /></Field>

@@ -110,7 +110,6 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
           dohLicense: companyInfo?.dohLicense || null,
           address: companyInfo?.address || null,
           addressProofFileUrl: fileUrls.addressProofFile || null,
-          consultationRates: companyInfo?.consultationRates ?? [],
           paymentSettings: companyInfo?.paymentSettings || null,
           bio: companyInfo?.bio || null,
           clinicImageUrl: fileUrls.clinicImage || null,
@@ -203,9 +202,11 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
         {phase === "companyInfo" && (
           <ClinicCompanyInfoForm
             heading="Branch / Company Information"
-            initialLicenseNumber={branch?.licenseNumber ?? ""}
-            initialDohLicense={branch?.dohLicense ?? ""}
-            initialAddress={branch?.address ?? ""}
+            initialLicenseNumber={companyInfo?.licenseNumber ?? branch?.licenseNumber ?? ""}
+            initialDohLicense={companyInfo?.dohLicense ?? branch?.dohLicense ?? ""}
+            initialAddress={companyInfo?.address ?? branch?.address ?? ""}
+            initialPaymentSettings={companyInfo?.paymentSettings ?? ""}
+            initialBio={companyInfo?.bio ?? ""}
             onSubmit={handleCompanyInfoSubmit}
             onGoBack={() => router.push("/clinic/branches")}
           />

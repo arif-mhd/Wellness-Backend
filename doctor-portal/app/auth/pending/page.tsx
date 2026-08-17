@@ -10,6 +10,7 @@ export default function PendingApprovalPage() {
   const router = useRouter();
 
   async function handleSignOut() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     await signOut();
     router.replace("/auth/login");
   }

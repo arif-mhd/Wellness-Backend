@@ -7,7 +7,7 @@ import {
   patientsContainer,
   queryDocuments,
 } from "../config/cosmos";
-import { resolveClinicScope, scopeToClinicIds, buildInClause } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, ClinicScope } from "../utils/clinicScope";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 
 const router = Router();
@@ -25,12 +25,13 @@ function calcAge(dob: string | null | undefined): number | null {
 // with patient/doctor display data. clinicId is stamped on the appointment
 // doc directly at booking time (see POST /api/appointments), so this is a
 // single flat query — no need to fan out over the doctor roster first.
-router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
-  if (!scope) return;
+// Extracted so GET /api/clinics/analytics (in clinics.ts, gated by the
+// view_analytics permission) can reuse this without duplicating it — this
+// route itself stays open to every staff member, same as before.
+export async function getClinicAppointmentsData(scope: ClinicScope) {
   const clinicIds = scopeToClinicIds(scope);
 
-  try {
+  {
     let appointments: any[] = [];
     if (clinicIds.length > 0) {
       const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
@@ -109,7 +110,15 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
       };
     });
 
-    res.json({ appointments: enriched });
+    return { appointments: enriched };
+  }
+}
+
+router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
+  if (!scope) return;
+  try {
+    res.json(await getClinicAppointmentsData(scope));
   } catch (err) {
     console.error("Fetch clinic appointments error:", err);
     res.status(500).json({ error: "Internal server error." });

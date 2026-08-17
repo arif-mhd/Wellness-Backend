@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { Patient } from "@/app/appointments/types";
 import { apiFetch } from "@/lib/apiFetch";
 
@@ -195,7 +194,6 @@ export default function PatientsPage() {
   };
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-8 pb-12 font-outfit select-none animate-fade-in">
 
         {/* Header Row */}
@@ -548,6 +546,5 @@ export default function PatientsPage() {
         </div>
 
       </div>
-    </ProtectedRoute>
   );
 }

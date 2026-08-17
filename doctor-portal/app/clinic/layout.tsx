@@ -356,7 +356,9 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const checkAuth = async () => {
+      if (!cancelled) setAllowed(null);
       try {
         const res = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
         if (!res.ok) { if (!cancelled) router.replace("/auth/login"); return; }
@@ -371,10 +373,29 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
           router.replace("/auth/login");
         }
       } catch {
-        if (!cancelled) setAllowed(true); // fail open — backend still enforces requireRole on every call
+        // A failed request here (network blip or a genuinely dead session)
+        // must not grant access — the previous "fail open" fallback let a
+        // logged-out user through on the assumption that per-call
+        // requireRole() would catch it, but that only protects individual
+        // API calls, not the page shell itself.
+        if (!cancelled) router.replace("/auth/login");
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    checkAuth();
+
+    // A bfcache restore (browser Back/Forward) fires `pageshow` with
+    // persisted:true without rerunning this effect — revalidate against the
+    // backend again so a stale allowed=true from before isn't trusted.
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) checkAuth();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pageshow", handlePageShow);
+    };
   }, [router]);
 
   if (!allowed) {
