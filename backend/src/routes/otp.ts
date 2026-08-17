@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
-import { otpCodesContainer, patientsContainer, pharmaciesContainer } from "../config/cosmos";
+import { otpCodesContainer, patientsContainer, pharmaciesContainer, doctorsContainer, clinicsContainer } from "../config/cosmos";
 import { sendOtpEmail } from "../config/resend";
 
 const router = Router();
@@ -11,7 +11,9 @@ const MAX_ATTEMPTS = 5;
 // Public. Generates a 6-digit code, stores it in otpCodesContainer (TTL 600s), sends via Resend.
 // purpose:
 //   "registration"   — blocks if email already exists in patients
-//   "reset"          — blocks if email NOT in patients
+//   "reset"          — blocks if email NOT found in patients, doctors, or clinics
+//                       (this flow is shared by the patient app and the doctor
+//                       portal's doctor AND clinic login screens)
 //   "pharmacy_reset" — blocks if email NOT in pharmacies
 //   "login_2fa"          — no existence check (doctor already authenticated)
 //   "enable_2fa"         — no existence check (doctor already authenticated)
@@ -31,7 +33,7 @@ router.post("/send", async (req: Request, res: Response) => {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Email existence checks only for patient-facing purposes
-    if (purpose === "registration" || purpose === "reset") {
+    if (purpose === "registration") {
       const { resources: existing } = await patientsContainer.items
         .query({
           query: "SELECT c.id FROM c WHERE c.email = @email",
@@ -39,11 +41,26 @@ router.post("/send", async (req: Request, res: Response) => {
         })
         .fetchAll();
 
-      if (purpose === "registration" && existing.length > 0) {
+      if (existing.length > 0) {
         res.status(409).json({ error: "EMAIL_EXISTS" });
         return;
       }
-      if (purpose === "reset" && existing.length === 0) {
+    } else if (purpose === "reset") {
+      // Shared by three different accounts types (patient, doctor, clinic
+      // admin/staff) — an email only registered as e.g. a clinic account was
+      // previously always rejected here since only patientsContainer was
+      // checked, permanently locking those accounts out of self-service
+      // password reset. Check all three before concluding it doesn't exist.
+      const emailQuery = {
+        query: "SELECT c.id FROM c WHERE c.email = @email",
+        parameters: [{ name: "@email", value: normalizedEmail }],
+      };
+      const [{ resources: patients }, { resources: doctors }, { resources: clinics }] = await Promise.all([
+        patientsContainer.items.query(emailQuery).fetchAll(),
+        doctorsContainer.items.query(emailQuery).fetchAll(),
+        clinicsContainer.items.query(emailQuery).fetchAll(),
+      ]);
+      if (patients.length === 0 && doctors.length === 0 && clinics.length === 0) {
         res.status(404).json({ error: "EMAIL_NOT_FOUND" });
         return;
       }

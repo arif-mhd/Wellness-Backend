@@ -389,6 +389,72 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
   }
 });
 
+// ─── POST /api/clinics/doctors/:id/2fa/enable ────────────────────────────────
+// ─── POST /api/clinics/doctors/:id/2fa/disable ───────────────────────────────
+// Doctors no longer have a self-service 2FA toggle — only their clinic can
+// change it. Unlike a doctor enabling their own 2FA, this doesn't require an
+// email-OTP step: the clinic's own authenticated session is the
+// authorization here, not proof of access to the doctor's inbox.
+router.post("/:id/2fa/enable", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
+  try {
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
+    if (!doctor) return;
+
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor 2FA Enabled",
+      details: `2FA enabled for Dr. ${doctor.fullName ?? doctor.id} by clinic`,
+      performedBy: "Clinic",
+      performedById: actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Enable clinic doctor 2FA error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.post("/:id/2fa/disable", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
+  try {
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
+    if (!doctor) return;
+
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor 2FA Disabled",
+      details: `2FA disabled for Dr. ${doctor.fullName ?? doctor.id} by clinic`,
+      performedBy: "Clinic",
+      performedById: actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Disable clinic doctor 2FA error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── PUT /api/clinics/doctors/:id/slots ──────────────────────────────────────
 // Clinic sets the doctor's weekly availability directly — no tempSlots/
 // pending-verification step, since the clinic is the authority for its own
