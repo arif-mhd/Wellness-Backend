@@ -290,31 +290,20 @@ function ManagePharmacyPageInner() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
-                  Today
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
               <div className="flex items-center gap-8 flex-1">
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Name
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </span>
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Date
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </span>
+                {["Name", ...(activeTab === "onboard" ? ["Total Prescriptions", "Medications Dispensed", "Ratings"] : ["Date Applied"])].map((label) => (
+                  <span key={label} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                    {label}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                ))}
               </div>
               <button aria-label="Filter" className="text-slate-500 hover:text-slate-800 transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -350,7 +339,7 @@ function ManagePharmacyPageInner() {
                           <>
                             <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
-                                Total Prescr.. <DoubleCaret />
+                                Total Prescriptions <DoubleCaret />
                               </div>
                             </th>
                             <th className="pb-4 pt-1 font-semibold">

@@ -196,11 +196,11 @@ function FeeRequestsPageInner() {
                 <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">Clinic</th>
-                        <th className="pb-4 pt-1 font-medium">Target</th>
-                        <th className="pb-4 pt-1 font-medium">Requested</th>
-                        <th className="pb-4 pt-1 font-medium">Status</th>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2">Clinic</th>
+                        <th className="pb-4 pt-1 font-semibold">Target</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Requested</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -211,16 +211,16 @@ function FeeRequestsPageInner() {
                           className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
                         >
                           <td className="py-3.5 px-2">
-                            <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.clinicName}</p>
+                            <p className="text-[13px] font-semibold text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.clinicName}</p>
                             {r.branchName && <p className="text-[11px] text-slate-400">{r.branchName}</p>}
                           </td>
                           <td className="py-3.5 text-[12px] text-slate-600 font-medium">
                             {r.targetType === "clinic" ? "Clinic-wide" : `Dr. ${r.doctorName ?? r.targetId}`}
                           </td>
-                          <td className="py-3.5 text-[12px] text-slate-500">
+                          <td className="py-3.5 text-[12px] text-slate-500 text-center">
                             {new Date(r.requestedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
-                          <td className="py-3.5"><StatusBadge status={r.status} /></td>
+                          <td className="py-3.5 text-center"><StatusBadge status={r.status} /></td>
                         </tr>
                       ))}
                     </tbody>

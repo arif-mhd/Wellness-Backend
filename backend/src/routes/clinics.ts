@@ -178,7 +178,7 @@ router.post("/register", async (req: Request, res: Response) => {
     const clinicDoc = {
       id: supertokensId,   // Cosmos id = ST userId
       supertokens_id: supertokensId,
-      status: "pending_approval",
+      status: "details_pending",
       email,
       clinicName,
       // The owner's own personal name — collected later in the complete-profile
@@ -409,6 +409,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       slots:                 slots                 ?? clinic.slots,
       isMultiBranchOrg:      isMultiBranchOrg       ?? clinic.isMultiBranchOrg,
       branches:              branches               ?? clinic.branches,
+      status:                "pending_approval",
       profileCompletedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

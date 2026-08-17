@@ -262,23 +262,7 @@ export default function ManageArticlesPage() {
               ))}
             </div>
 
-            {/* Column headers */}
-            <div className="flex items-center text-[13px] font-medium text-[#64748B] px-3 select-none">
-              <div className="flex items-center gap-1.5 flex-[3] cursor-pointer hover:text-slate-800">
-                Title <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Category <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Author <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Date <DoubleCaret />
-              </div>
-              <div className="w-20 text-center">Status</div>
-              <div className="w-20 text-center">Actions</div>
-            </div>
+
 
             {/* Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 min-h-[500px] flex flex-col justify-between">
@@ -299,6 +283,24 @@ export default function ManageArticlesPage() {
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2 min-w-[220px] w-[35%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Title <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[130px] w-[15%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Category <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[160px] w-[20%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Author <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[100px] w-[10%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Date <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[90px] w-[10%] text-center">Status</th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[90px] w-[10%] text-center">Actions</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {paginated.map(article => (
                         <tr
@@ -307,7 +309,7 @@ export default function ManageArticlesPage() {
                           className={`group cursor-pointer transition-colors duration-150 border-b border-slate-50 last:border-0 ${selectedId === article.id ? "bg-blue-50/40" : "hover:bg-slate-50/50"}`}
                         >
                           {/* Title */}
-                          <td className="py-3.5 px-2 flex-[3]">
+                          <td className="py-3.5 px-2">
                             <div className="flex items-center gap-3 min-w-0">
                               {/* Cover thumbnail */}
                               {article.coverImageUrl ? (
@@ -331,20 +333,20 @@ export default function ManageArticlesPage() {
                           </td>
 
                           {/* Category */}
-                          <td className="py-3.5 w-28">
+                          <td className="py-3.5">
                             <CategoryBadge category={article.category} />
                           </td>
 
                           {/* Author */}
-                          <td className="py-3.5 w-28 text-[13px] text-slate-600 font-medium">{article.author}</td>
+                          <td className="py-3.5 text-[13px] text-slate-600 font-medium">{article.author}</td>
 
                           {/* Date */}
-                          <td className="py-3.5 w-28 text-[11px] text-slate-400 font-medium">
+                          <td className="py-3.5 text-[11px] text-slate-400 font-medium">
                             {new Date(article.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
 
                           {/* Status */}
-                          <td className="py-3.5 w-20 text-center">
+                          <td className="py-3.5 text-center">
                             {article.flagged ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold">
                                 <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /></svg>
@@ -359,7 +361,7 @@ export default function ManageArticlesPage() {
                           </td>
 
                           {/* Actions */}
-                          <td className="py-3.5 w-20" onClick={e => e.stopPropagation()}>
+                          <td className="py-3.5 text-center" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               {/* Edit */}
                               <button

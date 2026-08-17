@@ -201,12 +201,11 @@ export default function FeedbackPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
-                        <th className="pb-4 pt-1 font-semibold pl-2 w-[18%]">
+                        <th className="pb-4 pt-1 font-semibold pl-2 pr-6 w-[25%]">
                           <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Name <DoubleCaret /></div>
                         </th>
                         <th className="pb-4 pt-1 font-semibold w-[22%]">Provider Rated</th>
-                        <th className="pb-4 pt-1 font-semibold w-[40%]">Comments</th>
-                        <th className="pb-4 pt-1 font-semibold w-[8%] text-center">Service</th>
+                        <th className="pb-4 pt-1 font-semibold w-[41%]">Comments</th>
                         <th className="pb-4 pt-1 font-semibold w-[12%] text-right pr-4">Rating</th>
                       </tr>
                     </thead>
@@ -219,7 +218,7 @@ export default function FeedbackPage() {
                             onClick={() => setSelectedId(rev.id)}
                             className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
                           >
-                            <td className="py-4 pl-2">
+                            <td className="py-4 pl-2 pr-6">
                               <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-semibold text-sm">
                                 {rev.reviewer.avatar || rev.reviewer.name[0]}
@@ -244,12 +243,7 @@ export default function FeedbackPage() {
                             <td className="py-4 text-[12px] text-slate-500 font-medium pr-6">
                               <p className="line-clamp-1">{rev.comment || <span className="italic text-slate-300">No comment left</span>}</p>
                             </td>
-                            <td className="py-4 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getFolderColor(rev.folder)}`}>
-                                {getFolderLabel(rev.folder)}
-                              </span>
-                            </td>
-                            <td className="py-4 pr-2 text-right">
+                            <td className="py-4 text-right pr-4">
                               <div className="flex justify-end">
                                 <StarRating rating={rev.rating} />
                               </div>

@@ -233,18 +233,12 @@ export default function ManageFormsPage() {
                           <p className="text-[12px] font-medium text-slate-400 truncate">Created: {form.createdDate}</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Last Modified</span>
-                          <span className="text-[12px] text-slate-500 font-medium">{form.modifiedDate} {form.modifiedTime}</span>
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Last Modified</span>
+                            <span className="text-[12px] text-slate-500 font-medium">{form.modifiedDate} {form.modifiedTime}</span>
+                          </div>
                         </div>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }}
-                          className="text-[11px] font-semibold px-4 py-1.5 rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-                        >
-                          Edit
-                        </button>
-                      </div>
                     </div>
                   );
                 })}
@@ -319,7 +313,7 @@ export default function ManageFormsPage() {
               {/* Action Buttons */}
               <button
                 onClick={() => router.push(`/dashboard/forms/${selectedForm.id}`)}
-                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
+                className="hidden md:block w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
               >
                 Edit Form
               </button>

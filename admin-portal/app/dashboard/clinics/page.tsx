@@ -299,15 +299,7 @@ function ManageClinicsPageInner() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Clinics</h1>
-              <button
-                onClick={() => router.push("/dashboard/clinics/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-medium px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Clinic
-              </button>
+
             </div>
 
             {/* Tab & search row */}

@@ -162,6 +162,20 @@ export default function ManageLabServicePage() {
               </div>
             </div>
 
+            {/* Text Filter Row */}
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4 mb-2">
+              <div className="flex items-center gap-8 flex-1">
+                {["Name", "Total Tests", "Rating", "Date Added"].map((label) => (
+                  <span key={label} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                    {label}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {/* Main Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[600px] flex flex-col justify-between">
               <>

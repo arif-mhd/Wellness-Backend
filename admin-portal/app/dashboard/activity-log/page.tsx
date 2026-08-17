@@ -114,10 +114,10 @@ export default function ActivityLogPage() {
           <span className="text-xs text-slate-400 font-medium">{total} total events</span>
         </div>
 
-        {/* Filter row */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Filters Row */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
           {/* Source filters */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             {SOURCE_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -134,10 +134,10 @@ export default function ActivityLogPage() {
           </div>
 
           {/* Divider */}
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="hidden md:block w-px h-6 bg-slate-200 mx-1" />
 
           {/* Time filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(["all", "recent", "past"] as const).map((t) => (
               <button
                 key={t}
@@ -156,7 +156,7 @@ export default function ActivityLogPage() {
           {/* Refresh */}
           <button
             onClick={() => fetchLogs(source, page, timeRange)}
-            className="ml-auto w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-700 border border-transparent hover:border-slate-100 transition"
+            className="md:ml-auto w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-700 border border-transparent hover:border-slate-100 transition shadow-sm bg-white"
             title="Refresh"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
