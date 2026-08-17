@@ -123,9 +123,6 @@ export default function ManagePatientsPage() {
       );
 
       setPatients(patientsWithStats);
-      if (patientsWithStats.length > 0 && !selectedId) {
-        setSelectedId(patientsWithStats[0].id);
-      }
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {

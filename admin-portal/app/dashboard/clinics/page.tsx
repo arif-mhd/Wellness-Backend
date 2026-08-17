@@ -158,8 +158,8 @@ function ManageClinicsPageInner() {
       }
 
       if (!selectedClinicId) {
-        if (approved?.length > 0) setSelectedClinicId(approved[0].id);
-        else if (pending?.length > 0) { setActiveTab("queue"); setSelectedClinicId(pending[0].id); }
+        if (approved?.length > 0) {}
+        else if (pending?.length > 0) { setActiveTab("queue"); }
       }
     } catch {
       setFetchError("Could not reach the backend.");
@@ -314,7 +314,7 @@ function ManageClinicsPageInner() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => { setActiveTab("onboard"); setSelectedClinicId(clinics[0]?.id ?? null); setShowRejectInput(false); }}
+                  onClick={() => { setActiveTab("onboard"); setSelectedClinicId(null); setShowRejectInput(false); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                     activeTab === "onboard" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -322,7 +322,7 @@ function ManageClinicsPageInner() {
                   Clinics Onboard
                 </button>
                 <button
-                  onClick={() => { setActiveTab("queue"); setSelectedClinicId(queue[0]?.id ?? null); setShowRejectInput(false); }}
+                  onClick={() => { setActiveTab("queue"); setSelectedClinicId(null); setShowRejectInput(false); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === "queue" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -368,16 +368,13 @@ function ManageClinicsPageInner() {
             </div>
 
             {/* Sort labels */}
-            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] px-3 select-none">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-medium text-[#64748B] px-3 select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <DoubleCaret />
                 </span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Address <DoubleCaret />
-                </span>
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Date <DoubleCaret />
                 </span>
               </div>
             </div>

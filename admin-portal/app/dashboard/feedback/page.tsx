@@ -88,8 +88,7 @@ export default function FeedbackPage() {
       if (!res.ok) throw new Error(`Failed to fetch reviews: status ${res.status}`);
       const data = await res.json();
       setReviews(data);
-      if (data.length > 0) setSelectedId(data[0].id);
-      else setSelectedId(null);
+      // removed
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong while loading feedbacks.");

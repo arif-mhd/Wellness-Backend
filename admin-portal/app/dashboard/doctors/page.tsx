@@ -127,8 +127,8 @@ function ManageDoctorsPageInner() {
       }
 
       if (!selectedDoctorId) {
-        if (approved?.length > 0) setSelectedDoctorId(approved[0].id);
-        else if (pending?.length > 0) { setActiveTab("queue"); setSelectedDoctorId(pending[0].id); }
+        if (approved?.length > 0) {}
+        else if (pending?.length > 0) { setActiveTab("queue"); }
       }
     } catch {
       setFetchError("Could not reach the backend.");
@@ -202,7 +202,7 @@ function ManageDoctorsPageInner() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => { setActiveTab("onboard"); setSelectedDoctorId(doctors[0]?.id ?? null); }}
+                  onClick={() => { setActiveTab("onboard"); setSelectedDoctorId(null); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                     activeTab === "onboard" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -210,7 +210,7 @@ function ManageDoctorsPageInner() {
                   Doctors Onboard
                 </button>
                 <button
-                  onClick={() => { setActiveTab("queue"); setSelectedDoctorId(queue[0]?.id ?? null); }}
+                  onClick={() => { setActiveTab("queue"); setSelectedDoctorId(null); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === "queue" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}

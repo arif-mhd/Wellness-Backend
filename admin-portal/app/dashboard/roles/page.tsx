@@ -147,9 +147,8 @@ export default function RolesPage() {
       const data = await res.json();
       const list: RoleUser[] = data.users ?? [];
       setUsers(list);
-      if (list.length > 0) {
-        setSelectedId(list[0].id);
-        setDraftPerms({ ...list[0].permissions });
+      if (list.length > 0 && !selectedId) {
+        // removed auto-select
       }
     } catch {
       setFetchError("Failed to load users.");

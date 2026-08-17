@@ -90,7 +90,7 @@ export default function ManageLabServicePage() {
         const { labs: data } = await res.json();
         const list: LabService[] = data ?? [];
         setLabs(list);
-        setSelectedLabId((prev) => prev ?? list[0]?.id ?? null);
+        // removed
       }
     } catch {
       setLabs([]);

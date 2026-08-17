@@ -67,7 +67,7 @@ export default function ManageVaccinationPage() {
       .then(r => r.json())
       .then(data => {
         setVaccines(Array.isArray(data) ? data : []);
-        if (data?.length) setSelectedVaccineId(data[0].id);
+        // removed
       })
       .catch(() => setVaccines([]))
       .finally(() => setLoading(false));

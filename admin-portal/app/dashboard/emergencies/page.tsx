@@ -79,7 +79,7 @@ export default function ManageEmergenciesPage() {
       const data = await res.json();
       const list: Emergency[] = data.emergencies ?? [];
       setEmergencies(list);
-      setSelectedId((prev) => prev ?? list[0]?.id ?? null);
+      // removed
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {

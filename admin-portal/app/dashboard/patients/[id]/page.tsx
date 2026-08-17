@@ -200,7 +200,6 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
           const d = await res.json();
           const visits: VisitHistoryEntry[] = d.visitHistory ?? [];
           setVisitHistory(visits);
-          setSelectedVisitId(visits[0]?.appointmentId ?? null);
         }
       } catch {
         // leave visitHistory empty — UI shows "no consultations" state
