@@ -44,7 +44,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     id: 7,
     question: "How do I enable two-factor authentication?",
-    answer: "Go to \"Account Settings\", turn on \"Enable 2FA\", and confirm with the one-time code sent to your registered email. You'll be asked for a fresh code each time you log in afterward.",
+    answer: "Two-factor authentication is managed by your clinic — contact your clinic administrator to have it enabled or disabled on your account.",
   },
   {
     id: 8,

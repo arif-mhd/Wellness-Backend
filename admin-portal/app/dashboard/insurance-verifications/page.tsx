@@ -183,33 +183,73 @@ function InsuranceVerificationsPageInner() {
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                      <th className="pb-4 pt-1 font-medium pl-2">Patient</th>
-                      <th className="pb-4 pt-1 font-medium">Provider</th>
-                      <th className="pb-4 pt-1 font-medium">Policy ID</th>
-                      <th className="pb-4 pt-1 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentList.map((r) => (
-                      <tr
-                        key={rowKey(r)}
-                        onClick={() => { setSelectedKey(rowKey(r)); setShowRejectBox(false); setRejectReason(""); }}
-                        className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
-                      >
-                        <td className="py-3.5 px-2">
-                          <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.patientName}</p>
-                          <p className="text-[11px] text-slate-400">{r.patientEmail}</p>
-                        </td>
-                        <td className="py-3.5 text-[12px] text-slate-600 font-medium">{r.provider}</td>
-                        <td className="py-3.5 text-[12px] text-slate-500">{r.policyId}</td>
-                        <td className="py-3.5"><StatusBadge status={r.status} /></td>
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="pb-4 pt-1 font-medium pl-2">Patient</th>
+                        <th className="pb-4 pt-1 font-medium">Provider</th>
+                        <th className="pb-4 pt-1 font-medium">Policy ID</th>
+                        <th className="pb-4 pt-1 font-medium">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {currentList.map((r) => (
+                        <tr
+                          key={rowKey(r)}
+                          onClick={() => { setSelectedKey(rowKey(r)); setShowRejectBox(false); setRejectReason(""); }}
+                          className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
+                        >
+                          <td className="py-3.5 px-2">
+                            <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{r.patientName}</p>
+                            <p className="text-[11px] text-slate-400">{r.patientEmail}</p>
+                          </td>
+                          <td className="py-3.5 text-[12px] text-slate-600 font-medium">{r.provider}</td>
+                          <td className="py-3.5 text-[12px] text-slate-500">{r.policyId}</td>
+                          <td className="py-3.5"><StatusBadge status={r.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {currentList.length > 0 && (
+                <div className="lg:hidden flex flex-col gap-4">
+                  {currentList.map((r) => {
+                    const isSelected = selectedKey === rowKey(r);
+                    return (
+                      <div
+                        key={rowKey(r)}
+                        onClick={() => { setSelectedKey(isSelected ? null : rowKey(r)); setShowRejectBox(false); setRejectReason(""); }}
+                        className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{r.patientName}</p>
+                            <p className="text-[12px] text-slate-400 font-medium truncate">{r.patientEmail}</p>
+                          </div>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Provider</span>
+                            <span className="text-[12px] text-slate-700 font-medium">{r.provider}</span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Policy ID</span>
+                            <span className="text-[12px] text-slate-500 font-medium">{r.policyId}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedKey(rowKey(r)); setShowRejectBox(false); setRejectReason(""); }}
+                          className="mt-1 text-[11px] font-semibold px-4 py-2 rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors w-full"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -217,7 +257,9 @@ function InsuranceVerificationsPageInner() {
 
         {/* RIGHT — Policy Details Panel */}
         {selected && (
-          <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+          <>
+          <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedKey(null)} />
+          <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
             <div className="flex items-center justify-between pb-4">
               <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Policy Details</h2>
               <button
@@ -293,6 +335,7 @@ function InsuranceVerificationsPageInner() {
               </div>
             )}
           </div>
+          </>
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
+import Pagination from "@/components/Pagination";
 
 interface OrderItem {
   medicine_id: string;
@@ -288,7 +289,7 @@ export default function OrdersPage() {
                 </table>
               </div>
 
-              <div className="md:hidden flex flex-col divide-y divide-slate-100">
+              <div className="md:hidden flex flex-col gap-4">
                 {!loading && paginated.length === 0 && (
                   <div className="py-16 text-center text-slate-400 text-[13px] font-medium">
                     {search ? "No orders match your search." : "No pharmacy orders yet."}
@@ -301,7 +302,7 @@ export default function OrdersPage() {
                     <div
                       key={o.id}
                       onClick={() => setSelectedId(isSelected ? null : o.id)}
-                      className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                      className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[12px] font-semibold text-slate-500">{shortId}</span>
@@ -321,25 +322,25 @@ export default function OrdersPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-slate-50">
+                      <div className="grid grid-cols-2 gap-3 mt-2 pt-3 border-t border-slate-50">
                         <div className="flex flex-col">
                           <span className="text-[10px] text-slate-400 uppercase tracking-wider">Date</span>
                           <span className="text-[12px] text-slate-700 font-medium">{formatDate(o.createdAt)}</span>
                         </div>
-                        <div className="flex flex-col text-center">
+                        <div className="flex flex-col items-end text-right">
                           <span className="text-[10px] text-slate-400 uppercase tracking-wider">Payment</span>
                           <span className="text-[12px] font-medium text-[#6A8BFF]">{o.payment_method === "mock" ? "Mock" : o.payment_method}</span>
                         </div>
-                        <div className="flex flex-col text-right">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Amount</span>
-                          <span className="text-[12px] text-slate-700 font-medium">AED {o.total_amount.toFixed(2)}</span>
-                        </div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-slate-50/50 flex flex-col">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Amount</span>
+                        <span className="text-[13px] text-slate-800 font-semibold">AED {o.total_amount.toFixed(2)}</span>
                       </div>
 
                       <div className="mt-3 w-full">
                         <button
                           onClick={e => { e.stopPropagation(); setSelectedId(o.id); }}
-                          className="bg-white border border-slate-200 text-slate-700 text-[12px] font-medium px-6 py-2.5 rounded-full shadow-sm w-full transition-colors active:bg-slate-50 flex items-center justify-center"
+                          className="text-[11px] font-semibold px-4 py-2 rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors w-full"
                         >
                           View Details
                         </button>
@@ -351,45 +352,17 @@ export default function OrdersPage() {
               </>
 
               {/* Pagination */}
-              <div className="flex items-center justify-center gap-1 mt-6 select-none border-t border-slate-50 pt-5">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 transition disabled:opacity-30"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    className={`w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center transition-all ${
-                      n === page
-                        ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-100"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 transition disabled:opacity-30"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+              {totalPages > 1 && (
+                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+              )}
             </div>
           </div>
 
           {/* RIGHT: Order Details Panel */}
           {selected && (
-            <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="xl:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto xl:static xl:z-auto xl:max-h-none xl:col-span-4 bg-white rounded-t-[2rem] xl:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] xl:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t xl:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 xl:slide-in-from-right-3 duration-300">
 
               <div className="flex items-center justify-between pb-5 border-b border-slate-50 mb-5">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Order Details</h2>
@@ -501,6 +474,7 @@ export default function OrdersPage() {
                 Go to Consultation
               </button>
             </div>
+            </>
           )}
         </div>
       </div>
