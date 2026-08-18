@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
 
 interface OtherInfoRow {
@@ -66,11 +66,33 @@ export default function OwnersPersonalInfoForm({
   const [weight, setWeight] = useState("");
   const [heightError, setHeightError] = useState("");
   const [weightError, setWeightError] = useState("");
+  const [dobError, setDobError] = useState("");
+
+  const today = new Date();
+  const dobMax = today.toISOString().slice(0, 10);
+  const dobMin = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+
+  const validateDob = (value: string): string => {
+    if (!value) return "Date of Birth is required.";
+    const picked = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(picked.getTime())) return "Enter a valid date of birth.";
+    if (picked > today) return "Date of Birth cannot be in the future.";
+    let age = today.getFullYear() - picked.getFullYear();
+    const hadBirthdayThisYear =
+      today.getMonth() > picked.getMonth() ||
+      (today.getMonth() === picked.getMonth() && today.getDate() >= picked.getDate());
+    if (!hadBirthdayThisYear) age -= 1;
+    if (age < 18) return "Must be at least 18 years old.";
+    if (age > 100) return "Enter a valid date of birth.";
+    return "";
+  };
 
   const [languages, setLanguages] = useState<string[]>(initialLanguages);
   const [langInput, setLangInput] = useState("");
   const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
+
+  const dobInputRef = useRef<HTMLInputElement>(null);
 
   const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>(
     initialOtherInfo && initialOtherInfo.length > 0 ? initialOtherInfo : [{ id: "1", label: "", value: "" }]
@@ -123,8 +145,11 @@ export default function OwnersPersonalInfoForm({
     if (!ownerId.trim()) { setFormError("Owner/Staff Emirates ID is required."); return; }
     if (!email.trim()) { setFormError("Email ID is required."); return; }
     if (!gender) { setFormError("Gender is required."); return; }
-    if (!dob) { setFormError("Date of Birth is required."); return; }
+    const dobErr = validateDob(dob);
+    if (dobErr) { setDobError(dobErr); setFormError(dobErr); return; }
     if (!positionInClinic.trim()) { setFormError("Position in Clinic is required."); return; }
+    if (heightError) { setFormError(heightError); return; }
+    if (weightError) { setFormError(weightError); return; }
 
     setFormError("");
     onSubmit({
@@ -229,12 +254,31 @@ export default function OwnersPersonalInfoForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            className={`${inputCls} ${dob ? "text-gray-800" : "text-gray-400"}`}
-          />
+          <div className="flex flex-col gap-1">
+            <div className="relative">
+              <input
+                ref={dobInputRef}
+                type="date"
+                value={dob}
+                min={dobMin}
+                max={dobMax}
+                onChange={(e) => { setDob(e.target.value); setDobError(validateDob(e.target.value)); }}
+                className={`${inputCls} pr-11 ${dob ? "text-gray-800" : "text-gray-400"}`}
+              />
+              <button
+                type="button"
+                onClick={() => dobInputRef.current?.showPicker?.() ?? dobInputRef.current?.focus()}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors"
+                aria-label="Open calendar"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <rect x="3" y="5" width="18" height="16" rx="2" />
+                  <path strokeLinecap="round" d="M8 3v4M16 3v4M3 10h18" />
+                </svg>
+              </button>
+            </div>
+            {dobError && <span className="text-red-500 text-xs mt-0.5 pl-1">{dobError}</span>}
+          </div>
           <input
             type="text"
             placeholder="Position in Clinic*"
@@ -278,7 +322,9 @@ export default function OwnersPersonalInfoForm({
                 const digits = e.target.value.replace(/\D/g, "");
                 const num = parseInt(digits, 10);
                 setHeight(digits);
-                if (digits && num > 250) setHeightError("Height must not exceed 250 cm");
+                if (!digits) setHeightError("");
+                else if (num > 250) setHeightError("Height must not exceed 250 cm.");
+                else if (num < 50) setHeightError("Height must be at least 50 cm.");
                 else setHeightError("");
               }}
               className={inputCls}
@@ -294,7 +340,9 @@ export default function OwnersPersonalInfoForm({
                 const digits = e.target.value.replace(/\D/g, "");
                 const num = parseInt(digits, 10);
                 setWeight(digits);
-                if (digits && num > 250) setWeightError("Weight must not exceed 250 kg");
+                if (!digits) setWeightError("");
+                else if (num > 250) setWeightError("Weight must not exceed 250 kg.");
+                else if (num < 20) setWeightError("Weight must be at least 20 kg.");
                 else setWeightError("");
               }}
               className={inputCls}

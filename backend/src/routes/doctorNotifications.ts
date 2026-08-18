@@ -21,7 +21,8 @@ type DoctorNotificationType =
   | "support_reply"
   | "doctor_approved"
   | "doctor_rejected"
-  | "slots_verified";
+  | "slots_verified"
+  | "slots_rejected";
 
 // Maps each app-toggle key to the notification types it gates.
 // patient_waiting is always shown (critical — can't be disabled).
@@ -29,7 +30,7 @@ const TOGGLE_GATES: Record<string, DoctorNotificationType[]> = {
   appointments: ["appointment_booked"],
   messages:     ["new_message"],
   reminders:    ["followup_reminder"],
-  system:       ["support_reply", "doctor_approved", "doctor_rejected", "slots_verified"],
+  system:       ["support_reply", "doctor_approved", "doctor_rejected", "slots_verified", "slots_rejected"],
 };
 
 interface DoctorNotification {
@@ -223,6 +224,20 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
         link: `/dashboard/profile`,
         isRead: false,
         createdAt: doctorDoc.slotsVerifiedAt,
+      });
+    }
+    if (allowed("slots_rejected") && doctorDoc.slotsRejectedAt) {
+      notifications.push({
+        id: `slots_rejected:${doctorId}:${doctorDoc.slotsRejectedAt}`,
+        doctorId,
+        type: "slots_rejected",
+        title: "Availability change was not approved",
+        body: doctorDoc.slotsRejectedReason
+          ? String(doctorDoc.slotsRejectedReason).slice(0, 100)
+          : "Your clinic declined your submitted schedule change. Your previous availability is still live.",
+        link: `/dashboard/schedule`,
+        isRead: false,
+        createdAt: doctorDoc.slotsRejectedAt,
       });
     }
   }

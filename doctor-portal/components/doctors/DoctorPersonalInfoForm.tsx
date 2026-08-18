@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface OtherInfoRow {
   id: string;
@@ -11,6 +11,17 @@ interface OtherInfoRow {
 
 interface DoctorPersonalInfoFormProps {
   onSubmit: (data: any) => void;
+  initialFirstName?: string;
+  initialLastName?: string;
+  initialEmiratesId?: string;
+  initialEmail?: string;
+  initialPhone?: string;
+  initialGender?: string;
+  initialDob?: string;
+  initialBloodGroup?: string;
+  initialLocation?: string;
+  initialLanguages?: string[];
+  initialOtherInfo?: OtherInfoRow[];
 }
 
 const ALL_LANGUAGES = [
@@ -19,29 +30,134 @@ const ALL_LANGUAGES = [
   "Chinese", "Japanese", "Korean", "Russian", "Persian", "Turkish", "Amharic",
 ];
 
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
 const inputCls =
   "w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors bg-white placeholder-[#A7AAB4]";
+const errCls = "border-red-300 bg-red-50 focus:border-red-400";
 
-export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoFormProps) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [emiratesId, setEmiratesId] = useState("");
+type FieldErrors = Partial<Record<"firstName" | "lastName" | "emiratesId" | "email" | "phone" | "gender" | "dob", string>>;
+
+export default function DoctorPersonalInfoForm({
+  onSubmit,
+  initialFirstName = "",
+  initialLastName = "",
+  initialEmiratesId = "",
+  initialEmail = "",
+  initialPhone = "",
+  initialGender = "",
+  initialDob = "",
+  initialBloodGroup = "",
+  initialLocation = "",
+  initialLanguages = [],
+  initialOtherInfo,
+}: DoctorPersonalInfoFormProps) {
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [emiratesId, setEmiratesId] = useState(initialEmiratesId);
   const [emiratesIdScanned, setEmiratesIdScanned] = useState(false);
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [gender, setGender] = useState("");
-  const [dob, setDob] = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [location, setLocation] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  const [phone, setPhone] = useState(initialPhone);
+  const [gender, setGender] = useState(initialGender);
+  const [dob, setDob] = useState(initialDob);
+  const [bloodGroup, setBloodGroup] = useState(initialBloodGroup);
+  const [location, setLocation] = useState(initialLocation);
 
-  const [languages, setLanguages] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>(initialLanguages);
   const [langInput, setLangInput] = useState("");
   const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
 
-  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>([{ id: "1", label: "", value: "" }]);
+  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>(
+    initialOtherInfo && initialOtherInfo.length > 0 ? initialOtherInfo : [{ id: "1", label: "", value: "" }]
+  );
 
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof FieldErrors, boolean>>>({});
+
+  // Emails already in use fail the account creation only once every other
+  // step (license, specializations, resume...) has been filled in — checking
+  // here at Step 1 surfaces that immediately instead.
+  const [emailCheckState, setEmailCheckState] = useState<"idle" | "checking" | "taken" | "available">("idle");
+  const emailCheckToken = useRef(0);
+
+  const today = new Date();
+  const dobMax = today.toISOString().slice(0, 10);
+  const dobMin = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  const dobInputRef = useRef<HTMLInputElement>(null);
+
+  const validateDob = (value: string): string => {
+    if (!value) return "Date of Birth is required.";
+    const picked = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(picked.getTime())) return "Enter a valid date of birth.";
+    if (picked > today) return "Date of Birth cannot be in the future.";
+    let age = today.getFullYear() - picked.getFullYear();
+    const hadBirthdayThisYear =
+      today.getMonth() > picked.getMonth() ||
+      (today.getMonth() === picked.getMonth() && today.getDate() >= picked.getDate());
+    if (!hadBirthdayThisYear) age -= 1;
+    if (age < 18) return "Must be at least 18 years old.";
+    if (age > 100) return "Enter a valid date of birth.";
+    return "";
+  };
+
+  const validateEmailFormat = (value: string): string => {
+    if (!value.trim()) return "Email ID is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Enter a valid email address.";
+    return "";
+  };
+
+  const validateField = (field: keyof FieldErrors, values = { firstName, lastName, emiratesId, email, phone, gender, dob }): string => {
+    switch (field) {
+      case "firstName": return values.firstName.trim() ? "" : "First name is required.";
+      case "lastName": return values.lastName.trim() ? "" : "Last name is required.";
+      case "emiratesId": return values.emiratesId.trim() ? "" : "Emirates ID is required.";
+      case "email": return validateEmailFormat(values.email);
+      case "phone": return values.phone.trim() ? "" : "Contact number is required.";
+      case "gender": return values.gender ? "" : "Gender is required.";
+      case "dob": return validateDob(values.dob);
+      default: return "";
+    }
+  };
+
+  const markTouched = (field: keyof FieldErrors) => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    setFieldErrors((e) => ({ ...e, [field]: validateField(field) }));
+  };
+
+  // Debounced existence check — fires 500ms after the user stops typing a
+  // syntactically-valid email, not on every keystroke.
+  useEffect(() => {
+    const emailErr = validateEmailFormat(email);
+    if (emailErr) { setEmailCheckState("idle"); return; }
+    const token = ++emailCheckToken.current;
+    setEmailCheckState("checking");
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/clinics/doctors/check-email?email=${encodeURIComponent(email.trim())}`);
+        if (token !== emailCheckToken.current) return;
+        if (res.ok) {
+          const data = await res.json();
+          setEmailCheckState(data.exists ? "taken" : "available");
+        } else {
+          setEmailCheckState("idle");
+        }
+      } catch {
+        if (token === emailCheckToken.current) setEmailCheckState("idle");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
+  const isFormValid = useMemo(() => {
+    const values = { firstName, lastName, emiratesId, email, phone, gender, dob };
+    const hasErrors = (["firstName", "lastName", "emiratesId", "email", "phone", "gender", "dob"] as const)
+      .some((f) => validateField(f, values));
+    return !hasErrors && emailCheckState !== "taken";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstName, lastName, emiratesId, email, phone, gender, dob, emailCheckState]);
 
   const handleScan = () => {
     if (!emiratesId.trim()) {
@@ -62,13 +178,21 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!firstName.trim()) { setFormError("First name is required."); return; }
-    if (!lastName.trim()) { setFormError("Last name is required."); return; }
-    if (!emiratesId.trim()) { setFormError("Emirates ID is required."); return; }
-    if (!email.trim()) { setFormError("Email ID is required."); return; }
-    if (!phone.trim()) { setFormError("Contact number is required."); return; }
-    if (!gender) { setFormError("Gender is required."); return; }
-    if (!dob) { setFormError("Date of Birth is required."); return; }
+    const values = { firstName, lastName, emiratesId, email, phone, gender, dob };
+    const fields = ["firstName", "lastName", "emiratesId", "email", "phone", "gender", "dob"] as const;
+    const errors: FieldErrors = {};
+    fields.forEach((f) => { const err = validateField(f, values); if (err) errors[f] = err; });
+    setFieldErrors(errors);
+    setTouched(Object.fromEntries(fields.map((f) => [f, true])));
+
+    if (Object.keys(errors).length > 0) {
+      setFormError("Please fill in all required fields highlighted below.");
+      return;
+    }
+    if (emailCheckState === "taken") {
+      setFormError("This email is already registered to another account.");
+      return;
+    }
 
     setFormError("");
     onSubmit({
@@ -101,11 +225,25 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">First name</label>
-            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputCls} />
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              onBlur={() => markTouched("firstName")}
+              className={`${inputCls} ${touched.firstName && fieldErrors.firstName ? errCls : ""}`}
+            />
+            {touched.firstName && fieldErrors.firstName && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.firstName}</span>}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Last name</label>
-            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputCls} />
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              onBlur={() => markTouched("lastName")}
+              className={`${inputCls} ${touched.lastName && fieldErrors.lastName ? errCls : ""}`}
+            />
+            {touched.lastName && fieldErrors.lastName && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.lastName}</span>}
           </div>
         </div>
 
@@ -116,7 +254,8 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
               type="text"
               value={emiratesId}
               onChange={(e) => { setEmiratesId(e.target.value); setEmiratesIdScanned(false); }}
-              className={inputCls}
+              onBlur={() => markTouched("emiratesId")}
+              className={`${inputCls} ${touched.emiratesId && fieldErrors.emiratesId ? errCls : ""}`}
             />
             <button
               type="button"
@@ -126,39 +265,95 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
               {emiratesIdScanned ? "SCANNED" : "SCAN"}
             </button>
           </div>
+          {touched.emiratesId && fieldErrors.emiratesId && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.emiratesId}</span>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Email ID</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => markTouched("email")}
+              className={`${inputCls} ${(touched.email && fieldErrors.email) || emailCheckState === "taken" ? errCls : ""}`}
+            />
+            {touched.email && fieldErrors.email && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.email}</span>}
+            {!fieldErrors.email && emailCheckState === "checking" && <span className="text-[#A7AAB4] text-[11px] mt-0.5">Checking availability…</span>}
+            {!fieldErrors.email && emailCheckState === "taken" && <span className="text-red-500 text-[11px] mt-0.5">This email is already registered.</span>}
+            {!fieldErrors.email && emailCheckState === "available" && <span className="text-emerald-600 text-[11px] mt-0.5">Email is available.</span>}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Contact Number</label>
-            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+            <input
+              type="text"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => markTouched("phone")}
+              className={`${inputCls} ${touched.phone && fieldErrors.phone ? errCls : ""}`}
+            />
+            {touched.phone && fieldErrors.phone && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.phone}</span>}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Gender</label>
-            <select value={gender} onChange={(e) => setGender(e.target.value)} className={`${inputCls} cursor-pointer appearance-none`}>
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              onBlur={() => markTouched("gender")}
+              className={`${inputCls} cursor-pointer appearance-none ${touched.gender && fieldErrors.gender ? errCls : ""}`}
+            >
               <option value="" disabled>Select Gender</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
+            {touched.gender && fieldErrors.gender && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.gender}</span>}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Date of Birth</label>
-            <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className={inputCls} />
+            <div className="relative">
+              <input
+                ref={dobInputRef}
+                type="date"
+                value={dob}
+                min={dobMin}
+                max={dobMax}
+                onChange={(e) => { setDob(e.target.value); if (touched.dob) setFieldErrors((er) => ({ ...er, dob: validateDob(e.target.value) })); }}
+                onBlur={() => markTouched("dob")}
+                className={`${inputCls} pr-11 ${touched.dob && fieldErrors.dob ? errCls : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => dobInputRef.current?.showPicker?.() ?? dobInputRef.current?.focus()}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors"
+                aria-label="Open calendar"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <rect x="3" y="5" width="18" height="16" rx="2" />
+                  <path strokeLinecap="round" d="M8 3v4M16 3v4M3 10h18" />
+                </svg>
+              </button>
+            </div>
+            {touched.dob && fieldErrors.dob && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.dob}</span>}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Blood Group</label>
-            <input type="text" value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className={inputCls} />
+            <select
+              value={bloodGroup}
+              onChange={(e) => setBloodGroup(e.target.value)}
+              className={`${inputCls} cursor-pointer appearance-none ${bloodGroup ? "" : "text-[#A7AAB4]"}`}
+            >
+              <option value="">Select Blood Group</option>
+              {BLOOD_GROUPS.map((bg) => (
+                <option key={bg} value={bg}>{bg}</option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Location</label>
@@ -237,7 +432,11 @@ export default function DoctorPersonalInfoForm({ onSubmit }: DoctorPersonalInfoF
         </div>
 
         <div className="flex justify-end mt-10 pt-4">
-          <button type="submit" className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all">
+          <button
+            type="submit"
+            disabled={!isFormValid}
+            className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          >
             CONTINUE
           </button>
         </div>

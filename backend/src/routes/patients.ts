@@ -8,6 +8,13 @@ import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { getAllProfiles } from "../utils/profile";
+import { v4 as uuidv4 } from "uuid";
+
+// Additional family members allowed per account (5 profiles total including
+// the account holder). Mirrored client-side in services/profileService.ts —
+// this check is the real enforcement; the frontend copy is only a pre-emptive
+// prompt.
+const MAX_ADDITIONAL_FAMILY_MEMBERS = 4;
 
 // multer stores the uploaded file in memory as a Buffer
 const upload = multer({
@@ -551,7 +558,6 @@ router.get("/family", requireRole("patient"), async (req: SessionRequest, res: R
 router.post("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
-    const member = { ...req.body, id: Date.now().toString() };
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -559,7 +565,19 @@ router.post("/family", requireRole("patient"), async (req: SessionRequest, res: 
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = [...((existing.familyMembers as any[]) ?? []), member];
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (currentMembers.length >= MAX_ADDITIONAL_FAMILY_MEMBERS) {
+      res.status(400).json({
+        error: `You can add up to ${MAX_ADDITIONAL_FAMILY_MEMBERS} family members (5 profiles total including yourself).`,
+      });
+      return;
+    }
+
+    // uuidv4 rather than a timestamp — Date.now() has only millisecond
+    // resolution, so a burst of near-simultaneous requests (e.g. a
+    // double-tapped submit button) could otherwise collide on the same id.
+    const member = { ...req.body, id: uuidv4() };
+    const familyMembers = [...currentMembers, member];
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
     res.json({ member });
   } catch (err) {

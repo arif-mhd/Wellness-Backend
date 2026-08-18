@@ -7,6 +7,8 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { hasDoctorPermission } from "../utils/doctorPermissions";
+import { notifyClinic } from "./clinicPayments";
+import { loadOrgDocForClinicId } from "./clinicInsurance";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -180,6 +182,25 @@ router.put("/slots", requireRole("doctor"), async (req: SessionRequest, res: Res
     const updated = { ...doctor, tempSlots: slots, slotsPending: true, updatedAt: new Date().toISOString() };
     await doctorsContainer.items.upsert(updated);
 
+    // Let the clinic's own staff know a request is waiting on them — without
+    // this, the only way to discover a pending change was to stumble onto
+    // the Home dashboard's generic task list.
+    if (doctor.clinicId) {
+      try {
+        const org = await loadOrgDocForClinicId(doctor.clinicId);
+        if (org) {
+          await notifyClinic(org.id, {
+            type: "doctor_schedule_pending",
+            title: "Schedule Change Awaiting Approval",
+            body: `Dr. ${doctor.fullName ?? "A doctor"} submitted an availability change for your review.`,
+            referenceId: doctor.id,
+          });
+        }
+      } catch (err) {
+        console.error("[doctors] Failed to notify clinic of pending schedule change:", err);
+      }
+    }
+
     res.json({ status: "OK", slots: doctor.slots ?? [], tempSlots: slots });
   } catch (err) {
     console.error("Set slots error:", err);
@@ -201,6 +222,7 @@ router.get("/slots", requireRole("doctor"), async (req: SessionRequest, res: Res
       slots: doctor.slots ?? [],
       tempSlots: doctor.tempSlots ?? [],
       slotsPending: doctor.slotsPending ?? false,
+      hasClinic: !!doctor.clinicId,
     });
   } catch (err) {
     console.error("Get doctor slots error:", err);

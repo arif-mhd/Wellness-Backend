@@ -215,7 +215,7 @@ export default function ClinicSidebar() {
           "fixed lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
           isMobileOpen ? "inset-0" : "inset-0 -translate-x-full",
           open ? "lg:w-[255px]" : "lg:w-[80px]",
-          "overflow-hidden",
+          "overflow-y-auto lg:overflow-hidden lg:h-full",
         ].join(" ")}
       >
       <div className="flex flex-col flex-1 min-h-0 w-full">

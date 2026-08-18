@@ -343,6 +343,26 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [fetchNotifications]);
 
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const fetchChatUnread = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/clinic-messages/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        const total = (data.conversations ?? []).reduce((sum: number, c: any) => sum + (c.unreadCount ?? 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch (err) {
+      console.error("Fetch clinic chat unread count error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChatUnread();
+    const id = setInterval(fetchChatUnread, 15_000);
+    return () => clearInterval(id);
+  }, [fetchChatUnread]);
+
   const handleMarkAsRead = async (notifId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)));
     try { await apiFetch(`/api/clinics/payments/notifications/${notifId}/read`, { method: "PATCH" }); } catch { /* best-effort */ }
@@ -520,10 +540,18 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Chat */}
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
+            <button
+              onClick={() => router.push("/clinic/messages")}
+              className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all relative"
+            >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.06 0-2.077-.163-3.02-.465L3 21l1.554-3.887A7.964 7.964 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
+              {chatUnreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-4 h-4 bg-[#E84949] text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                  {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+                </span>
+              )}
             </button>
           </div>
         </header>
