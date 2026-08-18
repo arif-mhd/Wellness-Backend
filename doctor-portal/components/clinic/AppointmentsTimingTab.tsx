@@ -109,12 +109,14 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
           <div className="flex flex-col gap-2">
             <input
               type="date"
+              max="9999-12-31"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
               className="w-full h-[42px] border border-gray-200 rounded-xl px-3 text-[13px] text-gray-700 outline-none focus:border-[#5476FC] transition-colors"
             />
             <input
               type="date"
+              max="9999-12-31"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
               className="w-full h-[42px] border border-gray-200 rounded-xl px-3 text-[13px] text-gray-700 outline-none focus:border-[#5476FC] transition-colors"

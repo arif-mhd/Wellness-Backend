@@ -755,6 +755,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Expiry Date</label>
                   <input
                     type="date"
+                    max="9999-12-31"
                     value={productForm.expiryDate}
                     onChange={e => setProductForm(p => ({ ...p, expiryDate: e.target.value }))}
                     className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"

@@ -254,7 +254,7 @@ export default function AddProductPage() {
             </div>
             <div>
               <label className={labelCls}>Expiry Date</label>
-              <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
+              <input type="date" max="9999-12-31" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
                 className="w-full h-12 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
             </div>
           </div>

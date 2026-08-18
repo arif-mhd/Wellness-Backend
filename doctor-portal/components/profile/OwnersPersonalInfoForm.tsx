@@ -254,31 +254,13 @@ export default function OwnersPersonalInfoForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <div className="relative">
-              <input
-                ref={dobInputRef}
-                type="date"
-                value={dob}
-                min={dobMin}
-                max={dobMax}
-                onChange={(e) => { setDob(e.target.value); setDobError(validateDob(e.target.value)); }}
-                className={`${inputCls} pr-11 ${dob ? "text-gray-800" : "text-gray-400"}`}
-              />
-              <button
-                type="button"
-                onClick={() => dobInputRef.current?.showPicker?.() ?? dobInputRef.current?.focus()}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors"
-                aria-label="Open calendar"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path strokeLinecap="round" d="M8 3v4M16 3v4M3 10h18" />
-                </svg>
-              </button>
-            </div>
-            {dobError && <span className="text-red-500 text-xs mt-0.5 pl-1">{dobError}</span>}
-          </div>
+          <input
+            type="date"
+            max="9999-12-31"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            className={`${inputCls} ${dob ? "text-gray-800" : "text-gray-400"}`}
+          />
           <input
             type="text"
             placeholder="Position in Clinic*"

@@ -679,6 +679,7 @@ function ClinicAppointmentsContent() {
             </p>
             <input
               type="datetime-local"
+              max="9999-12-31T23:59"
               value={rescheduleValue}
               onChange={(e) => setRescheduleValue(e.target.value)}
               className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC]"

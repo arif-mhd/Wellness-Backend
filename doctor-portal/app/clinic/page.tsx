@@ -117,7 +117,6 @@ function ClinicHomeContent() {
   const [clinicAvatar, setClinicAvatar] = useState("");
   const [clinicSlots, setClinicSlots] = useState<Slot[]>([]);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [hasMultipleBranches, setHasMultipleBranches] = useState(false);
   const [doctors, setDoctors] = useState<ClinicDoctor[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -128,6 +127,7 @@ function ClinicHomeContent() {
     // identity/hours instead of the org's; otherwise this is either an
     // ordinary clinic or the org's own aggregate view.
     if (branchId) {
+      // Viewing a specific branch — load that branch's identity and hours.
       apiFetch(`/api/clinics/branches/${branchId}`)
         .then((r) => r.json())
         .then((data) => {
@@ -138,6 +138,9 @@ function ClinicHomeContent() {
         })
         .catch(() => setClinicName("Branch"));
     } else {
+      // The clinic admin is always the admin of their own main clinic, so we
+      // always load and display the main clinic's availability — even when
+      // there are additional branches.
       apiFetch("/api/clinics/me")
         .then((r) => r.json())
         .then((data) => {
@@ -148,15 +151,6 @@ function ClinicHomeContent() {
           setIsAvailable(c.isOnline !== false);
         })
         .catch(() => setClinicName("Your Clinic"));
-
-      // Every org owner's own account is at least its own main branch, so
-      // this always succeeds with >= 1 entry — "Clinic's Availability"
-      // below only makes sense to show once there's exactly one location
-      // (main branch alone); once there's more, hours differ per branch.
-      apiFetch("/api/clinics/branches")
-        .then((r) => r.json())
-        .then((data) => setHasMultipleBranches(Array.isArray(data.branches) && data.branches.filter((b: any) => b.status === "active").length > 1))
-        .catch(() => setHasMultipleBranches(false));
     }
 
     apiFetch(`/api/clinics/doctors${qs}`)
@@ -484,8 +478,8 @@ function ClinicHomeContent() {
 
         {/* Right Column */}
         <div className="flex flex-col gap-6">
-          {/* Availability Panel — org-level hours don't exist for multi-branch orgs viewed in aggregate */}
-          {!(hasMultipleBranches && !branchId) && (
+          {/* Availability Panel — always shown; shows the main clinic's hours by default, or the selected branch's hours when branchId is set */}
+          {(
             <div className="bg-white rounded-xl p-6 border border-white shadow-sm flex flex-col gap-5">
               <div className="flex justify-between items-center w-full">
                 <span className="text-[#24292E] text-[20px] font-normal tracking-[-0.4px]" style={{ fontFamily: "Outfit, sans-serif" }}>

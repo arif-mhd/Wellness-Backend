@@ -361,7 +361,7 @@ export default function AddPharmacyPage() {
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className={labelCls}>Expiry Date</label>
-                        <input type="date" name="expiryDate" value={activeProduct.expiryDate} onChange={e => handleProductChange(activeProductIdx, e)} className={inputCls} />
+                        <input type="date" max="9999-12-31" name="expiryDate" value={activeProduct.expiryDate} onChange={e => handleProductChange(activeProductIdx, e)} className={inputCls} />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className={labelCls}>Reorder Level</label>

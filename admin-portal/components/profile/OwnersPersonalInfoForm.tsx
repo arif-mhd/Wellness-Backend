@@ -216,6 +216,7 @@ export default function OwnersPersonalInfoForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="date"
+            max="9999-12-31"
             value={dob}
             onChange={(e) => setDob(e.target.value)}
             className={`${inputCls} ${dob ? "text-gray-800" : "text-gray-400"}`}

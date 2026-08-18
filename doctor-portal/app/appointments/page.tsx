@@ -141,10 +141,15 @@ export default function AppointmentsPage() {
     }, 4000);
   };
 
+  // Track which appointment IDs have already had a reminder sent, so the
+  // button can be permanently disabled after the first successful send.
+  const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
+
   const sendReminder = async (patient: Patient) => {
     try {
       const res = await apiFetch(`/api/appointments/${patient.id}/remind`, { method: "POST" });
       if (res.ok) {
+        setRemindedIds((prev) => new Set(prev).add(patient.id));
         triggerToast(`Reminder sent to ${patient.name}`);
       } else {
         triggerToast("Failed to send reminder");
@@ -447,13 +452,15 @@ export default function AppointmentsPage() {
               )}
             </div>
 
-            <NewAppointmentsTable
+          <NewAppointmentsTable
               appointments={filteredNewAppointments}
               selectedPatientId={selectedPatient?.id}
               onSelectPatient={setSelectedPatient}
               onConsult={startConsult}
-              onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+              onSendReminder={sendReminder}
+              remindedIds={remindedIds}
             />
+
           </div>
         )}
 
@@ -532,7 +539,8 @@ export default function AppointmentsPage() {
             selectedPatientId={selectedPatient?.id}
             onSelectPatient={setSelectedPatient}
             onConsult={startConsult}
-            onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
+            onSendReminder={sendReminder}
+            remindedIds={remindedIds}
             activeTab={activeTab}
             fadeCompleted={activeTab === "All"}
           />
@@ -542,13 +550,14 @@ export default function AppointmentsPage() {
       {/* Right Panel - Details Sidecard — only visible when a patient is selected */}
       {selectedPatient && (
         <div className="w-full lg:w-[372px] lg:shrink-0 lg:sticky lg:top-8 self-start">
-          <AppointmentDetailsCard
+        <AppointmentDetailsCard
             patient={selectedPatient}
             onClose={() => setSelectedPatient(null)}
             onConsult={startConsult}
             onViewProfile={(patient) => router.push("/appointments/patient-details?id=" + patient.id)}
             onViewPreVisitForm={(patient) => router.push("/appointments/previsit-form?id=" + patient.id)}
             onSendReminder={sendReminder}
+            reminderSent={remindedIds.has(selectedPatient.id)}
             activeTab={activeTab}
           />
         </div>

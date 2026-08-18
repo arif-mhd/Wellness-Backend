@@ -314,30 +314,7 @@ export default function DoctorPersonalInfoForm({
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[12px] font-semibold text-[#24292E]">Date of Birth</label>
-            <div className="relative">
-              <input
-                ref={dobInputRef}
-                type="date"
-                value={dob}
-                min={dobMin}
-                max={dobMax}
-                onChange={(e) => { setDob(e.target.value); if (touched.dob) setFieldErrors((er) => ({ ...er, dob: validateDob(e.target.value) })); }}
-                onBlur={() => markTouched("dob")}
-                className={`${inputCls} pr-11 ${touched.dob && fieldErrors.dob ? errCls : ""}`}
-              />
-              <button
-                type="button"
-                onClick={() => dobInputRef.current?.showPicker?.() ?? dobInputRef.current?.focus()}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#5476FC] transition-colors"
-                aria-label="Open calendar"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path strokeLinecap="round" d="M8 3v4M16 3v4M3 10h18" />
-                </svg>
-              </button>
-            </div>
-            {touched.dob && fieldErrors.dob && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.dob}</span>}
+            <input type="date" max="9999-12-31" value={dob} onChange={(e) => setDob(e.target.value)} className={inputCls} />
           </div>
         </div>
 

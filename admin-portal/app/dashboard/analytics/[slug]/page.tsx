@@ -157,6 +157,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
                 <div className="relative">
                   <input
                     type="date"
+                    max="9999-12-31"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
                     placeholder="From date"
@@ -166,6 +167,7 @@ export default function ReportConfigPage({ params }: { params: Promise<{ slug: s
                 <div className="relative">
                   <input
                     type="date"
+                    max="9999-12-31"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
                     placeholder="To Date"

@@ -894,7 +894,7 @@ export default function SettingsPage() {
                           <div className="mt-5 grid grid-cols-12 gap-4 animate-in slide-in-from-top-2">
                             <div className="col-span-4 relative">
                               <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Effective Date</label>
-                              <input type="date" value={item.effectiveDate} onChange={e => updateFeeData(item.id, "effectiveDate", e.target.value)} className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm" />
+                              <input type="date" max="9999-12-31" value={item.effectiveDate} onChange={e => updateFeeData(item.id, "effectiveDate", e.target.value)} className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm" />
                             </div>
                             <div className="col-span-8 relative">
                               <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Notes</label>
@@ -1098,7 +1098,7 @@ export default function SettingsPage() {
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center px-5 max-w-md">
                     <div className="flex flex-col w-full">
                       <label className="text-[10px] font-medium text-slate-400">Scheduled Downtime</label>
-                      <input type="datetime-local" value={scheduledDowntime} onChange={e => setScheduledDowntime(e.target.value)} className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full" />
+                      <input type="datetime-local" max="9999-12-31T23:59" value={scheduledDowntime} onChange={e => setScheduledDowntime(e.target.value)} className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full" />
                     </div>
                   </div>
                 </div>
