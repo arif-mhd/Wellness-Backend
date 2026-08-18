@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { getUser } from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
@@ -341,6 +342,18 @@ router.get("/profile", requireRole("patient"), async (req: SessionRequest, res: 
     } else if (resource.dob && !resource.dateOfBirth) {
       resource.dateOfBirth = resource.dob;
     }
+
+    // The account's real sign-in email lives in SuperTokens, not this
+    // mutable Cosmos field — trusting SuperTokens as authoritative here
+    // means a stale/placeholder value on the document (old test data, a
+    // manual edit, anything that drifted from the real login credential)
+    // never gets displayed instead of the email the user actually signs in
+    // with. Family members have no login of their own, so their `email` is
+    // untouched — this only overrides the top-level/self field.
+    try {
+      const stUser = await getUser(userId);
+      if (stUser?.emails?.[0]) resource.email = stUser.emails[0];
+    } catch { /* fall back to the stored field */ }
 
     res.json({ profile: resource });
   } catch (err) {
@@ -878,16 +891,22 @@ router.post("/change-password", requireRole("patient"), async (req: SessionReque
   }
 
   try {
-    const { resource: patient } = await patientsContainer.item(userId, userId).read();
-    if (!patient) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+    // Re-verify against the REAL SuperTokens login email, not the mutable
+    // Cosmos profile field — if that field has ever drifted from the actual
+    // credential (old test data, a manual edit), signing in against it would
+    // target the wrong (often nonexistent) account and fail every time,
+    // even with the correct current password.
+    const stUser = await getUser(userId);
+    const loginEmail = stUser?.emails?.[0];
+    if (!loginEmail) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
 
-    const signInResult = await EmailPassword.signIn("public", patient.email, currentPassword);
+    const signInResult = await EmailPassword.signIn("public", loginEmail, currentPassword);
     if (signInResult.status !== "OK") {
       res.status(403).json({ error: "WRONG_PASSWORD" });
       return;
     }
 
-    const tokenResult = await EmailPassword.createResetPasswordToken("public", userId, patient.email);
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", userId, loginEmail);
     if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
 
     const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
