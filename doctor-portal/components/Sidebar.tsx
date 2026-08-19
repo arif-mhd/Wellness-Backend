@@ -99,12 +99,10 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState } = useSidebar();
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
-  const [isOnline, setIsOnline] = useState(false);
-  const [isManuallyOffline, setIsManuallyOffline] = useState(false);
   const [scheduleSlots, setScheduleSlots] = useState<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>([]);
   const { can } = useDoctorPermissions();
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.perm || can(item.perm));
@@ -126,11 +124,10 @@ export default function Sidebar() {
   }
 
   // ── Initial load: doctor profile + schedule slots ──
+  // Online/offline status itself now lives in SidebarContext (shared with
+  // the dashboard's Availability card) so a toggle from either place is
+  // reflected everywhere instantly instead of waiting on a separate poll.
   useEffect(() => {
-    // Use closure vars so whichever fetch resolves second has both pieces
-    let manuallyOff = false;
-    let loadedSlots: typeof scheduleSlots = [];
-
     apiFetch("/api/doctors/me")
       .then(r => r.json())
       .then(data => {
@@ -138,36 +135,15 @@ export default function Sidebar() {
         setDoctorName(d.fullName ?? "");
         setDoctorEmail(d.email ?? "");
         setDoctorAvatar(d.avatarUrl ?? "");
-        manuallyOff = d.isManuallyOffline ?? false;
-        setIsManuallyOffline(manuallyOff);
-        // Effective: in schedule AND not on a manual break
-        setIsOnline(!manuallyOff && computeScheduleOnline(loadedSlots));
       })
       .catch(() => {});
 
     apiFetch("/api/doctors/slots")
       .then(r => r.json())
       .then(data => {
-        loadedSlots = data.slots ?? [];
-        setScheduleSlots(loadedSlots);
-        setIsOnline(!manuallyOff && computeScheduleOnline(loadedSlots));
+        setScheduleSlots(data.slots ?? []);
       })
       .catch(() => {});
-  }, []);
-
-  // ── Poll API every 30s to stay in sync with dashboard toggle changes ──
-  useEffect(() => {
-    const pollId = setInterval(() => {
-      apiFetch("/api/doctors/me")
-        .then(r => r.json())
-        .then(data => {
-          const d = data.doctor ?? {};
-          setIsManuallyOffline(d.isManuallyOffline ?? false);
-          setIsOnline(d.isOnline !== false);
-        })
-        .catch(() => {});
-    }, 30_000);
-    return () => clearInterval(pollId);
   }, []);
 
   // ── Re-compute from schedule every 60s (only when not manually on break) ──
@@ -176,7 +152,7 @@ export default function Sidebar() {
     const id = setInterval(() => {
       if (!isManuallyOffline) {
         const effective = computeScheduleOnline(scheduleSlots);
-        setIsOnline(effective);
+        setOnlineState(effective, false);
         // Silently sync to backend
         apiFetch("/api/doctors/online-status", {
           method: "PATCH",
@@ -186,7 +162,7 @@ export default function Sidebar() {
       }
     }, 60_000);
     return () => clearInterval(id);
-  }, [scheduleSlots, isManuallyOffline]);
+  }, [scheduleSlots, isManuallyOffline, setOnlineState]);
 
   async function handleSignOut() {
     if (!window.confirm("Are you sure you want to log out?")) return;

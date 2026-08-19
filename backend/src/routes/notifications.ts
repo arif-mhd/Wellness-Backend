@@ -112,13 +112,18 @@ router.patch("/:id/read", verifySession(), async (req: SessionRequest, res: Resp
 // Marks all notifications for a patient as read.
 router.patch("/read-all", verifySession(), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
+  const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
 
   try {
+    let query = "SELECT * FROM c WHERE c.patientId = @patientId AND c.isRead = false";
+    const parameters: { name: string; value: string }[] = [{ name: "@patientId", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+
     const { resources } = await notificationsContainer.items
-      .query({
-        query: "SELECT * FROM c WHERE c.patientId = @patientId AND c.isRead = false",
-        parameters: [{ name: "@patientId", value: patientId }],
-      })
+      .query({ query, parameters })
       .fetchAll();
 
     for (const doc of resources) {

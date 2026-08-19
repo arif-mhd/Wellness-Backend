@@ -1,9 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+
+interface TicketAttachment {
+  id: string;
+  fileName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+}
 
 interface SupportTicket {
   id: string;
@@ -16,6 +25,7 @@ interface SupportTicket {
   createdAt: string;
   updatedAt: string;
   submitterRole?: string;
+  attachments?: TicketAttachment[];
 }
 
 export default function HelpSupportPage() {
@@ -33,6 +43,8 @@ export default function HelpSupportPage() {
   const [subject, setSubject] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [comments, setComments] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchTickets = useCallback(async () => {
@@ -86,7 +98,18 @@ export default function HelpSupportPage() {
         }),
       });
       if (res.ok) {
-        const newTicket = await res.json();
+        let newTicket = await res.json();
+
+        if (attachments.length > 0) {
+          const formData = new FormData();
+          attachments.forEach((file) => formData.append("files", file));
+          const attachRes = await apiFetch(`/api/support/${newTicket.id}/attachments`, {
+            method: "POST",
+            body: formData,
+          });
+          if (attachRes.ok) newTicket = await attachRes.json();
+        }
+
         setTickets((prev) => [newTicket, ...prev]);
       }
     } finally {
@@ -94,6 +117,7 @@ export default function HelpSupportPage() {
       setSubject("");
       setContactNumber("");
       setComments("");
+      setAttachments([]);
       setSelectedCategory("Technical Problems");
       setShowRaiseIssue(false);
     }
@@ -491,6 +515,52 @@ export default function HelpSupportPage() {
                 className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[16px] p-4 text-[13px] text-[#24292E] placeholder-[#9EA5AD] min-h-[100px] outline-none focus:border-[#5476FC] transition-colors"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               />
+            </div>
+
+            {/* Attachments */}
+            <div className="flex flex-col gap-2">
+              <span
+                className="text-[#9EA5AD] text-[9px] font-medium uppercase tracking-wider"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Attachments (optional)
+              </span>
+              <div
+                onClick={() => attachmentInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-[#C5D3FF] bg-[#F9FAFC] hover:bg-[#F4F7FF] rounded-[16px] px-4 py-4 flex items-center gap-3 cursor-pointer transition-colors"
+              >
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                  onChange={(e) => setAttachments((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
+                  className="hidden"
+                />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5476FC" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-[13px] font-semibold text-[#5476FC]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  {attachments.length > 0 ? `${attachments.length} file${attachments.length > 1 ? "s" : ""} selected` : "Add images, PDF, or Word docs"}
+                </span>
+              </div>
+              {attachments.length > 0 && (
+                <div className="flex flex-col gap-1.5 mt-1">
+                  {attachments.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="flex items-center justify-between bg-[#F9FAFC] border border-[#EBEEF5] rounded-[10px] px-3 py-2">
+                      <span className="text-[12px] text-[#676E76] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                        className="text-[#9EA5AD] hover:text-red-400 transition-colors shrink-0 ml-2"
+                        aria-label="Remove attachment"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Action buttons */}

@@ -58,8 +58,10 @@ import articlesRouter from "./routes/articles";
 import otpRouter from "./routes/otp";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
+import clinicMessagesRouter from "./routes/clinicMessages";
 import servicesRouter from "./routes/services";
 import fhirRouter from "./routes/fhir";
+import internalRouter from "./routes/internal";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -169,10 +171,15 @@ app.use("/api/articles", articlesRouter);
 app.use("/api/otp",      otpRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
+app.use("/api/clinic-messages", clinicMessagesRouter);
 app.use("/api/services", servicesRouter);
 
 // External EMR (FHIR) read-only integration — mock Cortex via public HAPI sandbox
 app.use("/api/fhir", fhirRouter);
+
+// Internal endpoints for server-to-server callers (Cloud Scheduler), not
+// logged-in users — guarded by a shared secret inside the router itself.
+app.use("/api/internal", internalRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

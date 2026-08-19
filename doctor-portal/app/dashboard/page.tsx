@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/apiFetch";
+import { useSidebar } from "@/components/SidebarContext";
 
 interface SlotDef {
   dayOfWeek: number;
@@ -93,9 +94,12 @@ export default function DashboardPage() {
 
   const [doctorName, setDoctorName]     = useState<string | null>(null);
   const [slots, setSlots]               = useState<SlotDef[]>([]);
-  const [isAvailable, setIsAvailable]   = useState(true);
+  // Shared with the Sidebar's own indicator (SidebarContext) so a toggle
+  // here or a schedule-driven auto-sync there shows up in both places
+  // instantly instead of waiting on each component's own separate poll.
+  const { isOnline: isAvailable, setOnlineState } = useSidebar();
   const [togglingAvailable, setTogglingAvailable] = useState(false);
-  const [isManuallyOffline, setIsManuallyOffline] = useState(false);
+  const [availabilityToggleError, setAvailabilityToggleError] = useState("");
 
   // Appointments
   const [patients, setPatients]               = useState<PatientRow[]>([]);
@@ -171,33 +175,34 @@ export default function DashboardPage() {
   const handleAvailabilityToggle = useCallback(async () => {
     const goingOnBreak = isAvailable; // currently "available" → going on break
     setTogglingAvailable(true);
+    setAvailabilityToggleError("");
     try {
-      let newIsOnline: boolean;
-      if (goingOnBreak) {
-        // Doctor taking a break — go offline
-        newIsOnline = false;
-      } else {
-        // Doctor resuming — back to schedule: online only if within working hours now
-        const now = new Date();
-        const todayDow = now.getDay();
-        const nowMins = now.getHours() * 60 + now.getMinutes();
-        newIsOnline = slots.some(s => {
-          if (!s.isActive || s.dayOfWeek !== todayDow) return false;
-          const [sh, sm] = s.startTime.split(":").map(Number);
-          const [eh, em] = s.endTime.split(":").map(Number);
-          return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
-        });
-      }
-      await apiFetch("/api/doctors/online-status", {
+      // A manual toggle is a direct override in both directions — flipping it
+      // on sets isOnline:true immediately, the same way flipping it off sets
+      // isOnline:false immediately. Previously "on" recomputed from the
+      // schedule instead of forcing true, so toggling on outside working
+      // hours silently stayed "offline" everywhere else (Sidebar, public
+      // directory) while this card alone showed "available now."
+      const newIsOnline = !goingOnBreak;
+      const res = await apiFetch("/api/doctors/online-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOnline: newIsOnline, isManuallyOffline: goingOnBreak }),
       });
-      setIsManuallyOffline(goingOnBreak);
-      setIsAvailable(!goingOnBreak); // toggle ON = following schedule
-    } catch { /* keep current state on error */ }
+      // A failed request (expired session, 500, etc.) must not silently
+      // leave this card showing a status the backend never actually saved —
+      // that's exactly how the toggle could look like it "did nothing"
+      // elsewhere (Sidebar, public directory) while this card still flipped.
+      if (!res.ok) {
+        setAvailabilityToggleError("Couldn't update your status. Please try again.");
+      } else {
+        setOnlineState(newIsOnline, goingOnBreak);
+      }
+    } catch {
+      setAvailabilityToggleError("Couldn't update your status. Please try again.");
+    }
     setTogglingAvailable(false);
-  }, [isAvailable, slots]);
+  }, [isAvailable, setOnlineState]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -206,15 +211,6 @@ export default function DashboardPage() {
       if (meRes.ok) {
         const meData = await meRes.json();
         setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
-      }
-
-      // Online/available: toggle shows whether doctor is following schedule (ON) or on a break (OFF)
-      const doctorRes = await apiFetch("/api/doctors/me");
-      if (doctorRes.ok) {
-        const { doctor } = await doctorRes.json();
-        const manuallyOff = doctor?.isManuallyOffline ?? false;
-        setIsManuallyOffline(manuallyOff);
-        setIsAvailable(!manuallyOff); // toggle ON = following schedule; toggle OFF = on break
       }
 
       // Appointments
@@ -783,6 +779,9 @@ export default function DashboardPage() {
                   <div className={`bg-white w-[13px] h-[13px] rounded-full shadow-sm transform transition-transform duration-200 ${isAvailable ? "translate-x-0" : "-translate-x-[16px]"}`} />
                 </button>
               </div>
+              {availabilityToggleError && (
+                <span className="text-red-500 text-[11px] -mt-2">{availabilityToggleError}</span>
+              )}
             </div>
 
             {/* Todays Tasks Panel */}

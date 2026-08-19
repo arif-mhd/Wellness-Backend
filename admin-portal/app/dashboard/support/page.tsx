@@ -26,6 +26,19 @@ interface TicketComment {
   createdAt: string;
 }
 
+interface TicketAttachment {
+  id: string;
+  fileName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+function isImageAttachment(contentType: string) {
+  return contentType.startsWith("image/");
+}
+
 const ROLE_LABEL: Record<string, string> = { doctor: "Doctor", clinic: "Clinic", patient: "Patient" };
 const ROLE_BADGE_COLOR: Record<string, string> = {
   doctor: "bg-purple-50 text-purple-600",
@@ -47,6 +60,7 @@ interface Ticket {
   status: Status;
   adminReply?: string | null;
   comments?: TicketComment[];
+  attachments?: TicketAttachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -471,6 +485,29 @@ function SupportPageInner() {
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
+                {selected.attachments && selected.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selected.attachments.map((att) => (
+                      <a
+                        key={att.id}
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 hover:border-[#6A8BFF] transition-colors"
+                      >
+                        {isImageAttachment(att.contentType) ? (
+                          <img src={att.url} alt={att.fileName} className="w-8 h-8 rounded object-cover shrink-0" />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6A8BFF" strokeWidth={2} className="shrink-0">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6" />
+                          </svg>
+                        )}
+                        <span className="text-[11px] text-[#4468E0] font-semibold truncate max-w-[140px]">{att.fileName}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Comment Thread */}

@@ -183,8 +183,33 @@ function AddDoctorContent() {
       )}
 
       <div className="max-w-4xl mx-auto">
-        {step === 1 && <DoctorPersonalInfoForm onSubmit={handleStep1Submit} />}
-        {step === 2 && <DoctorMedicalCareerForm onSubmit={handleStep2Submit} onGoBack={() => setStep(1)} />}
+        {step === 1 && (
+          <DoctorPersonalInfoForm
+            onSubmit={handleStep1Submit}
+            initialFirstName={personalInfo?.firstName}
+            initialLastName={personalInfo?.lastName}
+            initialEmiratesId={personalInfo?.emiratesId}
+            initialEmail={personalInfo?.email}
+            initialPhone={personalInfo?.phone}
+            initialGender={personalInfo?.gender}
+            initialDob={personalInfo?.dateOfBirth}
+            initialBloodGroup={personalInfo?.bloodGroup}
+            initialLocation={personalInfo?.location}
+            initialLanguages={personalInfo?.languages}
+            initialOtherInfo={personalInfo?.otherInfo}
+          />
+        )}
+        {step === 2 && (
+          <DoctorMedicalCareerForm
+            onSubmit={handleStep2Submit}
+            onGoBack={() => setStep(1)}
+            initialLicenseNumber={careerInfo?.licenseNumber}
+            initialSpecializationNames={careerInfo?.specializations?.map((s: any) => s.name)}
+            initialRates={careerInfo?.consultationRates}
+            initialPaymentSettings={careerInfo?.paymentSettings}
+            initialBio={careerInfo?.bio}
+          />
+        )}
         {step === 3 && (
           <div className="w-full bg-white rounded-3xl shadow-sm border border-[#E4E8F0] p-8 md:p-12 font-outfit animate-fade-in max-w-xl mx-auto">
           <p className="text-center text-gray-500 text-sm mb-6 -mt-2">
