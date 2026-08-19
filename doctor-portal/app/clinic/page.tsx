@@ -246,7 +246,7 @@ function ClinicHomeContent() {
   return (
     <div className="px-4 md:px-8 pb-12 select-none">
       {/* Top Greeting Row */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 mt-2">
         <div className="flex flex-col justify-center items-flex-start gap-1">
           <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]" style={{ fontFamily: "Outfit, sans-serif" }}>
             {greeting}
@@ -302,7 +302,7 @@ function ClinicHomeContent() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         {/* Card 1: Consultations Today */}
         <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
           <div className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>

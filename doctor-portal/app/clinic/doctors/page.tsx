@@ -284,7 +284,7 @@ function ManageDoctorsContent() {
 
   return (
     <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
-      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
 

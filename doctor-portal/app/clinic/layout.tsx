@@ -419,8 +419,8 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* On desktop, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
-      <div className="shrink-0 lg:z-10">
+      {/* On tablet+, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
+      <div className="shrink-0 md:z-10">
         <ClinicSidebar />
       </div>
 
@@ -428,7 +428,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-6 lg:px-[40px]"}`}>
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none"
+              className="md:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none"
               onClick={() => setIsMobileOpen(true)}
             >
               <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -468,7 +468,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
               {showNotifDropdown && (
                 <>
                   <div className="fixed inset-0 bg-slate-900/40 z-40 animate-in fade-in duration-200" aria-hidden="true" onClick={() => setShowNotifDropdown(false)} />
-                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
+                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] max-w-[calc(100vw-1.5rem)] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-[17px] font-black text-[#24292E]">Notifications</h3>
                       <button onClick={() => setShowNotifDropdown(false)} className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition">
