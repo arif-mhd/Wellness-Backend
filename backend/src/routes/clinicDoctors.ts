@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
+import { listUsersByAccountInfo } from "supertokens-node";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import RecipeUserId from "supertokens-node/lib/build/recipeUserId";
@@ -125,6 +126,25 @@ router.post(
     }
   }
 );
+
+// ─── GET /api/clinics/doctors/check-email ────────────────────────────────────
+// Lets the Add Doctor wizard flag an already-registered email at Step 1,
+// instead of the account only failing at the very last step (after the whole
+// form — license, specializations, resume, etc. — has been filled in).
+router.get("/check-email", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+  if (!email) {
+    res.status(400).json({ error: "email is required." });
+    return;
+  }
+  try {
+    const users = await listUsersByAccountInfo("public", { email });
+    res.json({ exists: users.length > 0 });
+  } catch (err) {
+    console.error("Check doctor email error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 // ─── POST /api/clinics/doctors ───────────────────────────────────────────────
 // Clinic creates a fully-onboarded doctor account in one step: real
@@ -335,7 +355,17 @@ router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionReq
   try {
     const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
-    await doctorsContainer.items.upsert({ ...doctor, isOnline, updatedAt: new Date().toISOString() });
+    // Mirrors the doctor's own PATCH /api/doctors/online-status semantics:
+    // isManuallyOffline must move with isOnline here too, otherwise the
+    // doctor's own client-side schedule-recompute loop (Sidebar.tsx) treats
+    // this as still "following schedule" and silently overwrites a clinic
+    // admin's override within its next ~60s poll.
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      isOnline,
+      isManuallyOffline: !isOnline,
+      updatedAt: new Date().toISOString(),
+    });
     res.json({ status: "OK", isOnline });
   } catch (err) {
     console.error("Update clinic doctor online status error:", err);
@@ -385,6 +415,72 @@ router.post("/:id/reset-password", requireRole("clinic"), async (req: SessionReq
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Reset clinic doctor password error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/clinics/doctors/:id/2fa/enable ────────────────────────────────
+// ─── POST /api/clinics/doctors/:id/2fa/disable ───────────────────────────────
+// Doctors no longer have a self-service 2FA toggle — only their clinic can
+// change it. Unlike a doctor enabling their own 2FA, this doesn't require an
+// email-OTP step: the clinic's own authenticated session is the
+// authorization here, not proof of access to the doctor's inbox.
+router.post("/:id/2fa/enable", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
+  try {
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
+    if (!doctor) return;
+
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor 2FA Enabled",
+      details: `2FA enabled for Dr. ${doctor.fullName ?? doctor.id} by clinic`,
+      performedBy: "Clinic",
+      performedById: actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Enable clinic doctor 2FA error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.post("/:id/2fa/disable", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
+  try {
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
+    if (!doctor) return;
+
+    await doctorsContainer.items.upsert({ ...doctor, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor 2FA Disabled",
+      details: `2FA disabled for Dr. ${doctor.fullName ?? doctor.id} by clinic`,
+      performedBy: "Clinic",
+      performedById: actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Disable clinic doctor 2FA error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -470,6 +566,61 @@ router.post("/:id/verify-slots", requireRole("clinic"), async (req: SessionReque
     res.json({ status: "OK", doctor: updatedDoctor });
   } catch (err) {
     console.error("Verify clinic doctor slots error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/clinics/doctors/:id/reject-slots ──────────────────────────────
+// Declines a doctor's pending schedule change — discards tempSlots, leaves
+// their live slots untouched, and records why so the doctor's own derived
+// notification (doctors.ts's buildNotificationsForDoctor) can show it.
+router.post("/:id/reject-slots", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const { reason } = req.body;
+  try {
+    const actorPerms = await getActorPermissionState(actorId);
+    if (!hasPermission(actorPerms, "manage_schedules")) {
+      res.status(403).json({ error: "You don't have permission to manage schedules." });
+      return;
+    }
+    const allowedClinicIds = await getActorClinicIds(actorId);
+    const { resource: doctor } = await doctorsContainer
+      .item(req.params.id, req.params.id)
+      .read()
+      .catch(() => ({ resource: undefined as any }));
+    if (!doctor || !allowedClinicIds.includes(doctor.clinicId)) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+    if (!doctor.slotsPending) {
+      res.status(400).json({ error: "This doctor has no pending schedule change." });
+      return;
+    }
+
+    const updatedDoctor = {
+      ...doctor,
+      tempSlots: null,
+      slotsPending: false,
+      slotsRejectedAt: new Date().toISOString(),
+      slotsRejectedReason: typeof reason === "string" && reason.trim() ? reason.trim() : null,
+      slotsRejectedBy: actorId,
+    };
+
+    await doctorsContainer.items.upsert(updatedDoctor);
+
+    logActivity({
+      source: "clinic",
+      action: "Doctor Slots Rejected",
+      details: `Dr. ${doctor.fullName ?? doctor.id}'s availability change request was rejected by clinic`,
+      performedBy: "Clinic",
+      performedById: actorId,
+      entityType: "doctor",
+      entityId: doctor.id,
+    });
+
+    res.json({ status: "OK", doctor: updatedDoctor });
+  } catch (err) {
+    console.error("Reject clinic doctor slots error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

@@ -275,7 +275,7 @@ export default function ClinicDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   return (
     <ProtectedRoute>
-      <ClinicDetailInner id={id} />
+        <ClinicDetailInner id={id} />
     </ProtectedRoute>
   );
 }

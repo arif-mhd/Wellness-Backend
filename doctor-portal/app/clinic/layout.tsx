@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import ClinicSidebar from "@/components/ClinicSidebar";
@@ -48,6 +48,272 @@ function notificationIcon(type: string) {
   );
 }
 
+// ─── ClinicSearch ──────────────────────────────────────────────────────────────
+
+interface ClinicSearchResult {
+  type: "doctor" | "patient" | "appointment";
+  id: string;
+  title: string;
+  subtitle: string;
+  status?: string;
+  date?: string;
+  avatarUrl?: string | null;
+  href: string;
+}
+
+interface ClinicSearchResults {
+  doctors: ClinicSearchResult[];
+  patients: ClinicSearchResult[];
+  appointments: ClinicSearchResult[];
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  doctor:      "bg-[#5476FC]/10 text-[#5476FC]",
+  patient:     "bg-purple-50 text-purple-600",
+  appointment: "bg-amber-50 text-amber-600",
+};
+const TYPE_LABELS: Record<string, string> = {
+  doctor: "Doctor", patient: "Patient", appointment: "Appt",
+};
+
+function SearchResultAvatar({ item }: { item: ClinicSearchResult }) {
+  if (item.avatarUrl) {
+    return <img src={item.avatarUrl} className="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="" />;
+  }
+  const initials = item.title.slice(0, 2).toUpperCase();
+  const cls = TYPE_COLORS[item.type] ?? "bg-slate-100 text-slate-500";
+  return (
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${cls}`}>
+      {initials}
+    </div>
+  );
+}
+
+function SearchTypeBadge({ type }: { type: string }) {
+  const cls = TYPE_COLORS[type] ?? "bg-slate-100 text-slate-500";
+  return (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${cls}`}>
+      {TYPE_LABELS[type] ?? type}
+    </span>
+  );
+}
+
+function fmtDate(iso?: string) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
+  catch { return ""; }
+}
+
+function ClinicSearch() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ClinicSearchResults | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const totalResults = results
+    ? results.doctors.length + results.patients.length + results.appointments.length
+    : 0;
+
+  useEffect(() => {
+    if (searchExpanded) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [searchExpanded]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim() || query.trim().length < 2) {
+      setResults(null); setLoading(false); return;
+    }
+    setLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/clinics/search?q=${encodeURIComponent(query.trim())}`);
+        if (res.ok) { const data = await res.json(); setResults(data); setDropdownOpen(true); }
+      } catch { /* silent */ } finally { setLoading(false); }
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+        if (!query) setSearchExpanded(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [query]);
+
+  function handleNavigate(href: string) {
+    setDropdownOpen(false); setQuery(""); setResults(null); setSearchExpanded(false);
+    router.push(href);
+  }
+
+  function handleClose() {
+    setDropdownOpen(false); setQuery(""); setResults(null); setSearchExpanded(false);
+  }
+
+  const showDropdown = dropdownOpen && query.trim().length >= 2;
+
+  return (
+    <div ref={wrapperRef} className="flex items-center justify-end relative">
+      {/* Animated expanding search bar */}
+      <div
+        className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out rounded-full ${
+          searchExpanded
+            ? "w-[300px] ring-2 ring-[#5476FC]/20 bg-white shadow-sm border border-[#EBEEF5]"
+            : "w-0 opacity-0 pointer-events-none border-transparent"
+        }`}
+      >
+        <div className="pl-4 pr-1 flex items-center shrink-0">
+          {loading ? (
+            <div className="w-3.5 h-3.5 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M6.41667 11.0833C8.994 11.0833 11.0833 8.994 11.0833 6.41667C11.0833 3.83934 8.994 1.75 6.41667 1.75C3.83934 1.75 1.75 3.83934 1.75 6.41667C1.75 8.994 3.83934 11.0833 6.41667 11.0833Z" stroke="#9EA5AD" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12.2504 12.2504L9.71289 9.71289" stroke="#9EA5AD" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+
+        <input
+          ref={inputRef}
+          id="clinic-search"
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setDropdownOpen(true); }}
+          onFocus={() => { if (results && totalResults > 0) setDropdownOpen(true); }}
+          onKeyDown={(e) => { if (e.key === "Escape") handleClose(); }}
+          placeholder="Search doctors, patients, appointments…"
+          className="flex-1 py-2.5 pr-2 text-xs bg-transparent border-none placeholder-[rgba(61,75,90,0.5)] focus:outline-none text-[#3D4B5A] font-medium min-w-0"
+        />
+
+        <button
+          onClick={handleClose}
+          className="pr-3 pl-1 flex items-center text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+          aria-label="Close search"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Search icon button (collapsed state) */}
+      <button
+        id="clinic-search-btn"
+        onClick={() => setSearchExpanded(true)}
+        aria-label="Open search"
+        className={`w-12 h-12 bg-white hover:bg-[#5476FC]/5 rounded-full flex items-center justify-center text-[#3D4B5A] hover:text-[#5476FC] border border-[#EBEEF5] transition-all ${
+          searchExpanded ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100"
+        }`}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <circle cx="11" cy="11" r="7" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M21 21l-4.35-4.35" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* Results Dropdown */}
+      {showDropdown && (
+        <div className="absolute top-[calc(100%+8px)] right-0 w-[380px] bg-white rounded-2xl border border-[#EBEEF5] shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-[9999] overflow-hidden">
+          {loading && !results ? (
+            <div className="px-5 py-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-2.5 bg-gray-100 rounded-full w-2/3" />
+                    <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !results || totalResults === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs font-semibold text-[#9EA5AD]">No results for &ldquo;{query}&rdquo;</p>
+              <p className="text-[10px] text-[#C4C9D0] mt-1">Try a doctor name, patient, or appointment reason</p>
+            </div>
+          ) : (
+            <div className="max-h-[480px] overflow-y-auto divide-y divide-[#F4F5F7]">
+
+              {/* Doctors */}
+              {results.doctors.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-[#9EA5AD] uppercase tracking-widest">Doctors</p>
+                  {results.doctors.map((item) => (
+                    <button key={item.id} onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left group">
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[#24292E] truncate group-hover:text-[#5476FC] transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-[#9EA5AD] truncate">{item.subtitle}</p>
+                      </div>
+                      <SearchTypeBadge type={item.type} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Patients */}
+              {results.patients.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-[#9EA5AD] uppercase tracking-widest">Patients</p>
+                  {results.patients.map((item) => (
+                    <button key={item.id} onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left group">
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[#24292E] truncate group-hover:text-purple-600 transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-[#9EA5AD] truncate">{item.subtitle}</p>
+                      </div>
+                      <SearchTypeBadge type={item.type} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Appointments */}
+              {results.appointments.length > 0 && (
+                <div>
+                  <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold text-[#9EA5AD] uppercase tracking-widest">Appointments</p>
+                  {results.appointments.map((item) => (
+                    <button key={item.id} onClick={() => handleNavigate(item.href)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left group">
+                      <SearchResultAvatar item={item} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[#24292E] truncate group-hover:text-amber-500 transition-colors">{item.title}</p>
+                        <p className="text-[10px] text-[#9EA5AD] truncate">{item.subtitle}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <SearchTypeBadge type={item.type} />
+                        {item.date && <span className="text-[9px] text-[#C4C9D0]">{fmtDate(item.date)}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="px-4 py-2.5 bg-[#F8FAFC] border-t border-[#EBEEF5]">
+                <p className="text-[9px] text-[#C4C9D0] text-center">
+                  {totalResults} result{totalResults !== 1 ? "s" : ""} · press <kbd className="bg-white border border-[#EBEEF5] px-1 rounded text-[8px]">Esc</kbd> to close
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ClinicLayoutContent ───────────────────────────────────────────────────────
+
 function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isOpen: sidebarOpen, setIsMobileOpen } = useSidebar();
@@ -77,6 +343,26 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [fetchNotifications]);
 
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const fetchChatUnread = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/clinic-messages/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        const total = (data.conversations ?? []).reduce((sum: number, c: any) => sum + (c.unreadCount ?? 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch (err) {
+      console.error("Fetch clinic chat unread count error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChatUnread();
+    const id = setInterval(fetchChatUnread, 15_000);
+    return () => clearInterval(id);
+  }, [fetchChatUnread]);
+
   const handleMarkAsRead = async (notifId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)));
     try { await apiFetch(`/api/clinics/payments/notifications/${notifId}/read`, { method: "PATCH" }); } catch { /* best-effort */ }
@@ -90,7 +376,9 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const checkAuth = async () => {
+      if (!cancelled) setAllowed(null);
       try {
         const res = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
         if (!res.ok) { if (!cancelled) router.replace("/auth/login"); return; }
@@ -105,10 +393,29 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
           router.replace("/auth/login");
         }
       } catch {
-        if (!cancelled) setAllowed(true); // fail open — backend still enforces requireRole on every call
+        // A failed request here (network blip or a genuinely dead session)
+        // must not grant access — the previous "fail open" fallback let a
+        // logged-out user through on the assumption that per-call
+        // requireRole() would catch it, but that only protects individual
+        // API calls, not the page shell itself.
+        if (!cancelled) router.replace("/auth/login");
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    checkAuth();
+
+    // A bfcache restore (browser Back/Forward) fires `pageshow` with
+    // persisted:true without rerunning this effect — revalidate against the
+    // backend again so a stale allowed=true from before isn't trusted.
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) checkAuth();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pageshow", handlePageShow);
+    };
   }, [router]);
 
   if (!allowed) {
@@ -132,16 +439,16 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* On desktop, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
-      <div className="shrink-0 lg:z-10">
+      {/* On tablet+, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
+      <div className="shrink-0 md:z-10">
         <ClinicSidebar />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 z-10 h-full">
         <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-6 lg:px-[40px]"}`}>
           <div className="flex items-center gap-3">
-            <button 
-              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none" 
+            <button
+              className="md:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none"
               onClick={() => setIsMobileOpen(true)}
             >
               <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -150,21 +457,19 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
             <img
               src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain"
+              className="w-[91px] h-[30px] object-contain hidden sm:block"
               alt="Wellness Central"
             />
-            <span className="text-[0.68rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
+            <span className="hidden sm:inline-block text-[0.68rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
               Clinic
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="7" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M21 21l-4.35-4.35" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            {/* Collapsible Global Search */}
+            <ClinicSearch />
+
+            {/* Notification Bell */}
             <div className="relative">
               <button
                 onClick={() => setShowNotifDropdown((v) => !v)}
@@ -183,7 +488,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
               {showNotifDropdown && (
                 <>
                   <div className="fixed inset-0 bg-slate-900/40 z-40 animate-in fade-in duration-200" aria-hidden="true" onClick={() => setShowNotifDropdown(false)} />
-                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
+                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] max-w-[calc(100vw-1.5rem)] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-[17px] font-black text-[#24292E]">Notifications</h3>
                       <button onClick={() => setShowNotifDropdown(false)} className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition">
@@ -233,10 +538,20 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
+
+            {/* Chat */}
+            <button
+              onClick={() => router.push("/clinic/messages")}
+              className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all relative"
+            >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.06 0-2.077-.163-3.02-.465L3 21l1.554-3.887A7.964 7.964 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
+              {chatUnreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-4 h-4 bg-[#E84949] text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                  {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+                </span>
+              )}
             </button>
           </div>
         </header>

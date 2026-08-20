@@ -13,17 +13,25 @@ interface InsuranceRow {
 interface InsurancesFormProps {
   onSubmit: (data: any) => void;
   onGoBack: () => void;
+  /** Prefills fields already entered before navigating back to this step —
+   *  the SPC contract file itself can't be restored (browsers don't allow
+   *  programmatically re-populating a file input), so only its verified
+   *  flag carries over; the file must be re-attached if it's still needed. */
+  initialInsurances?: Omit<InsuranceRow, "id">[];
+  initialSpcVerified?: boolean;
 }
 
 const inputCls =
   "w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-3.5 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit";
 
-export default function InsurancesForm({ onSubmit, onGoBack }: InsurancesFormProps) {
-  const [insurances, setInsurances] = useState<InsuranceRow[]>([
-    { id: "1", insurance: "", network: "", discounts: "" },
-  ]);
+export default function InsurancesForm({ onSubmit, onGoBack, initialInsurances, initialSpcVerified = false }: InsurancesFormProps) {
+  const [insurances, setInsurances] = useState<InsuranceRow[]>(
+    initialInsurances && initialInsurances.length > 0
+      ? initialInsurances.map((row, idx) => ({ id: String(idx + 1), ...row }))
+      : [{ id: "1", insurance: "", network: "", discounts: "" }]
+  );
   const [spcContractFile, setSpcContractFile] = useState<File | null>(null);
-  const [spcVerified, setSpcVerified] = useState(false);
+  const [spcVerified, setSpcVerified] = useState(initialSpcVerified);
   const [formError, setFormError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 

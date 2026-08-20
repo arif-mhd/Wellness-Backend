@@ -37,4 +37,6 @@ export interface Patient {
   /** Set when this appointment/record belongs to a family member profile rather than the account owner. */
   accountOwnerName?: string;
   profileRelationship?: string;
+  /** Online (video call) vs in-person visit — governs which consultation screen "Consult Now" opens. */
+  visitType?: 'online' | 'offline';
 }

@@ -200,7 +200,6 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
           const d = await res.json();
           const visits: VisitHistoryEntry[] = d.visitHistory ?? [];
           setVisitHistory(visits);
-          setSelectedVisitId(visits[0]?.appointmentId ?? null);
         }
       } catch {
         // leave visitHistory empty — UI shows "no consultations" state
@@ -695,8 +694,10 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
               <h3 className="text-[14px] font-medium text-slate-800 mb-6">Known Allergies</h3>
               {patient.allergies && patient.allergies.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {patient.allergies.map((a, i) => (
-                    <span key={i} className="bg-red-50 text-red-600 border border-red-100 text-[12px] font-medium px-4 py-2 rounded-full">{a}</span>
+                  {patient.allergies.map((a: any, i) => (
+                    <span key={i} className="bg-red-50 text-red-600 border border-red-100 text-[12px] font-medium px-4 py-2 rounded-full">
+                      {typeof a === "string" ? a : `${a.category ?? ""}: ${Array.isArray(a.selected) ? a.selected.join(", ") : a.selected ?? ""}`}
+                    </span>
                   ))}
                 </div>
               ) : (

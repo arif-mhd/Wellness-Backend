@@ -17,8 +17,8 @@ export default function LandingLayout({ heroImage, content }: LandingLayoutProps
       {/* Main Container */}
       <div className="relative z-10 w-full max-w-[1380px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-center">
         
-        {/* Left Side: Hero Image */}
-        <div className="w-full flex justify-center order-2 md:order-1">
+        {/* Left Side: Hero Image — desktop only, not needed on mobile */}
+        <div className="hidden md:flex w-full justify-center order-2 md:order-1">
           {heroImage}
         </div>
 

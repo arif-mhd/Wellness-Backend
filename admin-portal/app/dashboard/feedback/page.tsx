@@ -88,8 +88,7 @@ export default function FeedbackPage() {
       if (!res.ok) throw new Error(`Failed to fetch reviews: status ${res.status}`);
       const data = await res.json();
       setReviews(data);
-      if (data.length > 0) setSelectedId(data[0].id);
-      else setSelectedId(null);
+      // removed
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong while loading feedbacks.");
@@ -197,16 +196,16 @@ export default function FeedbackPage() {
                   <p className="text-sm font-semibold">No reviews found for this service</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="hidden xl:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
-                        <th className="pb-4 pt-1 font-semibold pl-2 w-[18%]">
+                        <th className="pb-4 pt-1 font-semibold pl-2 pr-6 w-[25%]">
                           <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Name <DoubleCaret /></div>
                         </th>
                         <th className="pb-4 pt-1 font-semibold w-[22%]">Provider Rated</th>
-                        <th className="pb-4 pt-1 font-semibold w-[40%]">Comments</th>
-                        <th className="pb-4 pt-1 font-semibold w-[8%] text-center">Service</th>
+                        <th className="pb-4 pt-1 font-semibold w-[41%]">Comments</th>
                         <th className="pb-4 pt-1 font-semibold w-[12%] text-right pr-4">Rating</th>
                       </tr>
                     </thead>
@@ -219,7 +218,7 @@ export default function FeedbackPage() {
                             onClick={() => setSelectedId(rev.id)}
                             className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
                           >
-                            <td className="py-4 pl-2">
+                            <td className="py-4 pl-2 pr-6">
                               <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-semibold text-sm">
                                 {rev.reviewer.avatar || rev.reviewer.name[0]}
@@ -244,12 +243,7 @@ export default function FeedbackPage() {
                             <td className="py-4 text-[12px] text-slate-500 font-medium pr-6">
                               <p className="line-clamp-1">{rev.comment || <span className="italic text-slate-300">No comment left</span>}</p>
                             </td>
-                            <td className="py-4 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getFolderColor(rev.folder)}`}>
-                                {getFolderLabel(rev.folder)}
-                              </span>
-                            </td>
-                            <td className="py-4 pr-2 text-right">
+                            <td className="py-4 text-right pr-4">
                               <div className="flex justify-end">
                                 <StarRating rating={rev.rating} />
                               </div>
@@ -260,6 +254,44 @@ export default function FeedbackPage() {
                     </tbody>
                   </table>
                 </div>
+
+                <div className="xl:hidden flex flex-col gap-4">
+                  {filteredReviews.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((rev) => {
+                    const isSelected = selectedId === rev.id;
+                    return (
+                      <div
+                        key={rev.id}
+                        onClick={() => setSelectedId(isSelected ? null : rev.id)}
+                        className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full border border-slate-100 flex-shrink-0 bg-gradient-to-br from-[#6A8BFF] to-[#5a7ae6] flex items-center justify-center text-white font-semibold text-sm">
+                            {rev.reviewer.avatar || rev.reviewer.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{rev.reviewer.name}</p>
+                            <p className="text-[12px] text-slate-400 font-medium truncate">{rev.reviewer.email}</p>
+                          </div>
+                          <StarRating rating={rev.rating} />
+                        </div>
+                        <div className="bg-[#f8fafd] rounded-xl p-3 flex flex-col gap-2 mt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Provider Rated</span>
+                            <span className="text-[12px] font-semibold text-slate-700 truncate">{rev.provider.name}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Service</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getFolderColor(rev.folder)}`}>
+                              {getFolderLabel(rev.folder)}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[12px] text-slate-500 font-medium line-clamp-2 mt-1">{rev.comment || <span className="italic text-slate-300">No comment left</span>}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                </>
               )}
 
               {/* Pagination (visual placeholder matching design) */}
@@ -279,7 +311,9 @@ export default function FeedbackPage() {
 
           {/* RIGHT: Rating Details Panel */}
           {selected && (
-            <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="xl:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto xl:static xl:z-auto xl:max-h-none xl:col-span-4 bg-white rounded-t-[2rem] xl:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] xl:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t xl:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 xl:slide-in-from-right-3 duration-300">
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Rating Details</h2>
                 <button onClick={() => setSelectedId(null)} className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100">
@@ -349,6 +383,7 @@ export default function FeedbackPage() {
                 )}
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

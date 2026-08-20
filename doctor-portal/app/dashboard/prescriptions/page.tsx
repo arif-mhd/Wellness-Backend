@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskListTable from "@/components/tasks/TaskListTable";
 import TaskDetailsCard, { TaskItem } from "@/components/tasks/TaskDetailsCard";
 
@@ -20,6 +19,7 @@ interface RawTask {
   patientAvatarUrl: string | null;
   patientAge: number | null;
   appointmentId: string;
+  visitType?: "online" | "offline";
 }
 
 function formatTime(iso: string) {
@@ -62,6 +62,7 @@ export default function PrescriptionsTasksPage() {
         patientAvatar: t.patientAvatarUrl ?? "/patient-avatar-1.png",
         patientBio: "",
         appointmentId: t.appointmentId,
+        visitType: t.visitType === "offline" ? "offline" : "online",
       }));
 
       setTasks(mapped);
@@ -76,17 +77,13 @@ export default function PrescriptionsTasksPage() {
   const handleSelectTask = (task: TaskItem) => setSelectedTaskId(task.id);
 
   const handleAction = (task: TaskItem) => {
-    if (task.type === "upcoming_consultation") {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    } else {
-      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    }
+    const route = task.type === "upcoming_consultation" && task.visitType !== "offline" ? "/appointments/consult" : "/appointments/complete-emr";
+    router.push(`${route}?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
   };
 
   const activeTask = hoveredTask || tasks.find((t) => t.id === selectedTaskId) || null;
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Title */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
@@ -122,11 +119,18 @@ export default function PrescriptionsTasksPage() {
           </div>
 
           {/* Right Column: Detailed Card (Fixed Width 372px) */}
-          <div className="w-full xl:w-[372px] xl:shrink-0 self-start">
-            <TaskDetailsCard task={activeTask} onAction={handleAction} />
+          <div className={`fixed inset-0 z-[100] bg-black/40 p-4 xl:static xl:z-auto xl:bg-transparent xl:p-0 xl:block xl:w-[372px] xl:shrink-0 self-start ${!selectedTaskId ? 'hidden xl:block' : 'flex items-center justify-center xl:block'}`}>
+            <div className="relative w-full max-h-[90vh] xl:max-h-none overflow-y-auto xl:overflow-visible rounded-[24px]">
+              <button 
+                onClick={() => setSelectedTaskId(null)}
+                className="xl:hidden absolute top-4 right-4 flex items-center justify-center w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 text-gray-500 hover:bg-gray-50 z-10"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <TaskDetailsCard task={activeTask} onAction={handleAction} />
+            </div>
           </div>
         </div>
       </div>
-    </ProtectedRoute>
   );
 }

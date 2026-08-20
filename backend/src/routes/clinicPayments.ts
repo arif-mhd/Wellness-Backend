@@ -113,13 +113,15 @@ router.get("/summary", requireRole("clinic"), async (req: SessionRequest, res: R
     // Fetched row-by-row (rather than a single SUM) so it can be split by
     // paymentMethod in the same pass — an appointment with no paymentMethod
     // field at all (booked before this field existed) counts as cash.
+    // paymentStatus = 'paid' excludes in-person ("pay at clinic") visits
+    // that haven't actually been collected yet — see PATCH /:id/mark-paid.
     let totalEarnings = 0;
     let cashEarnings = 0;
     let insuranceEarnings = 0;
     if (clinicIds.length > 0) {
       const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
       const { resources } = await appointmentsContainer.items
-        .query({ query: `SELECT c.paymentAmount, c.paymentMethod FROM c WHERE ${clause} AND c.status = 'completed'`, parameters })
+        .query({ query: `SELECT c.paymentAmount, c.paymentMethod FROM c WHERE ${clause} AND c.status = 'completed' AND c.paymentStatus = 'paid'`, parameters })
         .fetchAll();
       for (const a of resources) {
         const amount = a.paymentAmount ?? 0;
@@ -186,7 +188,7 @@ router.get("/doctors", requireRole("clinic"), async (req: SessionRequest, res: R
 
     const { clause: aptClause, parameters: aptParams } = buildInClause("c.clinicId", clinicIds);
     const appointments = await appointmentsContainer.items
-      .query({ query: `SELECT c.doctorId, c.paymentAmount FROM c WHERE ${aptClause} AND c.status = 'completed'`, parameters: aptParams })
+      .query({ query: `SELECT c.doctorId, c.paymentAmount FROM c WHERE ${aptClause} AND c.status = 'completed' AND c.paymentStatus = 'paid'`, parameters: aptParams })
       .fetchAll()
       .then((r) => r.resources);
 
@@ -224,7 +226,7 @@ router.get("/doctors/:id/summary", requireRole("clinic"), async (req: SessionReq
 
     const { resources: appointments } = await appointmentsContainer.items
       .query({
-        query: "SELECT c.paymentAmount, c.paymentMethod FROM c WHERE c.doctorId = @doctorId AND c.status = 'completed'",
+        query: "SELECT c.paymentAmount, c.paymentMethod FROM c WHERE c.doctorId = @doctorId AND c.status = 'completed' AND c.paymentStatus = 'paid'",
         parameters: [{ name: "@doctorId", value: doctor.id }],
       })
       .fetchAll();
@@ -307,7 +309,11 @@ router.get("/history", requireRole("clinic"), async (req: SessionRequest, res: R
     const history = appointments.map((a: any) => {
       const patient = patientById[a.patientId];
       const fullAmount = a.paymentAmount ?? 0;
-      const earning = category === "dr-share" ? fullAmount * (doctorSharePercent / 100) : (a.status === "cancelled" ? 0 : fullAmount);
+      // An in-person visit not yet marked paid (PATCH /:id/mark-paid) hasn't
+      // actually been collected — don't count it as earned yet, same as a
+      // cancelled appointment.
+      const isUnpaidInPerson = a.paymentMethod === "pay_at_clinic" && a.paymentStatus !== "paid";
+      const earning = category === "dr-share" ? fullAmount * (doctorSharePercent / 100) : (a.status === "cancelled" || isUnpaidInPerson ? 0 : fullAmount);
       return {
         id: a.id,
         patientName: patient?.fullName ?? "Unknown Patient",
@@ -318,7 +324,8 @@ router.get("/history", requireRole("clinic"), async (req: SessionRequest, res: R
         earning,
         status: a.status,
         doctorId: a.doctorId,
-        paymentMethod: a.paymentMethod === "insurance" ? "insurance" : "cash",
+        paymentMethod: a.paymentMethod === "insurance" ? "insurance" : a.paymentMethod === "pay_at_clinic" ? "pay_at_clinic" : "cash",
+        paymentStatus: a.paymentStatus ?? "paid",
       };
     });
 

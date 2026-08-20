@@ -1,10 +1,10 @@
 "use client";
 
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/apiFetch";
+import { useSidebar } from "@/components/SidebarContext";
 
 interface SlotDef {
   dayOfWeek: number;
@@ -20,6 +20,7 @@ interface Task {
   desc: string;
   appointmentId: string;
   patientName: string;
+  visitType?: "online" | "offline";
 }
 
 interface PatientRow {
@@ -30,6 +31,7 @@ interface PatientRow {
   status: string;
   scheduledAt: string;
   updatedAt: string;
+  visitType?: "online" | "offline";
 }
 
 const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -92,8 +94,12 @@ export default function DashboardPage() {
 
   const [doctorName, setDoctorName]     = useState<string | null>(null);
   const [slots, setSlots]               = useState<SlotDef[]>([]);
-  const [isAvailable, setIsAvailable]   = useState(true);
+  // Shared with the Sidebar's own indicator (SidebarContext) so a toggle
+  // here or a schedule-driven auto-sync there shows up in both places
+  // instantly instead of waiting on each component's own separate poll.
+  const { isOnline: isAvailable, setOnlineState } = useSidebar();
   const [togglingAvailable, setTogglingAvailable] = useState(false);
+  const [availabilityToggleError, setAvailabilityToggleError] = useState("");
 
   // Appointments
   const [patients, setPatients]               = useState<PatientRow[]>([]);
@@ -108,6 +114,11 @@ export default function DashboardPage() {
   const [totalAppointments, setTotalAppointments] = useState(0);
   const [todayCount, setTodayCount]           = useState(0);
   const [consultationChange, setConsultationChange] = useState<{ value: number; direction: "up" | "down" | "none" } | null>(null);
+
+  // Revenue — same client-side computation the Analytics page already does
+  // from this same appointments list (completed this month vs last month).
+  const [revenueThisMonth, setRevenueThisMonth] = useState(0);
+  const [revenueChange, setRevenueChange] = useState<{ value: number; direction: "up" | "down" | "none" } | null>(null);
 
   // Waiting — patients with status "in_progress" (actively in a call)
   const [waitingCount, setWaitingCount]       = useState(0);
@@ -162,18 +173,36 @@ export default function DashboardPage() {
   }, [pollForInvite]);
 
   const handleAvailabilityToggle = useCallback(async () => {
-    const next = !isAvailable;
+    const goingOnBreak = isAvailable; // currently "available" → going on break
     setTogglingAvailable(true);
+    setAvailabilityToggleError("");
     try {
-      await apiFetch("/api/doctors/online-status", {
+      // A manual toggle is a direct override in both directions — flipping it
+      // on sets isOnline:true immediately, the same way flipping it off sets
+      // isOnline:false immediately. Previously "on" recomputed from the
+      // schedule instead of forcing true, so toggling on outside working
+      // hours silently stayed "offline" everywhere else (Sidebar, public
+      // directory) while this card alone showed "available now."
+      const newIsOnline = !goingOnBreak;
+      const res = await apiFetch("/api/doctors/online-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: next }),
+        body: JSON.stringify({ isOnline: newIsOnline, isManuallyOffline: goingOnBreak }),
       });
-      setIsAvailable(next);
-    } catch { /* keep current state on error */ }
+      // A failed request (expired session, 500, etc.) must not silently
+      // leave this card showing a status the backend never actually saved —
+      // that's exactly how the toggle could look like it "did nothing"
+      // elsewhere (Sidebar, public directory) while this card still flipped.
+      if (!res.ok) {
+        setAvailabilityToggleError("Couldn't update your status. Please try again.");
+      } else {
+        setOnlineState(newIsOnline, goingOnBreak);
+      }
+    } catch {
+      setAvailabilityToggleError("Couldn't update your status. Please try again.");
+    }
     setTogglingAvailable(false);
-  }, [isAvailable]);
+  }, [isAvailable, setOnlineState]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -182,13 +211,6 @@ export default function DashboardPage() {
       if (meRes.ok) {
         const meData = await meRes.json();
         setDoctorName(meData.profile?.name ?? meData.profile?.fullName ?? "Doctor");
-      }
-
-      // Online/available status (same source of truth as the sidebar toggle)
-      const doctorRes = await apiFetch("/api/doctors/me");
-      if (doctorRes.ok) {
-        const { doctor } = await doctorRes.json();
-        setIsAvailable(doctor?.isOnline !== false); // default true if not set
       }
 
       // Appointments
@@ -216,6 +238,26 @@ export default function DashboardPage() {
         setTodayCount(todays.length);
         setConsultationChange(pctChange(todays.length, yesterdays.length));
 
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+
+        const isCompleted = (a: any) => a.status === "completed" || a.status === "Completed";
+        const revenueInMonth = (year: number, month: number) =>
+          all
+            .filter((a) => isCompleted(a) && a.scheduledAt)
+            .filter((a) => {
+              const d = parseLocalTime(a.scheduledAt);
+              return d.getFullYear() === year && d.getMonth() === month;
+            })
+            .reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
+
+        const thisMonthRevenue = revenueInMonth(currentYear, currentMonth);
+        const prevMonthRevenue = revenueInMonth(prevMonthDate.getFullYear(), prevMonthDate.getMonth());
+        setRevenueThisMonth(thisMonthRevenue);
+        setRevenueChange(pctChange(thisMonthRevenue, prevMonthRevenue));
+
         setWaitingCount(waitingNow.length);
         setWaitingAvatars(
           waitingNow.slice(0, 3).map((a: any) =>
@@ -231,6 +273,7 @@ export default function DashboardPage() {
           status:      a.status,
           scheduledAt: a.scheduledAt,
           updatedAt:   a.updatedAt ?? a.scheduledAt,
+          visitType:   a.visitType === "offline" ? "offline" : "online",
         }));
         setPatients(rows);
         if (rows.length > 0) setSelectedPatientId(rows[0].id);
@@ -247,6 +290,7 @@ export default function DashboardPage() {
           desc: `${t.patientName} — ${t.summary}`,
           appointmentId: t.appointmentId,
           patientName: t.patientName,
+          visitType: t.visitType === "offline" ? "offline" : "online",
         }));
         setTasks(mapped);
         setPendingEmrCount(counts?.pendingEmr ?? 0);
@@ -395,11 +439,8 @@ export default function DashboardPage() {
   ) : null;
 
   const goToTask = (task: Task) => {
-    if (task.type === "pending_emr") {
-      router.push(`/appointments/complete-emr?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    } else {
-      router.push(`/appointments/consult?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
-    }
+    const route = task.type === "pending_emr" || task.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+    router.push(`${route}?appointmentId=${task.appointmentId}&patientName=${encodeURIComponent(task.patientName)}`);
   };
 
   const upcomingCount       = tasks.length - pendingEmrCount;
@@ -413,12 +454,12 @@ export default function DashboardPage() {
   })();
 
   return (
-    <ProtectedRoute>
+    <>
       {inviteModalContent}
       <div className="px-4 md:px-8 pb-12 select-none">
 
         {/* Top Greeting Row */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 mt-2">
           <div className="flex flex-col justify-center items-flex-start gap-1">
             <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]" style={{ fontFamily: "Outfit, sans-serif" }}>
               {greeting}
@@ -468,7 +509,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
 
           {/* Card 1: Consultations Today */}
           <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
@@ -533,18 +574,47 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Card 3: Revenue — no backend endpoint, show unavailable */}
+          {/* Card 3: Revenue — computed client-side from the same appointments
+              list as Consultations/Tasks above, same logic as the Analytics page */}
           <div className="bg-white rounded-xl p-6 flex flex-col gap-4 shadow-sm border border-transparent hover:border-gray-100 hover:shadow-md transition-all">
             <div className="flex justify-between items-center w-full">
               <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Revenue
               </span>
             </div>
-            <div className="text-[#A0A8B0] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Not available
+            <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {dataLoaded
+                ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(revenueThisMonth)
+                : "—"}
             </div>
-            <div className="text-[#C0C8D0] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Revenue data coming soon
+            <div className="flex items-center gap-1">
+              {!dataLoaded || revenueChange === null ? (
+                <span className="text-[#A0A8B0] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>Calculating...</span>
+              ) : revenueChange.direction === "none" ? (
+                <span className="text-[#707070] text-xs" style={{ fontFamily: "Outfit, sans-serif" }}>0% change from last month</span>
+              ) : revenueChange.direction === "up" ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M4.08301 9.91671L9.91634 4.08337" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4.08301 4.08337H9.91634V9.91671" stroke="#179353" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <span className="text-[#179353] font-medium mr-1">{revenueChange.value}% Increase</span>
+                    <span className="text-[#707070]">from last month</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M4.08366 4.08337L9.91699 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9.91699 4.08337L9.91699 9.91671L4.08366 9.91671" stroke="#F25252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <span className="text-[#F25252] font-medium mr-1">{revenueChange.value}% Decrease</span>
+                    <span className="text-[#707070]">from last month</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -624,7 +694,8 @@ export default function DashboardPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (p.status === "completed") return;
-                            router.push(`/appointments/consult?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
+                            const route = p.visitType === "offline" ? "/appointments/complete-emr" : "/appointments/consult";
+                            router.push(`${route}?appointmentId=${p.id}&patientName=${encodeURIComponent(p.name)}`);
                           }}
                           disabled={p.status === "completed"}
                           className={`h-[32px] px-[13px] rounded-xl font-medium text-[13px] flex items-center justify-center transition-all ${
@@ -708,6 +779,9 @@ export default function DashboardPage() {
                   <div className={`bg-white w-[13px] h-[13px] rounded-full shadow-sm transform transition-transform duration-200 ${isAvailable ? "translate-x-0" : "-translate-x-[16px]"}`} />
                 </button>
               </div>
+              {availabilityToggleError && (
+                <span className="text-red-500 text-[11px] -mt-2">{availabilityToggleError}</span>
+              )}
             </div>
 
             {/* Todays Tasks Panel */}
@@ -782,6 +856,6 @@ export default function DashboardPage() {
         </div>
 
       </div>
-    </ProtectedRoute>
+    </>
   );
 }

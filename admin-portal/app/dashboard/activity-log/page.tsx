@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Session from "supertokens-web-js/recipe/session";
+import Pagination from "@/components/Pagination";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const PAGE_SIZE = 20;
@@ -103,8 +104,6 @@ export default function ActivityLogPage() {
   const handleSourceChange = (s: Source) => { setSource(s); setPage(1); };
   const handleTimeChange   = (t: "all" | "recent" | "past") => { setTimeRange(t); setPage(1); };
 
-  const pageNumbers = Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1);
-
   return (
     <ProtectedRoute>
       <div className="max-w-[1440px] mx-auto space-y-6 pb-12 font-sans px-1 animate-in fade-in duration-300">
@@ -115,10 +114,10 @@ export default function ActivityLogPage() {
           <span className="text-xs text-slate-400 font-medium">{total} total events</span>
         </div>
 
-        {/* Filter row */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Filters Row */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
           {/* Source filters */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             {SOURCE_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -135,10 +134,10 @@ export default function ActivityLogPage() {
           </div>
 
           {/* Divider */}
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="hidden md:block w-px h-6 bg-slate-200 mx-1" />
 
           {/* Time filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(["all", "recent", "past"] as const).map((t) => (
               <button
                 key={t}
@@ -157,7 +156,7 @@ export default function ActivityLogPage() {
           {/* Refresh */}
           <button
             onClick={() => fetchLogs(source, page, timeRange)}
-            className="ml-auto w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-700 border border-transparent hover:border-slate-100 transition"
+            className="md:ml-auto w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-700 border border-transparent hover:border-slate-100 transition shadow-sm bg-white"
             title="Refresh"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,95 +183,73 @@ export default function ActivityLogPage() {
               <span className="text-xs">Actions across all portals will appear here</span>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-50">
-                  <th className="py-6 px-8 text-[12px] font-medium text-slate-800 w-[18%]">Date/Time</th>
-                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[12%]">Source</th>
-                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[20%]">Action</th>
-                  <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[35%]">Details</th>
-                  <th className="py-6 px-8 text-[12px] font-medium text-slate-800">Performed By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log, idx) => (
-                  <tr
-                    key={log.id}
-                    className={`group border-b border-slate-50/70 last:border-0 ${
-                      idx === 0 ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"
-                    } transition-colors`}
-                  >
-                    <td className="py-4 px-8 text-[11px] font-medium text-slate-500 whitespace-nowrap">
-                      {formatDate(log.timestamp)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium border capitalize ${SOURCE_BADGE[log.source] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {log.source}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-[11px] font-semibold text-slate-600">{log.action}</td>
-                    <td className="py-4 px-4 text-[11px] font-medium text-slate-500 max-w-sm">
-                      <span className="line-clamp-2">{log.details}</span>
-                    </td>
-                    <td className="py-4 px-8 text-[11px] font-medium text-slate-500">{log.performedBy}</td>
+            <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-50">
+                    <th className="py-6 px-8 text-[12px] font-medium text-slate-800 w-[18%]">Date/Time</th>
+                    <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[12%]">Source</th>
+                    <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[20%]">Action</th>
+                    <th className="py-6 px-4 text-[12px] font-medium text-slate-800 w-[35%]">Details</th>
+                    <th className="py-6 px-8 text-[12px] font-medium text-slate-800">Performed By</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {logs.map((log, idx) => (
+                    <tr
+                      key={log.id}
+                      className={`group border-b border-slate-50/70 last:border-0 ${
+                        idx === 0 ? "bg-[#f8fafd]" : "hover:bg-slate-50/50"
+                      } transition-colors`}
+                    >
+                      <td className="py-4 px-8 text-[11px] font-medium text-slate-500 whitespace-nowrap">
+                        {formatDate(log.timestamp)}
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium border capitalize ${SOURCE_BADGE[log.source] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                          {log.source}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-[11px] font-semibold text-slate-600">{log.action}</td>
+                      <td className="py-4 px-4 text-[11px] font-medium text-slate-500 max-w-sm">
+                        <span className="line-clamp-2">{log.details}</span>
+                      </td>
+                      <td className="py-4 px-8 text-[11px] font-medium text-slate-500">{log.performedBy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="md:hidden flex flex-col">
+              {logs.map((log) => (
+                <div key={log.id} className="flex flex-col gap-3 p-5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium border capitalize ${SOURCE_BADGE[log.source] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                      {log.source}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-medium">{formatDate(log.timestamp)}</span>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-slate-700">{log.action}</p>
+                    <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">{log.details}</p>
+                  </div>
+                  <div className="mt-1 pt-3 border-t border-slate-50 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">Performed By</span>
+                    <span className="text-[12px] text-slate-700 font-medium">{log.performedBy}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-white rounded-[2rem] flex items-center justify-between px-6 py-4 shadow-sm border border-slate-50">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 disabled:opacity-30 transition"
-              aria-label="Previous page"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            <div className="flex items-center gap-2">
-              {pageNumbers.map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setPage(num)}
-                  className={`w-9 h-9 rounded-full text-[13px] font-medium flex items-center justify-center transition-all ${
-                    num === page
-                      ? "bg-[#6A8BFF] text-white shadow-md shadow-blue-200"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
-              {totalPages > 7 && page < totalPages - 3 && (
-                <>
-                  <span className="text-slate-400 text-xs px-1">…</span>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    className="w-9 h-9 rounded-full text-[13px] font-medium flex items-center justify-center text-slate-500 hover:bg-slate-50"
-                  >
-                    {totalPages}
-                  </button>
-                </>
-              )}
-            </div>
-
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600 disabled:opacity-30 transition"
-              aria-label="Next page"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-50 px-6 py-2 mb-4">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
         )}
 

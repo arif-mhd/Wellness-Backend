@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
-import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useMemo, useState, useRef } from "react";
 
 interface SpecializationRow {
   id: string;
@@ -18,26 +17,58 @@ interface RateRow {
 interface DoctorMedicalCareerFormProps {
   onSubmit: (data: any) => void;
   onGoBack: () => void;
+  /** Prefills fields already entered before navigating back to this step —
+   *  file inputs (resume, profile photo, certificate) can't be restored
+   *  (browsers don't allow programmatically re-populating a file input), so
+   *  those must be re-attached if the user goes back past this step. */
+  initialLicenseNumber?: string;
+  initialSpecializationNames?: string[];
+  initialRates?: Omit<RateRow, "id">[];
+  initialPaymentSettings?: string;
+  initialBio?: string;
 }
 
 const inputCls =
   "w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors bg-white placeholder-[#A7AAB4]";
+const errCls = "border-red-300 bg-red-50 focus:border-red-400";
 
-export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMedicalCareerFormProps) {
-  const [licenseNumber, setLicenseNumber] = useState("");
+export default function DoctorMedicalCareerForm({
+  onSubmit,
+  onGoBack,
+  initialLicenseNumber = "",
+  initialSpecializationNames,
+  initialRates,
+  initialPaymentSettings = "",
+  initialBio = "",
+}: DoctorMedicalCareerFormProps) {
+  const [licenseNumber, setLicenseNumber] = useState(initialLicenseNumber);
   const [licenseVerified, setLicenseVerified] = useState(false);
-  const [specializations, setSpecializations] = useState<SpecializationRow[]>([{ id: "1", name: "", certFile: null }]);
-  const [rates, setRates] = useState<RateRow[]>([{ id: "1", category: "Category 1", price: "" }]);
-  const [paymentSettings, setPaymentSettings] = useState("");
+  const [specializations, setSpecializations] = useState<SpecializationRow[]>(
+    initialSpecializationNames && initialSpecializationNames.length > 0
+      ? initialSpecializationNames.map((name, idx) => ({ id: String(idx + 1), name, certFile: null }))
+      : [{ id: "1", name: "", certFile: null }]
+  );
+  const [rates, setRates] = useState<RateRow[]>(
+    initialRates && initialRates.length > 0
+      ? initialRates.map((r, idx) => ({ id: String(idx + 1), ...r }))
+      : [{ id: "1", category: "Category 1", price: "" }]
+  );
+  const [paymentSettings, setPaymentSettings] = useState(initialPaymentSettings);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [bio, setBio] = useState("");
+  const [bio, setBio] = useState(initialBio);
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const [touchedLicense, setTouchedLicense] = useState(false);
+  const [touchedSpecs, setTouchedSpecs] = useState(false);
 
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const profilePicRef = useRef<HTMLInputElement>(null);
   const specFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const licenseError = licenseNumber.trim() ? "" : "License Number is required.";
+  const specsError = specializations.some((s) => s.name.trim()) ? "" : "Add at least one specialization.";
+  const isFormValid = useMemo(() => !licenseError && !specsError, [licenseError, specsError]);
 
   const handleVerifyLicense = () => {
     if (!licenseNumber.trim()) { setFormError("Enter the License Number first."); return; }
@@ -76,11 +107,13 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouchedLicense(true);
+    setTouchedSpecs(true);
 
-    if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
+    if (licenseError) { setFormError(licenseError); return; }
+    if (specsError) { setFormError(specsError); return; }
+
     const filledSpecs = specializations.filter((s) => s.name.trim());
-    if (filledSpecs.length === 0) { setFormError("Add at least one specialization."); return; }
-
     setFormError("");
     onSubmit({
       licenseNumber,
@@ -113,7 +146,8 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
               type="text"
               value={licenseNumber}
               onChange={(e) => { setLicenseNumber(e.target.value); setLicenseVerified(false); }}
-              className={inputCls}
+              onBlur={() => setTouchedLicense(true)}
+              className={`${inputCls} ${touchedLicense && licenseError ? errCls : ""}`}
             />
             {licenseVerified ? (
               <div className="h-11 px-8 rounded-xl bg-white border border-[#5476FC] text-[#5476FC] text-[12px] font-bold tracking-widest flex items-center shadow-sm">
@@ -129,6 +163,7 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
               </button>
             )}
           </div>
+          {touchedLicense && licenseError && <span className="text-red-500 text-[11px] mt-0.5">{licenseError}</span>}
         </div>
 
         {/* Specializations */}
@@ -148,7 +183,8 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
                   placeholder={`Specialisation ${idx + 1}`}
                   value={spec.name}
                   onChange={(e) => updateSpecializationName(spec.id, e.target.value)}
-                  className={`${inputCls} flex-1`}
+                  onBlur={() => setTouchedSpecs(true)}
+                  className={`${inputCls} flex-1 ${touchedSpecs && specsError ? errCls : ""}`}
                 />
                 <input
                   type="file"
@@ -172,6 +208,7 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
               </div>
             ))}
           </div>
+          {touchedSpecs && specsError && <span className="text-red-500 text-[11px]">{specsError}</span>}
         </div>
 
         {/* Consultation Rates */}
@@ -255,8 +292,8 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
               )}
             </button>
             <p className="text-[11px] text-[#676E76] leading-relaxed">
-              Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been
-              the industry's standard dummy text ever since the 1500s.
+              Add a clear, professional headshot — this is shown to patients across the app when they book with this doctor.
+              JPG or PNG, optional.
             </p>
           </div>
         </div>
@@ -265,7 +302,11 @@ export default function DoctorMedicalCareerForm({ onSubmit, onGoBack }: DoctorMe
           <button type="button" onClick={onGoBack} className="px-10 py-3.5 rounded-xl bg-white border border-[#E4E8F0] text-[#676E76] text-[13px] font-bold tracking-widest hover:bg-gray-50 transition-colors shadow-sm">
             BACK
           </button>
-          <button type="submit" className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all">
+          <button
+            type="submit"
+            disabled={!isFormValid}
+            className="px-10 py-3.5 rounded-xl bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          >
             CONTINUE
           </button>
         </div>

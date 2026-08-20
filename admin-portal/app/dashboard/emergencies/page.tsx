@@ -79,7 +79,7 @@ export default function ManageEmergenciesPage() {
       const data = await res.json();
       const list: Emergency[] = data.emergencies ?? [];
       setEmergencies(list);
-      setSelectedId((prev) => prev ?? list[0]?.id ?? null);
+      // removed
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {
@@ -120,9 +120,9 @@ export default function ManageEmergenciesPage() {
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Emergencies</h1>
             </div>
 
-            {/* Tabs + Search + Date */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            {/* Tabs + Search */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   onClick={() => setActiveTab("SOS")}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-semibold transition-all ${activeTab === "SOS" ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"}`}
@@ -135,7 +135,7 @@ export default function ManageEmergenciesPage() {
                 >
                   Past Emergency Requests
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                   {searchOpen && (
                     <input
                       autoFocus
@@ -143,12 +143,12 @@ export default function ManageEmergenciesPage() {
                       value={search}
                       onChange={e => setSearch(e.target.value)}
                       placeholder="Search emergencies…"
-                      className="w-44 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
+                      className="w-full sm:w-44 pl-3 pr-3 py-2 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 shadow-sm"
                     />
                   )}
                   <button
                     onClick={() => { setSearchOpen(o => !o); if (searchOpen) setSearch(""); }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
+                    className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-sm border transition ${searchOpen ? "bg-[#6A8BFF] text-white border-[#6A8BFF]" : "bg-white text-slate-400 hover:text-slate-700 border-slate-100"}`}
                   >
                     {searchOpen
                       ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -157,14 +157,10 @@ export default function ManageEmergenciesPage() {
                   </button>
                 </div>
               </div>
-              <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
-                Today
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-              </button>
             </div>
 
             {/* Column headers */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1 mb-2">
               <div className="flex items-center gap-10 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -180,61 +176,104 @@ export default function ManageEmergenciesPage() {
 
             {/* Table */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 flex flex-col justify-between min-h-[600px]">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
-                    <th className="pb-4 pt-1 pl-2 font-semibold w-[30%]">
-                      <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Patient Name <DoubleCaret /></div>
-                    </th>
-                    <th className="pb-4 pt-1 font-semibold w-[28%]">Address</th>
-                    <th className="pb-4 pt-1 font-semibold w-[20%]">Contact Number</th>
-                    <th className="pb-4 pt-1 font-semibold w-[15%]">
-                      <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Priority <DoubleCaret /></div>
-                    </th>
-                    <th className="pb-4 pt-1"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">Loading emergencies…</td></tr>
-                  ) : fetchError ? (
-                    <tr><td colSpan={5} className="py-16 text-center text-red-500 text-sm font-medium">{fetchError}</td></tr>
-                  ) : filteredEmergencies.length === 0 ? (
-                    <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">No emergencies found.</td></tr>
-                  ) : filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
-                    return (
-                      <tr
-                        key={em.id}
-                        onClick={() => setSelectedId(em.id)}
-                        className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors group hover:bg-slate-50/50`}
-                      >
-                        <td className="py-4 pl-2 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="text-[13px] font-semibold text-slate-800 leading-tight">{em.name}</p>
-                            <p className="text-[11px] text-slate-400 font-medium">{em.email}</p>
-                          </div>
-                        </td>
-                        <td className="py-4 text-[12px] text-slate-500 font-medium max-w-[180px] truncate pr-4">{em.address || "—"}</td>
-                        <td className="py-4 text-[12px] text-slate-500 font-medium">{em.phone || "—"}</td>
-                        <td className={`py-4 text-[12px] font-semibold ${priorityColor[em.priority]}`}>{em.priority}</td>
-                        <td className="py-4 pr-2 text-right">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedId(em.id); }}
-                            className="text-[12px] font-semibold px-5 py-2 rounded-xl transition-all text-slate-700 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)] whitespace-nowrap"
-                          >
-                            View Details
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                      <th className="pb-4 pt-1 pl-2 font-semibold w-[30%]">
+                        <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Patient Name <DoubleCaret /></div>
+                      </th>
+                      <th className="pb-4 pt-1 font-semibold w-[28%]">Address</th>
+                      <th className="pb-4 pt-1 font-semibold w-[20%]">Contact Number</th>
+                      <th className="pb-4 pt-1 font-semibold w-[15%]">
+                        <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Priority <DoubleCaret /></div>
+                      </th>
+                      <th className="pb-4 pt-1"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">Loading emergencies…</td></tr>
+                    ) : fetchError ? (
+                      <tr><td colSpan={5} className="py-16 text-center text-red-500 text-sm font-medium">{fetchError}</td></tr>
+                    ) : filteredEmergencies.length === 0 ? (
+                      <tr><td colSpan={5} className="py-16 text-center text-slate-400 text-sm font-medium">No emergencies found.</td></tr>
+                    ) : filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
+                      return (
+                        <tr
+                          key={em.id}
+                          onClick={() => setSelectedId(em.id)}
+                          className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors group hover:bg-slate-50/50`}
+                        >
+                          <td className="py-4 pl-2 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-semibold text-slate-800 leading-tight">{em.name}</p>
+                              <p className="text-[11px] text-slate-400 font-medium">{em.email}</p>
+                            </div>
+                          </td>
+                          <td className="py-4 text-[12px] text-slate-500 font-medium max-w-[180px] truncate pr-4">{em.address || "—"}</td>
+                          <td className="py-4 text-[12px] text-slate-500 font-medium">{em.phone || "—"}</td>
+                          <td className={`py-4 text-[12px] font-semibold ${priorityColor[em.priority]}`}>{em.priority}</td>
+                          <td className="py-4 pr-2 text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedId(em.id); }}
+                              className="text-[12px] font-semibold px-5 py-2 rounded-xl transition-all text-slate-700 bg-transparent group-hover:text-white group-hover:bg-gradient-to-b group-hover:from-[#8AA0FF] group-hover:to-[#5476FC] group-hover:shadow-[0_4px_10px_rgba(84,118,252,0.2)] whitespace-nowrap"
+                            >
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden flex flex-col gap-4">
+                {loading ? (
+                  <div className="py-16 text-center text-slate-400 text-sm font-medium">Loading emergencies…</div>
+                ) : fetchError ? (
+                  <div className="py-16 text-center text-red-500 text-sm font-medium">{fetchError}</div>
+                ) : filteredEmergencies.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 text-sm font-medium">No emergencies found.</div>
+                ) : filteredEmergencies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((em) => {
+                  const isSelected = selectedId === em.id;
+                  return (
+                    <div
+                      key={em.id}
+                      onClick={() => setSelectedId(isSelected ? null : em.id)}
+                      className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-100 flex-shrink-0 bg-slate-50 flex items-center justify-center text-slate-300">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{em.name}</p>
+                          <p className="text-[12px] text-slate-400 font-medium truncate">{em.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Priority</span>
+                          <span className={`text-[12px] font-semibold ${priorityColor[em.priority]}`}>{em.priority}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Phone</span>
+                          <span className="text-[12px] text-slate-500 font-medium">{em.phone || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Pagination */}
               {!loading && filteredEmergencies.length > 0 && (
@@ -248,7 +287,9 @@ export default function ManageEmergenciesPage() {
 
           {/* RIGHT: Patient Details Panel */}
           {selected && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
               {/* Header */}
               <div className="flex items-center justify-between pb-5 border-b border-slate-50">
@@ -318,6 +359,7 @@ export default function ManageEmergenciesPage() {
                 View Detailed Profile
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

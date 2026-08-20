@@ -153,7 +153,7 @@ export default function ManageFormsPage() {
 
             {/* Main Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[600px] flex flex-col justify-between">
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
@@ -213,6 +213,36 @@ export default function ManageFormsPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="md:hidden flex flex-col gap-4">
+                {mockForms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((form) => {
+                  const isSelected = selectedFormId === form.id;
+                  return (
+                    <div
+                      key={form.id}
+                      onClick={() => setSelectedFormId(form.id)}
+                      className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-5 h-5 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{form.title}</p>
+                          <p className="text-[12px] font-medium text-slate-400 truncate">Created: {form.createdDate}</p>
+                        </div>
+                      </div>
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Last Modified</span>
+                            <span className="text-[12px] text-slate-500 font-medium">{form.modifiedDate} {form.modifiedTime}</span>
+                          </div>
+                        </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Pagination Controls */}
               <div className="mt-6 border-t border-slate-50 pt-5">
@@ -230,7 +260,9 @@ export default function ManageFormsPage() {
 
           {/* Right Form Details panel */}
           {selectedForm && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedFormId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
               
               {/* Header */}
               <div className="flex items-center justify-between pb-6 border-b border-slate-50">
@@ -281,11 +313,12 @@ export default function ManageFormsPage() {
               {/* Action Buttons */}
               <button
                 onClick={() => router.push(`/dashboard/forms/${selectedForm.id}`)}
-                className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
+                className="hidden md:block w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
               >
                 Edit Form
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

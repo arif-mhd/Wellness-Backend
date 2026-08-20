@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 interface PatientRow {
   id: string;
   patientId: string;
@@ -75,18 +77,40 @@ function PatientsListContent() {
 
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [reminderState, setReminderState] = useState<Record<string, "idle" | "sending" | "sent" | "error">>({});
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
+  // Only doctors are allowed to send reminders — clinic admins and senior staff
+  // (whose SuperTokens role is "clinic" / "clinic_pending") see the button
+  // disabled with an explanatory tooltip.
+  const [isDoctor, setIsDoctor] = useState(false);
   useEffect(() => {
-    apiFetch(`/api/clinics/patients${qs}`)
+    fetch(`${API_URL}/auth/me`, { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => setPatients(Array.isArray(data.patients) ? data.patients : []))
-      .catch(() => setPatients([]))
+      .then((data) => { setIsDoctor((data.roles ?? []).includes("doctor")); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setLoadError("");
+    apiFetch(`/api/clinics/patients${qs}`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          setLoadError(r.status === 403 ? "Not authorized to view patients." : body.error ?? "Failed to load patients.");
+          setPatients([]);
+          return;
+        }
+        const data = await r.json();
+        setPatients(Array.isArray(data.patients) ? data.patients : []);
+      })
+      .catch(() => { setLoadError("Could not reach the server."); setPatients([]); })
       .finally(() => setLoading(false));
   }, [qs]);
 
@@ -133,7 +157,7 @@ function PatientsListContent() {
   }, [filtered, selectedId]);
 
   const sendReminder = async (p: PatientRow) => {
-    if (!p.nextAppointmentId) return;
+    if (!p.nextAppointmentId || !isDoctor) return;
     setReminderState((s) => ({ ...s, [p.id]: "sending" }));
     try {
       const res = await apiFetch(`/api/appointments/${p.nextAppointmentId}/remind`, { method: "POST" });
@@ -149,7 +173,10 @@ function PatientsListContent() {
     const state = reminderState[p.id] ?? "idle";
     return (
       <div
-        onClick={() => setSelectedId(p.id)}
+        onClick={() => {
+          setSelectedId(p.id);
+          setShowMobileDetails(true);
+        }}
         className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-0 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${isSelected ? "bg-[#F4F7FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
@@ -183,11 +210,15 @@ function PatientsListContent() {
           <div className="w-full md:flex-1 flex items-center justify-start md:justify-end md:pr-2 col-span-2 sm:col-span-1">
             <button
               onClick={(e) => { e.stopPropagation(); sendReminder(p); }}
-              disabled={!p.nextAppointmentId || state === "sending"}
+              disabled={!p.nextAppointmentId || !isDoctor || state === "sending" || state === "sent"}
               className="w-full md:w-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-6 py-2 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              title={p.nextAppointmentId ? "Send a reminder about their next appointment" : "No upcoming appointment to remind about"}
+              title={
+                !isDoctor ? "Only doctors can send reminders"
+                : p.nextAppointmentId ? "Send a reminder about their next appointment"
+                : "No upcoming appointment to remind about"
+              }
             >
-              {state === "sending" ? "Sending..." : state === "sent" ? "Sent" : state === "error" ? "Retry" : "Remind"}
+              {state === "sending" ? "Sending..." : state === "sent" ? "Sent ✓" : "Remind"}
             </button>
           </div>
         </div>
@@ -199,10 +230,14 @@ function PatientsListContent() {
 
   return (
     <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB] font-outfit relative">
-      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-bold tracking-tight">Patients</h1>
+
+          {loadError && (
+            <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{loadError}</div>
+          )}
 
           {/* Top Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
@@ -305,8 +340,29 @@ function PatientsListContent() {
 
         {/* ── Right: Patient Details Card ──────────────── */}
         {selectedPatient && (
-          <div className="w-full xl:w-[320px] bg-[#EEF0F8] rounded-3xl p-6 flex flex-col shrink-0 border border-[#E4E8F0] shadow-sm relative">
-            <h2 className="text-[#24292E] text-[16px] font-bold mb-6">Patient Details</h2>
+          <>
+            {showMobileDetails && (
+              <div 
+                className="lg:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+                onClick={() => setShowMobileDetails(false)}
+              />
+            )}
+            <div className={`
+              ${showMobileDetails ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"} 
+              lg:relative lg:flex lg:w-[300px] lg:rounded-3xl lg:z-auto lg:max-h-none lg:overflow-visible lg:pb-6 lg:shadow-sm
+              w-full bg-[#EEF0F8] p-6 flex-col shrink-0 border border-[#E4E8F0] transition-transform duration-300
+            `}>
+              <div className="lg:hidden w-full flex justify-center mb-4 pb-2">
+                <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+              </div>
+              <button 
+                className="lg:hidden absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-white transition-colors"
+                onClick={() => setShowMobileDetails(false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+
+              <h2 className="text-[#24292E] text-[16px] font-bold mb-6">Patient Details</h2>
 
             {/* Profile snippet */}
             <div className="flex items-center gap-4 mb-6">
@@ -361,14 +417,17 @@ function PatientsListContent() {
             {selectedPatient.nextAppointmentId ? (
               <>
                 <p className="text-[11px] text-[#676E76] mb-3">
-                  Sends a reminder about their next upcoming appointment with your clinic.
+                  {isDoctor
+                    ? "Sends a reminder about their next upcoming appointment with your clinic."
+                    : "Only doctors can send appointment reminders to patients."}
                 </p>
                 <button
                   onClick={() => sendReminder(selectedPatient)}
-                  disabled={selectedReminderState === "sending"}
-                  className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                  disabled={!isDoctor || selectedReminderState === "sending" || selectedReminderState === "sent"}
+                  className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!isDoctor ? "Only doctors can send reminders" : undefined}
                 >
-                  {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent" : "Remind for consultation"}
+                  {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent ✓" : "Remind for consultation"}
                 </button>
                 {selectedReminderState === "error" && <p className="text-[11px] text-red-600 mt-2">Failed to send. Try again.</p>}
               </>
@@ -376,6 +435,7 @@ function PatientsListContent() {
               <p className="text-[11px] text-[#A7AAB4]">No upcoming appointment to remind about.</p>
             )}
           </div>
+          </>
         )}
 
       </div>

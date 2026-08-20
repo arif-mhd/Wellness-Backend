@@ -229,10 +229,13 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
         <h3 className="text-xl md:text-[1.4rem] font-normal tracking-tight text-gray-800 font-marcellus leading-tight">
           {heading ?? "Set Availability"}
         </h3>
-        <p className="text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
+        <p className="hidden md:block text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
           {viewMode === "week"
             ? "Click a day header to switch to day view. Click or drag cells to set hours."
             : "You are editing one day. Switch to Week view to see all days."}
+        </p>
+        <p className="md:hidden text-gray-400 text-xs md:text-[0.825rem] font-light mt-1">
+          Select a day to set your availability hours.
         </p>
       </div>
 
@@ -268,7 +271,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
             </span>
 
             {/* Week / Day toggle */}
-            <div className="bg-gray-100 rounded-xl p-1 flex items-center">
+            <div className="hidden md:flex bg-gray-100 rounded-xl p-1 items-center">
               {(["week", "day"] as const).map((m) => (
                 <button key={m} type="button" onClick={() => setViewMode(m)}
                   className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all outline-none capitalize ${
@@ -281,7 +284,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
           </div>
 
           {/* ═══ WEEK VIEW ═══════════════════════════════════════════════ */}
-          {viewMode === "week" && (
+          <div className={`${viewMode === "week" ? "hidden md:block" : "hidden"}`}>
             <div
               ref={scrollContainerRefWeek}
               className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none scroll-smooth"
@@ -316,10 +319,10 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
                 </div>
               ))}
             </div>
-          )}
+          </div>
 
           {/* ═══ DAY VIEW ════════════════════════════════════════════════ */}
-          {viewMode === "day" && (
+          <div className={`${viewMode === "day" ? "block" : "block md:hidden"}`}>
             <div>
               {/* Day selector strip */}
               <div className="grid mb-3 bg-white border border-gray-100 rounded-2xl overflow-hidden"
@@ -367,7 +370,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
               {/* Single-day column grid */}
               <div
                 ref={scrollContainerRefDay}
-                className="bg-white border border-gray-100 rounded-2xl overflow-hidden select-none scroll-smooth"
+                className="md:bg-white md:border border-gray-100 rounded-2xl select-none scroll-smooth flex flex-col gap-2 md:gap-0 md:block md:overflow-hidden pb-2 md:pb-0"
                 style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}
                 onMouseLeave={() => setDragging(false)}
                 onMouseUp={() => setDragging(false)}
@@ -377,24 +380,24 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
                   const isSelected = selectedSlots.includes(key);
                   return (
                     <div key={time.timeVal}
-                      className="grid border-b last:border-b-0 border-gray-100"
+                      className="flex md:grid md:border-b last:border-b-0 border-gray-100 bg-white border md:border-0 rounded-xl md:rounded-none overflow-hidden shadow-sm md:shadow-none"
                       style={{ gridTemplateColumns: "56px 1fr", minHeight: 52 }}>
                       {/* Hour label */}
-                      <div className="border-r border-gray-100 flex items-center justify-center bg-slate-50/40">
+                      <div className="w-[64px] md:w-auto border-r border-gray-100 flex items-center justify-center bg-slate-50/40 shrink-0">
                         <span className="text-[0.65rem] font-bold text-gray-400">{time.label}</span>
                       </div>
                       {/* Slot cell — wide single column */}
                       <div
-                        className={`cursor-pointer transition-colors relative group flex items-center px-5 ${
+                        className={`flex-1 cursor-pointer transition-colors relative group flex items-center px-5 ${
                           isSelected ? "bg-[#A2B6FF] hover:bg-[#8AA0FF]" : "hover:bg-indigo-50/60"
                         }`}
                         onMouseDown={() => startDrag(activeDayKey, time.timeVal)}
                         onMouseEnter={() => continueDrag(activeDayKey, time.timeVal)}
                       >
                         {isSelected ? (
-                          <span className="text-[0.7rem] font-semibold text-white/90 select-none">Available</span>
+                          <span className="text-[0.75rem] font-semibold text-white/90 select-none">Available</span>
                         ) : (
-                          <span className="text-[0.7rem] font-medium text-gray-300 opacity-0 group-hover:opacity-100 select-none transition-opacity">Click to mark available</span>
+                          <span className="text-[0.7rem] font-medium text-gray-400 md:text-gray-300 md:opacity-0 group-hover:opacity-100 select-none transition-opacity">Click to mark available</span>
                         )}
                       </div>
                     </div>
@@ -410,7 +413,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
                 </span>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Per-day summary chips */}
           {selectedSlots.length > 0 && (
@@ -430,7 +433,7 @@ export default function SetAvailabilityForm({ initialAvailability, onSubmit, onG
         </div>
 
         {/* Tip */}
-        <p className="text-[0.7rem] text-gray-400 text-center font-light -mt-1">
+        <p className="text-[0.7rem] text-gray-400 text-center font-light -mt-1 hidden md:block">
           Tip: In Week view, click a day header to jump into Day view for that day.
           Selections are saved per weekday, not per specific date.
         </p>

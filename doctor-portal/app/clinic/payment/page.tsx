@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch, API_URL } from "@/lib/apiFetch";
 import Session from "supertokens-web-js/recipe/session";
 
@@ -29,7 +30,8 @@ interface DoctorRow { id: string; fullName: string; specialty?: string | null; a
 interface DoctorSummary { id: string; fullName: string; avatarUrl?: string | null; fees?: string | null; totalEarnings: number; cashEarnings: number; insuranceEarnings: number; }
 interface HistoryRow {
   id: string; patientName: string; patientAge: number | null; patientEmail: string;
-  diagnosis: string; date: string; earning: number; status: string; doctorId: string; paymentMethod: "cash" | "insurance";
+  diagnosis: string; date: string; earning: number; status: string; doctorId: string;
+  paymentMethod: "cash" | "insurance" | "pay_at_clinic"; paymentStatus?: string;
 }
 
 const HISTORY_FILTERS: { key: string; label: string }[] = [
@@ -124,9 +126,18 @@ function QuickFilterPills({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or the quick
+// filters below can misjudge "Today"/"This Week" near timezone boundaries.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function within(date: string, range: string): boolean {
   if (range === "All") return true;
-  const d = new Date(date);
+  const d = parseLocalTime(date);
   const now = new Date();
   if (range === "Today") return d.toDateString() === now.toDateString();
   if (range === "This Week") { const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0, 0, 0, 0); return d >= start; }
@@ -140,6 +151,7 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
   const [range, setRange] = useState("All");
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -154,6 +166,15 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
     } catch { setRows([]); }
     finally { setLoading(false); }
   }, [filter, branchId, doctorId]);
+
+  const handleMarkPaid = useCallback(async (id: string) => {
+    setMarkingPaidId(id);
+    try {
+      const res = await apiFetch(`/api/appointments/${id}/mark-paid`, { method: "PATCH" });
+      if (res.ok) await fetchHistory();
+    } catch { /* best-effort */ }
+    finally { setMarkingPaidId(null); }
+  }, [fetchHistory]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
@@ -208,9 +229,22 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
                 <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-medium shrink-0 ${DIAGNOSIS_COLORS[row.diagnosis] ?? "bg-[#F1F3F7] text-[#676E76]"}`}>
                   {row.diagnosis}
                 </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${row.paymentMethod === "insurance" ? "bg-[#E9F6EE] text-[#179353]" : "bg-[#F1F3F7] text-[#676E76]"}`}>
-                  {row.paymentMethod === "insurance" ? "Insurance" : "Cash"}
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
+                  row.paymentMethod === "insurance" ? "bg-[#E9F6EE] text-[#179353]" :
+                  row.paymentMethod === "pay_at_clinic" ? "bg-[#FFF7ED] text-[#C2761D]" :
+                  "bg-[#F1F3F7] text-[#676E76]"
+                }`}>
+                  {row.paymentMethod === "insurance" ? "Insurance" : row.paymentMethod === "pay_at_clinic" ? "Pay at Clinic" : "Cash"}
                 </span>
+                {row.paymentMethod === "pay_at_clinic" && row.paymentStatus !== "paid" && (
+                  <button
+                    onClick={() => handleMarkPaid(row.id)}
+                    disabled={markingPaidId === row.id}
+                    className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 bg-[#5476FC] text-white hover:bg-[#4065FB] disabled:opacity-50 transition-colors"
+                  >
+                    {markingPaidId === row.id ? "Marking…" : "Mark Paid"}
+                  </button>
+                )}
                 {row.status === "cancelled" && <span className="text-[10.5px] text-[#F25252] font-medium shrink-0">Cancelled</span>}
               </div>
               <span className="text-[12px] text-[#676E76]">{row.date ? new Date(row.date).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
@@ -506,12 +540,16 @@ function WithdrawModal({
 }
 
 // ─── Main page ───────────────────────────────────────────────────────────
-export default function ClinicPaymentPage() {
+function ClinicPaymentContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"clinics" | "doctors">("clinics");
   const [email, setEmail] = useState("");
   const [hasBranches, setHasBranches] = useState(false);
   const [branches, setBranches] = useState<BranchOption[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  // Deep-linked from a branch's own page (e.g. the branch drill-down's
+  // Payments tab "Manage Payments" link) — pre-scope to that branch instead
+  // of opening on the aggregate "Overall" view.
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(() => searchParams.get("branchId"));
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
 
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
@@ -522,7 +560,7 @@ export default function ClinicPaymentPage() {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [doctorSummary, setDoctorSummary] = useState<DoctorSummary | null>(null);
 
-  const [editingFee, setEditingFee] = useState<{ targetType: "clinic" | "doctor"; label: string; currentValue: string } | null>(null);
+  const [editingFee, setEditingFee] = useState<{ targetType: "doctor"; label: string; currentValue: string } | null>(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showBankAccount, setShowBankAccount] = useState(false);
   const [showDoctorShare, setShowDoctorShare] = useState(false);
@@ -587,19 +625,6 @@ export default function ClinicPaymentPage() {
   // calls above already thread through. Without this, submitting from a
   // multi-branch clinic 400s with "branchId is required."
   const branchQuery = selectedBranchId ? `?branchId=${selectedBranchId}` : "";
-
-  const submitClinicFee = async (category: string, newValue: string): Promise<{ ok: boolean; error?: string }> => {
-    if (!summary) return { ok: false, error: "No fee data loaded." };
-    const newRates = summary.consultationRates.map((r) => (r.category === category ? { ...r, price: newValue } : r));
-    try {
-      const r = await apiFetch(`/api/clinics/payments/fee-change-request${branchQuery}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "clinic", newRates }),
-      });
-      const d = await r.json();
-      return r.ok ? { ok: true } : { ok: false, error: d.error };
-    } catch { return { ok: false, error: "Network error." }; }
-  };
 
   const submitDoctorFee = async (doctorId: string, newValue: string): Promise<{ ok: boolean; error?: string }> => {
     // No branchId here on purpose — a doctor's fee is scoped to that
@@ -698,29 +723,6 @@ export default function ClinicPaymentPage() {
               )}
             </div>
           )}
-
-          {/* Consultation fees */}
-          <div className="mb-8">
-            <h2 className="text-[#383F45] text-[15px] font-medium mb-3">Consultation Fees</h2>
-            {isAggregateView ? (
-              <p className="text-[12px] text-[#9EA5AD]">Select a specific branch above to view or edit its consultation fees.</p>
-            ) : summaryLoading ? (
-              <p className="text-[12px] text-[#9EA5AD]">Loading…</p>
-            ) : !summary || summary.consultationRates.length === 0 ? (
-              <p className="text-[12px] text-[#9EA5AD]">No consultation fees configured yet. Add them from your <a href="/clinic/profile" className="text-[#5476FC] font-semibold hover:underline">Company Info profile</a>.</p>
-            ) : (
-              <div className="flex flex-wrap gap-4">
-                {summary.consultationRates.map((rate) => (
-                  <div key={rate.category} className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4">
-                    <span className="text-[13px] font-medium text-[#24292E]">{rate.category}: {rate.price}</span>
-                    <button onClick={() => setEditingFee({ targetType: "clinic", label: rate.category, currentValue: rate.price })} className="text-[#5476FC] text-[12px] font-semibold hover:underline">
-                      Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Earnings */}
           <div className="mb-8">
@@ -825,7 +827,7 @@ export default function ClinicPaymentPage() {
           currentValue={editingFee.currentValue}
           email={email}
           onClose={() => setEditingFee(null)}
-          onSubmit={(newValue) => editingFee.targetType === "clinic" ? submitClinicFee(editingFee.label, newValue) : submitDoctorFee(selectedDoctor!.id, newValue)}
+          onSubmit={(newValue) => submitDoctorFee(selectedDoctor!.id, newValue)}
         />
       )}
 
@@ -848,5 +850,13 @@ export default function ClinicPaymentPage() {
         <DoctorShareModal current={summary.doctorSharePercent} onSubmit={submitDoctorShare} onClose={() => setShowDoctorShare(false)} />
       )}
     </div>
+  );
+}
+
+export default function ClinicPaymentPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicPaymentContent />
+    </Suspense>
   );
 }

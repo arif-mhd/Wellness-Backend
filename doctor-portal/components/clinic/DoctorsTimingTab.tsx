@@ -120,6 +120,41 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
     }
   };
 
+  const [approvingSlots, setApprovingSlots] = useState(false);
+
+  const handleApprovePendingSlots = async () => {
+    if (!selectedDoctorId) return;
+    setApprovingSlots(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${selectedDoctorId}/verify-slots`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      await loadDoctors();
+    } catch {
+      alert("Failed to approve the schedule change.");
+    } finally {
+      setApprovingSlots(false);
+    }
+  };
+
+  const handleRejectPendingSlots = async () => {
+    if (!selectedDoctorId) return;
+    const reason = window.prompt("Reason for declining this schedule change (optional):") ?? "";
+    setApprovingSlots(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${selectedDoctorId}/reject-slots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error();
+      await loadDoctors();
+    } catch {
+      alert("Failed to decline the schedule change.");
+    } finally {
+      setApprovingSlots(false);
+    }
+  };
+
   const handleApproveAbsence = async (absenceId: string) => {
     if (!selectedDoctorId) return;
     try {
@@ -166,9 +201,14 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                   <span className="text-[12px] text-gray-400 truncate">{doctor.email}</span>
                 </div>
               </div>
-              <span className="text-[12px] font-medium text-gray-500 whitespace-nowrap">
-                {formatWorkingDays(doctor.slots)}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                {doctor.slotsPending && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Pending</span>
+                )}
+                <span className="text-[12px] font-medium text-gray-500 whitespace-nowrap">
+                  {formatWorkingDays(doctor.slots)}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -178,6 +218,38 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
       <div className="w-full md:w-2/3 flex flex-col gap-6">
         {selectedDoctor && (
           <>
+            {selectedDoctor.slotsPending && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Pending</span>
+                  <span className="text-[13px] font-semibold text-amber-800">
+                    Dr. {selectedDoctor.fullName} submitted an availability change awaiting your approval
+                  </span>
+                </div>
+                <p className="text-[12px] text-amber-700">
+                  Requested hours: {formatWorkingDays(selectedDoctor.tempSlots)}
+                </p>
+                {canManage && (
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleRejectPendingSlots}
+                      disabled={approvingSlots}
+                      className="px-4 py-1.5 bg-white border border-amber-300 text-amber-700 text-[12px] font-bold rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+                    >
+                      REJECT
+                    </button>
+                    <button
+                      onClick={handleApprovePendingSlots}
+                      disabled={approvingSlots}
+                      className="px-4 py-1.5 bg-black text-white text-[12px] font-bold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                    >
+                      APPROVE
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="bg-indigo-50/30 rounded-3xl p-6 border border-indigo-50/50">
               {canManage ? (
                 <>

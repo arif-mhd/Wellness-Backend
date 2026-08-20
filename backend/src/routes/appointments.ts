@@ -7,17 +7,19 @@ import {
   appointmentsContainer,
   patientsContainer,
   doctorsContainer,
-  clinicsContainer,
   queryDocuments,
   notificationsContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
-import { getActorClinicIds, getActorPermissionState, hasPermission } from "../utils/clinicScope";
+import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
+import { resolveAppointmentActor } from "../utils/appointmentAuth";
+import { sendPushToUser } from "../utils/pushNotifications";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
+import { devFallbackOrThrow } from "../utils/env";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 
@@ -37,8 +39,34 @@ function isAuthorizedDoctor(apt: any, doctorId: string): boolean {
   return apt.specialistInvite?.doctorId === doctorId;
 }
 
+// A doctor's clinicId may point either at an org's own top-level document
+// (main branch) or at a branch nested inside that org's branches[] array
+// (real branches have no standalone Cosmos doc of their own). A plain
+// clinicsContainer.item(clinicId, clinicId).read() only ever finds the
+// former — for a branch-assigned doctor it 404s and silently leaves the
+// appointment's clinicName blank. Resolve through the org doc + the same
+// mainBranchFrom/branchAsPublicClinic shaping used everywhere else that
+// needs to display a branch's identity.
+async function resolveDoctorClinicDisplay(clinicId: string | null | undefined): Promise<{ name: string | null; address: string | null }> {
+  if (!clinicId) return { name: null, address: null };
+  try {
+    const org = await loadOrgDocForClinicId(clinicId);
+    if (!org) return { name: null, address: null };
+    if (org.id === clinicId) {
+      const main = mainBranchFrom(org);
+      return { name: main.name ?? null, address: main.address ?? null };
+    }
+    const branch = (org.branches ?? []).find((b: any) => b.id === clinicId);
+    if (!branch) return { name: null, address: null };
+    const shaped = branchAsPublicClinic(org, branch);
+    return { name: shaped.clinicName ?? null, address: shaped.address ?? null };
+  } catch {
+    return { name: null, address: null };
+  }
+}
+
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
-  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
   const at = new AccessToken(livekitApiKey, livekitApiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
@@ -46,7 +74,7 @@ function makeLivekitToken(userId: string, room: string, name?: string): { token:
 
 async function sendLivekitData(room: string, payload: Record<string, unknown>): Promise<void> {
   try {
-    const wsUrl   = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const wsUrl   = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
     const httpUrl = wsUrl.replace(/^wss?:\/\//, "https://");
     const svc = new RoomServiceClient(httpUrl, livekitApiKey, livekitApiSecret);
     const data = Buffer.from(JSON.stringify(payload));
@@ -97,7 +125,10 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
   }
 
   const resolvedVisitType: "online" | "offline" = visitType === "offline" ? "offline" : "online";
-  const resolvedPaymentMethod: "cash" | "insurance" = paymentMethod === "insurance" ? "insurance" : "cash";
+  // In-person visits are paid at the clinic, not through the app — never let
+  // a client-supplied paymentMethod override that, regardless of what's sent.
+  const resolvedPaymentMethod: "cash" | "insurance" | "pay_at_clinic" =
+    resolvedVisitType === "offline" ? "pay_at_clinic" : paymentMethod === "insurance" ? "insurance" : "cash";
 
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
@@ -160,7 +191,10 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       reason,
       shareMedicalHistory: !!shareMedicalHistory,
       status: "scheduled",
-      paymentStatus: "paid",
+      // Online visits are mock-paid in-app at booking time; in-person visits
+      // are paid at the clinic and only marked paid afterward (see
+      // PATCH /:id/mark-paid) — never counted as earned until that happens.
+      paymentStatus: resolvedVisitType === "offline" ? "pending" : "paid",
       // Resolved server-side (never trusted from the client) — same value
       // it already defaulted to, just authoritative now instead of a client
       // override being accepted verbatim.
@@ -228,15 +262,7 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       appointments.map(async (apt) => {
         try {
           const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-          let clinicName: string | null = null;
-          let clinicAddress: string | null = null;
-          if (doctor?.clinicId) {
-            try {
-              const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
-              clinicName = clinic?.fullName ?? null;
-              clinicAddress = clinic?.address ?? null;
-            } catch { /* clinic lookup best-effort */ }
-          }
+          const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
           return {
             ...apt,
             doctorName: doctor?.fullName ?? "Unknown Doctor",
@@ -463,6 +489,7 @@ router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, r
           patientAvatarUrl,
           patientAge,
           appointmentId: apt.id,
+          visitType: apt.visitType === "offline" ? "offline" : "online",
         };
       })
     );
@@ -741,19 +768,14 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
     let enriched = apt;
     try {
       const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-      let clinicName: string | null = null;
-      if (doctor?.clinicId) {
-        try {
-          const { resource: clinic } = await clinicsContainer.item(doctor.clinicId, doctor.clinicId).read();
-          clinicName = clinic?.fullName ?? null;
-        } catch { /* best-effort */ }
-      }
+      const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
       enriched = {
         ...apt,
         doctorName: doctor?.fullName ?? apt.doctorName,
         doctorSpecialty: doctor?.specialty ?? apt.doctorSpecialty,
         doctorAvatarUrl: doctor?.avatarUrl ?? apt.doctorAvatarUrl,
         clinicName,
+        clinicAddress: clinicAddress ?? apt.clinicAddress ?? null,
       };
     } catch { /* fall back to the raw doc if doctor lookup fails */ }
 
@@ -776,20 +798,9 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const isDoctor = apt.doctorId === userId;
-    const isPatient = apt.patientId === userId;
-    let isClinic = false;
-    if (!isDoctor && !isPatient && apt.clinicId) {
-      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!isPatient && !isDoctor && !isClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-    if (isClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
-      res.status(403).json({ error: "You don't have permission to manage appointments." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { requireManagePermission: true });
+    if (!actor) return;
+    const { isDoctor, isPatient, isClinic } = actor;
 
     const cancelledReason = isPatient ? "cancelled_by_patient" : isClinic ? "cancelled_by_clinic" : "cancelled_by_doctor";
     // `cancelledReason` (above) encodes WHO cancelled; `patientCancelReason` is
@@ -829,6 +840,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
         sentAt: now,
       };
       await notificationsContainer.items.create(patientNotification);
+      await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
     } else {
       // Notify doctor
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
@@ -844,6 +856,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
         sentAt: now,
       };
       await notificationsContainer.items.create(doctorNotification);
+      await sendPushToUser(doctorNotification.patientId, doctorNotification.title, doctorNotification.body, { type: doctorNotification.type, referenceId: doctorNotification.referenceId });
     }
 
     logActivity({
@@ -859,6 +872,41 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
     console.error("Cancel appointment error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/appointments/:id/mark-paid ──────────────────────────────────
+// In-person ("pay at clinic") appointments are booked with paymentStatus
+// "pending" — nothing is actually collected through the app. Once the
+// doctor or clinic front desk collects payment at the visit, this flips it
+// to "paid" so it counts toward the clinic's earnings. Online appointments
+// are already paid at booking and never need this.
+router.patch("/:id/mark-paid", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
+
+    const actor = await resolveAppointmentActor(apt, userId, res, { checkPatient: false, requireManagePermission: true });
+    if (!actor) return;
+
+    if (apt.paymentMethod !== "pay_at_clinic") {
+      res.status(400).json({ error: "Only in-person appointments can be marked paid this way." });
+      return;
+    }
+
+    const updated = { ...apt, paymentStatus: "paid", updatedAt: new Date().toISOString() };
+    await appointmentsContainer.items.upsert(updated);
+
+    res.json({ status: "OK", appointment: updated });
+  } catch (err) {
+    console.error("Mark appointment paid error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -880,20 +928,9 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const callerIsDoctor = apt.doctorId === userId;
-    const callerIsPatient = apt.patientId === userId;
-    let callerIsClinic = false;
-    if (!callerIsDoctor && !callerIsPatient && apt.clinicId) {
-      callerIsClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!callerIsPatient && !callerIsDoctor && !callerIsClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-    if (callerIsClinic && !hasPermission(await getActorPermissionState(userId), "manage_appointments")) {
-      res.status(403).json({ error: "You don't have permission to manage appointments." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { requireManagePermission: true });
+    if (!actor) return;
+    const { isDoctor: callerIsDoctor, isClinic: callerIsClinic } = actor;
 
     const newDate = new Date(scheduledAt);
     if (isNaN(newDate.getTime())) {
@@ -1023,6 +1060,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
         sentAt: now,
       };
       await notificationsContainer.items.create(patientNotification);
+      await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
     } else {
       const patientDoc = await patientsContainer.item(apt.patientId, apt.patientId).read().then(r => r.resource).catch(() => null);
       const patientName = patientDoc?.fullName ?? "Patient";
@@ -1037,6 +1075,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
         sentAt: now,
       };
       await notificationsContainer.items.create(doctorNotification);
+      await sendPushToUser(doctorNotification.patientId, doctorNotification.title, doctorNotification.body, { type: doctorNotification.type, referenceId: doctorNotification.referenceId });
     }
 
     logActivity({
@@ -1235,6 +1274,28 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
       }
     }
 
+    // Doctor's presence just flipped true for the first time on this
+    // appointment — notify the patient to join, since the call only counts
+    // as a genuine no-show (auto-cancelled) once the doctor eventually
+    // leaves without the patient ever having joined too (see above).
+    if (isDoctor && inCall && apt.doctorInCall !== true) {
+      const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
+      const doctorName = docDoc?.fullName ?? "Doctor";
+      const doctorJoinedNotification = {
+        id: "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex"),
+        patientId: apt.patientId,
+        profileId: apt.familyMemberId ?? apt.patientId,
+        title: "Doctor Has Joined",
+        body: `Dr. ${doctorName} has joined your appointment — please join soon to avoid the appointment being cancelled as a no-show.`,
+        type: "doctor_joined",
+        referenceId: id,
+        isRead: false,
+        sentAt: new Date().toISOString(),
+      };
+      await notificationsContainer.items.create(doctorJoinedNotification);
+      await sendPushToUser(doctorJoinedNotification.patientId, doctorJoinedNotification.title, doctorJoinedNotification.body, { type: doctorJoinedNotification.type, referenceId: doctorJoinedNotification.referenceId });
+    }
+
     if (completionAction === "completed") {
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
       logActivity({
@@ -1332,15 +1393,9 @@ router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Res
       res.status(404).json({ error: "Appointment not found." });
       return;
     }
-    const isDoctor = apt.doctorId === userId;
-    let isClinic = false;
-    if (!isDoctor && apt.clinicId) {
-      isClinic = (await getActorClinicIds(userId)).includes(apt.clinicId);
-    }
-    if (!isDoctor && !isClinic) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
+    const actor = await resolveAppointmentActor(apt, userId, res, { checkPatient: false });
+    if (!actor) return;
+    const { isClinic } = actor;
 
     const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
     const doctorName = docDoc?.fullName ?? "Doctor";
@@ -1371,6 +1426,7 @@ router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Res
       sentAt: new Date().toISOString(),
     };
     await notificationsContainer.items.create(patientNotification);
+    await sendPushToUser(patientNotification.patientId, patientNotification.title, patientNotification.body, { type: patientNotification.type, referenceId: patientNotification.referenceId });
 
     logActivity({
       source: isClinic ? "clinic" : "doctor",
@@ -1757,8 +1813,8 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
     // Doctors connect from a browser on the same machine → use localhost (avoids Chrome
     // blocking WebRTC from HTTP pages to non-localhost IPs).
     // Patients connect from a physical device on the LAN → use LAN IP.
-    const wsUrlDoctor  = process.env.LIVEKIT_WS_URL_DOCTOR  || "ws://localhost:7880";
-    const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const wsUrlDoctor  = process.env.LIVEKIT_WS_URL_DOCTOR  || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
+    const wsUrlPatient = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_PATIENT", "ws://localhost:7880");
     const wsUrl = isDoctor ? wsUrlDoctor : wsUrlPatient;
 
     const participantName = isDoctor
@@ -1925,6 +1981,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
         sentAt: now,
       };
       await notificationsContainer.items.create(notification);
+      await sendPushToUser(notification.patientId, notification.title, notification.body, { type: notification.type, referenceId: notification.referenceId });
 
       // Notify doctor via LiveKit that the patient accepted
       await sendLivekitData(apt.livekitRoom, {

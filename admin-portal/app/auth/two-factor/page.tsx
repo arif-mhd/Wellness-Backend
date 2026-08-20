@@ -103,7 +103,7 @@ function TwoFactorInner() {
         body:        JSON.stringify({ email, code }),
       });
       const data = await res.json();
-      if (data.verified) { router.push("/dashboard"); return; }
+      if (data.verified) { router.replace("/dashboard"); return; }
       switch (data.reason) {
         case "INVALID_CODE":
           setError(data.attemptsLeft > 0

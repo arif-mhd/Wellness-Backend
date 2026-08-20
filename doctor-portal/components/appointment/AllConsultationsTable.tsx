@@ -8,7 +8,9 @@ interface AllConsultationsTableProps {
   selectedPatientId: string | undefined;
   onSelectPatient: (patient: Patient) => void;
   onConsult: (patient: Patient) => void;
-  onViewPreVisitForm?: (patient: Patient) => void;
+  onSendReminder?: (patient: Patient) => void;
+  /** Set of appointment IDs for which a reminder has already been sent */
+  remindedIds?: Set<string>;
   activeTab: "All" | "Upcoming" | "Past";
   /** When true, completed appointments are faded (used in the "All" tab) */
   fadeCompleted?: boolean;
@@ -19,7 +21,8 @@ export default function AllConsultationsTable({
   selectedPatientId,
   onSelectPatient,
   onConsult,
-  onViewPreVisitForm,
+  onSendReminder,
+  remindedIds,
   activeTab,
   fadeCompleted = false,
 }: AllConsultationsTableProps) {
@@ -55,10 +58,13 @@ export default function AllConsultationsTable({
             {activeTab === "Past" ? (
               <div className="flex items-center justify-between w-full">
                 <span>Date and Time</span>
-                <span className="pr-4">Earnings</span>
+                <span>Earnings</span>
               </div>
             ) : (
-              "Date and Time"
+              <div className="flex items-center justify-between w-full">
+                <span>Date and Time</span>
+                <span className="text-center w-[100px]">Action</span>
+              </div>
             )}
           </div>
         </div>
@@ -117,33 +123,35 @@ export default function AllConsultationsTable({
               </div>
 
               {/* Diagnosis Column — flexible */}
-              <div className="w-full md:flex-1 md:min-w-0 flex items-center gap-1.5 px-2">
-                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none">
+              <div className="w-full md:flex-1 md:min-w-0 flex items-start md:items-center gap-2 px-0 flex-col md:flex-row mt-2 md:mt-0">
+                <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Diagnosis</span>
+                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none max-w-full truncate">
                   {patient.diagnosis}
                 </span>
-                <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] truncate flex-1 min-w-0">
-                  {patient.description}
-                </p>
               </div>
 
               {/* Date + Action/Earnings Column — 293px */}
               <div
-                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2"
+                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 {activeTab === "Past" ? (
                   <>
-                    <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] truncate">
-                      {patient.dateTime}
-                    </span>
-                    <span className="text-[#676E76] text-[12px] font-medium leading-[1.5] tracking-[-0.24px] pr-4 select-text">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2 min-w-0">
+                      <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Date & Time</span>
+                      <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px] truncate">
+                        {patient.dateTime}
+                      </span>
+                    </div>
+                    <span className="text-[#676E76] text-[12px] font-medium leading-[1.5] tracking-[-0.24px] select-text">
                       {patient.earnings ?? "AED 110.00"}
                     </span>
                   </>
                 ) : (
                   <>
                     {/* Date/time or Waiting status */}
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2 min-w-0">
+                      <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Date & Time</span>
                       {patient.status === "Waiting" ? (
                         <div className="flex items-center gap-2">
                           {/* Animated pulsing dot matching Figma F4A308 */}
@@ -163,35 +171,45 @@ export default function AllConsultationsTable({
                     </div>
 
                     {/* Action button */}
-                    {patient.status === "Completed" ? (
-                      <button
-                        disabled
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
-                        style={{ minWidth: "100px" }}
-                      >
-                        Consult Now
-                      </button>
-                    ) : isSelected && patient.status !== "Waiting" ? (
-                      <button
-                        onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none"
-                        style={{
-                          background:
-                            "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
-                          minWidth: "130px",
-                        }}
-                      >
-                        View&nbsp;Pre-Visit Form
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onConsult(patient)}
-                        className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#24292E] font-medium text-[13px] leading-5 hover:bg-[#F5F6FA] transition-colors duration-150 select-none shadow-sm"
-                        style={{ minWidth: "100px" }}
-                      >
-                        Consult Now
-                      </button>
-                    )}
+                    {(() => {
+                      const reminded = remindedIds?.has(patient.id) ?? false;
+                      if (patient.status === "Completed") {
+                        return (
+                          <button
+                            disabled
+                            className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#9EA5AD] font-medium text-[13px] leading-5 cursor-not-allowed select-none"
+                            style={{ minWidth: "100px" }}
+                          >
+                            Consult Now
+                          </button>
+                        );
+                      }
+                      if (isSelected && patient.status !== "Waiting") {
+                        return (
+                          <button
+                            onClick={() => onSendReminder?.(patient)}
+                            disabled={reminded}
+                            className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{
+                              background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
+                              minWidth: "100px",
+                            }}
+                            title={reminded ? "Reminder already sent" : "Send appointment reminder to patient"}
+                          >
+                            {reminded ? "Reminded ✓" : "Remind"}
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={() => onConsult(patient)}
+                          className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] bg-white border border-[#EBEEF5] text-[#24292E] font-medium text-[13px] leading-5 hover:bg-[#F5F6FA] transition-colors duration-150 select-none shadow-sm"
+                          style={{ minWidth: "100px" }}
+                        >
+                          Consult Now
+                        </button>
+                      );
+                    })()}
                   </>
                 )}
               </div>

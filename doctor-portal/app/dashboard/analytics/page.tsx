@@ -1,6 +1,5 @@
 "use client";
 
-import ProtectedRoute from "@/components/ProtectedRoute";
 import React, { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import PatientRatings from "@/components/analytics/PatientRatings";
@@ -13,6 +12,15 @@ interface TaskCounts {
   upcomingConsultations: number;
   pendingEmr: number;
   total: number;
+}
+
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or month/year
+// bucketing near a month boundary can silently misattribute revenue.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
 }
 
 function pctChange(today: number, yesterday: number): { value: number; direction: "up" | "down" | "none" } {
@@ -99,7 +107,7 @@ export default function AnalyticsPage() {
   const completedThisMonth = appointments.filter((a) => {
     if (a.status !== "completed" && a.status !== "Completed") return false;
     if (!a.scheduledAt) return false;
-    const d = new Date(a.scheduledAt);
+    const d = parseLocalTime(a.scheduledAt);
     return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
   });
   const revenueThisMonth = completedThisMonth.reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
@@ -111,7 +119,7 @@ export default function AnalyticsPage() {
   const completedPrevMonth = appointments.filter((a) => {
     if (a.status !== "completed" && a.status !== "Completed") return false;
     if (!a.scheduledAt) return false;
-    const d = new Date(a.scheduledAt);
+    const d = parseLocalTime(a.scheduledAt);
     return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
   });
   const revenuePrevMonth = completedPrevMonth.reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
@@ -125,7 +133,6 @@ export default function AnalyticsPage() {
   }).format(revenueThisMonth);
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-5 pb-12 select-none">
         {/* Title row */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
@@ -255,6 +262,5 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
   );
 }

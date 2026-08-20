@@ -26,6 +26,19 @@ interface TicketComment {
   createdAt: string;
 }
 
+interface TicketAttachment {
+  id: string;
+  fileName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+function isImageAttachment(contentType: string) {
+  return contentType.startsWith("image/");
+}
+
 const ROLE_LABEL: Record<string, string> = { doctor: "Doctor", clinic: "Clinic", patient: "Patient" };
 const ROLE_BADGE_COLOR: Record<string, string> = {
   doctor: "bg-purple-50 text-purple-600",
@@ -47,6 +60,7 @@ interface Ticket {
   status: Status;
   adminReply?: string | null;
   comments?: TicketComment[];
+  attachments?: TicketAttachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -96,8 +110,6 @@ function SupportPageInner() {
         setTickets(data);
         if (targetId && data.some((t: Ticket) => t.id === targetId)) {
           setSelectedId(targetId);
-        } else if (data.length > 0 && !selectedId) {
-          setSelectedId(data[0].id);
         }
       }
     } catch {
@@ -203,7 +215,7 @@ function SupportPageInner() {
             <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Support and Tickets</h1>
 
             {/* Role tabs */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: "all", label: "All Requests" },
                 { key: "patient", label: "Patient Requests", count: patientOpenCount },
@@ -228,8 +240,8 @@ function SupportPageInner() {
             </div>
 
             {/* Status filters */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex flex-wrap items-center gap-2">
                 {(["all", "Open", "Closed"] as const).map((s) => (
                   <button
                     key={s}
@@ -242,13 +254,12 @@ function SupportPageInner() {
                   </button>
                 ))}
               </div>
-              <button onClick={fetchTickets} className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
-                Refresh
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <button onClick={fetchTickets} className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 shadow-sm border border-slate-100 transition-all hover:bg-slate-50" title="Refresh">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
+            <div className="hidden xl:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-1">
               <div className="flex items-center gap-6 flex-1">
                 {["Date", "Priority", "Status"].map((filter) => (
                   <span key={filter} className="flex items-center gap-1.5">
@@ -264,70 +275,126 @@ function SupportPageInner() {
                   <div className="text-slate-400 text-sm font-medium">Loading tickets...</div>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
-                      <th className="pb-4 pt-1 font-semibold pl-2 w-[24%]">
-                        <div className="flex items-center gap-2">Subject <DoubleCaret /></div>
-                      </th>
-                      <th className="pb-4 pt-1 font-semibold w-[10%]">
-                        <div className="flex items-center gap-2">Priority <DoubleCaret /></div>
-                      </th>
-                      <th className="pb-4 pt-1 font-semibold w-[14%]">Category</th>
-                      <th className="pb-4 pt-1 font-semibold w-[8%]">Type</th>
-                      <th className="pb-4 pt-1 font-semibold w-[18%]">Submitter</th>
-                      <th className="pb-4 pt-1 font-semibold w-[14%]">Date</th>
-                      <th className="pb-4 pt-1 font-semibold w-[12%] text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-16 text-center text-slate-400 text-sm">No tickets found</td>
+                <>
+                <div className="hidden xl:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2 w-[24%]">
+                          <div className="flex items-center gap-2">Subject <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold w-[10%]">
+                          <div className="flex items-center gap-2">Priority <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold w-[14%]">Category</th>
+                        <th className="pb-4 pt-1 font-semibold w-[8%]">Type</th>
+                        <th className="pb-4 pt-1 font-semibold w-[18%]">Submitter</th>
+                        <th className="pb-4 pt-1 font-semibold w-[14%]">Date</th>
+                        <th className="pb-4 pt-1 font-semibold w-[12%] text-center">Status</th>
                       </tr>
-                    ) : (
-                      filtered.map((t) => {
-                        const isSelected = selectedId === t.id;
-                        const priority = getPriority(t.category);
-                        return (
-                          <tr
-                            key={t.id}
-                            onClick={() => setSelectedId(t.id)}
-                            className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
-                          >
-                            <td className="py-4 pl-2">
-                              <p className="text-[13px] font-semibold text-slate-800 leading-tight">{t.subject}</p>
-                              <p className="text-[11px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
-                            </td>
-                            <td className={`py-4 text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</td>
-                            <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
-                            <td className="py-4">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-semibold ${roleBadgeColor(t.submitterRole)}`}>
+                    </thead>
+                    <tbody>
+                      {filtered.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-16 text-center text-slate-400 text-sm">No tickets found</td>
+                        </tr>
+                      ) : (
+                        filtered.map((t) => {
+                          const isSelected = selectedId === t.id;
+                          const priority = getPriority(t.category);
+                          return (
+                            <tr
+                              key={t.id}
+                              onClick={() => setSelectedId(t.id)}
+                              className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/50`}
+                            >
+                              <td className="py-4 pl-2">
+                                <p className="text-[13px] font-semibold text-slate-800 leading-tight">{t.subject}</p>
+                                <p className="text-[11px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
+                              </td>
+                              <td className={`py-4 text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</td>
+                              <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
+                              <td className="py-4">
+                                <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-semibold ${roleBadgeColor(t.submitterRole)}`}>
+                                  {roleLabel(t.submitterRole)}
+                                </span>
+                              </td>
+                              <td className="py-4 pr-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[12px] flex-shrink-0">
+                                    {displayName(t).slice(0, 1).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="text-[12px] font-semibold text-slate-800 leading-tight">{displayName(t)}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 text-[12px] text-slate-500 font-medium">{formatDate(t.createdAt)}</td>
+                              <td className="py-4 text-center">
+                                <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[11px] font-semibold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
+                                  {t.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {filtered.length > 0 && !loading && (
+                  <div className="xl:hidden flex flex-col gap-4">
+                    {filtered.map((t) => {
+                      const isSelected = selectedId === t.id;
+                      const priority = getPriority(t.category);
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => setSelectedId(isSelected ? null : t.id)}
+                          className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{t.subject}</p>
+                              <p className="text-[12px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
+                            </div>
+                            <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[10px] font-semibold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
+                              {t.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[12px] flex-shrink-0">
+                              {displayName(t).slice(0, 1).toUpperCase()}
+                            </div>
+                            <div className="flex flex-col">
+                              <p className="text-[12px] font-semibold text-slate-800 leading-tight">{displayName(t)}</p>
+                              <span className={`inline-flex px-2 py-0.5 mt-0.5 w-fit rounded-full text-[9px] font-semibold ${roleBadgeColor(t.submitterRole)}`}>
                                 {roleLabel(t.submitterRole)}
                               </span>
-                            </td>
-                            <td className="py-4 pr-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-semibold text-[12px] flex-shrink-0">
-                                  {displayName(t).slice(0, 1).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="text-[12px] font-semibold text-slate-800 leading-tight">{displayName(t)}</p>
-                                </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-3 mt-2 pt-3 border-t border-slate-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Priority</span>
+                                <span className={`text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</span>
                               </div>
-                            </td>
-                            <td className="py-4 text-[12px] text-slate-500 font-medium">{formatDate(t.createdAt)}</td>
-                            <td className="py-4 text-center">
-                              <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[11px] font-semibold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
-                                {t.status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Category</span>
+                                <span className="text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Date</span>
+                              <span className="text-[12px] text-slate-500 font-medium">{formatDate(t.createdAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                </>
               )}
 
               <div className="mt-6 border-t border-slate-50 pt-5">
@@ -344,7 +411,9 @@ function SupportPageInner() {
 
           {/* RIGHT: Ticket Details Panel */}
           {selected && (
-            <div className="xl:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300 flex flex-col gap-5">
+            <>
+            <div className="xl:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto xl:static xl:z-auto xl:max-h-none xl:col-span-4 bg-white rounded-t-[2rem] xl:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] xl:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t xl:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 xl:slide-in-from-right-3 duration-300 flex flex-col gap-5">
 
               <div className="flex items-center justify-between">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">{selected.subject}</h2>
@@ -416,6 +485,29 @@ function SupportPageInner() {
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
+                {selected.attachments && selected.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selected.attachments.map((att) => (
+                      <a
+                        key={att.id}
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 hover:border-[#6A8BFF] transition-colors"
+                      >
+                        {isImageAttachment(att.contentType) ? (
+                          <img src={att.url} alt={att.fileName} className="w-8 h-8 rounded object-cover shrink-0" />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6A8BFF" strokeWidth={2} className="shrink-0">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6" />
+                          </svg>
+                        )}
+                        <span className="text-[11px] text-[#4468E0] font-semibold truncate max-w-[140px]">{att.fileName}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Comment Thread */}
@@ -485,6 +577,7 @@ function SupportPageInner() {
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

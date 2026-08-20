@@ -8,6 +8,15 @@ import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INF
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or display
+// formatting silently shifts by the browser's timezone offset.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function CompleteEmrForm() {
   const searchParams  = useSearchParams();
   const router        = useRouter();
@@ -25,6 +34,16 @@ function CompleteEmrForm() {
   const [emrSaved, setEmrSaved] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
 
+  // "backfill" = this consultation already ended (video call, or a previous
+  // in-person visit) and the doctor is just catching up on documentation —
+  // the original flow this screen was built for. "live" = an in-person
+  // appointment that's still scheduled/in_progress and is being conducted
+  // right now via this screen (no video call for an in-person visit), so it
+  // also needs a way to actually complete the visit, not just save notes.
+  const [mode, setMode] = useState<"backfill" | "live">("backfill");
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [completingVisit, setCompletingVisit] = useState(false);
+
   useEffect(() => {
     Session.getUserId().then((id) => setCurrentDoctorId(id ?? null)).catch(() => {});
   }, []);
@@ -34,9 +53,10 @@ function CompleteEmrForm() {
     (async () => {
       setLoading(true);
       try {
-        const [emrRes, ehrRes] = await Promise.all([
+        const [emrRes, ehrRes, aptRes] = await Promise.all([
           apiFetch(`/api/appointments/${appointmentId}/emr`),
           apiFetch(`/api/appointments/${appointmentId}/ehr`),
+          apiFetch(`/api/appointments/${appointmentId}`),
         ]);
 
         if (emrRes.ok) {
@@ -53,6 +73,26 @@ function CompleteEmrForm() {
           const { profile } = await ehrRes.json();
           setPatientProfile(profile ?? null);
         }
+
+        if (aptRes.ok) {
+          const { appointment } = await aptRes.json();
+          setScheduledAt(appointment?.scheduledAt ?? null);
+          if (appointment?.status === "scheduled" || appointment?.status === "in_progress") {
+            setMode("live");
+            // Opening this screen for a still-scheduled in-person visit is
+            // the doctor starting it — mirrors what connecting to the video
+            // room does for an online consultation.
+            if (appointment.status === "scheduled") {
+              apiFetch(`/api/appointments/${appointmentId}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "in_progress" }),
+              }).catch(() => {});
+            }
+          } else {
+            setMode("backfill");
+          }
+        }
       } catch {
         // ignore — start with a blank EMR
       } finally {
@@ -60,6 +100,27 @@ function CompleteEmrForm() {
       }
     })();
   }, [appointmentId]);
+
+  const completeVisit = async () => {
+    setCompletingVisit(true);
+    try {
+      await apiFetch(`/api/appointments/${appointmentId}/emr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
+      });
+      const res = await apiFetch(`/api/appointments/${appointmentId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (res.ok) router.push("/appointments");
+    } catch {
+      // best-effort
+    } finally {
+      setCompletingVisit(false);
+    }
+  };
 
   const saveEmr = async () => {
     setSavingEmr(true);
@@ -86,15 +147,23 @@ function CompleteEmrForm() {
     <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 96px)" }}>
       {/* Top bar */}
       <div className="flex items-center gap-4 px-5 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
-        <button onClick={() => router.push("/dashboard/prescriptions")}
+        <button onClick={() => router.push(mode === "live" ? "/appointments" : "/dashboard/prescriptions")}
           className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div className="flex flex-col">
-          <p className="text-[#24292e] text-xs font-semibold">Complete EMR — {patientName}</p>
-          <p className="text-gray-400 text-[10px]">This consultation has already ended. Fill in and save the clinical record below.</p>
+          <p className="text-[#24292e] text-xs font-semibold">
+            {mode === "live" ? `In-Person Consultation — ${patientName}` : `Complete EMR — ${patientName}`}
+          </p>
+          <p className="text-gray-400 text-[10px]">
+            {mode === "live"
+              ? (scheduledAt
+                  ? parseLocalTime(scheduledAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                  : "Fill in the clinical record for this visit, then mark it complete.")
+              : "This consultation has already ended. Fill in and save the clinical record below."}
+          </p>
         </div>
       </div>
 
@@ -127,7 +196,7 @@ function CompleteEmrForm() {
 
         {/* Bottom save bar */}
         <div className="flex items-center justify-end gap-3 px-4 md:px-6 py-3 border-t border-gray-100 flex-shrink-0">
-          <button onClick={() => router.push("/dashboard/prescriptions")}
+          <button onClick={() => router.push(mode === "live" ? "/appointments" : "/dashboard/prescriptions")}
             className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 transition-colors">
             Cancel
           </button>
@@ -135,6 +204,12 @@ function CompleteEmrForm() {
             className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec] shadow-[0_2px_8px_rgba(84,118,252,0.3)]"}`}>
             {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
           </button>
+          {mode === "live" && (
+            <button onClick={completeVisit} disabled={completingVisit}
+              className="h-9 px-6 rounded-xl text-white text-xs font-bold bg-green-600 hover:bg-green-700 disabled:opacity-50 shadow-[0_2px_8px_rgba(22,163,74,0.3)] transition-all">
+              {completingVisit ? "Completing…" : "Complete Visit"}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -262,27 +262,11 @@ export default function ManageArticlesPage() {
               ))}
             </div>
 
-            {/* Column headers */}
-            <div className="flex items-center text-[13px] font-medium text-[#64748B] px-3 select-none">
-              <div className="flex items-center gap-1.5 flex-[3] cursor-pointer hover:text-slate-800">
-                Title <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Category <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Author <DoubleCaret />
-              </div>
-              <div className="flex items-center gap-1.5 w-28 cursor-pointer hover:text-slate-800">
-                Date <DoubleCaret />
-              </div>
-              <div className="w-20 text-center">Status</div>
-              <div className="w-20 text-center">Actions</div>
-            </div>
+
 
             {/* Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 min-h-[500px] flex flex-col justify-between">
-              <div className="overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-24 gap-3">
                     <div className="w-8 h-8 border-4 border-indigo-100 border-t-[#5476FC] rounded-full animate-spin" />
@@ -299,6 +283,24 @@ export default function ManageArticlesPage() {
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-700">
+                        <th className="pb-4 pt-1 font-semibold pl-2 min-w-[220px] w-[35%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Title <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[130px] w-[15%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Category <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[160px] w-[20%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Author <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[100px] w-[10%]">
+                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Date <DoubleCaret /></div>
+                        </th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[90px] w-[10%] text-center">Status</th>
+                        <th className="pb-4 pt-1 font-semibold min-w-[90px] w-[10%] text-center">Actions</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {paginated.map(article => (
                         <tr
@@ -307,7 +309,7 @@ export default function ManageArticlesPage() {
                           className={`group cursor-pointer transition-colors duration-150 border-b border-slate-50 last:border-0 ${selectedId === article.id ? "bg-blue-50/40" : "hover:bg-slate-50/50"}`}
                         >
                           {/* Title */}
-                          <td className="py-3.5 px-2 flex-[3]">
+                          <td className="py-3.5 px-2">
                             <div className="flex items-center gap-3 min-w-0">
                               {/* Cover thumbnail */}
                               {article.coverImageUrl ? (
@@ -331,20 +333,20 @@ export default function ManageArticlesPage() {
                           </td>
 
                           {/* Category */}
-                          <td className="py-3.5 w-28">
+                          <td className="py-3.5">
                             <CategoryBadge category={article.category} />
                           </td>
 
                           {/* Author */}
-                          <td className="py-3.5 w-28 text-[13px] text-slate-600 font-medium">{article.author}</td>
+                          <td className="py-3.5 text-[13px] text-slate-600 font-medium">{article.author}</td>
 
                           {/* Date */}
-                          <td className="py-3.5 w-28 text-[11px] text-slate-400 font-medium">
+                          <td className="py-3.5 text-[11px] text-slate-400 font-medium">
                             {new Date(article.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
 
                           {/* Status */}
-                          <td className="py-3.5 w-20 text-center">
+                          <td className="py-3.5 text-center">
                             {article.flagged ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold">
                                 <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /></svg>
@@ -359,7 +361,7 @@ export default function ManageArticlesPage() {
                           </td>
 
                           {/* Actions */}
-                          <td className="py-3.5 w-20" onClick={e => e.stopPropagation()}>
+                          <td className="py-3.5 text-center" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               {/* Edit */}
                               <button
@@ -417,6 +419,101 @@ export default function ManageArticlesPage() {
                   </table>
                 )}
               </div>
+              
+              <div className="lg:hidden flex flex-col gap-4">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-24 gap-3">
+                    <div className="w-8 h-8 border-4 border-indigo-100 border-t-[#5476FC] rounded-full animate-spin" />
+                    <p className="text-[13px] text-slate-400 font-medium">Loading articles…</p>
+                  </div>
+                ) : paginated.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
+                    <svg className="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-[13px] font-semibold text-center">
+                      {activeTab === "flagged" ? "No flagged articles" : "No articles yet — add one to get started"}
+                    </p>
+                  </div>
+                ) : (
+                  paginated.map(article => (
+                    <div
+                      key={article.id}
+                      onClick={() => setSelectedId(prev => prev === article.id ? null : article.id)}
+                      className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-150 bg-white rounded-2xl shadow-sm border ${selectedId === article.id ? "border-[#6A8BFF]/40 bg-[#f8faff]" : "border-slate-100 hover:bg-slate-50/50"}`}
+                    >
+                      <div className="flex gap-3 min-w-0">
+                        {article.coverImageUrl ? (
+                          <img src={article.coverImageUrl} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-100" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E0E7FF] to-[#EEF2FF] flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 text-[#6A8BFF] opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-semibold text-slate-800 mb-0.5 truncate">{article.title}</p>
+                          {article.summary && (
+                            <p className="text-[12px] text-slate-400 truncate">{article.summary}</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-1">
+                        <CategoryBadge category={article.category} />
+                        {article.flagged ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold">
+                            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /></svg>
+                            Flagged
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                            Live
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-1 pt-3 border-t border-slate-50">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Author</span>
+                          <span className="text-[12px] text-slate-700 font-medium truncate">{article.author}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Date</span>
+                          <span className="text-[12px] text-slate-500 font-medium">
+                            {new Date(article.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => router.push(`/dashboard/articles/${article.id}`)}
+                          className="flex-1 flex justify-center py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-semibold transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleFlag(article.id, article.flagged)}
+                          disabled={flagging === article.id}
+                          className={`flex-1 flex justify-center py-2 rounded-lg text-[11px] font-semibold transition-colors ${article.flagged ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700"}`}
+                        >
+                          {flagging === article.id ? "..." : (article.flagged ? "Unflag" : "Flag")}
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(article.id)}
+                          disabled={deleting === article.id}
+                          className="flex-1 flex justify-center py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[11px] font-semibold transition-colors"
+                        >
+                          {deleting === article.id ? "..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
 
               {filtered.length > itemsPerPage && (
                 <Pagination currentPage={currentPage} totalPages={Math.ceil(filtered.length / itemsPerPage)} onPageChange={setCurrentPage} />
@@ -426,7 +523,9 @@ export default function ManageArticlesPage() {
 
           {/* ── RIGHT DETAIL PANEL ───────────────────────────────────────── */}
           {selectedArticle && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300 sticky top-6">
+            <>
+            <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300 lg:sticky lg:top-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Article Preview</h2>
                 <button
@@ -509,6 +608,7 @@ export default function ManageArticlesPage() {
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
 

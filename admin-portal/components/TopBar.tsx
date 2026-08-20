@@ -139,13 +139,22 @@ function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AdminSearchResults | null>(null);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const totalResults = results
     ? results.doctors.length + results.clinics.length + results.patients.length + results.appointments.length
     : 0;
+
+  // Auto-focus input when search bar expands
+  useEffect(() => {
+    if (searchExpanded) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [searchExpanded]);
 
   // Debounced search
   useEffect(() => {
@@ -162,7 +171,7 @@ function GlobalSearch() {
         if (res.ok) {
           const data = await res.json();
           setResults(data);
-          setOpen(true);
+          setDropdownOpen(true);
         }
       } catch { /* silent */ } finally {
         setLoading(false);
@@ -171,65 +180,97 @@ function GlobalSearch() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  // Click outside closes dropdown
+  // Click outside closes search bar and dropdown
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        setDropdownOpen(false);
+        if (!query) setSearchExpanded(false);
       }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [query]);
 
   function handleNavigate(href: string) {
-    setOpen(false);
+    setDropdownOpen(false);
     setQuery("");
     setResults(null);
+    setSearchExpanded(false);
     router.push(href);
   }
 
-  const showDropdown = open && query.trim().length >= 2;
+  function handleClose() {
+    setDropdownOpen(false);
+    setQuery("");
+    setResults(null);
+    setSearchExpanded(false);
+  }
+
+  const showDropdown = dropdownOpen && query.trim().length >= 2;
 
   return (
-    <div ref={wrapperRef} className="flex-1 max-w-lg mx-auto relative">
-      {/* Search icon / spinner */}
-      <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
-        {loading ? (
-          <div className="w-4 h-4 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        )}
-      </div>
+    <div ref={wrapperRef} className="flex items-center justify-end relative">
+      {/* Animated expanding search bar */}
+      <div
+        className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out rounded-full ${
+          searchExpanded
+            ? "w-[320px] ring-2 ring-blue-500/20 bg-white shadow-sm border border-slate-200"
+            : "w-0 opacity-0 pointer-events-none border-transparent"
+        }`}
+      >
+        {/* Search icon inside input */}
+        <div className="pl-4 pr-1 flex items-center shrink-0">
+          {loading ? (
+            <div className="w-4 h-4 border-2 border-[#5476FC] border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          )}
+        </div>
 
-      <input
-        id="topbar-search"
-        type="text"
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-        onFocus={() => { if (results && totalResults > 0) setOpen(true); }}
-        onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); setQuery(""); setResults(null); } }}
-        placeholder="Search doctors, clinics, patients…"
-        className="w-full pl-12 pr-10 py-2.5 text-sm bg-[#eef2f7] border-none rounded-full placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white text-slate-700 font-medium transition-all"
-      />
+        <input
+          ref={inputRef}
+          id="topbar-search"
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setDropdownOpen(true); }}
+          onFocus={() => { if (results && totalResults > 0) setDropdownOpen(true); }}
+          onKeyDown={(e) => { if (e.key === "Escape") handleClose(); }}
+          placeholder="Search doctors, clinics, patients…"
+          className="flex-1 py-2.5 pr-2 text-sm bg-transparent border-none placeholder-slate-400 focus:outline-none text-slate-700 font-medium min-w-0"
+        />
 
-      {/* Clear button */}
-      {query && (
+        {/* Clear / close button */}
         <button
-          onClick={() => { setQuery(""); setResults(null); setOpen(false); }}
-          className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+          onClick={handleClose}
+          className="pr-3 pl-1 flex items-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+          aria-label="Close search"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
-      )}
+      </div>
 
-      {/* Dropdown */}
+      {/* Search icon button (collapsed state) */}
+      <button
+        id="topbar-search-btn"
+        onClick={() => setSearchExpanded(true)}
+        aria-label="Open search"
+        className={`w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-[#5476FC] hover:bg-blue-50 shadow-sm transition-all active:scale-95 ${
+          searchExpanded ? "opacity-0 pointer-events-none !w-0 !border-0 overflow-hidden" : "opacity-100 ml-0"
+        }`}
+      >
+        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
+
+      {/* Results Dropdown */}
       {showDropdown && (
-        <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-2xl border border-slate-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-[9999] overflow-hidden">
+        <div className="absolute top-[calc(100%+8px)] right-0 w-[400px] bg-white rounded-2xl border border-slate-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-[9999] overflow-hidden">
           {loading && !results ? (
             <div className="px-5 py-6 space-y-3">
               {[1, 2, 3].map((i) => (
@@ -353,8 +394,11 @@ function GlobalSearch() {
 
 // ─── TopBar ──────────────────────────────────────────────────────────────────
 
+import { useSidebar } from "./SidebarContext";
+
 export default function TopBar() {
   const router = useRouter();
+  const { setIsMobileOpen } = useSidebar();
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"Unread" | "All">("Unread");
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -412,43 +456,55 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header className="h-20 bg-transparent flex items-center justify-between px-8 shrink-0 z-40 w-full relative">
+    <header className="h-16 md:h-20 bg-transparent flex items-center justify-between px-4 md:px-8 shrink-0 z-40 w-full relative">
 
-      {/* Left: Logo */}
-      <div className="flex items-center w-[200px]">
-        <img
-          src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-          className="w-[100px] object-contain"
-          alt="Wellness Central"
-        />
-      </div>
-
-      {/* Middle: Global Search */}
-      <GlobalSearch />
-
-      {/* Right: Action Buttons and Notification icons */}
+      {/* Left: Hamburger (Mobile) + Logo */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => router.push("/dashboard/emergencies")}
-          className="bg-gradient-to-b from-[#FF6B6B] to-[#E84949] hover:from-[#FF7A7A] hover:to-[#D63D3D] text-white px-5 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2.5 shadow-[0_4px_10px_rgba(232,73,73,0.2)] transition-all active:scale-95 select-none"
+          onClick={() => setIsMobileOpen(true)}
+          className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+          aria-label="Open sidebar"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="hidden md:flex items-center lg:w-[200px]">
+          <img
+            src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
+            className="w-[100px] object-contain"
+            alt="Wellness Central"
+          />
+        </div>
+      </div>
+
+      {/* Right: Search + Action Buttons + Notifications */}
+      <div className="flex items-center gap-1.5 md:gap-3">
+        <button
+          onClick={() => router.push("/dashboard/emergencies")}
+          className="bg-gradient-to-b from-[#FF6B6B] to-[#E84949] hover:from-[#FF7A7A] hover:to-[#D63D3D] text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl text-[12px] md:text-[13px] font-medium flex items-center gap-1.5 md:gap-2.5 shadow-[0_4px_10px_rgba(232,73,73,0.2)] transition-all active:scale-95 select-none whitespace-nowrap shrink-0"
+        >
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          SOS Records
+          <span className="hidden sm:inline">SOS Records</span>
+          <span className="sm:hidden">SOS</span>
         </button>
 
+        {/* Global Search */}
+        <GlobalSearch />
+
         {/* Notification Bell Wrapper */}
-        <div className="relative" ref={notificationsRef}>
+        <div className="relative shrink-0" ref={notificationsRef}>
           <button
             id="topbar-notifications"
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`w-10 h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center transition-all active:scale-95 shadow-sm ${
+            className={`w-9 h-9 md:w-10 md:h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center transition-all active:scale-95 shadow-sm ${
               showNotifications ? "text-blue-500 bg-blue-50 ring-2 ring-blue-500/20" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
             }`}
             aria-label="Notifications"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             {unreadCount > 0 && (
@@ -563,10 +619,10 @@ export default function TopBar() {
         {/* Message / Chat Bubble */}
         <button
           id="topbar-messages"
-          className="w-10 h-10 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm relative transition-all active:scale-95"
+          className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full border border-slate-200/60 bg-white flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 shadow-sm relative transition-all active:scale-95"
           aria-label="Messages"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full" />

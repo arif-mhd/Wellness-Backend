@@ -123,9 +123,6 @@ export default function ManagePatientsPage() {
       );
 
       setPatients(patientsWithStats);
-      if (patientsWithStats.length > 0 && !selectedId) {
-        setSelectedId(patientsWithStats[0].id);
-      }
     } catch (e: any) {
       setFetchError(e?.message ?? "Network error");
     } finally {
@@ -137,8 +134,8 @@ export default function ManagePatientsPage() {
 
   const filtered = patients.filter(p =>
     !search ||
-    p.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
+    (p.fullName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const selectedPatient = filtered.find(p => p.id === selectedId) ?? null;
@@ -159,18 +156,18 @@ export default function ManagePatientsPage() {
           <div className={`${selectedPatient ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
 
             {/* Top Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Patients</h1>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 bg-white border border-slate-100 rounded-full px-4 h-10 shadow-sm">
-                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 bg-white border border-slate-100 rounded-full px-4 h-10 shadow-sm flex-1 md:flex-none">
+                  <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search patients…"
-                    className="text-[13px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-36"
+                    className="text-[13px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-full md:w-36"
                   />
                 </div>
                 <button
@@ -186,7 +183,7 @@ export default function ManagePatientsPage() {
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-medium text-[#64748B] select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -220,70 +217,124 @@ export default function ManagePatientsPage() {
                     <p className="text-sm font-semibold">{search ? "No patients match your search" : "No patients yet"}</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-800 tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">
-                          <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium">
-                          <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Total Appointments <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium">
-                          <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Last Appointment <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(patient => {
-                        const isSelected = selectedId === patient.id;
-                        return (
-                          <tr
-                            key={patient.id}
-                            onClick={() => setSelectedId(patient.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
-                              patient.status === "deactivated" ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-slate-50/50"
-                            }`}
-                          >
-                            <td className="py-3 px-2">
-                              <div className="flex items-center gap-3">
-                                <Avatar patient={patient} size="md" />
-                                <div className="min-w-0">
-                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
-                                    {patient.fullName}
-                                    {age(patient.dateOfBirth) && (
-                                      <span className="font-normal text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
-                                    )}
-                                    {patient.status === "deactivated" && (
-                                      <span className="px-2 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full text-[10px] font-semibold shrink-0">
-                                        Deactivated
-                                      </span>
-                                    )}
-                                  </p>
-                                  <p className="text-[11px] font-normal text-slate-400 truncate">{patient.email}</p>
+                  <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-800 tracking-wider">
+                          <th className="pb-4 pt-1 font-medium pl-2">
+                            <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium">
+                            <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Total Appointments <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium">
+                            <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">Last Appointment <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(patient => {
+                          const isSelected = selectedId === patient.id;
+                          return (
+                            <tr
+                              key={patient.id}
+                              onClick={() => setSelectedId(patient.id)}
+                              className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 ${
+                                patient.status === "deactivated" ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-slate-50/50"
+                              }`}
+                            >
+                              <td className="py-3 px-2">
+                                <div className="flex items-center gap-3">
+                                  <Avatar patient={patient} size="md" />
+                                  <div className="min-w-0">
+                                    <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
+                                      {patient.fullName}
+                                      {age(patient.dateOfBirth) && (
+                                        <span className="font-normal text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
+                                      )}
+                                      {patient.status === "deactivated" && (
+                                        <span className="px-2 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full text-[10px] font-semibold shrink-0">
+                                          Deactivated
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-[11px] font-normal text-slate-400 truncate">{patient.email}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="py-3 text-[13px] text-slate-500 font-medium text-center">
-                              {patient.totalAppointments ?? "—"}
-                            </td>
-                            <td className="py-3 text-[13px] text-slate-500 font-medium text-center">
-                              {patient.lastAppointment ? formatDate(patient.lastAppointment) : "—"}
-                            </td>
-                            <td className="py-3 pr-4 text-right">
-                              <button
-                                onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
-                                className="text-[12px] font-medium text-slate-800 px-6 py-2 rounded-xl hover:bg-[#6A8BFF] hover:text-white hover:shadow-md hover:shadow-blue-200/50 transition-all"
-                              >
-                                View Details
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              </td>
+                              <td className="py-3 text-[13px] text-slate-500 font-medium text-center">
+                                {patient.totalAppointments ?? "—"}
+                              </td>
+                              <td className="py-3 text-[13px] text-slate-500 font-medium text-center">
+                                {patient.lastAppointment ? formatDate(patient.lastAppointment) : "—"}
+                              </td>
+                              <td className="py-3 pr-4 text-right">
+                                <button
+                                  onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
+                                  className="text-[12px] font-medium text-slate-800 px-6 py-2 rounded-xl hover:bg-[#6A8BFF] hover:text-white hover:shadow-md hover:shadow-blue-200/50 transition-all"
+                                >
+                                  View Details
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                    {filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(patient => {
+                      const isSelected = selectedId === patient.id;
+                      return (
+                        <div
+                          key={patient.id}
+                          onClick={() => setSelectedId(patient.id)}
+                          className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 ${
+                            patient.status === "deactivated" ? "bg-red-50/60" : "hover:bg-slate-50/50"
+                          } ${isSelected ? 'bg-slate-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar patient={patient} size="md" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-slate-800 truncate flex items-center gap-2">
+                                {patient.fullName}
+                                {age(patient.dateOfBirth) && (
+                                  <span className="font-normal text-slate-400 ml-1">{age(patient.dateOfBirth)}</span>
+                                )}
+                                {patient.status === "deactivated" && (
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full text-[10px] font-semibold shrink-0">
+                                    Deactivated
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[12px] font-normal text-slate-400 truncate">{patient.email}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Total Appts</span>
+                              <span className="text-[13px] text-slate-700 font-medium">{patient.totalAppointments ?? "—"}</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Last Appt</span>
+                              <span className="text-[13px] text-slate-700 font-medium">{patient.lastAppointment ? formatDate(patient.lastAppointment) : "—"}</span>
+                            </div>
+                          </div>
+                          <div className="mt-2 w-full">
+                            <button
+                              onClick={e => { e.stopPropagation(); router.push(`/dashboard/patients/${patient.id}`); }}
+                              className="bg-white border border-slate-200 text-slate-700 text-[12px] font-medium px-6 py-2.5 rounded-full shadow-sm w-full transition-colors active:bg-slate-50 flex items-center justify-center gap-2"
+                            >
+                              View Details
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  </>
                 )}
               </div>
 
@@ -300,7 +351,9 @@ export default function ManagePatientsPage() {
 
           {/* RIGHT — Patient Details Panel */}
           {selectedPatient && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+              <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedId(null)} />
+              <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
@@ -378,6 +431,7 @@ export default function ManagePatientsPage() {
                 View Detailed Profile
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

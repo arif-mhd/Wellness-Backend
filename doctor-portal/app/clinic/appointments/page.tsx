@@ -120,6 +120,7 @@ function ClinicAppointmentsContent() {
   const [timeFilter, setTimeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
   const [showPreVisitModal, setShowPreVisitModal] = useState(false);
@@ -263,7 +264,10 @@ function ClinicAppointmentsContent() {
     const dateObj = parseLocalISO(appt.scheduledAt);
     return (
       <div
-        onClick={() => setSelectedId(appt.id)}
+        onClick={() => {
+          setSelectedId(appt.id);
+          setShowMobileDetails(true);
+        }}
         className={`rounded-xl border transition-all cursor-pointer ${isSelected ? "bg-[#EEF2FF] border-[#5476FC]/40 shadow-sm" : "bg-white border-[#E4E8F0] hover:border-[#C0CAFF]"
           }`}
       >
@@ -352,7 +356,7 @@ function ClinicAppointmentsContent() {
 
   return (
     <div className="px-4 md:px-6 py-6 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
-      <div className="flex flex-col xl:flex-row gap-6 xl:items-start w-full">
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start w-full">
         {/* ── Left: Main Content ───────────────────────────── */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-5">
           <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Appointments</h1>
@@ -524,31 +528,54 @@ function ClinicAppointmentsContent() {
 
         {/* ── Right: Appointment Details Card ──────────────── */}
         {selectedAppt && (
-          <div className="w-full xl:w-[300px] bg-white rounded-2xl p-5 flex flex-col gap-4 shrink-0 border border-[#E4E8F0] shadow-sm">
-            <h2 className="text-[#24292E] text-[15px] font-semibold">Appointment Details</h2>
-            <div className="h-px bg-[#EBEEF5]" />
+          <>
+            {showMobileDetails && (
+              <div 
+                className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+                onClick={() => setShowMobileDetails(false)}
+              />
+            )}
+            <div className={`
+              ${showMobileDetails ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"} 
+              xl:relative xl:flex xl:w-[300px] xl:rounded-2xl xl:z-auto xl:max-h-none xl:overflow-visible xl:pb-5 xl:shadow-sm
+              w-full bg-white p-5 flex-col gap-4 shrink-0 border border-[#E4E8F0] transition-transform duration-300
+            `}>
+              <div className="xl:hidden w-full flex justify-center mb-3">
+                <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+              </div>
+              <button 
+                className="xl:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                onClick={() => setShowMobileDetails(false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+
+              <h2 className="text-[#24292E] text-[15px] font-semibold">Appointment Details</h2>
+            <div className="h-px bg-[#EBEEF5] xl:mt-0 mt-4" />
 
             {/* Patient */}
-            <div className="flex items-center gap-3">
-              <Avatar name={selectedAppt.patientName} size="w-11 h-11 text-sm" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[13px] font-semibold truncate">{selectedAppt.patientName}</span>
-                <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.patientEmail}</span>
+            <div className="flex flex-col gap-4 xl:mt-0 mt-4">
+              <div className="flex items-center gap-3">
+                <Avatar name={selectedAppt.patientName} size="w-11 h-11 text-sm" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[#24292E] text-[14px] font-bold truncate">{selectedAppt.patientName}</span>
+                  <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.patientEmail}</span>
+                </div>
               </div>
+              <p className="text-[#9EA5AD] text-[12px] font-medium">
+                {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {" · "}
+                {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              </p>
+              <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full flex justify-center items-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
+                View Profile
+              </a>
             </div>
-            <p className="text-[#9EA5AD] text-[11px] text-center">
-              {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-              {" · "}
-              {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-            </p>
-            <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full text-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
-              View Profile
-            </a>
-
-            <div className="h-px bg-[#EBEEF5]" />
+            
+            <div className="h-px bg-[#E4E8F0] w-full xl:my-0 my-2" />
 
             {/* Doctor */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 xl:mt-0 mt-2">
               <Avatar name={selectedAppt.doctorName} size="w-11 h-11 text-sm" />
               <div className="flex flex-col min-w-0">
                 <span className="text-[#24292E] text-[13px] font-semibold truncate">{selectedAppt.doctorName}</span>
@@ -559,16 +586,16 @@ function ClinicAppointmentsContent() {
               </div>
             </div>
 
-            <div className="h-px bg-[#EBEEF5]" />
+            <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
 
             {/* Reason for visit */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 xl:mt-0 mt-2">
               <span className="text-[#24292E] text-[12px] font-semibold">Reason for visit</span>
               <p className="text-[#9EA5AD] text-[11px] leading-relaxed">{selectedAppt.reason}</p>
             </div>
 
             {/* Pre-visit */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 xl:mt-0 mt-2">
               <span className="text-[#24292E] text-[12px] font-semibold">Pre-visit form</span>
               <p className="text-[11px] mt-0.5">
                 {selectedAppt.preVisitData ? (
@@ -585,7 +612,7 @@ function ClinicAppointmentsContent() {
 
             {/* Reschedule + Cancel */}
             {canManage && (
-              <div className="flex flex-col gap-2 mt-1">
+              <div className="flex flex-col gap-3 xl:mt-1 mt-4">
                 <button
                   onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
                   disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
@@ -603,6 +630,7 @@ function ClinicAppointmentsContent() {
               </div>
             )}
           </div>
+          </>
         )}
 
       </div>
@@ -651,6 +679,7 @@ function ClinicAppointmentsContent() {
             </p>
             <input
               type="datetime-local"
+              max="9999-12-31T23:59"
               value={rescheduleValue}
               onChange={(e) => setRescheduleValue(e.target.value)}
               className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC]"

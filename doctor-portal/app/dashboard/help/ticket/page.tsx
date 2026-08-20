@@ -4,13 +4,21 @@ import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface TicketComment {
   id: string;
   authorRole: "admin" | "doctor" | "patient";
   message: string;
   createdAt: string;
+}
+
+interface TicketAttachment {
+  id: string;
+  fileName: string;
+  url: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
 }
 
 interface Ticket {
@@ -22,8 +30,13 @@ interface Ticket {
   status: "Open" | "In Progress" | "Closed";
   adminReply?: string | null;
   comments?: TicketComment[];
+  attachments?: TicketAttachment[];
   createdAt: string;
   updatedAt: string;
+}
+
+function isImageAttachment(contentType: string) {
+  return contentType.startsWith("image/");
 }
 
 function formatDate(iso: string) {
@@ -197,6 +210,31 @@ function TicketContent() {
               >
                 {ticket.description}
               </p>
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {ticket.attachments.map((att) => (
+                    <a
+                      key={att.id}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 bg-[#F9FAFC] border border-[#EBEEF5] rounded-[10px] px-3 py-2 hover:border-[#5476FC] transition-colors"
+                    >
+                      {isImageAttachment(att.contentType) ? (
+                        <img src={att.url} alt={att.fileName} className="w-8 h-8 rounded-[6px] object-cover shrink-0" />
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5476FC" strokeWidth={2} className="shrink-0">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 2v6h6" />
+                        </svg>
+                      )}
+                      <span className="text-[11px] text-[#5476FC] font-medium truncate max-w-[140px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        {att.fileName}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -390,7 +428,6 @@ function TicketContent() {
 
 export default function TicketInformationPage() {
   return (
-    <ProtectedRoute>
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[300px]">
           <span className="text-[#9EA5AD] text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Loading...</span>
@@ -398,6 +435,5 @@ export default function TicketInformationPage() {
       }>
         <TicketContent />
       </Suspense>
-    </ProtectedRoute>
   );
 }

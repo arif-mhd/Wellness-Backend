@@ -1,11 +1,14 @@
 import { Router, Response } from "express";
+import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { medicineOrdersContainer, prescriptionsContainer, pharmacyProductsContainer } from "../config/cosmos";
+import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ─── POST /api/pharmacy/orders ────────────────────────────────────────────────
 // Patient places a medicine order. Items are validated against real product stock.
@@ -17,6 +20,19 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
     if (!items?.length || !delivery_address) {
       res.status(400).json({ error: "items and delivery_address are required" });
       return;
+    }
+
+    // If a prescription is attached, confirm it actually belongs to this patient
+    // rather than trusting a client-supplied id outright.
+    if (prescription_id) {
+      const { resources: rxMatches } = await prescriptionsContainer.items.query({
+        query: "SELECT VALUE COUNT(1) FROM c WHERE c.id = @id AND c.patientId = @pid",
+        parameters: [{ name: "@id", value: prescription_id }, { name: "@pid", value: patientId }],
+      }, { partitionKey: patientId }).fetchAll();
+      if (!rxMatches[0]) {
+        res.status(400).json({ error: "Invalid prescription_id" });
+        return;
+      }
     }
 
     // Validate each item and calculate total
@@ -117,8 +133,12 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
   }
 });
 
-// ─── GET /api/pharmacy/orders ─────────────────────────────────────────────────
-router.get("/orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+// ─── GET /api/pharmacy/my-orders ──────────────────────────────────────────────
+// Named "my-orders" rather than "orders" — pharmacy.ts's staff-only "/orders"
+// route (requireRole("pharmacy")) is mounted before this router at the same
+// /api/pharmacy base, so a patient-scoped "/orders" here would be permanently
+// shadowed and unreachable. See index.ts's mount order for both routers.
+router.get("/my-orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
@@ -181,6 +201,35 @@ router.patch("/orders/:orderId/cancel", requireRole("patient"), async (req: Sess
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── POST /api/pharmacy/prescriptions/upload ─────────────────────────────────
+// Patient uploads a prescription image (JPG/PNG). Stores it in blob storage
+// and returns the URL — a separate step from creating the prescription record
+// below, mirroring the pharmacy product-image upload pattern.
+router.post(
+  "/prescriptions/upload",
+  requireRole("patient"),
+  upload.single("file"),
+  async (req: SessionRequest, res: Response) => {
+    try {
+      const patientId = req.session!.getUserId();
+      if (!req.file) {
+        res.status(400).json({ error: "file is required" });
+        return;
+      }
+
+      const ext = req.file.mimetype.split("/")[1] ?? "jpg";
+      const blobPath = `patients/${patientId}/prescriptions/${Date.now()}.${ext}`;
+      await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+      const url = generateSasUrl(blobPath, 365);
+
+      res.status(201).json({ url });
+    } catch (err) {
+      console.error("Upload prescription file error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 // ─── POST /api/pharmacy/prescriptions ────────────────────────────────────────
 router.post("/prescriptions", requireRole("patient"), async (req: SessionRequest, res: Response) => {

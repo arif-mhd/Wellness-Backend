@@ -15,6 +15,15 @@ interface Appointment {
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
 }
 
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or hour/minute
+// reads and display formatting silently shift by the browser's timezone.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
+
 function Avatar({ name }: { name: string }) {
   return (
     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-semibold shrink-0 text-sm">
@@ -52,7 +61,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
     return appointments
       .filter((a) => a.status !== "cancelled")
       .filter((a) => {
-        const d = new Date(a.scheduledAt);
+        const d = parseLocalTime(a.scheduledAt);
         if (quickFilter === "today" && d.toDateString() !== now.toDateString()) return false;
         if (quickFilter === "week") {
           const weekStart = new Date(now);
@@ -80,7 +89,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
   const goToAppointment = (id: string) => router.push(`/clinic/appointments?apptId=${id}${qs ? `&${qs.slice(1)}` : ""}`);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full">
+    <div className="flex flex-col lg:flex-row gap-6 w-full" style={{ fontFamily: "Outfit, sans-serif" }}>
       {/* ── Left: Date & Time filter ─────────────────────────────────── */}
       <div className="w-full lg:w-[300px] shrink-0 bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col gap-6 h-fit">
         <div className="flex items-center gap-2">
@@ -100,12 +109,14 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
           <div className="flex flex-col gap-2">
             <input
               type="date"
+              max="9999-12-31"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
               className="w-full h-[42px] border border-gray-200 rounded-xl px-3 text-[13px] text-gray-700 outline-none focus:border-[#5476FC] transition-colors"
             />
             <input
               type="date"
+              max="9999-12-31"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
               className="w-full h-[42px] border border-gray-200 rounded-xl px-3 text-[13px] text-gray-700 outline-none focus:border-[#5476FC] transition-colors"
@@ -152,32 +163,42 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
         ) : (
           <div className="flex flex-col gap-3">
             {filtered.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3 min-w-0">
+              <div key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-3 p-4 sm:p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                {/* Patient Info Column */}
+                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 sm:basis-1/3">
                   <Avatar name={a.patientName} />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-semibold text-gray-800 truncate">
+                    <span className="text-[14px] sm:text-[13px] font-semibold text-gray-800 truncate">
                       {a.patientName}{a.patientAge ? `, ${a.patientAge}` : ""}
                     </span>
-                    <span className="text-[11px] text-gray-400 truncate">Reason: {a.reason || "—"}</span>
+                    <span className="text-[12px] sm:text-[11px] text-gray-400 truncate">Reason: {a.reason || "—"}</span>
+                    <span className="text-[12px] text-gray-500 sm:hidden mt-1 font-medium">
+                      {parseLocalTime(a.scheduledAt).toLocaleDateString("en-GB")}, {parseLocalTime(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
                 </div>
-                <span className="text-[12px] text-gray-500 whitespace-nowrap shrink-0">
-                  {new Date(a.scheduledAt).toLocaleDateString("en-GB")}, {new Date(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <div className="flex items-center gap-2 shrink-0">
+
+                {/* Date/Time Column */}
+                <div className="hidden sm:flex justify-center flex-1 sm:basis-1/3 shrink-0">
+                  <span className="text-[12px] text-gray-500 whitespace-nowrap">
+                    {parseLocalTime(a.scheduledAt).toLocaleDateString("en-GB")}, {parseLocalTime(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+
+                {/* Actions Column */}
+                <div className="flex items-center justify-end gap-2 shrink-0 w-full sm:w-auto sm:basis-1/3 flex-1 pt-3 sm:pt-0 border-t sm:border-0 border-gray-100 mt-1 sm:mt-0">
                   {canManage && (
                     <button
                       onClick={() => goToAppointment(a.id)}
                       disabled={a.status === "completed"}
-                      className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex-1 sm:flex-none px-4 py-2 sm:py-1.5 bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] hover:opacity-90 text-white text-[13px] sm:text-[12px] font-semibold rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed text-center shadow-sm hover:shadow"
                     >
                       Reschedule
                     </button>
                   )}
                   <button
                     onClick={() => goToAppointment(a.id)}
-                    className="px-4 py-1.5 border border-gray-200 text-gray-700 text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex-1 sm:flex-none px-4 py-2 sm:py-1.5 border border-gray-200 text-gray-700 text-[13px] sm:text-[12px] font-semibold rounded-lg hover:bg-gray-50 transition-colors text-center"
                   >
                     View
                   </button>

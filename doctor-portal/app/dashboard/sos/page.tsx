@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
 import EhrPanel from "@/components/video-call/EhrPanel";
 
@@ -13,13 +12,24 @@ export default function SOSPage() {
   const [ehrData, setEhrData] = useState<any | null>(null);
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseError, setLicenseError] = useState("");
-  
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [doctorEmail, setDoctorEmail] = useState("");
+
   // OTP states
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
   const [otpError, setOtpError] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resending, setResending] = useState(false);
   const [timer, setTimer] = useState(85);
   const [canResend, setCanResend] = useState(false);
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    apiFetch("/api/doctors/me")
+      .then((r) => r.json())
+      .then((data) => setDoctorEmail(data.doctor?.email ?? ""))
+      .catch(() => {});
+  }, []);
 
   // SOS Code states
   const [sosCode, setSosCode] = useState<string[]>(Array(6).fill(""));
@@ -49,7 +59,35 @@ export default function SOSPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleLicenseSubmit = (e: React.FormEvent) => {
+  // Sends a real OTP to the doctor's own registered email (confirmed via
+  // /api/doctors/me, not client-editable). Real medical-license-number
+  // verification against an external registry isn't available in this
+  // codebase — the length check below is what the audit flagged as the
+  // remaining, genuinely-blocked piece. Returns an error message on failure
+  // (rather than setting shared state) so both callers — initial send and
+  // resend — can show it in the right place without a stale-state race.
+  const sendOtp = async (): Promise<string | null> => {
+    if (!doctorEmail) {
+      return "Could not load your account email. Please refresh and try again.";
+    }
+    try {
+      const res = await apiFetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: doctorEmail, purpose: "sos_access" }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      if (err.error === "TOO_SOON") {
+        return `Please wait ${err.retryAfter ?? 60}s before requesting another code.`;
+      }
+      return "Failed to send verification code. Please try again.";
+    } catch {
+      return "Network error. Please check your connection.";
+    }
+  };
+
+  const handleLicenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!licenseNumber.trim()) {
       setLicenseError("Please enter your medical license number.");
@@ -60,6 +98,10 @@ export default function SOSPage() {
       return;
     }
     setLicenseError("");
+    setSendingOtp(true);
+    const error = await sendOtp();
+    setSendingOtp(false);
+    if (error) { setLicenseError(error); return; }
     setStep("otp");
     setTimer(85);
     setCanResend(false);
@@ -84,19 +126,47 @@ export default function SOSPage() {
     }
   };
 
-  const handleOtpSubmit = (e: React.FormEvent) => {
+  const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullOtp = otp.join("");
     if (fullOtp.length < 6) {
       setOtpError("Please enter all 6 digits of the verification code.");
       return;
     }
-    // Simulate verification
-    if (fullOtp === "123456" || fullOtp.length === 6) {
-      setOtpError("");
-      setStep("sosCode");
-    } else {
-      setOtpError("Invalid verification code. Please try again.");
+    setVerifyingOtp(true);
+    setOtpError("");
+    try {
+      const res = await apiFetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: doctorEmail, code: fullOtp, purpose: "sos_access" }),
+      });
+      const data = await res.json();
+      if (data.verified) {
+        setStep("sosCode");
+        return;
+      }
+      switch (data.reason) {
+        case "INVALID_CODE":
+          setOtpError(
+            data.attemptsLeft !== undefined && data.attemptsLeft > 0
+              ? `Incorrect code. ${data.attemptsLeft} attempt${data.attemptsLeft === 1 ? "" : "s"} remaining.`
+              : "Incorrect code."
+          );
+          break;
+        case "EXPIRED":
+          setOtpError("Code has expired. Click Resend to get a new one.");
+          break;
+        case "TOO_MANY_ATTEMPTS":
+          setOtpError("Too many incorrect attempts. Please request a new code.");
+          break;
+        default:
+          setOtpError("Verification failed. Please try again.");
+      }
+    } catch {
+      setOtpError("Network error. Please check your connection.");
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -150,11 +220,15 @@ export default function SOSPage() {
     }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
+    setResending(true);
+    setOtpError("");
+    const error = await sendOtp();
+    setResending(false);
+    if (error) { setOtpError(error); return; }
     setTimer(85);
     setCanResend(false);
     setOtp(Array(6).fill(""));
-    setOtpError("");
     // Focus the first input box
     setTimeout(() => {
       otpInputsRef.current[0]?.focus();
@@ -171,7 +245,6 @@ export default function SOSPage() {
   };
 
   return (
-    <ProtectedRoute>
       <div className="min-h-[calc(100vh-100px)] flex flex-col justify-center items-center px-4 py-8 select-none font-outfit">
         {step === "license" && (
           <div className="w-full max-w-[624px] bg-white rounded-2xl border border-[#EBEEF5] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 transition-all duration-300">
@@ -214,9 +287,10 @@ export default function SOSPage() {
 
               <button
                 type="submit"
-                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all"
+                disabled={sendingOtp}
+                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all disabled:opacity-60"
               >
-                Verify License & Continue
+                {sendingOtp ? "Sending code..." : "Verify License & Continue"}
               </button>
             </form>
           </div>
@@ -241,7 +315,7 @@ export default function SOSPage() {
             </div>
 
             <p className="text-[#24292E] text-xs font-normal leading-5 tracking-[-0.24px] mb-6">
-              An OTP has been sent to your registered phone number <span className="text-[#5476FC] font-medium">(219) 555-0114</span>. Please enter the OTP below to verify your identity and access the patient's SOS records.
+              An OTP has been sent to your registered email <span className="text-[#5476FC] font-medium">{doctorEmail}</span>. Please enter the OTP below to verify your identity and access the patient's SOS records.
             </p>
 
             <form onSubmit={handleOtpSubmit} className="flex flex-col gap-6">
@@ -278,14 +352,14 @@ export default function SOSPage() {
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  disabled={!canResend}
+                  disabled={!canResend || resending}
                   className={`font-semibold transition-all ${
-                    canResend 
-                      ? "text-[#5B7BFC] hover:underline" 
+                    canResend && !resending
+                      ? "text-[#5B7BFC] hover:underline"
                       : "text-[#9EA5AD] cursor-not-allowed"
                   }`}
                 >
-                  Resend OTP
+                  {resending ? "Sending..." : "Resend OTP"}
                 </button>
               </div>
 
@@ -311,9 +385,10 @@ export default function SOSPage() {
 
               <button
                 type="submit"
-                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all"
+                disabled={verifyingOtp}
+                className="w-full h-14 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-base rounded-xl flex items-center justify-center shadow-[0_6px_20px_rgba(84,118,252,0.25)] hover:shadow-[0_8px_24px_rgba(84,118,252,0.35)] active:scale-[0.99] transition-all disabled:opacity-60"
               >
-                Verify OTP
+                {verifyingOtp ? "Verifying..." : "Verify OTP"}
               </button>
             </form>
           </div>
@@ -392,6 +467,5 @@ export default function SOSPage() {
           <EhrPanel open={true} onClose={handleResetFlow} loading={false} data={{ ...ehrData, preVisitData: null }} />
         )}
       </div>
-    </ProtectedRoute>
   );
 }

@@ -43,6 +43,7 @@ export default function PersonalInformationForm({
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [contactNumber, setContactNumber] = useState(initialPhone);
+  const [phoneError, setPhoneError] = useState("");
   const [emiratesId, setEmiratesId] = useState(initialEmiratesId);
   const [emiratesIdFile, setEmiratesIdFile] = useState<File | null>(null);
   const [email, setEmail] = useState(initialEmail);
@@ -54,6 +55,8 @@ export default function PersonalInformationForm({
   const [dob, setDob] = useState(initialDob);
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [heightError, setHeightError] = useState("");
+  const [weightError, setWeightError] = useState("");
   const [maritalStatus, setMaritalStatus] = useState("");
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
@@ -195,10 +198,23 @@ export default function PersonalInformationForm({
     e.preventDefault();
 
     // Required fields check
+    const phoneDigits = contactNumber.replace(/\D/g, "");
     if (!contactNumber.trim()) {
+      setPhoneError("Contact number is required.");
       setFormError("Contact number is required.");
       return;
     }
+    if (/[a-zA-Z]/.test(contactNumber)) {
+      setPhoneError("Phone number must not contain letters.");
+      setFormError("Phone number must not contain letters.");
+      return;
+    }
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      setPhoneError("Phone number must have 7–15 digits.");
+      setFormError("Phone number must have 7–15 digits.");
+      return;
+    }
+    setPhoneError("");
     if (!emiratesId.trim()) {
       setFormError("Emirates ID is required.");
       return;
@@ -328,14 +344,25 @@ export default function PersonalInformationForm({
 
         {/* CONTACT NUMBER & EMIRATES ID INPUTS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="flex flex-col gap-1">
             <input
-              type="text"
-              placeholder="Contact Number*"
+              type="tel"
+              placeholder="Contact Number* (e.g. +971501234567)"
               value={contactNumber}
-              onChange={(e) => setContactNumber(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (/[a-zA-Z]/.test(raw)) return;
+                setContactNumber(raw);
+                const digits = raw.replace(/\D/g, "");
+                if (!raw.trim()) setPhoneError("Contact number is required.");
+                else if (digits.length < 7 || digits.length > 15) setPhoneError("Phone number must have 7–15 digits.");
+                else setPhoneError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${phoneError ? "border-red-300 bg-red-50" : "border-transparent"}`}
             />
+            {phoneError && (
+              <span className="text-[11px] text-red-500 font-medium pl-1">{phoneError}</span>
+            )}
           </div>
           <div>
             <input
@@ -594,9 +621,16 @@ export default function PersonalInformationForm({
               type="text"
               placeholder="Height (in cm)*"
               value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setHeight(digits);
+                if (digits && num > 250) setHeightError("Height must not exceed 250 cm");
+                else setHeightError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${heightError ? "border-red-400" : "border-transparent"}`}
             />
+            {heightError && <span className="text-red-500 text-xs mt-1 block">{heightError}</span>}
           </div>
         </div>
 
@@ -609,9 +643,16 @@ export default function PersonalInformationForm({
               type="text"
               placeholder="Weight (in kg)*"
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setWeight(digits);
+                if (digits && num > 250) setWeightError("Weight must not exceed 250 kg");
+                else setWeightError("");
+              }}
+              className={`w-full bg-[#F7F8FC] border rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit ${weightError ? "border-red-400" : "border-transparent"}`}
             />
+            {weightError && <span className="text-red-500 text-xs mt-1 block">{weightError}</span>}
           </div>
 
           {/* Custom Marital Status Dropdown */}

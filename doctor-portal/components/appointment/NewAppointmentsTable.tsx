@@ -8,7 +8,9 @@ interface NewAppointmentsTableProps {
   selectedPatientId: string | undefined;
   onSelectPatient: (patient: Patient) => void;
   onConsult: (patient: Patient) => void;
-  onViewPreVisitForm?: (patient: Patient) => void;
+  onSendReminder?: (patient: Patient) => void;
+  /** Set of appointment IDs for which a reminder has already been sent */
+  remindedIds?: Set<string>;
 }
 
 export default function NewAppointmentsTable({
@@ -16,7 +18,8 @@ export default function NewAppointmentsTable({
   selectedPatientId,
   onSelectPatient,
   onConsult,
-  onViewPreVisitForm,
+  onSendReminder,
+  remindedIds,
 }: NewAppointmentsTableProps) {
   return (
     <div className="w-full bg-white rounded-[12px] shadow-sm border border-[#EBEEF5] font-outfit">
@@ -33,8 +36,9 @@ export default function NewAppointmentsTable({
             Diagnosis
           </div>
           {/* Date/Action col */}
-          <div className="flex-shrink-0 w-[293px] text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-            Date and Time
+          <div className="flex-shrink-0 w-[293px] flex items-center justify-between text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+            <span>Date and Time</span>
+            <span className="text-center w-[100px]">Action</span>
           </div>
         </div>
 
@@ -48,17 +52,19 @@ export default function NewAppointmentsTable({
           const isSelected = selectedPatientId === patient.id;
           const isAlternate = index % 2 === 1;
           const isWaiting = patient.status === "Waiting";
+          const reminded = remindedIds?.has(patient.id) ?? false;
 
           return (
             <div
               key={patient.id}
               onClick={() => onSelectPatient(patient)}
-              className={`flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0 px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${isSelected
+              className={`flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0 px-2 py-2 rounded-[8px] cursor-pointer transition-all duration-200 ${
+                isSelected
                   ? "bg-[#EEF1FF]/60 border border-[#8AA0FF]/40"
                   : isAlternate
-                    ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
-                    : "bg-white border border-transparent hover:bg-[#F9FAFB]"
-                }`}
+                  ? "bg-[#F5F6FA] border border-transparent hover:bg-[#F0F2F8]"
+                  : "bg-white border border-transparent hover:bg-[#F9FAFB]"
+              }`}
             >
               {/* Name Column — 200px */}
               <div className="w-full md:w-[200px] md:flex-shrink-0 flex items-center gap-4">
@@ -87,25 +93,23 @@ export default function NewAppointmentsTable({
               </div>
 
               {/* Diagnosis Column — flexible */}
-              <div className="w-full md:flex-1 md:min-w-0 flex items-center gap-1.5 px-2">
-                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none">
+              <div className="w-full md:flex-1 md:min-w-0 flex items-start md:items-center gap-2 px-0 flex-col md:flex-row mt-2 md:mt-0">
+                <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Diagnosis</span>
+                <span className="flex-shrink-0 bg-[#E2EAFE] text-[#213159] font-light text-[12px] leading-none px-2.5 py-[5px] rounded-full select-none max-w-full truncate">
                   {patient.diagnosis}
                 </span>
-                <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] truncate flex-1 min-w-0">
-                  {patient.description}
-                </p>
               </div>
 
               {/* Date + Action Column — 293px */}
               <div
-                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2"
+                className="w-full md:w-[293px] md:flex-shrink-0 flex items-center justify-between gap-2 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Left: status or date */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2 min-w-0">
+                  <span className="md:hidden text-[#9EA5AD] text-[11px] font-medium uppercase tracking-wider">Date &amp; Time</span>
                   {isWaiting ? (
                     <div className="flex items-center gap-2">
-                      {/* Animated pulsing dot matching Figma F4A308 */}
                       <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F4A308] opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F4A308]" />
@@ -121,18 +125,19 @@ export default function NewAppointmentsTable({
                   )}
                 </div>
 
-                {/* Right: action button — gradient when selected, white otherwise */}
+                {/* Right: Remind when row is selected, Consult Now otherwise */}
                 {isSelected && !isWaiting ? (
                   <button
-                    onClick={() => (onViewPreVisitForm ?? onConsult)(patient)}
-                    className="flex-shrink-0 flex items-center justify-center px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none"
+                    onClick={() => onSendReminder?.(patient)}
+                    disabled={reminded}
+                    className="flex-shrink-0 flex items-center justify-center gap-1.5 px-[13px] py-[6px] rounded-[12px] text-white font-medium text-[13px] leading-5 select-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
-                      background:
-                        "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
-                      minWidth: "130px",
+                      background: "linear-gradient(180deg, #8AA0FF 0%, #5476FC 100%)",
+                      minWidth: "100px",
                     }}
+                    title={reminded ? "Reminder already sent" : "Send appointment reminder to patient"}
                   >
-                    View&nbsp;Pre-Visit Form
+                    {reminded ? "Reminded ✓" : "Remind"}
                   </button>
                 ) : (
                   <button

@@ -1,14 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import { signIn, signOut } from "supertokens-web-js/recipe/emailpassword";
+import STGeneralError from "supertokens-web-js/utils/error";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+// Shared by the post-signIn redirect and the "you're already logged in"
+// prompt below — both need to land a session on the right screen (clinic,
+// doctor dashboard, 2FA, or an unfinished onboarding wizard) using the same
+// role-resolution rules, and using `router.replace` (not `push`) so this
+// intermediate step never lingers as a Back target once the user is in.
+async function goToLanding(router: ReturnType<typeof useRouter>, email: string) {
+  let roles: string[] = [];
+  try {
+    const meRes = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+    if (meRes.ok) {
+      const meData = await meRes.json();
+      roles = meData.roles ?? [];
+    }
+  } catch {
+    // If we can't resolve roles, fall through to the doctor path below.
+  }
+
+  if (roles.includes("clinic_pending")) {
+    // A clinic_pending account whose onboarding wizard was never finished
+    // (e.g. they lost their session mid-wizard, or just closed the tab) has
+    // nowhere to go from the generic "awaiting review" screen — send them
+    // back to finish it instead.
+    try {
+      const meRes = await fetch(`${API_URL}/api/clinics/me`, { credentials: "include" });
+      if (meRes.ok) {
+        const { clinic } = await meRes.json();
+        if (!clinic?.profileCompletedAt) {
+          const params = new URLSearchParams({ email: clinic?.email ?? email });
+          router.replace(`/auth/complete-profile?${params.toString()}`);
+          return;
+        }
+      }
+    } catch {
+      // If we can't resolve profile status, fall through to the pending
+      // screen — better than blocking login entirely.
+    }
+    router.replace("/auth/pending");
+    return;
+  }
+  if (roles.includes("clinic")) {
+    router.replace("/clinic");
+    return;
+  }
+
+  // ── Doctor path — check if this doctor has 2FA enabled ──────────────────
+  try {
+    const twoFaRes = await fetch(`${API_URL}/api/doctors/2fa/status`, { credentials: "include" });
+    if (twoFaRes.ok) {
+      const twoFaData = await twoFaRes.json();
+      if (twoFaData.twoFactorEnabled === true) {
+        router.replace(`/auth/two-factor?email=${encodeURIComponent(email)}`);
+        return;
+      }
+    }
+  } catch {
+    // If we can't check 2FA status, let the doctor through normally.
+  }
+  router.replace("/dashboard");
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,7 +78,38 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
+
+  // Landing on this page (via Back/Forward, a stale tab, or a typed URL)
+  // while a session is still valid server-side must never just silently
+  // show the login form as if signed out — that's exactly how Forward could
+  // later walk back into the dashboard without a real login. Ask instead.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+        if (cancelled) return;
+        if (res.ok) {
+          const wantsLogout = window.confirm("You're already logged in. Do you want to log out?");
+          if (cancelled) return;
+          if (wantsLogout) {
+            try { await signOut(); } catch { /* ignore */ }
+            setCheckingSession(false);
+          } else {
+            const data = await res.json().catch(() => ({}));
+            await goToLanding(router, data?.profile?.email ?? "");
+          }
+        } else {
+          setCheckingSession(false);
+        }
+      } catch {
+        if (!cancelled) setCheckingSession(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,66 +125,7 @@ export default function LoginPage() {
       });
 
       if (response.status === "OK") {
-        // ── Resolve role first — clinic and doctor sessions share this one
-        // login page but land on different dashboards. ──────────────────────
-        let roles: string[] = [];
-        try {
-          const meRes = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            roles = meData.roles ?? [];
-          }
-        } catch {
-          // If we can't resolve roles, fall through to the doctor path below.
-        }
-
-        if (roles.includes("clinic_pending")) {
-          // A clinic_pending account whose onboarding wizard was never
-          // finished (e.g. they lost their session mid-wizard, or just
-          // closed the tab) has nowhere to go from the generic "awaiting
-          // review" screen — send them back to finish it instead.
-          try {
-            const meRes = await fetch(`${API_URL}/api/clinics/me`, { credentials: "include" });
-            if (meRes.ok) {
-              const { clinic } = await meRes.json();
-              if (!clinic?.profileCompletedAt) {
-                const params = new URLSearchParams({
-                  email: clinic?.email ?? email,
-                });
-                router.push(`/auth/complete-profile?${params.toString()}`);
-                return;
-              }
-            }
-          } catch {
-            // If we can't resolve profile status, fall through to the
-            // pending screen — better than blocking login entirely.
-          }
-          router.push("/auth/pending");
-          return;
-        }
-        if (roles.includes("clinic")) {
-          router.push("/clinic");
-          return;
-        }
-
-        // ── Doctor path — check if this doctor has 2FA enabled ──────────────
-        // The SuperTokens session is now active, so we can call the protected endpoint.
-        try {
-          const twoFaRes = await fetch(`${API_URL}/api/doctors/2fa/status`, {
-            credentials: "include",
-          });
-          if (twoFaRes.ok) {
-            const twoFaData = await twoFaRes.json();
-            if (twoFaData.twoFactorEnabled === true) {
-              // Redirect to the 2FA verification page — full session is held there.
-              router.push(`/auth/two-factor?email=${encodeURIComponent(email)}`);
-              return;
-            }
-          }
-        } catch {
-          // If we can't check 2FA status, let the doctor through normally.
-        }
-        router.push("/dashboard");
+        await goToLanding(router, email);
       } else if (response.status === "WRONG_CREDENTIALS_ERROR") {
         setError("Invalid email or password.");
       } else if (response.status === "FIELD_ERROR") {
@@ -100,11 +133,26 @@ export default function LoginPage() {
       } else {
         setError("Sign in is not allowed right now.");
       }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
+    } catch (err) {
+      // The backend can reject sign-in with a GENERAL_ERROR (e.g. a deleted
+      // account) — that arrives here as a thrown STGeneralError carrying the
+      // real message, and must not be papered over with the network-failure text.
+      if (STGeneralError.isThisError(err)) {
+        setError(err.message);
+      } else {
+        setError("Cannot reach the server. Make sure the backend is running.");
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+      </div>
+    );
   }
 
   return (
@@ -116,8 +164,8 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-[1380px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center flex-1 py-6">
 
-        {/* Left Side: Doctor Image */}
-        <div className="w-full flex justify-center select-none">
+        {/* Left Side: Doctor Image — desktop only, not needed on mobile */}
+        <div className="hidden md:flex w-full justify-center select-none">
           <div className="relative w-full max-h-[82vh] aspect-[4/5] md:aspect-[0.8] rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.06)] border-4 border-white/80 group">
             <div className="absolute inset-0 bg-indigo-900/5 group-hover:bg-indigo-900/0 transition-colors duration-500 z-10" />
             <Image
@@ -192,7 +240,7 @@ export default function LoginPage() {
                     </svg>
                   ) : (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   )}
                 </button>
@@ -215,13 +263,13 @@ export default function LoginPage() {
               </div>
 
               {/* Buttons Row */}
-              <div className="flex gap-4 pt-4 justify-start">
+              <div className="flex flex-row gap-3 pt-4 w-full">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white px-8 py-4 rounded-[0.8rem] font-medium font-outfit text-sm shadow-lg shadow-blue-500/10 transition-all duration-150 select-none cursor-pointer hover:opacity-95"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-3.5 px-2 rounded-xl font-medium font-outfit text-sm shadow-md shadow-blue-500/20 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                 >
-                  <span>{loading ? "Signing in…" : "Clinic/Doctor Login"}</span>
+                  <span>{loading ? "Signing in…" : "Login"}</span>
                   {!loading && (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -231,9 +279,9 @@ export default function LoginPage() {
 
                 <Link
                   href="/auth/signup"
-                  className="bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] px-8 py-3.5 rounded-[0.8rem] font-medium font-outfit text-sm flex items-center justify-center transition-all hover:translate-y-[-1px] active:translate-y-[0px] duration-150"
+                  className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-[#182A6F] py-3.5 px-2 rounded-xl font-medium font-outfit text-sm flex items-center justify-center transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                 >
-                  Register Your Clinic
+                  Register Clinic
                 </Link>
               </div>
             </form>

@@ -5,6 +5,17 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
+
+// scheduledAt is stored as a naive local wall-clock time with a cosmetic
+// trailing "Z" — must not be handed to `new Date()` as-is, or display
+// formatting and the isActiveNow comparison against Date.now() silently
+// shift by the browser's timezone offset.
+function parseLocalTime(isoString: string): Date {
+  if (!isoString) return new Date();
+  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
+  return new Date(clean);
+}
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
@@ -27,8 +38,11 @@ interface Doctor {
   languages?: string[] | string | null;
   fees?: number | null;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
   avatarUrl?: string | null;
   slots?: Slot[];
+  slotsPending?: boolean;
+  tempSlots?: Slot[];
   bio?: string | null;
   eligibility?: string | null;
   consultations?: number;
@@ -89,7 +103,7 @@ function statusColor(c: Consultation) {
   return "text-[#5476FC]";
 }
 function isActiveNow(c: Consultation) {
-  return c.status === "in_progress" || (c.status === "scheduled" && new Date(c.scheduledAt).getTime() >= Date.now());
+  return c.status === "in_progress" || (c.status === "scheduled" && parseLocalTime(c.scheduledAt).getTime() >= Date.now());
 }
 
 function fmt12(t: string) {
@@ -169,6 +183,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [togglingOnline, setTogglingOnline] = useState(false);
+  const [togglingTwoFA, setTogglingTwoFA] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [savingDoc, setSavingDoc] = useState(false);
@@ -337,6 +352,24 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
     }
   };
 
+  const handleToggleTwoFA = async () => {
+    if (!doctor) return;
+    const next = !doctor.twoFactorEnabled;
+    setTogglingTwoFA(true);
+    setDoctor((prev) => (prev ? { ...prev, twoFactorEnabled: next } : prev));
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/2fa/${next ? "enable" : "disable"}${qs}`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      window.alert("Failed to update 2FA.");
+      setDoctor((prev) => (prev ? { ...prev, twoFactorEnabled: !next } : prev));
+    } finally {
+      setTogglingTwoFA(false);
+    }
+  };
+
   const openSlotEditor = () => {
     setSlotDraft(doctor?.slots ? doctor.slots.map((s) => ({ ...s })) : []);
     setShowSlotEditor(true);
@@ -364,6 +397,39 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       window.alert("Failed to save timing.");
     } finally {
       setSavingSlots(false);
+    }
+  };
+
+  const [savingSlotApproval, setSavingSlotApproval] = useState(false);
+
+  const handleApprovePendingSlots = async () => {
+    setSavingSlotApproval(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/verify-slots${qs}`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      loadDoctor();
+    } catch {
+      window.alert("Failed to approve the schedule change.");
+    } finally {
+      setSavingSlotApproval(false);
+    }
+  };
+
+  const handleRejectPendingSlots = async () => {
+    const reason = window.prompt("Reason for declining this schedule change (optional):") ?? "";
+    setSavingSlotApproval(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/reject-slots${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error();
+      loadDoctor();
+    } catch {
+      window.alert("Failed to decline the schedule change.");
+    } finally {
+      setSavingSlotApproval(false);
     }
   };
 
@@ -397,7 +463,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const displayName = doctor.fullName?.startsWith("Dr.") ? doctor.fullName : `Dr. ${doctor.fullName}`;
 
   return (
-    <div className="px-8 py-8 overflow-y-auto h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
+    <DesktopOnlyWrapper>
+    <div className="px-4 sm:px-8 py-6 sm:py-8 overflow-y-auto overflow-x-hidden h-full w-full bg-[#F9FAFB]" style={{ fontFamily: "Outfit, sans-serif" }}>
 
       {/* ── Page Header ── */}
       <div className="flex items-center gap-3 mb-6">
@@ -416,7 +483,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {/* ── Top Profile Card ── */}
-      <div className="bg-[#EEF0F6] rounded-2xl p-7 relative w-full flex flex-col lg:flex-row gap-12 lg:gap-24 mb-6 shadow-sm border border-[#E4E8F0]">
+      <div className="bg-[#EEF0F6] rounded-2xl p-5 sm:p-7 relative w-full flex flex-col lg:flex-row gap-8 lg:gap-24 mb-6 shadow-sm border border-[#E4E8F0]">
 
         {can("manage_doctors") && (
           <button onClick={editing ? undefined : startEditing} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center text-[#24292E] hover:text-[#5476FC] bg-white rounded-lg shadow-sm border border-[#E4E8F0] transition-colors">
@@ -445,7 +512,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <select value={eGender} onChange={(e) => setEGender(e.target.value)} className={inputCls}>
                 <option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
               </select>
-              <input type="date" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
+              <input type="date" max="9999-12-31" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
               <select value={eBloodGroup} onChange={(e) => setEBloodGroup(e.target.value)} className={inputCls}>
                 <option value="">Blood Group</option>
                 {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => <option key={bg} value={bg}>{bg}</option>)}
@@ -454,7 +521,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <input placeholder="Weight" value={eWeight} onChange={(e) => setEWeight(e.target.value)} className={inputCls} />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-x-12 gap-y-3">
+            <div className="grid grid-cols-2 gap-x-4 sm:gap-x-12 gap-y-3">
               {[
                 { label: "Gender", val: doctor.gender ?? "—" },
                 { label: "Date of Birth", val: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—" },
@@ -474,7 +541,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
         {/* Column 3: Credentials */}
         <div className="flex flex-col flex-1">
           <h3 className="text-[#24292E] text-[14px] font-bold mb-4">Credentials</h3>
-          <div className="flex flex-col gap-3 pr-8">
+          <div className="flex flex-col gap-3 pr-0 sm:pr-8">
             <div className="flex justify-between items-center text-[12px]">
               <span className="text-[#676E76]">Name</span>
               <div className="flex items-center gap-2">
@@ -496,17 +563,29 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                 <button onClick={handleResetPassword} className="text-[#5476FC] font-bold hover:underline">Reset</button>
               </div>
             )}
+            {can("manage_doctors") && (
+              <div className="flex justify-between items-center text-[12px]">
+                <span className="text-[#676E76]">Two-Factor Authentication</span>
+                <button
+                  onClick={handleToggleTwoFA}
+                  disabled={togglingTwoFA}
+                  className={`font-bold hover:underline disabled:opacity-50 ${doctor.twoFactorEnabled ? "text-[#E84949]" : "text-[#5476FC]"}`}
+                >
+                  {togglingTwoFA ? "Updating…" : doctor.twoFactorEnabled ? "Disable" : "Enable"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-6 border-b border-[#EBEEF5] pb-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6 border-b border-[#EBEEF5] pb-4">
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-2.5 rounded-full text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
+            className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[12px] font-bold tracking-wider transition-all ${activeTab === tab
                 ? "bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white shadow-md scale-[1.02]"
                 : "bg-white text-[#676E76] border border-[#E4E8F0] hover:border-[#5476FC] hover:text-[#5476FC] shadow-sm"
               }`}
@@ -534,7 +613,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
 
             <div>
               <h3 className="text-[#24292E] text-[14px] font-bold mb-4">Personal Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="flex flex-col gap-2">
                   {[
                     { label: "Gender", val: doctor.gender ?? "—" },
@@ -590,7 +669,48 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {doctor.slotsPending && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Pending</span>
+                    <span className="text-[12px] font-semibold text-amber-800">Availability change awaiting your approval</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {TIMING_DAYS.map(({ label, dow }) => {
+                      const daySlots = (doctor.tempSlots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                      const isOpen = daySlots.length > 0;
+                      return (
+                        <div key={label} className={`rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 border ${isOpen ? "bg-white border-amber-200" : "bg-amber-50/50 border-amber-100"}`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${isOpen ? "text-amber-700" : "text-amber-300"}`}>{label.slice(0, 3)}</span>
+                          <span className={`text-[10px] font-medium text-center leading-tight ${isOpen ? "text-[#24292E]" : "text-amber-300"}`}>
+                            {isOpen ? daySlots.map((s) => `${fmt12(s.startTime)} - ${fmt12(s.endTime)}`).join(", ") : "Closed"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {can("manage_schedules") && (
+                    <div className="flex justify-end gap-2 mt-1">
+                      <button
+                        onClick={handleRejectPendingSlots}
+                        disabled={savingSlotApproval}
+                        className="px-4 py-1.5 bg-white border border-amber-300 text-amber-700 text-[11px] font-bold rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        REJECT
+                      </button>
+                      <button
+                        onClick={handleApprovePendingSlots}
+                        disabled={savingSlotApproval}
+                        className="px-4 py-1.5 bg-black text-white text-[11px] font-bold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                      >
+                        APPROVE
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {TIMING_DAYS.map(({ label, dow }) => {
                   const daySlots = (doctor.slots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
                   const isOpen = daySlots.length > 0;
@@ -611,23 +731,23 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
 
           {/* Action Buttons */}
           {can("manage_doctors") && (
-            <div className="flex justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
-              <button onClick={handleDelete} disabled={deleting} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
+            <div className="flex flex-wrap justify-center sm:justify-end gap-3 mt-8 col-span-1 xl:col-span-2">
+              <button onClick={handleDelete} disabled={deleting} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors disabled:opacity-50">
                 {deleting ? "REMOVING..." : "DELETE"}
               </button>
               {editing ? (
-                <button onClick={() => setEditing(false)} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                <button onClick={() => setEditing(false)} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
                   CANCEL
                 </button>
               ) : (
-                <button onClick={startEditing} className="px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
+                <button onClick={startEditing} className="px-4 sm:px-8 py-2.5 rounded-lg bg-[#A7AAB4] text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:bg-gray-500 transition-colors">
                   EDIT
                 </button>
               )}
               <button
                 onClick={editing ? handleSave : undefined}
                 disabled={!editing || savingDoc}
-                className="px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
+                className="px-6 sm:px-10 py-2.5 rounded-lg bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] shadow-sm text-white text-[11px] sm:text-[12px] font-bold tracking-widest hover:shadow-md transition-all disabled:opacity-50"
               >
                 {savingDoc ? "SAVING..." : "SAVE"}
               </button>
@@ -642,15 +762,15 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex flex-col xl:flex-row gap-6 items-start">
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {["All", "Upcoming", "Past"].map((t) => (
                   <button key={t} onClick={() => setConsultFilter(t)} className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${consultFilter === t ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"}`}>{t}</button>
                 ))}
               </div>
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text" placeholder="Search all" value={consultSearch} onChange={(e) => setConsultSearch(e.target.value)}
-                  className="w-56 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
+                  className="w-full sm:w-56 h-9 pl-4 pr-9 rounded-full border border-[#D6DEFF] bg-white text-sm outline-none focus:border-[#5476FC] text-[#24292E]"
                 />
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               </div>
@@ -679,8 +799,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                         <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
                         <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                         <div className="flex flex-col gap-0.5 shrink-0">
-                          <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{new Date(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
-                          <span className="text-[11px] text-[#676E76]">{new Date(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                          <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{parseLocalTime(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
+                          <span className="text-[11px] text-[#676E76]">{parseLocalTime(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
                         </div>
                         <span className={`text-[12px] font-medium shrink-0 ${statusColor(c)}`}>{statusLabel(c)}</span>
                         <div className="flex items-center gap-3 shrink-0">
@@ -709,8 +829,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                       <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
                       <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                       <div className="flex flex-col gap-0.5 shrink-0">
-                        <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{new Date(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
-                        <span className="text-[11px] text-[#676E76]">{new Date(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                        <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{parseLocalTime(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
+                        <span className="text-[11px] text-[#676E76]">{parseLocalTime(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
                       </div>
                       <span className={`text-[12px] font-medium shrink-0 ${statusColor(c)}`}>{statusLabel(c)}</span>
                       <button onClick={(e) => { e.stopPropagation(); setSelectedConsultId(c.id); }} className="flex items-center gap-1 text-[12px] font-medium text-[#24292E] hover:text-[#5476FC] transition-colors shrink-0">
@@ -836,6 +956,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       )}
 
     </div>
+    </DesktopOnlyWrapper>
   );
 }
 

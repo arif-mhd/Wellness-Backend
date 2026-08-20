@@ -286,17 +286,19 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
           {/* Main Header Card */}
           <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <Avatar pharmacy={pharmacy} size="xl" />
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="shrink-0">
+                <Avatar pharmacy={pharmacy} size="xl" />
+              </div>
               <div className="flex flex-col justify-center">
-                <div className="flex items-center gap-3 mb-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mb-1">
                   <h2 className="text-[20px] font-semibold text-slate-800">{pharmacy.pharmacyName}</h2>
                   {pharmacy.status === "approved" && (
-                    <div className="flex items-center gap-1.5 text-teal-400">
-                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <div className="flex items-center gap-1.5 text-teal-400 bg-teal-50 px-2.5 py-1 rounded-full">
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-[12px] font-semibold">Verified by Malaffi</span>
+                      <span className="text-[11px] font-semibold whitespace-nowrap">Verified by Malaffi</span>
                     </div>
                   )}
                 </div>
@@ -304,11 +306,11 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button className="px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
+              <button className="flex-1 sm:flex-none px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95 text-center">
                 Edit
               </button>
-              <button className="px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95">
+              <button className="flex-1 sm:flex-none px-8 py-3.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4f46e5] text-[13px] font-semibold rounded-2xl transition active:scale-95 text-center">
                 Deactivate Pharmacy
               </button>
             </div>
@@ -432,30 +434,32 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
                 {/* Filters Row */}
                 <div className="flex items-center gap-8 text-[13px] font-semibold text-[#64748B] select-none pl-2 flex-wrap">
-                  <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                    Medicine Name
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </span>
-                  <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                    Batch No.
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </span>
-                  <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                    Expiry Date
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </span>
-                  <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                    Stock Status
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </span>
+                  <div className="hidden lg:flex items-center gap-8">
+                    <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                      Medicine Name
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                    <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                      Batch No.
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                    <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                      Expiry Date
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                    <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                      Stock Status
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                  </div>
                   <div className="ml-auto flex items-center gap-3">
                     <button
                       onClick={() => { setShowAddProduct(true); setAddProductError(""); setProductForm(emptyProductForm()); }}
@@ -485,8 +489,8 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                         <p className="text-sm font-semibold">No products for this pharmacy</p>
                       </div>
                     ) : (
-                      <table className="w-full text-left border-collapse">
-                        <thead>
+                      <table className="w-full text-left border-collapse block lg:table">
+                        <thead className="hidden lg:table-header-group">
                           <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
                             <th className="pb-4 pt-1 font-semibold pl-2">Medicine Name</th>
                             <th className="pb-4 pt-1 font-semibold">Batch No.</th>
@@ -514,15 +518,16 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                             <th className="pb-4 pt-1"></th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="block lg:table-row-group">
                           {stockProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item) => {
                             const isLowStock = item.stock < (item.reorderLevel ?? 100);
                             return (
                               <tr
                                 key={item.id}
-                                className={`group transition-colors duration-200 border-b border-slate-50 last:border-0 ${item.flagged ? "bg-red-50/40" : "hover:bg-slate-50/50"}`}
+                                className={`block lg:table-row bg-white lg:bg-transparent rounded-2xl mb-4 p-4 lg:mb-0 lg:p-0 shadow-sm lg:shadow-none border border-slate-100 lg:border-b lg:border-slate-50 relative group transition-colors duration-200 lg:last:border-0 ${item.flagged ? "bg-red-50/40" : "lg:hover:bg-slate-50/50"}`}
                               >
-                                <td className="py-5 px-2">
+                                <td className="block lg:table-cell py-2 lg:py-5 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Medicine Name</div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-[13px] font-semibold text-slate-800">{item.name}</span>
                                     {item.flagged && (
@@ -531,17 +536,24 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                   </div>
                                   <span className="text-[11px] text-slate-400">{item.category}</span>
                                 </td>
-                                <td className="py-5 text-[12px] font-semibold text-slate-400">
+                                <td className="block lg:table-cell py-2 lg:py-5 text-[12px] font-semibold text-slate-400 lg:px-0 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Batch No.</div>
                                   {item.batchNumber ?? "—"}
                                 </td>
-                                <td className="py-5 text-[13px] font-medium text-slate-500 pl-4">{item.stock}</td>
-                                <td className="py-5 text-[13px] font-medium text-slate-500">
+                                <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:pl-4 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Quantity</div>
+                                  {item.stock}
+                                </td>
+                                <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:px-0 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Expiry Date</div>
                                   {item.expiryDate ?? "—"}
                                 </td>
-                                <td className="py-5 text-[13px] font-medium text-slate-500 pl-4">
+                                <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:pl-4 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Price (AED)</div>
                                   AED {item.price.toFixed(2)}
                                 </td>
-                                <td className="py-5 text-[13px] font-semibold pl-4">
+                                <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-semibold lg:pl-4 px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Stock Status</div>
                                   {item.status === "pending_approval" ? (
                                     <span className="text-amber-500">Pending</span>
                                   ) : item.status === "rejected" ? (
@@ -552,11 +564,12 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-5 text-center">
+                                <td className="block lg:table-cell py-2 lg:py-5 lg:text-center px-2">
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Flagged</div>
                                   <button
                                     onClick={() => toggleFlag(item.id, item.flagged ?? false)}
                                     title={item.flagged ? `Flagged: ${item.flagReason ?? ""}` : "Flag this product"}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto transition ${
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center lg:mx-auto transition ${
                                       item.flagged
                                         ? "bg-red-100 text-red-500 hover:bg-red-200"
                                         : "bg-slate-100 text-slate-400 hover:bg-amber-50 hover:text-amber-500"
@@ -567,25 +580,25 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                     </svg>
                                   </button>
                                 </td>
-                                <td className="py-5 pr-4 text-right min-w-[200px]">
-                                  <div className="flex items-center justify-end gap-2">
+                                <td className="block lg:table-cell py-3 lg:py-5 lg:pr-4 text-right min-w-[200px] border-t border-slate-50 lg:border-0 mt-3 lg:mt-0 px-2">
+                                  <div className="flex items-center lg:justify-end gap-2">
                                     <button
                                       onClick={() => router.push(`/dashboard/pharmacy/${id}/product/${item.id}`)}
-                                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[11px] font-semibold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition opacity-0 group-hover:opacity-100"
+                                      className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[11px] font-semibold px-5 py-2 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] transition lg:opacity-0 lg:group-hover:opacity-100 flex-1 lg:flex-none"
                                     >
                                       View Details
                                     </button>
                                     {item.flagged ? (
                                       <button
                                         onClick={() => toggleFlag(item.id, true)}
-                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-semibold px-4 py-2 rounded-full transition"
+                                        className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-semibold px-4 py-2 rounded-full transition lg:opacity-0 lg:group-hover:opacity-100"
                                       >
                                         Unflag
                                       </button>
                                     ) : (
                                       <button
                                         onClick={() => toggleFlag(item.id, false)}
-                                        className="bg-red-50 hover:bg-red-100 text-red-500 text-[11px] font-semibold px-4 py-2 rounded-full transition opacity-0 group-hover:opacity-100"
+                                        className="bg-red-50 hover:bg-red-100 text-red-500 text-[11px] font-semibold px-4 py-2 rounded-full transition lg:opacity-0 lg:group-hover:opacity-100"
                                       >
                                         Flag
                                       </button>
@@ -742,6 +755,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                   <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Expiry Date</label>
                   <input
                     type="date"
+                    max="9999-12-31"
                     value={productForm.expiryDate}
                     onChange={e => setProductForm(p => ({ ...p, expiryDate: e.target.value }))}
                     className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"

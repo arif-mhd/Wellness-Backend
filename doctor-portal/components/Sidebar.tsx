@@ -92,25 +92,41 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
   { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon },
   { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon },
   { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
-  { href: "/dashboard/wallet", label: "Payment", Icon: PaymentIcon },
+  { href: "/dashboard/profile/payments", label: "Payment", Icon: PaymentIcon },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState } = useSidebar();
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
-  const [isOnline, setIsOnline] = useState(true);
-  const [togglingOnline, setTogglingOnline] = useState(false);
+  const [scheduleSlots, setScheduleSlots] = useState<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>([]);
   const { can } = useDoctorPermissions();
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.perm || can(item.perm));
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);
 
+  // ── Helper: is current time within any active schedule slot for today? ──
+  function computeScheduleOnline(s: typeof scheduleSlots): boolean {
+    const now = new Date();
+    const todayDow = now.getDay();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    return s.some((slot) => {
+      if (!slot.isActive || slot.dayOfWeek !== todayDow) return false;
+      const [sh, sm] = slot.startTime.split(":").map(Number);
+      const [eh, em] = slot.endTime.split(":").map(Number);
+      return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
+    });
+  }
+
+  // ── Initial load: doctor profile + schedule slots ──
+  // Online/offline status itself now lives in SidebarContext (shared with
+  // the dashboard's Availability card) so a toggle from either place is
+  // reflected everywhere instantly instead of waiting on a separate poll.
   useEffect(() => {
     apiFetch("/api/doctors/me")
       .then(r => r.json())
@@ -119,26 +135,37 @@ export default function Sidebar() {
         setDoctorName(d.fullName ?? "");
         setDoctorEmail(d.email ?? "");
         setDoctorAvatar(d.avatarUrl ?? "");
-        setIsOnline(d.isOnline !== false); // default true if not set
+      })
+      .catch(() => {});
+
+    apiFetch("/api/doctors/slots")
+      .then(r => r.json())
+      .then(data => {
+        setScheduleSlots(data.slots ?? []);
       })
       .catch(() => {});
   }, []);
 
-  async function handleOnlineToggle() {
-    const next = !isOnline;
-    setTogglingOnline(true);
-    try {
-      await apiFetch("/api/doctors/online-status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOnline: next }),
-      });
-      setIsOnline(next);
-    } catch { /* keep current state on error */ }
-    setTogglingOnline(false);
-  }
+  // ── Re-compute from schedule every 60s (only when not manually on break) ──
+  useEffect(() => {
+    if (scheduleSlots.length === 0) return;
+    const id = setInterval(() => {
+      if (!isManuallyOffline) {
+        const effective = computeScheduleOnline(scheduleSlots);
+        setOnlineState(effective, false);
+        // Silently sync to backend
+        apiFetch("/api/doctors/online-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isOnline: effective, isManuallyOffline: false }),
+        }).catch(() => {});
+      }
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [scheduleSlots, isManuallyOffline, setOnlineState]);
 
   async function handleSignOut() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     try { await signOut(); } catch { /* ignore */ }
     router.replace("/auth/login");
   }
@@ -146,7 +173,7 @@ export default function Sidebar() {
   // Labels are shown/hidden purely from open on desktop, but always visible on mobile
   const labelCls = [
     "transition-[max-width,opacity,margin] duration-300 ease-in-out",
-    open ? "lg:opacity-100 lg:max-w-[160px] lg:ml-3" : "lg:opacity-0 lg:max-w-0 lg:ml-0 lg:pointer-events-none",
+    open ? "md:opacity-100 md:max-w-[160px] md:ml-3" : "md:opacity-0 md:max-w-0 md:ml-0 md:pointer-events-none",
     "opacity-100 max-w-[160px] ml-3"
   ].join(" ");
 
@@ -155,7 +182,7 @@ export default function Sidebar() {
       {/* Mobile backdrop */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-[#1E1E1E]/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-[#1E1E1E]/60 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -164,12 +191,12 @@ export default function Sidebar() {
           "z-50 shrink-0 flex flex-col justify-between",
           "bg-[#F5F7FB] border-r border-[#EBEEF5] select-none",
           "transition-[transform,width] duration-300 ease-in-out",
-          // Mobile: cover the entire viewport using inset-0 (top+right+bottom+left=0)
-          // Desktop: sit in the left column of the flex layout
-          "fixed lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto",
+          // Mobile (<768px): cover the entire viewport using inset-0
+          // Tablet/Desktop (≥768px): sit in the left column of the flex layout
+          "fixed md:relative md:translate-x-0 md:inset-y-0 md:left-0 md:right-auto",
           isMobileOpen ? "inset-0" : "inset-0 -translate-x-full",
-          open ? "lg:w-[255px]" : "lg:w-[80px]",
-          "overflow-y-auto lg:overflow-hidden",
+          open ? "md:w-[255px]" : "md:w-[80px]",
+          "overflow-y-auto md:overflow-hidden md:h-full",
         ].join(" ")}
       >
       {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
@@ -181,19 +208,19 @@ export default function Sidebar() {
           <img
             src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
             alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[100px] ${open ? "lg:opacity-100 lg:max-w-[100px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"}`}
+            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[100px] ${open ? "md:opacity-100 md:max-w-[100px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"}`}
           />
           {/* Toggle button — always visible */}
           <button
             onClick={() => {
-              if (window.innerWidth < 1024) setIsMobileOpen(false);
+              if (window.innerWidth < 768) setIsMobileOpen(false);
               else toggle();
             }}
             title="Toggle sidebar"
             className="absolute right-5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-[#3D4B5A] hover:bg-gray-50 hover:text-[#5476FC] transition-colors shrink-0 z-20"
           >
-            <span className="hidden lg:block">{open ? <CollapseIcon /> : <HamburgerIcon />}</span>
-            <span className="block lg:hidden">
+            <span className="hidden md:block">{open ? <CollapseIcon /> : <HamburgerIcon />}</span>
+            <span className="block md:hidden">
               <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </span>
           </button>
@@ -201,7 +228,7 @@ export default function Sidebar() {
 
         {/* Nav links */}
         <nav
-          className={`flex flex-col gap-2 w-full flex-1 min-h-0 overflow-y-auto px-4 pb-4 ${open ? "lg:px-4" : "lg:px-3"}`}
+          className={`flex flex-col gap-2 w-full flex-1 min-h-0 overflow-y-auto px-4 pb-4 ${open ? "md:px-4" : "md:px-3"}`}
           style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         >
           {visibleNavItems.map(({ href, label, Icon }) => {
@@ -215,7 +242,7 @@ export default function Sidebar() {
                 className={[
                   "flex items-center py-3 transition-[background,box-shadow,padding] duration-150 rounded-[92px] overflow-hidden",
                   "px-4",
-                  open ? "lg:px-4" : "lg:px-3 lg:justify-center",
+                  open ? "md:px-4" : "md:px-3 md:justify-center",
                   active
                     ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                     : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
@@ -238,7 +265,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── BOTTOM FOOTER ────────────────────────────────────────────────── */}
-      <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 px-5 shrink-0 ${open ? "lg:px-5" : "lg:px-3 lg:items-center"}`}>
+      <div className={`flex flex-col gap-3 w-full border-t border-[#EBEEF5] pt-4 pb-6 px-5 shrink-0 ${open ? "md:px-5" : "md:px-3 md:items-center"}`}>
 
         {/* Help & Support */}
         {[
@@ -249,7 +276,7 @@ export default function Sidebar() {
             href={href}
             title={open ? undefined : label}
             onClick={() => setIsMobileOpen(false)}
-            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors px-3 ${open ? "lg:px-3" : "lg:justify-center lg:px-2"
+            className={`flex items-center py-2 rounded-lg text-[#3D4B5A] hover:bg-[#ECEFFE] transition-colors px-3 ${open ? "md:px-3" : "md:justify-center md:px-2"
               }`}
           >
             <span className="shrink-0 w-5 h-5 flex items-center justify-center">
@@ -263,29 +290,25 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {/* Online / Offline toggle */}
-        <button
-          onClick={handleOnlineToggle}
-          disabled={togglingOnline}
-          title={isOnline ? "Go Offline" : "Go Online"}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2 w-full transition-colors ${
-            isOnline
-              ? "bg-[#ECFDF5] hover:bg-[#D1FAE5]"
-              : "bg-[#F1F5F9] hover:bg-[#E2E8F0]"
-          } lg:justify-start ${open ? "lg:justify-start" : "lg:justify-center"} ${togglingOnline ? "opacity-50 cursor-not-allowed" : ""}`}
+        {/* Online / Offline — reflects current effective status (set by schedule or manual break) */}
+        <div
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 w-full ${
+            isOnline ? "bg-[#ECFDF5]" : "bg-[#F1F5F9]"
+          } ${open ? "" : "md:justify-center"}`}
         >
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-[#22C55E]" : "bg-[#94A3B8]"}`} />
-          <span
-            className={`text-xs font-semibold whitespace-nowrap overflow-hidden opacity-100 max-w-[160px] ${
-              open ? "lg:opacity-100 lg:max-w-[160px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
-            } ${isOnline ? "text-[#16A34A]" : "text-[#64748B]"} transition-[max-width,opacity] duration-300 ease-in-out`}
-          >
-            {togglingOnline ? "Updating…" : isOnline ? "Online" : "Offline"}
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+            isOnline ? "bg-[#22C55E] shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" : "bg-[#94A3B8]"
+          }`} />
+          <span className={`text-xs font-semibold whitespace-nowrap overflow-hidden opacity-100 max-w-[160px] ${
+            open ? "md:opacity-100 md:max-w-[160px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"
+          } ${isOnline ? "text-[#16A34A]" : "text-[#64748B]"} transition-[max-width,opacity] duration-300 ease-in-out`}>
+            {isOnline ? "Online" : "Offline"}
           </span>
-        </button>
+        </div>
+
 
         {/* Profile row */}
-        <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 flex-row ${open ? "lg:flex-row" : "lg:flex-col"}`}>
+        <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 flex-row ${open ? "md:flex-row" : "md:flex-col"}`}>
           {/* Avatar — click to go to Profile */}
           <Link href="/dashboard/profile" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[#5476FC]">
             {doctorAvatar ? (
@@ -299,7 +322,7 @@ export default function Sidebar() {
 
           {/* Name / email — stays in DOM */}
           <div
-            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[120px] ${open ? "lg:opacity-100 lg:max-w-[120px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
+            className={`flex flex-col min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[120px] ${open ? "md:opacity-100 md:max-w-[120px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"
               }`}
           >
             <span className="text-[#24292E] font-medium text-sm truncate">{doctorName}</span>

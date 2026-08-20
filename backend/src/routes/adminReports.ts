@@ -563,6 +563,43 @@ function drawPdfReport(
   drawDataTable(doc, columns, rows);
 }
 
+// ─── POST /api/admin/reports/preview ─────────────────────────────────────────
+// Body: { reportType: ReportType, ...filters }
+// Same real, filtered data buildReportData() already computes for the PDF
+// below — returned as JSON instead, so the admin portal can render real
+// summary numbers and a chart on screen before (or instead of) generating
+// a PDF. Table rows are capped since this is an on-screen preview, not the
+// full export.
+router.post("/preview", requireRole("admin"), async (req: Request, res: Response) => {
+  const reportType = req.body.reportType as ReportType;
+  if (!reportType || !REPORT_TITLES[reportType]) {
+    res.status(400).json({ error: "Invalid or missing reportType." });
+    return;
+  }
+
+  const filters = parseFilters(req.body);
+
+  try {
+    const data = await buildReportData(reportType, filters);
+    if (!data) {
+      res.status(400).json({ error: "Unable to build report." });
+      return;
+    }
+
+    res.json({
+      title: REPORT_TITLES[reportType],
+      summary: data.summary,
+      chart: data.chart ?? null,
+      columns: data.columns,
+      rows: data.rows.slice(0, 25),
+      totalRows: data.rows.length,
+    });
+  } catch (err) {
+    console.error("Report preview error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/admin/reports/generate ───────────────────────────────────────
 // Body: { reportType: ReportType, ...filters }
 // Streams back a PDF built from real, filtered platform data.

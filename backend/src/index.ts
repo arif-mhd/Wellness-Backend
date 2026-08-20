@@ -14,6 +14,7 @@ import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
 import clinicsRouter from "./routes/clinics";
 import adminClinicsRouter from "./routes/adminClinics";
+import adminEarningsRouter from "./routes/adminEarnings";
 import clinicDoctorsRouter from "./routes/clinicDoctors";
 import clinicAppointmentsRouter from "./routes/clinicAppointments";
 import clinicPatientsRouter from "./routes/clinicPatients";
@@ -22,6 +23,7 @@ import clinicFeedbackRouter from "./routes/clinicFeedback";
 import clinicInsuranceRouter from "./routes/clinicInsurance";
 import clinicPermissionsRouter from "./routes/clinicPermissions";
 import clinicPaymentsRouter from "./routes/clinicPayments";
+import clinicSearchRouter from "./routes/clinicSearch";
 import adminFeeRequestsRouter from "./routes/adminFeeRequests";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
@@ -43,6 +45,7 @@ import supportRouter from "./routes/support";
 import remindersRouter from "./routes/reminders";
 import feedbackRouter from "./routes/feedback";
 import notificationsRouter from "./routes/notifications";
+import pushTokensRouter from "./routes/pushTokens";
 import adminActivityLogRouter from "./routes/adminActivityLog";
 import adminDashboardRouter from "./routes/adminDashboard";
 import adminNotificationsRouter from "./routes/adminNotifications";
@@ -55,8 +58,10 @@ import articlesRouter from "./routes/articles";
 import otpRouter from "./routes/otp";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
+import clinicMessagesRouter from "./routes/clinicMessages";
 import servicesRouter from "./routes/services";
 import fhirRouter from "./routes/fhir";
+import internalRouter from "./routes/internal";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -109,6 +114,7 @@ app.use("/api/clinics/feedback", clinicFeedbackRouter);
 app.use("/api/clinics/insurance-policies", clinicInsuranceRouter);
 app.use("/api/clinics/permissions", clinicPermissionsRouter);
 app.use("/api/clinics/payments", clinicPaymentsRouter);
+app.use("/api/clinics/search",   clinicSearchRouter);
 
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);
@@ -116,6 +122,7 @@ app.use("/api/clinics", clinicsRouter);
 // Admin clinic management (requires admin role)
 app.use("/api/admin/clinics", adminClinicsRouter);
 app.use("/api/admin/fee-requests", adminFeeRequestsRouter);
+app.use("/api/admin/earnings", adminEarningsRouter);
 
 // Patient self-registration + profile updates (public register, rest require patient role)
 app.use("/api/patients", patientsRouter);
@@ -152,6 +159,7 @@ app.use("/api/support",        supportRouter);
 app.use("/api/reminders",      remindersRouter);
 app.use("/api/feedback",       feedbackRouter);
 app.use("/api/notifications",  notificationsRouter);
+app.use("/api/push-tokens",    pushTokensRouter);
 app.use("/api/admin/activity-logs", adminActivityLogRouter);
 app.use("/api/admin/dashboard", adminDashboardRouter);
 app.use("/api/admin/notifications", adminNotificationsRouter);
@@ -163,10 +171,15 @@ app.use("/api/articles", articlesRouter);
 app.use("/api/otp",      otpRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
+app.use("/api/clinic-messages", clinicMessagesRouter);
 app.use("/api/services", servicesRouter);
 
 // External EMR (FHIR) read-only integration — mock Cortex via public HAPI sandbox
 app.use("/api/fhir", fhirRouter);
+
+// Internal endpoints for server-to-server callers (Cloud Scheduler), not
+// logged-in users — guarded by a shared secret inside the router itself.
+app.use("/api/internal", internalRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

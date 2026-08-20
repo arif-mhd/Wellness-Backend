@@ -127,8 +127,8 @@ function ManageDoctorsPageInner() {
       }
 
       if (!selectedDoctorId) {
-        if (approved?.length > 0) setSelectedDoctorId(approved[0].id);
-        else if (pending?.length > 0) { setActiveTab("queue"); setSelectedDoctorId(pending[0].id); }
+        if (approved?.length > 0) {}
+        else if (pending?.length > 0) { setActiveTab("queue"); }
       }
     } catch {
       setFetchError("Could not reach the backend.");
@@ -200,9 +200,9 @@ function ManageDoctorsPageInner() {
 
             {/* Tab & search row */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => { setActiveTab("onboard"); setSelectedDoctorId(doctors[0]?.id ?? null); }}
+                  onClick={() => { setActiveTab("onboard"); setSelectedDoctorId(null); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                     activeTab === "onboard" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -210,7 +210,7 @@ function ManageDoctorsPageInner() {
                   Doctors Onboard
                 </button>
                 <button
-                  onClick={() => { setActiveTab("queue"); setSelectedDoctorId(queue[0]?.id ?? null); }}
+                  onClick={() => { setActiveTab("queue"); setSelectedDoctorId(null); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === "queue" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -296,97 +296,180 @@ function ManageDoctorsPageInner() {
                     </p>
                   </div>
                 ) : activeTab === "onboard" ? (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">
-                          <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium text-center">
-                          <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Consultation <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium text-center">
-                          <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Avg. Consultation <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium text-center">
-                          <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Prescription <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium text-center">
-                          <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Ratings <DoubleCaret /></div>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
-                        const isSelected = selectedDoctorId === doc.id;
-                        return (
-                          <tr
-                            key={doc.id}
-                            onClick={() => setSelectedDoctorId(doc.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
-                          >
-                            <td className="py-3 px-2 flex items-center gap-3">
-                              <div className="relative shrink-0">
-                                <DoctorAvatar doctor={doc} size="md" />
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
-                                <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
-                              </div>
-                            </td>
-                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.consultations ?? 0}</td>
-                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.avgConsultation ?? 0}</td>
-                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.prescriptions ?? 0}</td>
-                            <td className="py-3 text-center"><StarRow rating={doc.rating ?? 0} /></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="pb-4 pt-1 font-medium pl-2">
+                            <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium text-center">
+                            <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Consultation <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium text-center">
+                            <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Avg. Consultation <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium text-center">
+                            <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">No. of Prescription <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium text-center">
+                            <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Ratings <DoubleCaret /></div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
+                          const isSelected = selectedDoctorId === doc.id;
+                          return (
+                            <tr
+                              key={doc.id}
+                              onClick={() => setSelectedDoctorId(doc.id)}
+                              className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
+                            >
+                              <td className="py-3 px-2 flex items-center gap-3">
+                                <div className="relative shrink-0">
+                                  <DoctorAvatar doctor={doc} size="md" />
+                                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
+                                  <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
+                                </div>
+                              </td>
+                              <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.consultations ?? 0}</td>
+                              <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.avgConsultation ?? 0}</td>
+                              <td className="py-3 text-[13px] text-slate-700 font-medium text-center">{doc.prescriptions ?? 0}</td>
+                              <td className="py-3 text-center"><StarRow rating={doc.rating ?? 0} /></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                    {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
+                      const isSelected = selectedDoctorId === doc.id;
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => setSelectedDoctorId(doc.id)}
+                          className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <DoctorAvatar doctor={doc} size="md" />
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10b981] border-2 border-white rounded-full" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-slate-800 truncate">{doc.fullName}</p>
+                              <p className="text-[12px] font-normal text-slate-400 truncate">{doc.email}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-50">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Consults</span>
+                              <span className="text-[13px] text-slate-700 font-medium">{doc.consultations ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Avg</span>
+                              <span className="text-[13px] text-slate-700 font-medium">{doc.avgConsultation ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Scripts</span>
+                              <span className="text-[13px] text-slate-700 font-medium">{doc.prescriptions ?? 0}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Rating</span>
+                              <StarRow rating={doc.rating ?? 0} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  </>
                 ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">
-                          <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
-                        const isSelected = selectedDoctorId === doc.id;
-                        return (
-                          <tr
-                            key={doc.id}
-                            onClick={() => setSelectedDoctorId(doc.id)}
-                            className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
-                          >
-                            <td className="py-3 px-2 flex items-center gap-3">
+                  <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="pb-4 pt-1 font-medium pl-2">
+                            <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
+                          const isSelected = selectedDoctorId === doc.id;
+                          return (
+                            <tr
+                              key={doc.id}
+                              onClick={() => setSelectedDoctorId(doc.id)}
+                              className={`group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50`}
+                            >
+                              <td className="py-3 px-2 flex items-center gap-3">
+                                <div className="relative shrink-0">
+                                  <DoctorAvatar doctor={doc} size="md" />
+                                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-amber-400 border-2 border-white rounded-full" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
+                                  <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
+                                </div>
+                              </td>
+                              <td className="py-3 pr-4 text-right">
+                                {isSelected ? (
+                                  <button className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)]">
+                                    Verify Manually
+                                  </button>
+                                ) : (
+                                  <span className="text-[12px] font-medium text-slate-800 mr-6">Verify Manually</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                    {sortedDoctors.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(doc => {
+                      const isSelected = selectedDoctorId === doc.id;
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => setSelectedDoctorId(doc.id)}
+                          className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="relative shrink-0">
                                 <DoctorAvatar doctor={doc} size="md" />
                                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-amber-400 border-2 border-white rounded-full" />
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate">{doc.fullName}</p>
-                                <p className="text-[11px] font-normal text-slate-400 truncate">{doc.email}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[14px] font-medium text-slate-800 truncate">{doc.fullName}</p>
+                                <p className="text-[12px] font-normal text-slate-400 truncate">{doc.email}</p>
                               </div>
-                            </td>
-                            <td className="py-3 pr-4 text-right">
-                              {isSelected ? (
-                                <button className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)]">
-                                  Verify Manually
-                                </button>
-                              ) : (
-                                <span className="text-[12px] font-medium text-slate-800 mr-6">Verify Manually</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          </div>
+                          <div className="mt-2 w-full">
+                            {isSelected ? (
+                              <button className="bg-[#6A8BFF] text-white text-[12px] font-medium px-6 py-2.5 rounded-full shadow-sm w-full transition-colors active:bg-blue-600">
+                                Verify Manually
+                              </button>
+                            ) : (
+                              <span className="text-[12px] font-medium text-slate-800 text-center block w-full py-2.5 bg-slate-100 rounded-full">Verify Manually</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  </>
                 )}
               </div>
 
@@ -402,7 +485,9 @@ function ManageDoctorsPageInner() {
 
           {/* RIGHT — Doctor Details Panel */}
           {selectedDoctor && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+              <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedDoctorId(null)} />
+              <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
               {/* Header */}
               <div className="flex items-center justify-between pb-4">
@@ -499,6 +584,7 @@ function ManageDoctorsPageInner() {
                 )}
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

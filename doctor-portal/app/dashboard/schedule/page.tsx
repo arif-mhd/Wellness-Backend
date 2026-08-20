@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import ScheduleTabs from "@/components/schedule/ScheduleTabs";
 import ScheduleListView, { ScheduleItem } from "@/components/schedule/ScheduleListView";
 import ScheduleCalendarView, { CalendarAppointment } from "@/components/schedule/ScheduleCalendarView";
 import TimeSlotView from "@/components/schedule/TimeSlotView";
 import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
+import RescheduleModal from "@/components/schedule/RescheduleModal";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -36,6 +37,7 @@ export default function SchedulesDashboardPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [reschedulingItem, setReschedulingItem] = useState<ScheduleItem | null>(null);
 
   // Load appointments
   const fetchAppointments = useCallback(async () => {
@@ -171,7 +173,6 @@ export default function SchedulesDashboardPage() {
   };
 
   return (
-    <ProtectedRoute>
       <div className="px-4 md:px-5 pb-12 select-none">
         {/* Page Header */}
         <div className="flex flex-col justify-center items-start gap-1 mb-8 mt-2">
@@ -197,25 +198,39 @@ export default function SchedulesDashboardPage() {
         {/* Main Content: switches based on active tab and view */}
         <div className="w-full">
           {activeTab === "Time slot" ? (
-            <TimeSlotView />
+            <DesktopOnlyWrapper>
+              <TimeSlotView />
+            </DesktopOnlyWrapper>
           ) : activeTab === "Schedule Absences" ? (
-            <ScheduleAbsencesView />
+            <DesktopOnlyWrapper>
+              <ScheduleAbsencesView />
+            </DesktopOnlyWrapper>
           ) : activeView === "list" ? (
+            // Appointments list is available on all screen sizes
             <ScheduleListView
               items={filteredListItems}
               selectedItemId={selectedItemId}
               onSelectItem={handleSelectItem}
-              onRescheduleClick={(item) => console.log("Rescheduling:", item.patientName)}
+              onRescheduleClick={(item) => setReschedulingItem(item)}
               onConsultClick={(item) => handleConsultClick(item.id)}
             />
           ) : (
-            <ScheduleCalendarView
-              appointments={calendarAppointments}
-              onConsultClick={(appt) => handleConsultClick(appt.id)}
-            />
+            <DesktopOnlyWrapper>
+              <ScheduleCalendarView
+                appointments={calendarAppointments}
+                onConsultClick={(appt) => handleConsultClick(appt.id)}
+              />
+            </DesktopOnlyWrapper>
           )}
         </div>
+
+        {reschedulingItem && (
+          <RescheduleModal
+            appointment={reschedulingItem}
+            onClose={() => setReschedulingItem(null)}
+            onRescheduled={() => fetchAppointments()}
+          />
+        )}
       </div>
-    </ProtectedRoute>
   );
 }

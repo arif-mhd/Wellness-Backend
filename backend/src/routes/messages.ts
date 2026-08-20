@@ -10,6 +10,7 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
+import { devFallbackOrThrow } from "../utils/env";
 
 const router = Router();
 
@@ -137,7 +138,7 @@ router.get("/token", verifySession(), async (req: SessionRequest, res: Response)
       }
     } catch { /* use undefined */ }
 
-    const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
+    const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL", "ws://localhost:7880");
     const token = await makeChatToken(userId, channel, displayName);
 
     res.json({ token, wsUrl, channel });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
 
 interface OtherInfoRow {
@@ -16,6 +16,13 @@ interface OwnersPersonalInfoFormProps {
   initialGender?: string;
   initialDob?: string;
   initialEmiratesIdOrPassport?: string;
+  initialPositionInClinic?: string;
+  initialBloodGroup?: string;
+  initialMaritalStatus?: string;
+  initialHeight?: string;
+  initialWeight?: string;
+  initialLanguages?: string[];
+  initialOtherInfo?: OtherInfoRow[];
   onSubmit: (data: any) => void;
 }
 
@@ -35,10 +42,18 @@ export default function OwnersPersonalInfoForm({
   initialGender = "",
   initialDob = "",
   initialEmiratesIdOrPassport = "",
+  initialPositionInClinic = "",
+  initialBloodGroup = "",
+  initialMaritalStatus = "",
+  initialHeight = "",
+  initialWeight = "",
+  initialLanguages = [],
+  initialOtherInfo,
   onSubmit,
 }: OwnersPersonalInfoFormProps) {
   const [fullName, setFullName] = useState(initialFullName);
   const [contactNumber, setContactNumber] = useState(initialPhone);
+  const [phoneError, setPhoneError] = useState("");
   const [ownerId, setOwnerId] = useState(initialEmiratesIdOrPassport);
   const [ownerIdVerified, setOwnerIdVerified] = useState(false);
   const [email, setEmail] = useState(initialEmail);
@@ -49,13 +64,39 @@ export default function OwnersPersonalInfoForm({
   const [maritalStatus, setMaritalStatus] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [heightError, setHeightError] = useState("");
+  const [weightError, setWeightError] = useState("");
+  const [dobError, setDobError] = useState("");
 
-  const [languages, setLanguages] = useState<string[]>([]);
+  const today = new Date();
+  const dobMax = today.toISOString().slice(0, 10);
+  const dobMin = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+
+  const validateDob = (value: string): string => {
+    if (!value) return "Date of Birth is required.";
+    const picked = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(picked.getTime())) return "Enter a valid date of birth.";
+    if (picked > today) return "Date of Birth cannot be in the future.";
+    let age = today.getFullYear() - picked.getFullYear();
+    const hadBirthdayThisYear =
+      today.getMonth() > picked.getMonth() ||
+      (today.getMonth() === picked.getMonth() && today.getDate() >= picked.getDate());
+    if (!hadBirthdayThisYear) age -= 1;
+    if (age < 18) return "Must be at least 18 years old.";
+    if (age > 100) return "Enter a valid date of birth.";
+    return "";
+  };
+
+  const [languages, setLanguages] = useState<string[]>(initialLanguages);
   const [langInput, setLangInput] = useState("");
   const [langSuggestions, setLangSuggestions] = useState<string[]>([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
 
-  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>([{ id: "1", label: "", value: "" }]);
+  const dobInputRef = useRef<HTMLInputElement>(null);
+
+  const [otherInfo, setOtherInfo] = useState<OtherInfoRow[]>(
+    initialOtherInfo && initialOtherInfo.length > 0 ? initialOtherInfo : [{ id: "1", label: "", value: "" }]
+  );
 
   const [formError, setFormError] = useState("");
 
@@ -80,16 +121,35 @@ export default function OwnersPersonalInfoForm({
     setOtherInfo((rows) => rows.filter((r) => r.id !== id));
   };
 
+  const validatePhone = (value: string): string => {
+    if (!value.trim()) return "Contact number is required.";
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 7 || digits.length > 15) return "Phone number must have 7–15 digits.";
+    if (/[a-zA-Z]/.test(value)) return "Phone number must not contain letters.";
+    return "";
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (/[a-zA-Z]/.test(raw)) return;
+    setContactNumber(raw);
+    setPhoneError(validatePhone(raw));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName.trim()) { setFormError("Full name is required."); return; }
-    if (!contactNumber.trim()) { setFormError("Contact number is required."); return; }
+    const phoneErr = validatePhone(contactNumber);
+    if (phoneErr) { setPhoneError(phoneErr); setFormError(phoneErr); return; }
     if (!ownerId.trim()) { setFormError("Owner/Staff Emirates ID is required."); return; }
     if (!email.trim()) { setFormError("Email ID is required."); return; }
     if (!gender) { setFormError("Gender is required."); return; }
-    if (!dob) { setFormError("Date of Birth is required."); return; }
+    const dobErr = validateDob(dob);
+    if (dobErr) { setDobError(dobErr); setFormError(dobErr); return; }
     if (!positionInClinic.trim()) { setFormError("Position in Clinic is required."); return; }
+    if (heightError) { setFormError(heightError); return; }
+    if (weightError) { setFormError(weightError); return; }
 
     setFormError("");
     onSubmit({
@@ -136,13 +196,18 @@ export default function OwnersPersonalInfoForm({
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Contact Number*"
-            value={contactNumber}
-            onChange={(e) => setContactNumber(e.target.value)}
-            className={inputCls}
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="tel"
+              placeholder="Contact Number* (e.g. +971501234567)"
+              value={contactNumber}
+              onChange={handlePhoneChange}
+              className={`${inputCls} ${phoneError ? "border border-red-300 bg-red-50" : ""}`}
+            />
+            {phoneError && (
+              <span className="text-[11px] text-red-500 font-medium pl-1">{phoneError}</span>
+            )}
+          </div>
           <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
             <input
               type="text"
@@ -191,6 +256,7 @@ export default function OwnersPersonalInfoForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="date"
+            max="9999-12-31"
             value={dob}
             onChange={(e) => setDob(e.target.value)}
             className={`${inputCls} ${dob ? "text-gray-800" : "text-gray-400"}`}
@@ -229,20 +295,42 @@ export default function OwnersPersonalInfoForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Height (e.g. 175 cm)"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            className={inputCls}
-          />
-          <input
-            type="text"
-            placeholder="Weight (e.g. 70 kg)"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            className={inputCls}
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              placeholder="Height (e.g. 175 cm)"
+              value={height}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setHeight(digits);
+                if (!digits) setHeightError("");
+                else if (num > 250) setHeightError("Height must not exceed 250 cm.");
+                else if (num < 50) setHeightError("Height must be at least 50 cm.");
+                else setHeightError("");
+              }}
+              className={inputCls}
+            />
+            {heightError && <span className="text-red-500 text-xs mt-0.5">{heightError}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              placeholder="Weight (e.g. 70 kg)"
+              value={weight}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                const num = parseInt(digits, 10);
+                setWeight(digits);
+                if (!digits) setWeightError("");
+                else if (num > 250) setWeightError("Weight must not exceed 250 kg.");
+                else if (num < 20) setWeightError("Weight must be at least 20 kg.");
+                else setWeightError("");
+              }}
+              className={inputCls}
+            />
+            {weightError && <span className="text-red-500 text-xs mt-0.5">{weightError}</span>}
+          </div>
         </div>
 
         {/* Languages — typeahead multi-select */}

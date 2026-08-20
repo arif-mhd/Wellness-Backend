@@ -110,6 +110,8 @@ function ManagePharmacyPageInner() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [approvedPharmacies, setApprovedPharmacies] = useState<Pharmacy[]>([]);
   const [pendingPharmacies, setPendingPharmacies] = useState<Pharmacy[]>([]);
@@ -185,6 +187,13 @@ function ManagePharmacyPageInner() {
   const displayedPharmacies: Pharmacy[] =
     activeTab === "onboard" ? approvedPharmacies : pendingPharmacies;
 
+  const filteredPharmacies = displayedPharmacies.filter(p =>
+    !search ||
+    (p.pharmacyName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.email ?? "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.ownerName ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
   const selectedPharmacy = displayedPharmacies.find((p) => p.id === selectedPharmacyId) ?? null;
 
   return (
@@ -207,7 +216,7 @@ function ManagePharmacyPageInner() {
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Pharmacy</h1>
               <button
                 onClick={() => router.push("/dashboard/pharmacy/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap md:whitespace-normal transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -217,8 +226,8 @@ function ManagePharmacyPageInner() {
             </div>
 
             {/* Filter / Tabs Row */}
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => { setActiveTab("onboard"); setSelectedPharmacyId(null); }}
                   className={`px-5 py-2.5 rounded-full text-[12px] font-semibold transition-all shadow-sm ${
@@ -246,38 +255,55 @@ function ManagePharmacyPageInner() {
                   </span>
                 </button>
 
-                <button className="w-9 h-9 ml-2 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
+                {/* Collapsible search */}
+                <div className="ml-2 flex items-center gap-1">
+                  {searchOpen && (
+                    <div className="flex items-center bg-white border border-slate-200 rounded-full px-3 h-9 shadow-sm animate-in slide-in-from-right-2 duration-200">
+                      <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                      </svg>
+                      <input
+                        autoFocus
+                        value={search}
+                        onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                        onKeyDown={e => { if (e.key === "Escape") { setSearch(""); setSearchOpen(false); } }}
+                        placeholder="Search pharmacies…"
+                        className="ml-2 text-[12px] text-slate-700 placeholder-slate-400 outline-none bg-transparent w-40"
+                      />
+                      {search && (
+                        <button onClick={() => setSearch("")} className="ml-1 text-slate-400 hover:text-slate-600">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch(""); }}
+                    className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 shadow-sm border border-slate-100 transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button className="text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
-                  Today
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+
             </div>
 
             {/* Text Filter Row */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
               <div className="flex items-center gap-8 flex-1">
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Name
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </span>
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Date
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </span>
+                {["Name", ...(activeTab === "onboard" ? ["Total Prescriptions", "Medications Dispensed", "Ratings"] : ["Date Applied"])].map((label) => (
+                  <span key={label} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
+                    {label}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                ))}
               </div>
               <button aria-label="Filter" className="text-slate-500 hover:text-slate-800 transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,14 +314,15 @@ function ManagePharmacyPageInner() {
 
             {/* Main Table panel */}
             <div className="bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 transition-all duration-300 min-h-[400px] flex flex-col justify-between">
-              <div className="overflow-x-auto">
-                {displayedPharmacies.length === 0 ? (
+              <>
+              <div className="hidden md:block overflow-x-auto">
+                {filteredPharmacies.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                     <svg className="w-12 h-12 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <p className="text-sm font-semibold">
-                      No {activeTab === "onboard" ? "approved" : "pending"} pharmacies
+                      {search ? `No pharmacies match "${search}"` : `No ${activeTab === "onboard" ? "approved" : "pending"} pharmacies`}
                     </p>
                   </div>
                 ) : (
@@ -312,7 +339,7 @@ function ManagePharmacyPageInner() {
                           <>
                             <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center justify-center gap-2 cursor-pointer hover:text-slate-600">
-                                Total Prescr.. <DoubleCaret />
+                                Total Prescriptions <DoubleCaret />
                               </div>
                             </th>
                             <th className="pb-4 pt-1 font-semibold">
@@ -344,7 +371,7 @@ function ManagePharmacyPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedPharmacies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pharmacy) => {
+                      {filteredPharmacies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pharmacy) => {
                         const isSelected = selectedPharmacyId === pharmacy.id;
                         return (
                           <tr
@@ -410,158 +437,236 @@ function ManagePharmacyPageInner() {
                   </table>
                 )}
               </div>
+              <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                {filteredPharmacies.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <svg className="w-12 h-12 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <p className="text-sm font-semibold">
+                      {search ? `No pharmacies match "${search}"` : `No ${activeTab === "onboard" ? "approved" : "pending"} pharmacies`}
+                    </p>
+                  </div>
+                ) : (
+                  filteredPharmacies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pharmacy) => {
+                    const isSelected = selectedPharmacyId === pharmacy.id;
+                    return (
+                      <div
+                        key={pharmacy.id}
+                        onClick={() => setSelectedPharmacyId(pharmacy.id)}
+                        className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar pharmacy={pharmacy} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-[14px] font-semibold text-slate-800 truncate">{pharmacy.pharmacyName}</p>
+                              {pharmacy.status === "approved" && (
+                                <svg className="w-3.5 h-3.5 text-teal-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <p className="text-[12px] font-medium text-slate-400 truncate">{pharmacy.email}</p>
+                          </div>
+                        </div>
+
+                        {activeTab === "onboard" ? (
+                          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-50">
+                            <div className="flex flex-col text-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Prescriptions</span>
+                              <span className="text-[13px] text-slate-500 font-medium">{pharmacy.totalPrescriptions ?? "—"}</span>
+                            </div>
+                            <div className="flex flex-col text-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Dispensed</span>
+                              <span className="text-[13px] text-slate-500 font-medium">{pharmacy.medicationsDispensed ?? "—"}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Rating</span>
+                              <span className="text-[13px] text-slate-500 font-medium flex items-center justify-center">
+                                {pharmacy.rating != null ? <StarRating rating={pharmacy.rating} /> : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Joined</span>
+                              <span className="text-[13px] text-slate-500 font-medium">{new Date(pharmacy.registeredAt).toLocaleDateString()}</span>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">Pending</span>
+                          </div>
+                        )}
+                        
+                        {activeTab === "queue" && (
+                          <div className="mt-2 w-full">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedPharmacyId(pharmacy.id); }}
+                              className="bg-[#E5EDFF] text-[#6A8BFF] text-[12px] font-semibold px-8 py-2.5 rounded-full hover:bg-blue-100 transition-colors w-full"
+                            >
+                              Review
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              </>
 
               {/* Pagination Controls */}
-              {displayedPharmacies.length > 0 && (
+              {filteredPharmacies.length > 0 && (
                 <div className="mt-6 border-t border-slate-50 pt-5">
-                {displayedPharmacies.length > 0 && (
                   <Pagination 
                     currentPage={currentPage} 
-                    totalPages={Math.ceil(displayedPharmacies.length / itemsPerPage)} 
+                    totalPages={Math.ceil(filteredPharmacies.length / itemsPerPage)} 
                     onPageChange={setCurrentPage} 
                   />
-                )}
-              </div>
+                </div>
               )}
             </div>
-          </div>
+            
+            {/* RIGHT — Pharmacy Details Panel */}
+            {selectedPharmacy && (
+              <>
+                <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }} />
+                <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
-          {/* RIGHT — Pharmacy Details Panel */}
-          {selectedPharmacy && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+                  {/* Header */}
+                  <div className="flex items-center justify-between pb-4">
+                    <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Pharmacy Details</h2>
+                    <button
+                      onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }}
+                      className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
+                      aria-label="Close details"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4">
-                <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">Pharmacy Details</h2>
-                <button
-                  onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }}
-                  className="w-7 h-7 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-sm border border-slate-100"
-                  aria-label="Close details"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+                  {/* Profile Header */}
+                  <div className="mb-8 mt-2 flex items-center gap-4">
+                    <Avatar pharmacy={selectedPharmacy} size="lg" />
+                    <div>
+                      <h3 className="text-[14px] font-semibold text-slate-800">{selectedPharmacy.pharmacyName}</h3>
+                      <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPharmacy.email}</p>
+                    </div>
+                  </div>
 
-              {/* Profile Header */}
-              <div className="mb-8 mt-2 flex items-center gap-4">
-                <Avatar pharmacy={selectedPharmacy} size="lg" />
-                <div>
-                  <h3 className="text-[14px] font-semibold text-slate-800">{selectedPharmacy.pharmacyName}</h3>
-                  <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedPharmacy.email}</p>
-                </div>
-              </div>
-
-              {/* Details List */}
-              <div className="space-y-5 mb-8 px-1">
-                {selectedPharmacy.tradeLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Trade License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
-                  </div>
-                )}
-                {selectedPharmacy.healthAuthorityLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Health Authority License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">Owner</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.ownerName}</span>
-                </div>
-                {selectedPharmacy.manager && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-semibold">Manager</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.manager}</span>
-                  </div>
-                )}
-                {selectedPharmacy.pharmacistLicense && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2">Pharmacist License</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
-                  </div>
-                )}
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-                  <span className="text-[11px] text-slate-400 font-semibold w-1/2">Location</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">Contact Number</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.phone}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">License No.</span>
-                  <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.licenseNumber}</span>
-                </div>
-                {selectedPharmacy.emiratesId && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Approve/Reject actions for pending pharmacies */}
-              {selectedPharmacy.status === "pending_approval" && (
-                <div className="mb-4 space-y-3">
-                  {showRejectInput ? (
-                    <>
-                      <textarea
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        placeholder="Reason for rejection…"
-                        rows={3}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => { setShowRejectInput(false); setRejectReason(""); }}
-                          className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => rejectPharmacy(selectedPharmacy.id)}
-                          disabled={actionLoading}
-                          className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition disabled:opacity-60"
-                        >
-                          {actionLoading ? "…" : "Confirm Reject"}
-                        </button>
+                  {/* Details List */}
+                  <div className="space-y-5 mb-8 px-1">
+                    {selectedPharmacy.tradeLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Trade License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.tradeLicense}</span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowRejectInput(true)}
-                        className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => approvePharmacy(selectedPharmacy.id)}
-                        disabled={actionLoading}
-                        className="flex-1 py-2.5 rounded-xl bg-[#6A8BFF] text-white text-sm font-semibold hover:bg-[#5a7ae6] transition disabled:opacity-60 shadow-[0_4px_10px_rgba(84,118,252,0.2)]"
-                      >
-                        {actionLoading ? "…" : "Approve"}
-                      </button>
+                    )}
+                    {selectedPharmacy.healthAuthorityLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Health Authority License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.healthAuthorityLicense}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">Owner</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.ownerName}</span>
+                    </div>
+                    {selectedPharmacy.manager && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 font-semibold">Manager</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.manager}</span>
+                      </div>
+                    )}
+                    {selectedPharmacy.pharmacistLicense && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <span className="text-[11px] text-slate-400 font-semibold w-1/2">Pharmacist License</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.pharmacistLicense}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
+                      <span className="text-[11px] text-slate-400 font-semibold w-1/2">Location</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{selectedPharmacy.location || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">Contact Number</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.phone}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-semibold">License No.</span>
+                      <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.licenseNumber}</span>
+                    </div>
+                    {selectedPharmacy.emiratesId && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Approve/Reject actions for pending pharmacies */}
+                  {selectedPharmacy.status === "pending_approval" && (
+                    <div className="mb-4 space-y-3">
+                      {showRejectInput ? (
+                        <>
+                          <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Reason for rejection…"
+                            rows={3}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { setShowRejectInput(false); setRejectReason(""); }}
+                              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => rejectPharmacy(selectedPharmacy.id)}
+                              disabled={actionLoading}
+                              className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition disabled:opacity-60"
+                            >
+                              {actionLoading ? "…" : "Confirm Reject"}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowRejectInput(true)}
+                            className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-[13px] font-semibold hover:bg-red-50 transition"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => approvePharmacy(selectedPharmacy.id)}
+                            disabled={actionLoading}
+                            className="flex-1 py-2.5 rounded-xl bg-[#179353] text-white text-[13px] font-semibold hover:bg-[#138048] shadow-[0_4px_10px_rgba(23,147,83,0.2)] transition disabled:opacity-60"
+                          >
+                            {actionLoading ? "…" : "Approve"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* View Detailed Profile button — for approved pharmacies */}
-              {selectedPharmacy.status === "approved" && (
-                <button
-                  onClick={() => router.push(`/dashboard/pharmacy/${selectedPharmacy.id}`)}
-                  className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-semibold transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
-                >
-                  View Detailed Profile
-                </button>
-              )}
-            </div>
-          )}
+                  {/* Link to pharmacy profile */}
+                  {selectedPharmacy.status === "approved" && (
+                    <button
+                      onClick={() => router.push(`/dashboard/pharmacy/${selectedPharmacy.id}`)}
+                      className="w-full py-4 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white rounded-[1rem] text-[13px] font-medium transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] active:scale-[0.98]"
+                    >
+                      View Profile
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </ProtectedRoute>

@@ -41,6 +41,7 @@ function ClinicInsuranceContent() {
   const [error, setError] = useState("");
   const { can } = useClinicPermissions();
   const canManage = can("manage_insurance");
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/clinics/branches")
@@ -79,6 +80,7 @@ function ClinicInsuranceContent() {
     setEditing(false);
     setError("");
     setForm({ name: p.name, network: p.network, discounts: p.discounts, spcContractFileUrl: p.spcContractFileUrl, renewDate: p.renewDate ?? "" });
+    setShowMobilePanel(true);
   }
 
   // A policy always belongs to exactly one branch — with no branch picked
@@ -93,6 +95,7 @@ function ClinicInsuranceContent() {
     setEditing(true);
     setError("");
     setForm(EMPTY_FORM);
+    setShowMobilePanel(true);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -299,8 +302,29 @@ function ClinicInsuranceContent() {
       </div>
 
       {/* Right Details Panel */}
-      <div className="w-full lg:w-[380px] lg:shrink-0 mt-6 lg:mt-0">
-        <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-5 md:p-8 shadow-sm flex flex-col">
+      {/* Overlay for mobile */}
+      {showMobilePanel && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
+          onClick={() => setShowMobilePanel(false)}
+        />
+      )}
+      <div className={`
+        ${showMobilePanel ? "fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)]" : "hidden"}
+        lg:relative lg:flex lg:flex-col lg:w-[380px] lg:shrink-0 lg:mt-0 lg:rounded-[24px] lg:max-h-none lg:overflow-visible lg:shadow-sm
+        w-full mt-6 bg-white border-t lg:border border-[#EBEEF5]
+      `}>
+        {/* Drag handle — mobile only */}
+        <div className="lg:hidden w-full flex justify-center pt-4 pb-1">
+          <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
+        </div>
+        <button
+          className="lg:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+          onClick={() => setShowMobilePanel(false)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <div className="p-5 md:p-8 flex flex-col w-full">
           {panelOpen ? (
             <>
               <h2 className="text-[18px] font-medium text-[#24292E] mb-6">

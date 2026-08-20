@@ -894,7 +894,7 @@ export default function SettingsPage() {
                           <div className="mt-5 grid grid-cols-12 gap-4 animate-in slide-in-from-top-2">
                             <div className="col-span-4 relative">
                               <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Effective Date</label>
-                              <input type="date" value={item.effectiveDate} onChange={e => updateFeeData(item.id, "effectiveDate", e.target.value)} className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm" />
+                              <input type="date" max="9999-12-31" value={item.effectiveDate} onChange={e => updateFeeData(item.id, "effectiveDate", e.target.value)} className="w-full bg-white rounded-xl h-[56px] pl-4 pt-4 text-[13px] font-medium text-slate-800 outline-none border-none shadow-sm" />
                             </div>
                             <div className="col-span-8 relative">
                               <label className="absolute top-2 left-4 text-[10px] font-medium text-slate-400 pointer-events-none">Notes</label>
@@ -1023,7 +1023,7 @@ export default function SettingsPage() {
                     <button className="text-[12px] font-medium text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">Status <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg></button>
                     <button className="text-slate-400 hover:text-slate-700 transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M10 18h4" /></svg></button>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse whitespace-nowrap">
                       <thead>
                         <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-700">
@@ -1056,6 +1056,31 @@ export default function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
+                  
+                  {/* Mobile Cards */}
+                  <div className="md:hidden flex flex-col gap-4 mt-2">
+                    {insuranceData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(provider => (
+                      <div key={provider.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3 relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] text-slate-500 font-medium">ID: {provider.id}</span>
+                          <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full border ${provider.status === "Active" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}>
+                            {provider.status}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-[14px] font-semibold text-slate-800">{provider.name}</p>
+                          <p className="text-[11px] text-slate-400 mt-1">Last updated: {provider.date}</p>
+                        </div>
+                        <div className="mt-2 pt-3 border-t border-slate-50 flex justify-end">
+                          {provider.status === "Active" ? (
+                            <button onClick={() => setInsuranceData(prev => prev.map(p => p.id === provider.id ? { ...p, status: "Disabled" } : p))} className="px-5 py-1.5 rounded-full border border-rose-500 text-rose-500 text-[11px] font-medium hover:bg-rose-50 transition-colors bg-white shadow-sm w-full">Disable</button>
+                          ) : (
+                            <button onClick={() => setInsuranceData(prev => prev.map(p => p.id === provider.id ? { ...p, status: "Active" } : p))} className="px-5 py-1.5 rounded-full border border-[#1e293b] text-[#1e293b] text-[11px] font-medium hover:bg-slate-50 transition-colors bg-white shadow-sm w-full">Enable</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {insuranceData.length > 0 && <Pagination currentPage={currentPage} totalPages={Math.ceil(insuranceData.length / itemsPerPage)} onPageChange={setCurrentPage} />}
               </div>
@@ -1073,7 +1098,7 @@ export default function SettingsPage() {
                   <div className="relative bg-[#f8fafc] rounded-[1.25rem] h-[64px] flex items-center px-5 max-w-md">
                     <div className="flex flex-col w-full">
                       <label className="text-[10px] font-medium text-slate-400">Scheduled Downtime</label>
-                      <input type="datetime-local" value={scheduledDowntime} onChange={e => setScheduledDowntime(e.target.value)} className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full" />
+                      <input type="datetime-local" max="9999-12-31T23:59" value={scheduledDowntime} onChange={e => setScheduledDowntime(e.target.value)} className="bg-transparent border-none p-0 text-[13px] font-medium text-slate-800 outline-none w-full" />
                     </div>
                   </div>
                 </div>

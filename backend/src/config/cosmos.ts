@@ -102,6 +102,13 @@ export const activityLogsContainer: Container = db.container("activityLogs");
 /** Chat messages — partition key: /conversationId (format: chat:{patientId}:{doctorId}) */
 export const messagesContainer: Container = db.container("messages");
 
+/** Clinic staff/doctor chat messages — partition key: /conversationId (format:
+ *  staffchat:{sortedIdA}:{sortedIdB}). Deliberately a separate container from
+ *  `messages` (patient<->doctor chat) so nothing here can ever be swept into
+ *  a patient-facing query, even if a future query on that container ever
+ *  dropped its conversationId filter. */
+export const clinicMessagesContainer: Container = db.container("clinicMessages");
+
 /** SOS emergency codes — partition key: /patientId (short-lived, single-use access codes) */
 export const sosCodesContainer: Container = db.container("sosCodes");
 
@@ -119,6 +126,9 @@ export const feeChangeRequestsContainer: Container = db.container("feeChangeRequ
 
 /** Clinic withdrawal requests — partition key: /orgId (bookkeeping only — no real payment rail) */
 export const withdrawalRequestsContainer: Container = db.container("withdrawalRequests");
+
+/** Push notification tokens — partition key: /userId (one doc per user, holds every device's Expo push token) */
+export const pushTokensContainer: Container = db.container("pushTokens");
 
 // ─── Container provisioning ──────────────────────────────────────────────────
 
@@ -158,12 +168,14 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "notifications",          partitionKey: { paths: ["/patientId"] } },
     { id: "activityLogs",           partitionKey: { paths: ["/source"] } },
     { id: "messages",               partitionKey: { paths: ["/conversationId"] } },
+    { id: "clinicMessages",         partitionKey: { paths: ["/conversationId"] } },
     { id: "sosCodes",               partitionKey: { paths: ["/patientId"] } },
     { id: "adminNotifications",     partitionKey: { paths: ["/id"] } },
     { id: "articles",               partitionKey: { paths: ["/id"] } },
     { id: "otpCodes",               partitionKey: { paths: ["/email"] }, defaultTtl: 600 },
     { id: "feeChangeRequests",      partitionKey: { paths: ["/orgId"] } },
     { id: "withdrawalRequests",     partitionKey: { paths: ["/orgId"] } },
+    { id: "pushTokens",             partitionKey: { paths: ["/userId"] } },
   ];
 
   for (const spec of required) {

@@ -706,16 +706,26 @@ router.get("/routines/discovery", (_req: SessionRequest, res: Response) => {
   res.json({ routines: DISCOVERY_ROUTINES });
 });
 
-// ── GET /api/wellness/routines ───────────────────────────────────────────────
-// Returns the authenticated patient's saved routines.
+// ── GET /api/wellness/routines?profileId=xxx ─────────────────────────────────
+// Returns the authenticated patient's saved routines. Unscoped (no
+// ?profileId) returns every profile's routines merged, matching the same
+// opt-in convention as /food-log and /workout-log — pass ?profileId to see
+// just one family member's saved routines.
 router.get("/routines", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : null;
+
+    let query = "SELECT * FROM c WHERE c.patientId = @pid";
+    const parameters = [{ name: "@pid", value: patientId }];
+    if (profileId) {
+      query += " AND c.profileId = @profileId";
+      parameters.push({ name: "@profileId", value: profileId });
+    }
+    query += " ORDER BY c.createdAt DESC";
+
     const { resources } = await routinesContainer.items.query(
-      {
-        query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-        parameters: [{ name: "@pid", value: patientId }],
-      },
+      { query, parameters },
       { partitionKey: patientId }
     ).fetchAll();
     res.json({ routines: resources });
@@ -726,11 +736,11 @@ router.get("/routines", async (req: SessionRequest, res: Response) => {
 });
 
 // ── POST /api/wellness/routines ───────────────────────────────────────────────
-// Body: { title, exercises: [{ exerciseId, name, image, type, defaultSets }] }
+// Body: { title, exercises: [{ exerciseId, name, image, type, defaultSets }], profileId }
 router.post("/routines", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { title, exercises } = req.body;
+    const { title, exercises, profileId } = req.body;
     if (!title || !Array.isArray(exercises)) {
       res.status(400).json({ error: "title and exercises array are required" });
       return;
@@ -738,6 +748,7 @@ router.post("/routines", async (req: SessionRequest, res: Response) => {
     const routine = {
       id: crypto.randomUUID(),
       patientId,
+      profileId: profileId ?? patientId,
       title,
       exercises,
       createdAt: new Date().toISOString(),

@@ -58,8 +58,7 @@ function FieldPreview({ field, onChange }: { field: FormField; onChange: (update
           placeholder="Section Heading"
         />
       );
-    case 'date':
-      return <input type="date" className={base} />;
+    case 'date': return <input type="date" max="9999-12-31" className={base} />;
     case 'time':
       return <input type="time" className={base} />;
     case 'number':
@@ -108,7 +107,7 @@ function FieldPreview({ field, onChange }: { field: FormField; onChange: (update
       return (
         <div className="bg-[#f8fafd] rounded-xl p-4 border border-slate-100">
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" className={base} />
+            <input type="date" max="9999-12-31" className={base} />
             <input type="time" className={base} />
           </div>
         </div>

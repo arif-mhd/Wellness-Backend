@@ -44,6 +44,7 @@ function deriveSosStatusAndPriority(sosCode: { usedAt: string | null; expiresAt:
 // and verify only ever matches a real, unexpired, unused code).
 router.post("/generate", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
+  const { reason } = req.body as { reason?: string };
 
   try {
     const now = new Date();
@@ -53,6 +54,7 @@ router.post("/generate", requireRole("patient"), async (req: SessionRequest, res
       id: "sos_" + Date.now().toString(36) + "_" + randomBytes(6).toString("hex"),
       patientId,
       code: generateSixDigitCode(),
+      reason: typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 200) : null,
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       usedAt: null as string | null,
@@ -161,7 +163,7 @@ router.post("/verify", requireRole("doctor"), async (req: SessionRequest, res: R
         emr:           a.emr ?? null,
       }));
 
-    res.json({ patientId: validMatch.patientId, profile, visitHistory });
+    res.json({ patientId: validMatch.patientId, reason: validMatch.reason ?? null, profile, visitHistory });
   } catch (err) {
     console.error("Verify SOS code error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -215,6 +217,7 @@ router.get("/admin/all", requireRole("admin"), async (_req: SessionRequest, res:
           address: patient.location ?? "",
           gender: patient.gender ?? "",
           bio: patient.bio ?? "",
+          reason: s.reason ?? null,
           createdAt: s.createdAt,
           expiresAt: s.expiresAt,
           usedAt: s.usedAt,

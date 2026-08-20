@@ -67,14 +67,14 @@ export default function ManageVaccinationPage() {
       .then(r => r.json())
       .then(data => {
         setVaccines(Array.isArray(data) ? data : []);
-        if (data?.length) setSelectedVaccineId(data[0].id);
+        // removed
       })
       .catch(() => setVaccines([]))
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = vaccines.filter(v =>
-    v.name.toLowerCase().includes(search.toLowerCase()) ||
+    (v.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (v.manufacturer ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (v.vaccineType ?? "").toLowerCase().includes(search.toLowerCase())
   );
@@ -103,11 +103,11 @@ export default function ManageVaccinationPage() {
           {/* LEFT COLUMN */}
           <div className={`${selected ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-start sm:items-center justify-between gap-4">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Vaccines</h1>
               <button
                 onClick={() => router.push("/dashboard/vaccination/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap md:whitespace-normal transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -133,7 +133,7 @@ export default function ManageVaccinationPage() {
             </div>
 
             {/* Sort row */}
-            <div className="flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-2">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-2">
               <div className="flex items-center gap-8 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Name <DoubleCaret /></span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">Type <DoubleCaret /></span>
@@ -148,7 +148,8 @@ export default function ManageVaccinationPage() {
                   <div className="w-8 h-8 border-2 border-[#6A8BFF] border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
@@ -160,7 +161,7 @@ export default function ManageVaccinationPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paged.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(vaccine => {
+                      {paged.map(vaccine => {
                         const isSelected = selectedVaccineId === vaccine.id;
                         return (
                           <tr
@@ -218,6 +219,65 @@ export default function ManageVaccinationPage() {
                     </tbody>
                   </table>
                 </div>
+                
+                <div className="md:hidden flex flex-col gap-4">
+                  {paged.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(vaccine => {
+                    const isSelected = selectedVaccineId === vaccine.id;
+                    return (
+                      <div
+                        key={vaccine.id}
+                        onClick={() => setSelectedVaccineId(isSelected ? null : vaccine.id)}
+                        className={`p-5 flex flex-col gap-3 cursor-pointer transition-colors duration-200 bg-white rounded-2xl shadow-sm border ${isSelected ? 'border-[#6A8BFF]/40 bg-[#f8faff]' : 'border-slate-100 hover:bg-slate-50/50'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#EEF2FF] flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5 text-[#6A8BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m18 2 4 4" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m17 7 3-3" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m9 11 4 4" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m5 19-3 3" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m14 4 6 6" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-semibold text-slate-800 truncate">{vaccine.name}</p>
+                            {vaccine.manufacturer && <p className="text-[12px] font-medium text-slate-400 truncate">{vaccine.manufacturer}</p>}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 mt-2 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Type</span>
+                            <span className="text-[13px] text-slate-500 font-medium">{vaccine.vaccineType ?? vaccine.age_group ?? "General"}</span>
+                          </div>
+                          <div className="flex flex-col items-end text-right">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Price</span>
+                            <span className="text-[13px] text-slate-500 font-medium">AED {vaccine.price.toFixed(2)}</span>
+                          </div>
+                          <div className="flex flex-row items-center justify-between col-span-2">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Doses</span>
+                              <span className="text-[13px] text-slate-500 font-medium">{vaccine.doses_required ?? 1}</span>
+                            </div>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleToggle(vaccine.id); }}
+                              disabled={togglingId === vaccine.id}
+                              className={`px-4 py-1.5 rounded-full text-[11px] font-semibold transition ${vaccine.is_active ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                            >
+                              {togglingId === vaccine.id ? "..." : vaccine.is_active ? "Active" : "Inactive"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {paged.length === 0 && !loading && (
+                    <div className="py-16 text-center text-slate-400 text-[13px] font-medium">
+                      {search ? `No vaccines found for "${search}"` : "No vaccines added yet. Click 'Add Vaccine' to get started."}
+                    </div>
+                  )}
+                </div>
+                </>
               )}
 
               {/* Pagination */}
@@ -237,7 +297,9 @@ export default function ManageVaccinationPage() {
 
           {/* RIGHT — Vaccine Detail Panel */}
           {selected && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+            <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => setSelectedVaccineId(null)} />
+            <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
               <div className="flex items-center justify-between pb-4">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Vaccine Details</h2>
                 <button
@@ -295,9 +357,9 @@ export default function ManageVaccinationPage() {
                   { label: "Price", value: `AED ${selected.price.toFixed(2)}` },
                   { label: "Original Price", value: selected.originalPrice ? `AED ${selected.originalPrice.toFixed(2)}` : "—" },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold w-1/2 shrink-0">{label}</span>
-                    <span className="text-[11px] text-slate-800 font-semibold text-right w-1/2">{value}</span>
+                  <div key={label} className="flex flex-col sm:flex-row sm:items-start justify-between gap-1">
+                    <span className="text-[11px] text-slate-400 font-semibold">{label}</span>
+                    <span className="text-[12px] text-slate-800 font-medium sm:text-right">{value}</span>
                   </div>
                 ))}
               </div>
@@ -326,6 +388,7 @@ export default function ManageVaccinationPage() {
                 {togglingId === selected.id ? "Updating..." : selected.is_active ? "Deactivate Vaccine" : "Activate Vaccine"}
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

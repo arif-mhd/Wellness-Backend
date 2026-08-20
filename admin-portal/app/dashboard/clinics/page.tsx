@@ -158,8 +158,8 @@ function ManageClinicsPageInner() {
       }
 
       if (!selectedClinicId) {
-        if (approved?.length > 0) setSelectedClinicId(approved[0].id);
-        else if (pending?.length > 0) { setActiveTab("queue"); setSelectedClinicId(pending[0].id); }
+        if (approved?.length > 0) {}
+        else if (pending?.length > 0) { setActiveTab("queue"); }
       }
     } catch {
       setFetchError("Could not reach the backend.");
@@ -299,22 +299,14 @@ function ManageClinicsPageInner() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Clinics</h1>
-              <button
-                onClick={() => router.push("/dashboard/clinics/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-medium px-6 py-3 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Clinic
-              </button>
+
             </div>
 
             {/* Tab & search row */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => { setActiveTab("onboard"); setSelectedClinicId(clinics[0]?.id ?? null); setShowRejectInput(false); }}
+                  onClick={() => { setActiveTab("onboard"); setSelectedClinicId(null); setShowRejectInput(false); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all ${
                     activeTab === "onboard" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -322,7 +314,7 @@ function ManageClinicsPageInner() {
                   Clinics Onboard
                 </button>
                 <button
-                  onClick={() => { setActiveTab("queue"); setSelectedClinicId(queue[0]?.id ?? null); setShowRejectInput(false); }}
+                  onClick={() => { setActiveTab("queue"); setSelectedClinicId(null); setShowRejectInput(false); }}
                   className={`px-6 py-2.5 rounded-full text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === "queue" ? "bg-[#1E293B] text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200/70"
                   }`}
@@ -368,16 +360,13 @@ function ManageClinicsPageInner() {
             </div>
 
             {/* Sort labels */}
-            <div className="flex items-center justify-between text-[13px] font-medium text-[#64748B] px-3 select-none">
+            <div className="hidden md:flex items-center justify-between text-[13px] font-medium text-[#64748B] px-3 select-none">
               <div className="flex items-center gap-12 flex-1">
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Name <DoubleCaret />
                 </span>
                 <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
                   Address <DoubleCaret />
-                </span>
-                <span className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer transition">
-                  Date <DoubleCaret />
                 </span>
               </div>
             </div>
@@ -396,60 +385,107 @@ function ManageClinicsPageInner() {
                     </p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                        <th className="pb-4 pt-1 font-medium pl-2">
-                          <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1 font-medium text-center">
-                          <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Address <DoubleCaret /></div>
-                        </th>
-                        <th className="pb-4 pt-1"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedClinics.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(clinic => {
-                        const isSelected = selectedClinicId === clinic.id;
-                        const pendingBranchCount = clinic.branches?.filter(b => b.status === "requested" || b.status === "pending_approval").length ?? 0;
-                        return (
-                          <tr
-                            key={clinic.id}
-                            onClick={() => { setSelectedClinicId(clinic.id); setShowRejectInput(false); }}
-                            className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
-                          >
-                            <td className="py-3 px-2 flex items-center gap-3">
-                              <div className="relative shrink-0">
-                                <ClinicAvatar clinic={clinic} size="md" />
-                                <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${activeTab === "onboard" ? "bg-[#10b981]" : "bg-amber-400"}`} />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
-                                  {clinicDisplayName(clinic)}
-                                  {pendingBranchCount > 0 && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
-                                      {pendingBranchCount} branch{pendingBranchCount > 1 ? "es" : ""} pending
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-[11px] font-normal text-slate-400 truncate">{clinic.email}</p>
-                              </div>
-                            </td>
-                            <td className="py-3 text-[13px] text-slate-700 font-medium text-center truncate max-w-[220px]">{clinic.address ?? "—"}</td>
-                            <td className="py-3 pr-4 text-right">
-                              {activeTab === "queue" && (
-                                isSelected ? (
-                                  <span className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)]">Review</span>
-                                ) : (
-                                  <span className="text-[12px] font-medium text-slate-800 mr-6">Review</span>
-                                )
+                  <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                          <th className="pb-4 pt-1 font-medium pl-2">
+                            <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600">Name <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1 font-medium text-center">
+                            <div className="flex items-center justify-center gap-1.5 cursor-pointer hover:text-slate-600">Address <DoubleCaret /></div>
+                          </th>
+                          <th className="pb-4 pt-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedClinics.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(clinic => {
+                          const isSelected = selectedClinicId === clinic.id;
+                          const pendingBranchCount = clinic.branches?.filter(b => b.status === "requested" || b.status === "pending_approval").length ?? 0;
+                          return (
+                            <tr
+                              key={clinic.id}
+                              onClick={() => { setSelectedClinicId(clinic.id); setShowRejectInput(false); }}
+                              className="group cursor-pointer transition-colors duration-200 border-b border-slate-50 last:border-0 hover:bg-slate-50/50"
+                            >
+                              <td className="py-3 px-2 flex items-center gap-3">
+                                <div className="relative shrink-0">
+                                  <ClinicAvatar clinic={clinic} size="md" />
+                                  <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${activeTab === "onboard" ? "bg-[#10b981]" : "bg-amber-400"}`} />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-medium text-slate-800 group-hover:text-blue-500 transition-colors truncate flex items-center gap-2">
+                                    {clinicDisplayName(clinic)}
+                                    {pendingBranchCount > 0 && (
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
+                                        {pendingBranchCount} branch{pendingBranchCount > 1 ? "es" : ""} pending
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-[11px] font-normal text-slate-400 truncate">{clinic.email}</p>
+                                </div>
+                              </td>
+                              <td className="py-3 text-[13px] text-slate-700 font-medium text-center truncate max-w-[220px]">{clinic.address ?? "—"}</td>
+                              <td className="py-3 pr-4 text-right">
+                                {activeTab === "queue" && (
+                                  isSelected ? (
+                                    <span className="bg-[#6A8BFF] text-white text-[11px] font-medium px-6 py-2 rounded-full shadow-[0_4px_10px_rgba(84,118,252,0.2)]">Review</span>
+                                  ) : (
+                                    <span className="text-[12px] font-medium text-slate-800 mr-6">Review</span>
+                                  )
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                    {sortedClinics.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(clinic => {
+                      const isSelected = selectedClinicId === clinic.id;
+                      const pendingBranchCount = clinic.branches?.filter(b => b.status === "requested" || b.status === "pending_approval").length ?? 0;
+                      return (
+                        <div
+                          key={clinic.id}
+                          onClick={() => { setSelectedClinicId(clinic.id); setShowRejectInput(false); }}
+                          className={`p-4 flex flex-col gap-3 cursor-pointer transition-colors duration-200 hover:bg-slate-50/50 ${isSelected ? 'bg-slate-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <ClinicAvatar clinic={clinic} size="md" />
+                              <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${activeTab === "onboard" ? "bg-[#10b981]" : "bg-amber-400"}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-slate-800 truncate flex items-center gap-2">
+                                {clinicDisplayName(clinic)}
+                                {pendingBranchCount > 0 && (
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">
+                                    {pendingBranchCount} branch{pendingBranchCount > 1 ? "es" : ""} pending
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[12px] font-normal text-slate-400 truncate">{clinic.email}</p>
+                            </div>
+                          </div>
+                          <div className="text-[13px] text-slate-700 font-medium truncate w-full">{clinic.address ?? "—"}</div>
+                          {activeTab === "queue" && (
+                            <div className="mt-2 text-right w-full">
+                              {isSelected ? (
+                                <button className="bg-[#6A8BFF] text-white text-[12px] font-medium px-6 py-2.5 rounded-full shadow-sm w-full transition-colors active:bg-blue-600">
+                                  Review
+                                </button>
+                              ) : (
+                                <span className="text-[12px] font-medium text-slate-800 text-center block w-full py-2.5 bg-slate-100 rounded-full">Review</span>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  </>
                 )}
               </div>
 
@@ -465,7 +501,9 @@ function ManageClinicsPageInner() {
 
           {/* RIGHT — Clinic Details Panel */}
           {selectedClinic && (
-            <div className="lg:col-span-4 bg-white rounded-[2rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 animate-in slide-in-from-right-3 duration-300">
+            <>
+              <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => { setSelectedClinicId(null); setShowRejectInput(false); }} />
+              <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
               <div className="flex items-center justify-between pb-4">
                 <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">Clinic Details</h2>
@@ -673,6 +711,7 @@ function ManageClinicsPageInner() {
                 View Detailed Profile
               </button>
             </div>
+            </>
           )}
         </div>
       </div>
