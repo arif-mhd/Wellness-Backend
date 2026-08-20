@@ -233,7 +233,23 @@ RULES:
 - Keep answers concise: 2-4 sentences max.
 - Be friendly and empathetic.
 - Never diagnose or prescribe. Always recommend consulting a doctor for serious symptoms.
-- Whenever you recommend the user see a doctor, healthcare professional, or urgent care (e.g. for concerning symptoms, or when they ask for help finding/booking care), end your reply with the exact marker "[SUGGEST_BOOKING]" on its own line after your message. Only include this marker when you're actually recommending they see someone — not for general wellness tips.
+- Whenever you recommend the user see a doctor, healthcare professional, or urgent care, you MUST append a special JSON block at the very end of your reply on a new line in this exact format (no spaces around the braces):
+  [BOOKING_JSON]{"suggestBooking":true,"specialty":"<one of: General Physician, Neurologist, Cardiologist, Dermatologist, ENT Specialist, Gynecologist, Orthopedic Surgeon, Pediatrician, Psychiatrist, Ophthalmologist, Gastroenterologist, Urologist, Pulmonologist, Endocrinologist, Rheumatologist, Oncologist, Nephrologist, Allergist, Infectious Disease Specialist>"}[/BOOKING_JSON]
+  Choose the specialty that is most relevant to the patient's described symptoms. For example:
+  - Headache, migraine → Neurologist
+  - Chest pain, heart palpitations → Cardiologist
+  - Skin rash, acne → Dermatologist
+  - Ear pain, sore throat, sinus → ENT Specialist
+  - Pregnancy, menstrual issues → Gynecologist
+  - Joint pain, fracture → Orthopedic Surgeon
+  - Child illness → Pediatrician
+  - Anxiety, depression → Psychiatrist
+  - Eye problems → Ophthalmologist
+  - Stomach pain, digestion → Gastroenterologist
+  - Breathing, asthma → Pulmonologist
+  - Diabetes, thyroid → Endocrinologist
+  - General/unclear symptoms → General Physician
+  Only include this JSON block when you are actively recommending they see a doctor — not for general wellness tips.
 - For greetings like "hi" or "hello", respond warmly and ask how you can help with their health today.`;
 
   try {
@@ -285,11 +301,28 @@ RULES:
         reply: "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
         offTopic: true,
         suggestBooking: false,
+        recommendedSpecialty: null,
       });
     } else {
-      const suggestBooking = trimmed.includes("[SUGGEST_BOOKING]");
-      const reply = trimmed.replace("[SUGGEST_BOOKING]", "").trim();
-      res.json({ reply, offTopic: false, suggestBooking });
+      // Parse optional booking JSON block
+      const bookingMatch = trimmed.match(/\[BOOKING_JSON\](.*?)\[\/BOOKING_JSON\]/s);
+      let suggestBooking = false;
+      let recommendedSpecialty: string | null = null;
+
+      if (bookingMatch) {
+        try {
+          const parsed = JSON.parse(bookingMatch[1].trim());
+          suggestBooking = parsed.suggestBooking === true;
+          recommendedSpecialty = parsed.specialty ?? null;
+        } catch {
+          // Malformed JSON — still flag booking was suggested
+          suggestBooking = true;
+        }
+      }
+
+      // Strip the booking JSON block from the visible reply
+      const reply = trimmed.replace(/\[BOOKING_JSON\].*?\[\/BOOKING_JSON\]/s, "").trim();
+      res.json({ reply, offTopic: false, suggestBooking, recommendedSpecialty });
     }
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
