@@ -307,7 +307,7 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                         {abs.status === "pending" ? (
                           <>
                             <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
-                            {canManage && (
+                            {canManage ? (
                               <>
                                 <button
                                   onClick={() => handleRejectAbsence(abs.id)}
@@ -322,6 +322,8 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                                   APPROVE
                                 </button>
                               </>
+                            ) : (
+                              <span className="text-[11px] text-gray-400 italic">No permission to approve/reject</span>
                             )}
                           </>
                         ) : abs.status === "rejected" ? (
