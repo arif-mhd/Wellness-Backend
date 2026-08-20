@@ -1,11 +1,33 @@
 import { Router, Response } from "express";
+import multer from "multer";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
 import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer } from "../config/cosmos";
+import { uploadBlob, generateSasUrl } from "../config/blob";
 
 const router = Router();
+
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 }, // 10 MB per file, 5 files max
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_ATTACHMENT_TYPES.has(file.mimetype)) cb(null, true);
+    else cb(new Error("Only images, PDF, and Word documents are allowed"));
+  },
+});
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_").slice(-100);
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +188,60 @@ router.post("/:ticketId/comments", verifySession(), async (req: SessionRequest, 
   await supportContainer.items.upsert(ticket);
   return res.status(201).json(ticket);
 });
+
+// POST /api/support/:ticketId/attachments — submitter (patient/doctor/pharmacy/
+// clinic) attaches one or more files to their own ticket. Same ownership check
+// as the comments route above — a ticket can only be attached to by whoever
+// created it.
+router.post(
+  "/:ticketId/attachments",
+  verifySession(),
+  upload.array("files", 5),
+  async (req: SessionRequest, res: Response) => {
+    const session = req.session!;
+    const userId = session.getUserId();
+    const { ticketId } = req.params;
+    const files = (req.files as Express.Multer.File[]) || [];
+
+    if (!files.length) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    const { resources } = await supportContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @patientId",
+        parameters: [
+          { name: "@id", value: ticketId },
+          { name: "@patientId", value: userId },
+        ] as any[],
+      })
+      .fetchAll();
+
+    if (!resources[0]) return res.status(404).json({ error: "Ticket not found" });
+
+    const ticket = resources[0] as any;
+    const uploaded = [];
+    for (const file of files) {
+      const blobPath = `support/${ticketId}/${uuidv4()}-${sanitizeFileName(file.originalname)}`;
+      await uploadBlob(blobPath, file.buffer, file.mimetype);
+      uploaded.push({
+        id: uuidv4(),
+        fileName: file.originalname,
+        url: generateSasUrl(blobPath, 365),
+        blobPath,
+        contentType: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
+    }
+
+    ticket.attachments = [...(ticket.attachments ?? []), ...uploaded];
+    ticket.updatedAt = new Date().toISOString();
+
+    await supportContainer.items.upsert(ticket);
+    return res.status(201).json(ticket);
+  }
+);
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { getUser } from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
@@ -8,6 +9,13 @@ import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { getAllProfiles } from "../utils/profile";
+import { v4 as uuidv4 } from "uuid";
+
+// Additional family members allowed per account (5 profiles total including
+// the account holder). Mirrored client-side in services/profileService.ts —
+// this check is the real enforcement; the frontend copy is only a pre-emptive
+// prompt.
+const MAX_ADDITIONAL_FAMILY_MEMBERS = 4;
 
 // multer stores the uploaded file in memory as a Buffer
 const upload = multer({
@@ -335,6 +343,18 @@ router.get("/profile", requireRole("patient"), async (req: SessionRequest, res: 
       resource.dateOfBirth = resource.dob;
     }
 
+    // The account's real sign-in email lives in SuperTokens, not this
+    // mutable Cosmos field — trusting SuperTokens as authoritative here
+    // means a stale/placeholder value on the document (old test data, a
+    // manual edit, anything that drifted from the real login credential)
+    // never gets displayed instead of the email the user actually signs in
+    // with. Family members have no login of their own, so their `email` is
+    // untouched — this only overrides the top-level/self field.
+    try {
+      const stUser = await getUser(userId);
+      if (stUser?.emails?.[0]) resource.email = stUser.emails[0];
+    } catch { /* fall back to the stored field */ }
+
     res.json({ profile: resource });
   } catch (err) {
     console.error("Profile fetch error:", err);
@@ -551,7 +571,6 @@ router.get("/family", requireRole("patient"), async (req: SessionRequest, res: R
 router.post("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
-    const member = { ...req.body, id: Date.now().toString() };
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -559,7 +578,19 @@ router.post("/family", requireRole("patient"), async (req: SessionRequest, res: 
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = [...((existing.familyMembers as any[]) ?? []), member];
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (currentMembers.length >= MAX_ADDITIONAL_FAMILY_MEMBERS) {
+      res.status(400).json({
+        error: `You can add up to ${MAX_ADDITIONAL_FAMILY_MEMBERS} family members (5 profiles total including yourself).`,
+      });
+      return;
+    }
+
+    // uuidv4 rather than a timestamp — Date.now() has only millisecond
+    // resolution, so a burst of near-simultaneous requests (e.g. a
+    // double-tapped submit button) could otherwise collide on the same id.
+    const member = { ...req.body, id: uuidv4() };
+    const familyMembers = [...currentMembers, member];
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
     res.json({ member });
   } catch (err) {
@@ -860,16 +891,22 @@ router.post("/change-password", requireRole("patient"), async (req: SessionReque
   }
 
   try {
-    const { resource: patient } = await patientsContainer.item(userId, userId).read();
-    if (!patient) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+    // Re-verify against the REAL SuperTokens login email, not the mutable
+    // Cosmos profile field — if that field has ever drifted from the actual
+    // credential (old test data, a manual edit), signing in against it would
+    // target the wrong (often nonexistent) account and fail every time,
+    // even with the correct current password.
+    const stUser = await getUser(userId);
+    const loginEmail = stUser?.emails?.[0];
+    if (!loginEmail) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
 
-    const signInResult = await EmailPassword.signIn("public", patient.email, currentPassword);
+    const signInResult = await EmailPassword.signIn("public", loginEmail, currentPassword);
     if (signInResult.status !== "OK") {
       res.status(403).json({ error: "WRONG_PASSWORD" });
       return;
     }
 
-    const tokenResult = await EmailPassword.createResetPasswordToken("public", userId, patient.email);
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", userId, loginEmail);
     if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
 
     const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);

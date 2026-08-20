@@ -343,6 +343,26 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [fetchNotifications]);
 
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const fetchChatUnread = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/clinic-messages/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        const total = (data.conversations ?? []).reduce((sum: number, c: any) => sum + (c.unreadCount ?? 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch (err) {
+      console.error("Fetch clinic chat unread count error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChatUnread();
+    const id = setInterval(fetchChatUnread, 15_000);
+    return () => clearInterval(id);
+  }, [fetchChatUnread]);
+
   const handleMarkAsRead = async (notifId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n)));
     try { await apiFetch(`/api/clinics/payments/notifications/${notifId}/read`, { method: "PATCH" }); } catch { /* best-effort */ }
@@ -419,8 +439,8 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </div>
 
-      {/* On desktop, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
-      <div className="shrink-0 lg:z-10">
+      {/* On tablet+, this div participates in flex layout. On mobile, it renders as zero-height since the aside inside is position:fixed and covers the full viewport */}
+      <div className="shrink-0 md:z-10">
         <ClinicSidebar />
       </div>
 
@@ -428,7 +448,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
         <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-6 lg:px-[40px]"}`}>
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none"
+              className="md:hidden p-2 -ml-2 text-gray-600 hover:text-black focus:outline-none"
               onClick={() => setIsMobileOpen(true)}
             >
               <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -468,7 +488,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
               {showNotifDropdown && (
                 <>
                   <div className="fixed inset-0 bg-slate-900/40 z-40 animate-in fade-in duration-200" aria-hidden="true" onClick={() => setShowNotifDropdown(false)} />
-                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
+                  <div className="absolute right-0 top-14 bg-white border border-[#EBEEF5] rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[380px] max-w-[calc(100vw-1.5rem)] p-6 z-50 text-left animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-[17px] font-black text-[#24292E]">Notifications</h3>
                       <button onClick={() => setShowNotifDropdown(false)} className="w-8 h-8 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition">
@@ -520,10 +540,18 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Chat */}
-            <button className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all">
+            <button
+              onClick={() => router.push("/clinic/messages")}
+              className="w-12 h-12 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center text-[#3D4B5A] border border-[#EBEEF5] transition-all relative"
+            >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.06 0-2.077-.163-3.02-.465L3 21l1.554-3.887A7.964 7.964 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
+              {chatUnreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-4 h-4 bg-[#E84949] text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                  {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+                </span>
+              )}
             </button>
           </div>
         </header>

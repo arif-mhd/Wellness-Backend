@@ -688,7 +688,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-semibold text-[#24292E]">Date of Birth</label>
-                    <input type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
+                    <input type="date" max="9999-12-31" value={editDob} onChange={(e) => setEditDob(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-semibold text-[#24292E]">Blood Group</label>
@@ -1170,7 +1170,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[12px] font-semibold text-[#24292E]">Date of Birth</label>
-                      <input type="date" value={addDob} onChange={(e) => setAddDob(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
+                      <input type="date" max="9999-12-31" value={addDob} onChange={(e) => setAddDob(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
                     </div>
 
                     <div className="flex flex-col gap-1.5">

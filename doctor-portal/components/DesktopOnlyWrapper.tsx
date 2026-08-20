@@ -14,7 +14,7 @@ interface DesktopOnlyWrapperProps {
  */
 export default function DesktopOnlyWrapper({
   children,
-  minWidth = 1024,
+  minWidth = 768,
 }: DesktopOnlyWrapperProps) {
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
@@ -82,8 +82,8 @@ export default function DesktopOnlyWrapper({
             marginBottom: 28,
           }}
         >
-          This section is optimised for larger screens. Please open it on a
-          desktop or laptop to manage schedules, time slots, and absences.
+          This section is optimised for tablet and larger screens. Please open
+          it on a tablet, laptop, or desktop to manage schedules and settings.
         </p>
 
         <div
@@ -112,7 +112,7 @@ export default function DesktopOnlyWrapper({
             <circle cx={12} cy={12} r={10} />
             <path d="M12 8v4m0 4h.01" />
           </svg>
-          Tip: Rotate to landscape or use a larger device
+          Tip: Rotate to landscape or use a tablet/larger device
         </div>
       </div>
     );

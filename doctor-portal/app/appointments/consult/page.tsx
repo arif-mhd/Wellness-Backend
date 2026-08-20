@@ -80,6 +80,7 @@ function ConsultRoom() {
   const [labs, setLabs] = useState<LabRecommendation[]>([]);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved, setEmrSaved] = useState(false);
+  const [emrSaveError, setEmrSaveError] = useState<string | null>(null);
   const [emrSavedAtLeastOnce, setEmrSavedAtLeastOnce] = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
@@ -226,6 +227,18 @@ function ConsultRoom() {
         } else if (data.type === "specialist_declined") {
           if (patientPollRef.current) clearInterval(patientPollRef.current);
           setInviteStatus("declined");
+        } else if (data.type === "followup_accepted") {
+          setFollowUpStatus("accepted");
+          setFollowUpToast(
+            data.followUpDate
+              ? `Follow-up booked for ${data.followUpDate} at ${data.followUpTime}`
+              : "Patient accepted the follow-up"
+          );
+          setTimeout(() => setFollowUpToast(null), 5000);
+        } else if (data.type === "followup_declined") {
+          setFollowUpStatus("declined");
+          setFollowUpToast("Patient declined the follow-up.");
+          setTimeout(() => setFollowUpToast(null), 4000);
         }
       } catch { }
     });
@@ -459,16 +472,26 @@ function ConsultRoom() {
 
   const saveEmr = async () => {
     setSavingEmr(true);
+    setEmrSaveError(null);
     try {
       const res = await apiFetch(`/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
       });
-      if (res.ok) setEmrSavedAtLeastOnce(true);
-      setEmrSaved(true);
-      setTimeout(() => setEmrSaved(false), 2500);
-    } catch { } finally { setSavingEmr(false); }
+      if (res.ok) {
+        setEmrSavedAtLeastOnce(true);
+        setEmrSaved(true);
+        setTimeout(() => setEmrSaved(false), 2500);
+      } else {
+        const body = await res.json().catch(() => null);
+        setEmrSaveError(body?.error ?? "Could not save the EMR. Please try again.");
+      }
+    } catch {
+      setEmrSaveError("Could not save the EMR. Please check your connection and try again.");
+    } finally {
+      setSavingEmr(false);
+    }
   };
 
   const openEhrPanel = async () => {
@@ -569,6 +592,7 @@ function ConsultRoom() {
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Follow-up Date</label>
               <input
                 type="date"
+                max="9999-12-31"
                 value={followUpDate}
                 onChange={e => setFollowUpDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
@@ -773,8 +797,12 @@ function ConsultRoom() {
             </div>
           )}
           {followUpToast && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full text-emerald-700 text-[10px] font-semibold animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{followUpToast}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold border ${
+              followUpStatus === "accepted"
+                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                : "bg-red-50 border-red-100 text-red-600"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${followUpStatus === "accepted" ? "bg-emerald-500" : "bg-red-500"}`} />{followUpToast}
             </div>
           )}
           <button onClick={openEhrPanel}
@@ -1099,6 +1127,9 @@ function ConsultRoom() {
                 )}
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
+                {emrSaveError && (
+                  <p className="text-xs text-red-600 mr-auto">{emrSaveError}</p>
+                )}
                 <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 transition-colors">Cancel</button>
                 <button onClick={saveEmr} disabled={savingEmr}
                   className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec] shadow-[0_2px_8px_rgba(84,118,252,0.3)]"}`}>

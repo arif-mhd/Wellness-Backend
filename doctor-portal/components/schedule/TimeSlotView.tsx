@@ -87,6 +87,7 @@ export default function TimeSlotView() {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [slotsPending, setSlotsPending] = useState(false);
+  const [hasClinic, setHasClinic] = useState(false);
 
   // Date switching reference
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -147,6 +148,7 @@ export default function TimeSlotView() {
         const tempSlots: TimeSlotRange[] = data.tempSlots ?? [];
         const pending: boolean = data.slotsPending ?? false;
         setSlotsPending(pending);
+        setHasClinic(!!data.hasClinic);
         
         const parseToKeys = (ranges: TimeSlotRange[]) => {
           const keys = new Set<string>();
@@ -296,7 +298,7 @@ export default function TimeSlotView() {
         // Availability saved successfully: keep newly added slots yellow and deleted slots white (pending admin approval)
         setSlotsPending(true);
         setShowApprovalDialog(false);
-        alert("Availability updates sent to admin for approval successfully!");
+        alert(hasClinic ? "Availability updates sent to your clinic for approval successfully!" : "Availability updates sent to admin for approval successfully!");
       } else if (res.status === 403) {
         alert("Access Denied (403): You must be logged in as a Doctor. If you are logged in as an Admin in another tab, please log out of the Admin Portal or open the Doctor Portal in an Incognito/Private window.");
       } else if (res.status === 401) {
@@ -577,7 +579,10 @@ export default function TimeSlotView() {
                 {/* Info box */}
                 <div className="bg-[#FFF9E6] rounded-[14px] p-4 mb-4">
                   <p className="text-[#8A6D1C] text-[12px] leading-[1.6] font-medium" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    Confirm your availability updates. Yellow highlights represent your newly added slots. All updates will be saved immediately to the system.
+                    Confirm your availability updates. Yellow highlights represent your newly added slots.{" "}
+                    {hasClinic
+                      ? "Your current schedule stays live until your clinic approves this change."
+                      : "Your current schedule stays live until an admin approves this change."}
                   </p>
                 </div>
 

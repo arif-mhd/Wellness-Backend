@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
 import {
   patientsContainer,
@@ -134,6 +135,18 @@ router.patch("/:patientId/status", requireRole("admin"), async (req: Request, re
     patient.status = status;
     patient.updatedAt = new Date().toISOString();
     await patientsContainer.item(patientId, patientId).replace(patient);
+
+    // Deactivating only blocked future sign-ins (see comment above) — an
+    // already-open session on this account kept working normally, since
+    // verifySession only checks the session token's own validity, never
+    // this status field. Revoking here (same pattern used when a clinic
+    // deletes a doctor) means the very next request from that device fails
+    // fast, instead of only once its access token happens to expire on its
+    // own — which the app now correctly treats as "log out", but was
+    // previously leaving a deactivated account looking like it still worked.
+    if (status === "deactivated") {
+      try { await Session.revokeAllSessionsForUser(patientId); } catch { /* best-effort */ }
+    }
 
     res.json({ patient });
   } catch (err) {

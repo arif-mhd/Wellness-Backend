@@ -41,6 +41,8 @@ interface Doctor {
   twoFactorEnabled?: boolean;
   avatarUrl?: string | null;
   slots?: Slot[];
+  slotsPending?: boolean;
+  tempSlots?: Slot[];
   bio?: string | null;
   eligibility?: string | null;
   consultations?: number;
@@ -398,6 +400,39 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
     }
   };
 
+  const [savingSlotApproval, setSavingSlotApproval] = useState(false);
+
+  const handleApprovePendingSlots = async () => {
+    setSavingSlotApproval(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/verify-slots${qs}`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      loadDoctor();
+    } catch {
+      window.alert("Failed to approve the schedule change.");
+    } finally {
+      setSavingSlotApproval(false);
+    }
+  };
+
+  const handleRejectPendingSlots = async () => {
+    const reason = window.prompt("Reason for declining this schedule change (optional):") ?? "";
+    setSavingSlotApproval(true);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/reject-slots${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error();
+      loadDoctor();
+    } catch {
+      window.alert("Failed to decline the schedule change.");
+    } finally {
+      setSavingSlotApproval(false);
+    }
+  };
+
   const filteredConsultations = useMemo(() => {
     return consultations.filter((c) => {
       if (consultFilter === "Upcoming" && !isActiveNow(c)) return false;
@@ -477,7 +512,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <select value={eGender} onChange={(e) => setEGender(e.target.value)} className={inputCls}>
                 <option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
               </select>
-              <input type="date" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
+              <input type="date" max="9999-12-31" value={eDob} onChange={(e) => setEDob(e.target.value)} className={inputCls} />
               <select value={eBloodGroup} onChange={(e) => setEBloodGroup(e.target.value)} className={inputCls}>
                 <option value="">Blood Group</option>
                 {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => <option key={bg} value={bg}>{bg}</option>)}
@@ -633,6 +668,47 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                   </button>
                 )}
               </div>
+
+              {doctor.slotsPending && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Pending</span>
+                    <span className="text-[12px] font-semibold text-amber-800">Availability change awaiting your approval</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {TIMING_DAYS.map(({ label, dow }) => {
+                      const daySlots = (doctor.tempSlots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                      const isOpen = daySlots.length > 0;
+                      return (
+                        <div key={label} className={`rounded-lg p-2 flex flex-col items-center justify-center gap-0.5 border ${isOpen ? "bg-white border-amber-200" : "bg-amber-50/50 border-amber-100"}`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${isOpen ? "text-amber-700" : "text-amber-300"}`}>{label.slice(0, 3)}</span>
+                          <span className={`text-[10px] font-medium text-center leading-tight ${isOpen ? "text-[#24292E]" : "text-amber-300"}`}>
+                            {isOpen ? daySlots.map((s) => `${fmt12(s.startTime)} - ${fmt12(s.endTime)}`).join(", ") : "Closed"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {can("manage_schedules") && (
+                    <div className="flex justify-end gap-2 mt-1">
+                      <button
+                        onClick={handleRejectPendingSlots}
+                        disabled={savingSlotApproval}
+                        className="px-4 py-1.5 bg-white border border-amber-300 text-amber-700 text-[11px] font-bold rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        REJECT
+                      </button>
+                      <button
+                        onClick={handleApprovePendingSlots}
+                        disabled={savingSlotApproval}
+                        className="px-4 py-1.5 bg-black text-white text-[11px] font-bold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                      >
+                        APPROVE
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {TIMING_DAYS.map(({ label, dow }) => {

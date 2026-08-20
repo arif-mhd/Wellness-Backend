@@ -5,20 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { Room, RoomEvent } from "livekit-client";
+import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
-// "source" tracks which backend this conversation came from — patient<->doctor
-// chat (`/api/messages/*`) or clinic staff/admin<->doctor chat
-// (`/api/clinic-messages/*`, a fully separate system) — so every subsequent
-// action on it (loading history, the LiveKit token, sending) hits the right
-// endpoint family without the two ever getting mixed up.
 interface Conversation {
   conversationId: string;
-  source: "patient" | "staff";
   otherPartyId: string;
   otherPartyName: string;
-  otherPartyRole: string;
+  otherPartyRole: "owner" | "staff" | "doctor";
+  otherPartySpecialty?: string;
   otherPartyAvatarUrl?: string | null;
-  lastMessage?: { text: string; createdAt: string; senderRole: string } | null;
+  lastMessage?: { text: string; createdAt: string; senderId: string } | null;
   unreadCount: number;
 }
 
@@ -26,13 +22,17 @@ interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
-  senderRole: "patient" | "doctor" | "owner" | "staff";
+  senderRole: "owner" | "staff" | "doctor";
   text: string;
   createdAt: string;
   isRead: boolean;
 }
 
-const STAFF_ROLE_LABEL: Record<string, string> = { owner: "Clinic Admin", staff: "Senior Staff" };
+const ROLE_LABEL: Record<Conversation["otherPartyRole"], string> = {
+  owner: "Clinic Admin",
+  staff: "Senior Staff",
+  doctor: "Doctor",
+};
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -103,13 +103,11 @@ function SpinnerIcon({ size = 24 }: { size?: number }) {
   );
 }
 
-function MessagesPageInner() {
+function ClinicMessagesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const targetPatientId = searchParams.get("patientId");
+  const targetPartyId = searchParams.get("partyId");
   const [conversations, setConversations]     = useState<Conversation[]>([]);
-  const [staffConversations, setStaffConversations] = useState<Conversation[]>([]);
-  const [activeFilter, setActiveFilter]       = useState<"patients" | "staff">("patients");
   const [filtered, setFiltered]               = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery]         = useState("");
   const [selectedConv, setSelectedConv]       = useState<Conversation | null>(null);
@@ -120,13 +118,13 @@ function MessagesPageInner() {
   const [sending, setSending]                 = useState(false);
   const [connected, setConnected]             = useState(false);
   const [myUserId, setMyUserId]               = useState<string>("");
-  const [myName, setMyName]                   = useState("Doctor");
+  const [myName, setMyName]                   = useState("Me");
 
   const roomRef = useRef<Room | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // ── Fetch doctor identity ──────────────────────────────────────────────────
+  // ── Fetch clinic identity ──────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const uid = await Session.getUserId().catch(() => null);
@@ -134,23 +132,23 @@ function MessagesPageInner() {
       setMyUserId(uid);
 
       try {
-        const r = await apiFetch("/api/doctors/me");
+        const r = await apiFetch("/api/clinics/me");
         if (r.ok) {
-          const { doctor } = await r.json();
-          if (doctor?.fullName) setMyName(doctor.fullName);
+          const { clinic } = await r.json();
+          if (clinic?.fullName) setMyName(clinic.fullName);
         }
       } catch { /* keep default name */ }
     })();
   }, [router]);
 
-  // ── Fetch conversations (patients + clinic senior staff, independently) ───
+  // ── Fetch conversations ────────────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     try {
-      const r = await apiFetch("/api/messages/conversations");
+      const r = await apiFetch("/api/clinic-messages/conversations");
       if (r.ok) {
         const d = await r.json();
-        const withSource: Conversation[] = (d.conversations ?? []).map((c: any) => ({ ...c, source: "patient" as const }));
-        setConversations(withSource);
+        setConversations(d.conversations ?? []);
+        setFiltered(d.conversations ?? []);
       }
     } catch (e) {
       console.error("fetchConversations:", e);
@@ -159,42 +157,24 @@ function MessagesPageInner() {
     }
   }, []);
 
-  // Clinic senior staff of this doctor's own branch — a completely separate
-  // conversation system (clinic-messages.ts) from patient chat, fetched
-  // independently so a failure/empty result here never affects patients.
-  const fetchStaffConversations = useCallback(async () => {
-    try {
-      const r = await apiFetch("/api/clinic-messages/conversations");
-      if (r.ok) {
-        const d = await r.json();
-        const withSource: Conversation[] = (d.conversations ?? []).map((c: any) => ({ ...c, source: "staff" as const }));
-        setStaffConversations(withSource);
-      }
-    } catch (e) {
-      console.error("fetchStaffConversations:", e);
-    }
-  }, []);
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  useEffect(() => { fetchConversations(); fetchStaffConversations(); }, [fetchConversations, fetchStaffConversations]);
-
-  const activeConversations = activeFilter === "patients" ? conversations : staffConversations;
-
-  // ── Auto-select conversation from patientId query param ───────────────────
+  // ── Auto-select conversation from partyId query param ─────────────────────
   useEffect(() => {
-    if (!targetPatientId || loadingConvs || conversations.length === 0) return;
-    const match = conversations.find((c) => c.otherPartyId === targetPatientId);
+    if (!targetPartyId || loadingConvs || conversations.length === 0) return;
+    const match = conversations.find((c) => c.otherPartyId === targetPartyId);
     if (match && selectedConv?.conversationId !== match.conversationId) {
       selectConversation(match);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetPatientId, loadingConvs, conversations]);
+  }, [targetPartyId, loadingConvs, conversations]);
 
-  // ── Search filter (re-runs whenever the Patients/Senior Staff toggle changes too) ──
+  // ── Search filter ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!searchQuery.trim()) { setFiltered(activeConversations); return; }
+    if (!searchQuery.trim()) { setFiltered(conversations); return; }
     const q = searchQuery.toLowerCase();
-    setFiltered(activeConversations.filter((c) => c.otherPartyName.toLowerCase().includes(q)));
-  }, [searchQuery, activeConversations]);
+    setFiltered(conversations.filter((c) => c.otherPartyName.toLowerCase().includes(q)));
+  }, [searchQuery, conversations]);
 
   // ── Select conversation ────────────────────────────────────────────────────
   const selectConversation = useCallback(async (conv: Conversation) => {
@@ -208,16 +188,14 @@ function MessagesPageInner() {
     setMessages([]);
     setLoadingMsgs(true);
 
-    const apiBase = conv.source === "staff" ? "/api/clinic-messages" : "/api/messages";
-
     try {
-      const r = await apiFetch(`${apiBase}/${encodeURIComponent(conv.conversationId)}`);
+      const r = await apiFetch(`/api/clinic-messages/${encodeURIComponent(conv.conversationId)}`);
       if (r.ok) {
         const d = await r.json();
         setMessages(d.messages ?? []);
       }
 
-      const tokenRes = await apiFetch(`${apiBase}/token?channel=${encodeURIComponent(conv.conversationId)}`);
+      const tokenRes = await apiFetch(`/api/clinic-messages/token?channel=${encodeURIComponent(conv.conversationId)}`);
       if (!tokenRes.ok) throw new Error("Could not get chat token");
       const { token: lkToken, wsUrl } = await tokenRes.json();
 
@@ -257,10 +235,9 @@ function MessagesPageInner() {
       setLoadingMsgs(false);
     }
 
-    const zeroUnread = (prev: Conversation[]) =>
-      prev.map((c) => c.conversationId === conv.conversationId ? { ...c, unreadCount: 0 } : c);
-    if (conv.source === "staff") setStaffConversations(zeroUnread);
-    else setConversations(zeroUnread);
+    setConversations((prev) =>
+      prev.map((c) => c.conversationId === conv.conversationId ? { ...c, unreadCount: 0 } : c)
+    );
   }, []);
 
   // ── Auto scroll ────────────────────────────────────────────────────────────
@@ -279,18 +256,16 @@ function MessagesPageInner() {
       id: `opt_${Date.now()}`,
       conversationId: selectedConv.conversationId,
       senderId: myUserId,
-      senderRole: "doctor",
+      senderRole: "staff",
       text,
       createdAt: new Date().toISOString(),
       isRead: true,
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    const apiBase = selectedConv.source === "staff" ? "/api/clinic-messages" : "/api/messages";
-
     try {
       const r = await apiFetch(
-        `${apiBase}/${encodeURIComponent(selectedConv.conversationId)}`,
+        `/api/clinic-messages/${encodeURIComponent(selectedConv.conversationId)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -314,7 +289,7 @@ function MessagesPageInner() {
           type: "chat_message",
           id: savedMsg?.id ?? optimisticMsg.id,
           senderId: myUserId,
-          senderRole: "doctor",
+          senderRole: savedMsg?.senderRole ?? "staff",
           senderName: myName,
           text,
           createdAt: savedMsg?.createdAt ?? optimisticMsg.createdAt,
@@ -323,14 +298,13 @@ function MessagesPageInner() {
         await roomRef.current.localParticipant.publishData(data, { reliable: true });
       }
 
-      const updateLastMessage = (prev: Conversation[]) =>
+      setConversations((prev) =>
         prev.map((c) =>
           c.conversationId === selectedConv.conversationId
-            ? { ...c, lastMessage: { text, createdAt: new Date().toISOString(), senderRole: "doctor" } }
+            ? { ...c, lastMessage: { text, createdAt: new Date().toISOString(), senderId: myUserId } }
             : c
-        );
-      if (selectedConv.source === "staff") setStaffConversations(updateLastMessage);
-      else setConversations(updateLastMessage);
+        )
+      );
 
     } catch (err) {
       console.error("handleSend:", err);
@@ -346,11 +320,10 @@ function MessagesPageInner() {
     return () => { roomRef.current?.disconnect(); };
   }, []);
 
-  const totalUnread = [...conversations, ...staffConversations].reduce((acc, c) => acc + c.unreadCount, 0);
-  const patientsUnread = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
-  const staffUnread = staffConversations.reduce((acc, c) => acc + c.unreadCount, 0);
+  const totalUnread = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
 
   return (
+    <DesktopOnlyWrapper>
     <div style={{ display: "flex", height: "100%", background: "#f4f5fa", overflow: "hidden" }}>
       <style dangerouslySetInnerHTML={{ __html: `@keyframes spin{to{transform:rotate(360deg)}}` }} />
 
@@ -371,41 +344,6 @@ function MessagesPageInner() {
               </span>
             )}
           </div>
-
-          {/* Patients / Senior Staff filter — two entirely separate chat
-              systems sharing this one inbox UI, switched by conversation
-              `source` rather than mixed into a single list. */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-            {([
-              { key: "patients" as const, label: "Patients", unread: patientsUnread },
-              { key: "staff" as const, label: "Senior Staff", unread: staffUnread },
-            ]).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => { setActiveFilter(tab.key); setSelectedConv(null); setSearchQuery(""); }}
-                style={{
-                  flex: 1, padding: "7px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                  background: activeFilter === tab.key ? "#5476fc" : "#f8f9fc",
-                  color: activeFilter === tab.key ? "#fff" : "#676e76",
-                  fontSize: 12, fontWeight: 700, transition: "all 0.15s",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                }}
-              >
-                {tab.label}
-                {tab.unread > 0 && (
-                  <span style={{
-                    minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999,
-                    background: activeFilter === tab.key ? "rgba(255,255,255,0.3)" : "#e84949",
-                    color: "#fff", fontSize: 9, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {tab.unread > 9 ? "9+" : tab.unread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
           <div style={{ position: "relative" }}>
             <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ea5ad" }}>
               <SearchIcon />
@@ -413,7 +351,7 @@ function MessagesPageInner() {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={activeFilter === "patients" ? "Search patients..." : "Search senior staff..."}
+              placeholder="Search..."
               style={{
                 width: "100%", paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
                 border: "1px solid #eaecf0", borderRadius: 8, fontSize: 13, outline: "none",
@@ -432,11 +370,7 @@ function MessagesPageInner() {
             <div style={{ textAlign: "center", padding: "40px 20px", color: "#9ea5ad" }}>
               <div style={{ opacity: 0.4, marginBottom: 12 }}><MessageSquareIcon /></div>
               <p style={{ fontSize: 13 }}>
-                {activeConversations.length > 0
-                  ? "No results found."
-                  : activeFilter === "patients"
-                    ? "No patient conversations yet. Patients can message you after booking an appointment."
-                    : "No conversations with your clinic's senior staff yet."}
+                {conversations.length === 0 ? "No conversations yet." : "No results found."}
               </p>
             </div>
           ) : (
@@ -479,12 +413,17 @@ function MessagesPageInner() {
                       )}
                     </div>
                     <p style={{
+                      fontSize: 11, color: "#a7aab4", margin: "1px 0 0", fontWeight: 600,
+                    }}>
+                      {ROLE_LABEL[conv.otherPartyRole]}{conv.otherPartySpecialty ? ` · ${conv.otherPartySpecialty}` : ""}
+                    </p>
+                    <p style={{
                       fontSize: 12, color: conv.unreadCount > 0 ? "#5476fc" : "#9ea5ad",
                       margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       fontWeight: conv.unreadCount > 0 ? 600 : 400,
                     }}>
                       {conv.lastMessage
-                        ? `${conv.lastMessage.senderRole === "doctor" ? "You: " : ""}${conv.lastMessage.text}`
+                        ? `${conv.lastMessage.senderId === myUserId ? "You: " : ""}${conv.lastMessage.text}`
                         : "Tap to start chatting"}
                     </p>
                   </div>
@@ -507,7 +446,7 @@ function MessagesPageInner() {
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#24292e", marginBottom: 8 }}>Select a conversation</h2>
             <p style={{ fontSize: 14, textAlign: "center", maxWidth: 280 }}>
-              Choose a patient from the list to view and send messages.
+              Choose someone from the list to view and send messages.
             </p>
           </div>
         ) : (
@@ -527,7 +466,7 @@ function MessagesPageInner() {
               <div style={{ flex: 1 }}>
                 <p style={{ fontWeight: 700, color: "#24292e", margin: 0, fontSize: 15 }}>{selectedConv.otherPartyName}</p>
                 <p style={{ fontSize: 12, color: "#9ea5ad", margin: "2px 0 0" }}>
-                  {selectedConv.source === "staff" ? (STAFF_ROLE_LABEL[selectedConv.otherPartyRole] ?? "Senior Staff") : "Patient"}
+                  {ROLE_LABEL[selectedConv.otherPartyRole]}{selectedConv.otherPartySpecialty ? ` · ${selectedConv.otherPartySpecialty}` : ""}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -612,17 +551,18 @@ function MessagesPageInner() {
         )}
       </div>
     </div>
+    </DesktopOnlyWrapper>
   );
 }
 
-export default function MessagesPage() {
+export default function ClinicMessagesPage() {
   return (
     <Suspense fallback={
       <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center" }}>
         <SpinnerIcon size={32} />
       </div>
     }>
-      <MessagesPageInner />
+      <ClinicMessagesInner />
     </Suspense>
   );
 }

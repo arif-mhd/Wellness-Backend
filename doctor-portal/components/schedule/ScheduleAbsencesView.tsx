@@ -996,6 +996,7 @@ export default function ScheduleAbsencesView() {
               </span>
               <input
                 type="date"
+                max="9999-12-31"
                 value={rescheduleDate}
                 onChange={(e) => setRescheduleDate(e.target.value)}
                 className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[12px] p-3 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors"
