@@ -25,9 +25,14 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
     ? [
         { label: "What is the primary reason for your visit today", value: form?.primaryConcern ?? "Not provided" },
         { label: "Are you experiencing any new symptoms?", value: form?.smokes ?? "None" },
+        { label: "When did it start?", value: form?.onset ?? "Not provided" },
+        { label: "Location / side", value: form?.location ?? "Not provided" },
+        { label: "Severity", value: form?.severity ?? "Not provided" },
+        { label: "Duration / frequency", value: form?.duration ?? "Not provided" },
         { label: "Do you have any existing medical conditions or chronic illnesses?", value: form?.chronicIllnesses ?? "None reported" },
         { label: "What medications are you currently taking?", value: form?.currentMedications ?? "None" },
-        { label: "What is the primary reason for your visit today", value: form?.drinks ?? "None" },
+        { label: "Allergies", value: form?.allergies ?? "None known" },
+        { label: "Additional notes", value: form?.drinks ?? "None" },
       ]
     : [
         { label: "Do you have any chronic illnesses?", value: form?.chronicIllnesses ?? "Not provided" },
@@ -53,9 +58,16 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
         <div className="flex flex-col gap-2 w-full">
           {/* Title row */}
           <div className="flex items-center justify-between w-full">
-            <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
-              Pre-visit Form
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                Pre-visit Form
+              </span>
+              {form?.source === "ai_chat" && (
+                <span className="bg-[#EEF2FF] text-[#5476FC] text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap">
+                  Collected by Dr. Wellness AI
+                </span>
+              )}
+            </div>
             <button
               onClick={handleClose}
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"

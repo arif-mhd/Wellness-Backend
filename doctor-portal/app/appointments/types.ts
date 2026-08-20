@@ -6,6 +6,12 @@ export interface PreVisitForm {
   smokes: string;
   drinks: string;
   isQuestionnaire?: boolean;
+  onset?: string;
+  location?: string;
+  severity?: string;
+  duration?: string;
+  /** 'ai_chat' = gathered by the Dr. Wellness chatbot; 'manual' = patient filled the form directly. */
+  source?: 'ai_chat' | 'manual';
 }
 
 export interface Patient {

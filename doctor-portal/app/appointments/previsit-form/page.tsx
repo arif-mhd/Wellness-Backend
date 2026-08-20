@@ -64,6 +64,11 @@ function PreVisitFormContent() {
                 primaryConcern: match.preVisitData.primaryReason || match.reason || "Consultation",
                 smokes: Array.isArray(match.preVisitData.symptoms) ? match.preVisitData.symptoms.join(", ") : (match.preVisitData.symptoms || "None"),
                 drinks: match.preVisitData.additionalNotes || "None",
+                onset: match.preVisitData.onset || "Not provided",
+                location: match.preVisitData.location || "Not provided",
+                severity: match.preVisitData.severity || "Not provided",
+                duration: match.preVisitData.duration || "Not provided",
+                source: match.preVisitData.source === "ai_chat" ? "ai_chat" : "manual",
               } : {
                 isQuestionnaire: false,
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
