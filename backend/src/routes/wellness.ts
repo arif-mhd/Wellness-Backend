@@ -6,6 +6,7 @@ import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
+import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
 
 const router = Router();
 
@@ -209,11 +210,117 @@ function mapOffCategory(tag: string): string {
   return "Other";
 }
 
+// ── Symptom intake shape ─────────────────────────────────────────────────────
+// Cumulative, structured detail the chatbot gathers when a patient describes
+// a symptom. Echoed back and forth between client and server each turn (the
+// server always returns the full merged object, never a delta) and — once
+// the patient books — flows into the same appointment.preVisitData shape via
+// the pre-visit-questionnaire screen, tagged source: "ai_chat".
+interface WellnessIntake {
+  primaryReason: string | null;
+  symptoms: string[];
+  onset: string | null;
+  location: string | null;
+  severity: string | null;
+  duration: string | null;
+  conditions: string | null;
+  medications: string | null;
+  allergies: string | null;
+  additionalNotes: string | null;
+}
+
+const EMPTY_INTAKE: WellnessIntake = {
+  primaryReason: null,
+  symptoms: [],
+  onset: null,
+  location: null,
+  severity: null,
+  duration: null,
+  conditions: null,
+  medications: null,
+  allergies: null,
+  additionalNotes: null,
+};
+
+function sanitizeIntake(raw: any): WellnessIntake {
+  return {
+    primaryReason: typeof raw?.primaryReason === "string" ? raw.primaryReason : null,
+    symptoms: Array.isArray(raw?.symptoms) ? raw.symptoms.filter((s: any) => typeof s === "string") : [],
+    onset: typeof raw?.onset === "string" ? raw.onset : null,
+    location: typeof raw?.location === "string" ? raw.location : null,
+    severity: typeof raw?.severity === "string" ? raw.severity : null,
+    duration: typeof raw?.duration === "string" ? raw.duration : null,
+    conditions: typeof raw?.conditions === "string" ? raw.conditions : null,
+    medications: typeof raw?.medications === "string" ? raw.medications : null,
+    allergies: typeof raw?.allergies === "string" ? raw.allergies : null,
+    additionalNotes: typeof raw?.additionalNotes === "string" ? raw.additionalNotes : null,
+  };
+}
+
+// Gemini structured-output schema (Gemini "OpenAPI subset" schema format).
+const WELLNESS_CHAT_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    offTopic: { type: "BOOLEAN" },
+    reply: { type: "STRING" },
+    intake: {
+      type: "OBJECT",
+      properties: {
+        primaryReason: { type: "STRING", nullable: true },
+        symptoms: { type: "ARRAY", items: { type: "STRING" } },
+        onset: { type: "STRING", nullable: true },
+        location: { type: "STRING", nullable: true },
+        severity: { type: "STRING", nullable: true },
+        duration: { type: "STRING", nullable: true },
+        conditions: { type: "STRING", nullable: true },
+        medications: { type: "STRING", nullable: true },
+        allergies: { type: "STRING", nullable: true },
+        additionalNotes: { type: "STRING", nullable: true },
+      },
+      required: ["primaryReason", "symptoms", "onset", "location", "severity", "duration"],
+    },
+    readyForRecommendation: { type: "BOOLEAN" },
+    recommendedSpecialty: { type: "STRING", nullable: true },
+    suggestBooking: { type: "BOOLEAN" },
+  },
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking"],
+};
+
+const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
+  .map((h) => `  - ${h.symptoms} → ${h.specialty}`)
+  .join("\n");
+
+function buildWellnessSystemPrompt(): string {
+  return `You are a helpful wellness assistant for Wellness Central, a healthcare platform. Your name is Dr. Wellness.
+
+You MUST respond with ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
+
+RULES:
+- Only discuss: health, wellness, nutrition, fitness, mental health, symptoms, medications, medical conditions, sleep, stress, hydration, vitamins, diet, exercise, pregnancy, or women's health. If the patient's message is unrelated (coding, politics, sports, entertainment, math, etc.), set offTopic=true and reply with a short redirect back to health topics; leave every other field at its default (empty/false/null).
+- Keep "reply" concise: 2-4 sentences max, friendly and empathetic.
+- Never diagnose or prescribe. Always recommend consulting a doctor for anything beyond general wellness advice.
+- For greetings like "hi" or "hello" with no symptom mentioned, respond warmly, ask how you can help, and leave intake/booking fields at their defaults.
+
+SYMPTOM INTAKE (this is the core of your job):
+- You are given the patient's current message, the conversation history, and the "intake so far" (a JSON object representing everything already gathered — may be all-null on the first turn).
+- When the patient describes any symptom or health complaint, your job is to have a natural back-and-forth to fill in "intake": primaryReason, symptoms, onset (when it started), location (which body part / side — e.g. left, right, bilateral), severity, duration, conditions (existing chronic conditions, if mentioned), medications (current medications, if mentioned), allergies (if mentioned), additionalNotes (anything else relevant).
+- Ask ONE focused follow-up question per turn for whatever's most clinically useful and still missing — do not interrogate with a rigid checklist, and do not ask about fields the patient has no reason to know or hasn't implied are relevant (e.g. don't force a "conditions" question if nothing suggests it matters).
+- ALWAYS return the full merged intake object — carry forward every field you already knew from "intake so far" plus whatever new information this turn added. Never null out something you already learned.
+- Once you have at least primaryReason plus onset or location or severity (enough to meaningfully point toward a specialist), set readyForRecommendation=true, recommendedSpecialty to the best match, and suggestBooking=true, and let "reply" summarize what you understood and offer to show relevant doctors. Until then, readyForRecommendation=false and recommendedSpecialty=null.
+- If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors.
+
+Valid values for recommendedSpecialty (choose the closest match; use "General Physician" if unclear):
+${SPECIALTIES.join(", ")}
+
+Example symptom → specialty reasoning:
+${SPECIALTY_HINTS_TEXT}`;
+}
+
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
-// Body: { message: string, history?: { role: "user"|"model", text: string }[] }
-// Returns: { reply: string, offTopic: boolean, suggestBooking: boolean }
+// Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
+// Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking }
 router.post("/chat", async (req: SessionRequest, res: Response) => {
-  const { message, history = [] } = req.body;
+  const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
     return;
@@ -225,16 +332,8 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
     return;
   }
 
-  const systemPrompt = `You are a helpful wellness assistant for Wellness Central, a healthcare platform. Your name is Dr. Wellness.
-
-RULES:
-- Only answer questions about: health, wellness, nutrition, fitness, mental health, symptoms, medications, medical conditions, sleep, stress, hydration, vitamins, diet, exercise, pregnancy, or women's health.
-- If asked anything unrelated to health/wellness (coding, politics, sports, entertainment, math, etc.), reply with exactly: OFFTOPIC
-- Keep answers concise: 2-4 sentences max.
-- Be friendly and empathetic.
-- Never diagnose or prescribe. Always recommend consulting a doctor for serious symptoms.
-- Whenever you recommend the user see a doctor, healthcare professional, or urgent care (e.g. for concerning symptoms, or when they ask for help finding/booking care), end your reply with the exact marker "[SUGGEST_BOOKING]" on its own line after your message. Only include this marker when you're actually recommending they see someone — not for general wellness tips.
-- For greetings like "hi" or "hello", respond warmly and ask how you can help with their health today.`;
+  const systemPrompt = buildWellnessSystemPrompt();
+  const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
 
   try {
     const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
@@ -245,7 +344,10 @@ RULES:
       ...(Array.isArray(history) ? history : [])
         .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
         .map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
-      { role: "user", parts: [{ text: message }] },
+      {
+        role: "user",
+        parts: [{ text: `Intake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}` }],
+      },
     ];
 
     for (const model of models) {
@@ -257,7 +359,12 @@ RULES:
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents,
-            generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
+            generationConfig: {
+              maxOutputTokens: 800,
+              temperature: 0.7,
+              responseMimeType: "application/json",
+              responseSchema: WELLNESS_CHAT_RESPONSE_SCHEMA,
+            },
           }),
         });
         if (!r.ok) {
@@ -279,18 +386,33 @@ RULES:
       throw new Error(`All models failed: ${lastError?.message}`);
     }
 
-    const trimmed = responseText.trim();
-    if (trimmed === "OFFTOPIC") {
-      res.json({
-        reply: "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
-        offTopic: true,
-        suggestBooking: false,
-      });
-    } else {
-      const suggestBooking = trimmed.includes("[SUGGEST_BOOKING]");
-      const reply = trimmed.replace("[SUGGEST_BOOKING]", "").trim();
-      res.json({ reply, offTopic: false, suggestBooking });
+    let parsed: any;
+    try {
+      parsed = JSON.parse(responseText.trim());
+    } catch {
+      throw new Error("Model returned malformed JSON");
     }
+
+    if (parsed.offTopic === true) {
+      res.json({
+        reply: parsed.reply || "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
+        offTopic: true,
+        intake: intakeSoFar,
+        readyForRecommendation: false,
+        suggestBooking: false,
+        recommendedSpecialty: null,
+      });
+      return;
+    }
+
+    res.json({
+      reply: typeof parsed.reply === "string" ? parsed.reply : "",
+      offTopic: false,
+      intake: sanitizeIntake(parsed.intake),
+      readyForRecommendation: parsed.readyForRecommendation === true,
+      recommendedSpecialty: typeof parsed.recommendedSpecialty === "string" ? parsed.recommendedSpecialty : null,
+      suggestBooking: parsed.suggestBooking === true,
+    });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
     res.status(500).json({ error: "Chat is temporarily unavailable. Please try again." });

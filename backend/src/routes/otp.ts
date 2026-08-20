@@ -7,6 +7,35 @@ const router = Router();
 
 const MAX_ATTEMPTS = 5;
 
+// ── GET /api/otp/check-email ─────────────────────────────────────────────────
+// Public, side-effect-free (no OTP sent, no rate-limit record written) —
+// lets the patient app's login entry screen tell "no account with this
+// email" apart from "wrong password" before the patient ever reaches the
+// password screen, instead of only surfacing that after a failed sign-in.
+// Patient accounts only — doctor/clinic emails are a different, later-stage
+// case already handled by /auth/me's role check post sign-in.
+router.get("/check-email", async (req: Request, res: Response) => {
+  const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ error: "INVALID_EMAIL" });
+    return;
+  }
+
+  try {
+    const { resources } = await patientsContainer.items
+      .query({
+        query: "SELECT c.id FROM c WHERE c.email = @email",
+        parameters: [{ name: "@email", value: email }],
+      })
+      .fetchAll();
+
+    res.json({ exists: resources.length > 0 });
+  } catch (err) {
+    console.error("check-email error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ── POST /api/otp/send ───────────────────────────────────────────────────────
 // Public. Generates a 6-digit code, stores it in otpCodesContainer (TTL 600s), sends via Resend.
 // purpose:

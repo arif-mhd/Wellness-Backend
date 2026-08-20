@@ -1352,8 +1352,8 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
     }
 
     const {
-      primaryReason, symptoms, severity, duration,
-      conditions, medications, allergies, additionalNotes,
+      primaryReason, symptoms, severity, duration, onset, location,
+      conditions, medications, allergies, additionalNotes, source,
     } = req.body;
 
     const updated = {
@@ -1361,12 +1361,15 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
       preVisitData: {
         primaryReason:    primaryReason    ?? null,
         symptoms:         Array.isArray(symptoms) ? symptoms : [],
+        onset:            onset            ?? "",
+        location:         location         ?? "",
         severity:         severity         ?? "",
         duration:         duration         ?? "",
         conditions:       conditions       ?? "",
         medications:      medications      ?? "",
         allergies:        allergies        ?? "",
         additionalNotes:  additionalNotes  ?? "",
+        source:           source === "ai_chat" ? "ai_chat" : "manual",
         submittedAt:      new Date().toISOString(),
       },
       updatedAt: new Date().toISOString(),

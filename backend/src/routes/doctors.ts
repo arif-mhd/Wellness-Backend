@@ -749,8 +749,17 @@ function toPublicDoctor(doc: any) {
 // Optional ?clinicId= filters to just that clinic's roster (used by the
 // Clinic Profile screen's "Doctors Available" section) — additive, existing
 // callers that don't pass it are unaffected.
+// Optional ?specialization= (alias ?specialty=) filters by specialty — used
+// by the Dr. Wellness chatbot's doctor recommendations. Matched case-
+// insensitively in-memory since Cosmos SQL API has no case-insensitive
+// operator usable with parameterized queries here.
 router.get("/", async (req: Request, res: Response) => {
   const clinicId = typeof req.query.clinicId === "string" ? req.query.clinicId : null;
+  const specialization = typeof req.query.specialization === "string"
+    ? req.query.specialization
+    : typeof req.query.specialty === "string"
+      ? req.query.specialty
+      : null;
   try {
     const query = clinicId
       ? "SELECT * FROM c WHERE c.status = @status AND c.clinicId = @clinicId ORDER BY c.approvedAt DESC"
@@ -761,7 +770,11 @@ router.get("/", async (req: Request, res: Response) => {
 
     const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
 
-    res.json({ doctors: resources.map(toPublicDoctor) });
+    const filtered = specialization
+      ? resources.filter((doc: any) => (doc.specialty ?? "").toLowerCase() === specialization.toLowerCase())
+      : resources;
+
+    res.json({ doctors: filtered.map(toPublicDoctor) });
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
