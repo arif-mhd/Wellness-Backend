@@ -94,7 +94,7 @@ function PatientsListContent() {
     fetch(`${API_URL}/auth/me`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => { setIsDoctor((data.roles ?? []).includes("doctor")); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -214,8 +214,8 @@ function PatientsListContent() {
               className="w-full md:w-auto bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[12px] font-medium px-6 py-2 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               title={
                 !isDoctor ? "Only doctors can send reminders"
-                : p.nextAppointmentId ? "Send a reminder about their next appointment"
-                : "No upcoming appointment to remind about"
+                  : p.nextAppointmentId ? "Send a reminder about their next appointment"
+                    : "No upcoming appointment to remind about"
               }
             >
               {state === "sending" ? "Sending..." : state === "sent" ? "Sent ✓" : "Remind"}
@@ -243,9 +243,9 @@ function PatientsListContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
             {/* Time-range pills — replaces the old All / New pills */}
             <div className="flex flex-wrap items-center gap-2">
-              <FilterPill label="All"        active={timeFilter === "All"}        onClick={() => setTimeFilter("All")} />
-              <FilterPill label="Today"      active={timeFilter === "Today"}      onClick={() => setTimeFilter("Today")} />
-              <FilterPill label="This Week"  active={timeFilter === "This Week"}  onClick={() => setTimeFilter("This Week")} />
+              <FilterPill label="All" active={timeFilter === "All"} onClick={() => setTimeFilter("All")} />
+              <FilterPill label="Today" active={timeFilter === "Today"} onClick={() => setTimeFilter("Today")} />
+              <FilterPill label="This Week" active={timeFilter === "This Week"} onClick={() => setTimeFilter("This Week")} />
               <FilterPill label="This month" active={timeFilter === "This month"} onClick={() => setTimeFilter("This month")} />
             </div>
 
@@ -312,8 +312,8 @@ function PatientsListContent() {
                               key={pg}
                               onClick={() => setCurrentPage(pg)}
                               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected
-                                  ? "bg-[#5476FC] text-white shadow-sm"
-                                  : "text-[#9EA5AD] hover:text-[#5476FC]"
+                                ? "bg-[#5476FC] text-white shadow-sm"
+                                : "text-[#9EA5AD] hover:text-[#5476FC]"
                                 }`}
                               style={{ fontFamily: "Outfit, sans-serif" }}
                             >
@@ -342,7 +342,7 @@ function PatientsListContent() {
         {selectedPatient && (
           <>
             {showMobileDetails && (
-              <div 
+              <div
                 className="lg:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
                 onClick={() => setShowMobileDetails(false)}
               />
@@ -355,7 +355,7 @@ function PatientsListContent() {
               <div className="lg:hidden w-full flex justify-center mb-4 pb-2">
                 <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
               </div>
-              <button 
+              <button
                 className="lg:hidden absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-white transition-colors"
                 onClick={() => setShowMobileDetails(false)}
               >
@@ -364,77 +364,77 @@ function PatientsListContent() {
 
               <h2 className="text-[#24292E] text-[16px] font-bold mb-6">Patient Details</h2>
 
-            {/* Profile snippet */}
-            <div className="flex items-center gap-4 mb-6">
-              <AvatarPlaceholder avatarUrl={selectedPatient.avatarUrl} name={selectedPatient.name} size="w-12 h-12" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[14px] font-bold truncate">{selectedPatient.name}</span>
-                <span className="text-[#676E76] text-[11px] truncate">{selectedPatient.email}</span>
-              </div>
-            </div>
-
-            <Link href={profileHref(selectedPatient, branchId)} className="w-full flex items-center justify-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all mb-6">
-              View Profile
-            </Link>
-
-            {/* Doctors List */}
-            {selectedPatient.doctors.length > 0 && (
-              <>
-                <div className="flex flex-col gap-3 mb-6">
-                  {selectedPatient.doctors.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3">
-                      <div className="relative">
-                        <AvatarPlaceholder name={doc.name} size="w-7 h-7" />
-                        {doc.isOnline && <span className="absolute bottom-0 right-0 w-2 h-2 bg-[#1FAF65] border border-white rounded-full" />}
-                      </div>
-                      <span className="text-[#676E76] text-[13px]">{doc.name}</span>
-                    </div>
-                  ))}
+              {/* Profile snippet */}
+              <div className="flex items-center gap-4 mb-6">
+                <AvatarPlaceholder avatarUrl={selectedPatient.avatarUrl} name={selectedPatient.name} size="w-12 h-12" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[#24292E] text-[14px] font-bold truncate">{selectedPatient.name}</span>
+                  <span className="text-[#676E76] text-[11px] truncate">{selectedPatient.email}</span>
                 </div>
-                <div className="h-px bg-[#D6DEFF] mb-6 w-full" />
-              </>
-            )}
+              </div>
 
-            {/* Consultations */}
-            <h3 className="text-[#24292E] text-[13px] font-bold mb-3">Consultations</h3>
-            <div className="flex flex-col gap-2 mb-8 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-              {selectedPatient.consultations.length === 0 ? (
-                <span className="text-[#A7AAB4] text-[12px]">No consultations yet.</span>
-              ) : (
-                selectedPatient.consultations.slice(0, 8).map((c, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span className="text-[#676E76] text-[12px]">Reason: {c.reason}</span>
-                    <span className="text-[#A7AAB4] text-[11px]">{formatDate(c.date)}</span>
+              <Link href={profileHref(selectedPatient, branchId)} className="w-full flex items-center justify-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all mb-6">
+                View Profile
+              </Link>
+
+              {/* Doctors List */}
+              {selectedPatient.doctors.length > 0 && (
+                <>
+                  <div className="flex flex-col gap-3 mb-6">
+                    {selectedPatient.doctors.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-3">
+                        <div className="relative">
+                          <AvatarPlaceholder name={doc.name} size="w-7 h-7" />
+                          {doc.isOnline && <span className="absolute bottom-0 right-0 w-2 h-2 bg-[#1FAF65] border border-white rounded-full" />}
+                        </div>
+                        <span className="text-[#676E76] text-[13px]">{doc.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))
+                  <div className="h-px bg-[#D6DEFF] mb-6 w-full" />
+                </>
+              )}
+
+              {/* Consultations */}
+              <h3 className="text-[#24292E] text-[13px] font-bold mb-3">Consultations</h3>
+              <div className="flex flex-col gap-2 mb-8 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
+                {selectedPatient.consultations.length === 0 ? (
+                  <span className="text-[#A7AAB4] text-[12px]">No consultations yet.</span>
+                ) : (
+                  selectedPatient.consultations.slice(0, 8).map((c, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-[#676E76] text-[12px]">Reason: {c.reason}</span>
+                      <span className="text-[#A7AAB4] text-[11px]">{formatDate(c.date)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="h-px bg-[#D6DEFF] mb-6 w-full" />
+
+              {/* Send Reminder */}
+              <h3 className="text-[#24292E] text-[13px] font-bold mb-3">Send Reminder</h3>
+              {selectedPatient.nextAppointmentId ? (
+                <>
+                  <p className="text-[11px] text-[#676E76] mb-3">
+                    {isDoctor
+                      ? "Sends a reminder about their next upcoming appointment with your clinic."
+                      : "Only doctors can send appointment reminders to patients."}
+                  </p>
+                  <button
+                    onClick={() => sendReminder(selectedPatient)}
+                    disabled={!isDoctor || selectedReminderState === "sending" || selectedReminderState === "sent"}
+                    className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={!isDoctor ? "Only doctors can send reminders" : undefined}
+                  >
+                    {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent ✓" : "Remind for consultation"}
+                  </button>
+                  {selectedReminderState === "error" && <p className="text-[11px] text-red-600 mt-2">Failed to send. Try again.</p>}
+                </>
+              ) : (
+                <p className="text-[11px] text-[#A7AAB4]">No upcoming appointment to remind about.</p>
               )}
             </div>
-
-            <div className="h-px bg-[#D6DEFF] mb-6 w-full" />
-
-            {/* Send Reminder */}
-            <h3 className="text-[#24292E] text-[13px] font-bold mb-3">Send Reminder</h3>
-            {selectedPatient.nextAppointmentId ? (
-              <>
-                <p className="text-[11px] text-[#676E76] mb-3">
-                  {isDoctor
-                    ? "Sends a reminder about their next upcoming appointment with your clinic."
-                    : "Only doctors can send appointment reminders to patients."}
-                </p>
-                <button
-                  onClick={() => sendReminder(selectedPatient)}
-                  disabled={!isDoctor || selectedReminderState === "sending" || selectedReminderState === "sent"}
-                  className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!isDoctor ? "Only doctors can send reminders" : undefined}
-                >
-                  {selectedReminderState === "sending" ? "Sending..." : selectedReminderState === "sent" ? "Reminder Sent ✓" : "Remind for consultation"}
-                </button>
-                {selectedReminderState === "error" && <p className="text-[11px] text-red-600 mt-2">Failed to send. Try again.</p>}
-              </>
-            ) : (
-              <p className="text-[11px] text-[#A7AAB4]">No upcoming appointment to remind about.</p>
-            )}
-          </div>
           </>
         )}
 

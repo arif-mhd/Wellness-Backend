@@ -498,8 +498,8 @@ function ClinicAppointmentsContent() {
                             key={pg}
                             onClick={() => setCurrentPage(pg)}
                             className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected
-                                ? "bg-[#5476FC] text-white shadow-sm"
-                                : "text-[#9EA5AD] hover:text-[#5476FC]"
+                              ? "bg-[#5476FC] text-white shadow-sm"
+                              : "text-[#9EA5AD] hover:text-[#5476FC]"
                               }`}
                             style={{ fontFamily: "Outfit, sans-serif" }}
                           >
@@ -530,7 +530,7 @@ function ClinicAppointmentsContent() {
         {selectedAppt && (
           <>
             {showMobileDetails && (
-              <div 
+              <div
                 className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
                 onClick={() => setShowMobileDetails(false)}
               />
@@ -543,7 +543,7 @@ function ClinicAppointmentsContent() {
               <div className="xl:hidden w-full flex justify-center mb-3">
                 <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
               </div>
-              <button 
+              <button
                 className="xl:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
                 onClick={() => setShowMobileDetails(false)}
               >
@@ -551,85 +551,85 @@ function ClinicAppointmentsContent() {
               </button>
 
               <h2 className="text-[#24292E] text-[15px] font-semibold">Appointment Details</h2>
-            <div className="h-px bg-[#EBEEF5] xl:mt-0 mt-4" />
+              <div className="h-px bg-[#EBEEF5] xl:mt-0 mt-4" />
 
-            {/* Patient */}
-            <div className="flex flex-col gap-4 xl:mt-0 mt-4">
-              <div className="flex items-center gap-3">
-                <Avatar name={selectedAppt.patientName} size="w-11 h-11 text-sm" />
+              {/* Patient */}
+              <div className="flex flex-col gap-4 xl:mt-0 mt-4">
+                <div className="flex items-center gap-3">
+                  <Avatar name={selectedAppt.patientName} size="w-11 h-11 text-sm" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[#24292E] text-[14px] font-bold truncate">{selectedAppt.patientName}</span>
+                    <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.patientEmail}</span>
+                  </div>
+                </div>
+                <p className="text-[#9EA5AD] text-[12px] font-medium">
+                  {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {" · "}
+                  {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                </p>
+                <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full flex justify-center items-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
+                  View Profile
+                </a>
+              </div>
+
+              <div className="h-px bg-[#E4E8F0] w-full xl:my-0 my-2" />
+
+              {/* Doctor */}
+              <div className="flex items-center gap-3 xl:mt-0 mt-2">
+                <Avatar name={selectedAppt.doctorName} size="w-11 h-11 text-sm" />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[#24292E] text-[14px] font-bold truncate">{selectedAppt.patientName}</span>
-                  <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.patientEmail}</span>
+                  <span className="text-[#24292E] text-[13px] font-semibold truncate">{selectedAppt.doctorName}</span>
+                  <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.doctorEmail}</span>
+                  <span className={`text-[11px] font-medium mt-0.5 ${selectedAppt.doctorIsOnline ? "text-[#179353]" : "text-gray-400"}`}>
+                    {selectedAppt.doctorIsOnline ? "Online" : "Offline"}
+                  </span>
                 </div>
               </div>
-              <p className="text-[#9EA5AD] text-[12px] font-medium">
-                {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                {" · "}
-                {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              </p>
-              <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full flex justify-center items-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
-                View Profile
-              </a>
-            </div>
-            
-            <div className="h-px bg-[#E4E8F0] w-full xl:my-0 my-2" />
 
-            {/* Doctor */}
-            <div className="flex items-center gap-3 xl:mt-0 mt-2">
-              <Avatar name={selectedAppt.doctorName} size="w-11 h-11 text-sm" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[13px] font-semibold truncate">{selectedAppt.doctorName}</span>
-                <span className="text-[#9EA5AD] text-[11px] truncate">{selectedAppt.doctorEmail}</span>
-                <span className={`text-[11px] font-medium mt-0.5 ${selectedAppt.doctorIsOnline ? "text-[#179353]" : "text-gray-400"}`}>
-                  {selectedAppt.doctorIsOnline ? "Online" : "Offline"}
-                </span>
+              <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
+
+              {/* Reason for visit */}
+              <div className="flex flex-col gap-1 xl:mt-0 mt-2">
+                <span className="text-[#24292E] text-[12px] font-semibold">Reason for visit</span>
+                <p className="text-[#9EA5AD] text-[11px] leading-relaxed">{selectedAppt.reason}</p>
               </div>
-            </div>
 
-            <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
-
-            {/* Reason for visit */}
-            <div className="flex flex-col gap-1 xl:mt-0 mt-2">
-              <span className="text-[#24292E] text-[12px] font-semibold">Reason for visit</span>
-              <p className="text-[#9EA5AD] text-[11px] leading-relaxed">{selectedAppt.reason}</p>
-            </div>
-
-            {/* Pre-visit */}
-            <div className="flex flex-col gap-1 xl:mt-0 mt-2">
-              <span className="text-[#24292E] text-[12px] font-semibold">Pre-visit form</span>
-              <p className="text-[11px] mt-0.5">
-                {selectedAppt.preVisitData ? (
-                  <span onClick={() => setShowPreVisitModal(true)} className="text-[#5476FC] underline cursor-pointer font-medium hover:text-[#3B59DF] transition-colors">
-                    View Pre-Visit Form
-                  </span>
-                ) : (
-                  <span className="text-[#9EA5AD]">Not filled by patient yet</span>
-                )}
-              </p>
-            </div>
-
-            {actionError && <p className="text-[11px] text-red-600">{actionError}</p>}
-
-            {/* Reschedule + Cancel */}
-            {canManage && (
-              <div className="flex flex-col gap-3 xl:mt-1 mt-4">
-                <button
-                  onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
-                  disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
-                  className="w-full border border-[#C8D0DA] text-[#676E76] text-[12px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Reschedule Consultation
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={actionBusy || selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
-                  className="w-full border border-[#F5C2C2] text-[#D92D20] text-[12px] font-medium py-2 rounded-lg hover:bg-red-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Cancel Appointment
-                </button>
+              {/* Pre-visit */}
+              <div className="flex flex-col gap-1 xl:mt-0 mt-2">
+                <span className="text-[#24292E] text-[12px] font-semibold">Pre-visit form</span>
+                <p className="text-[11px] mt-0.5">
+                  {selectedAppt.preVisitData ? (
+                    <span onClick={() => setShowPreVisitModal(true)} className="text-[#5476FC] underline cursor-pointer font-medium hover:text-[#3B59DF] transition-colors">
+                      View Pre-Visit Form
+                    </span>
+                  ) : (
+                    <span className="text-[#9EA5AD]">Not filled by patient yet</span>
+                  )}
+                </p>
               </div>
-            )}
-          </div>
+
+              {actionError && <p className="text-[11px] text-red-600">{actionError}</p>}
+
+              {/* Reschedule + Cancel */}
+              {canManage && (
+                <div className="flex flex-col gap-3 xl:mt-1 mt-4">
+                  <button
+                    onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
+                    disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
+                    className="w-full border border-[#C8D0DA] text-[#676E76] text-[12px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Reschedule Consultation
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    disabled={actionBusy || selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
+                    className="w-full border border-[#F5C2C2] text-[#D92D20] text-[12px] font-medium py-2 rounded-lg hover:bg-red-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Cancel Appointment
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
 

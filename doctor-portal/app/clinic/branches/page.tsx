@@ -349,92 +349,92 @@ export default function ClinicBranchesPage() {
               </button>
               <div className="p-5 flex flex-col gap-4 w-full">
                 <h2 className="text-[#24292E] text-[15px] font-semibold">Branch Details</h2>
-            <div className="h-px bg-[#EBEEF5]" />
+                <div className="h-px bg-[#EBEEF5]" />
 
-            <div className="flex items-center gap-3">
-              <Avatar name={selected.name} idx={selectedIdx} size="w-11 h-11 text-sm" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[13px] font-semibold truncate">{selected.name}</span>
-                <span className="text-[#9EA5AD] text-[11px] truncate">{selected.address}</span>
-              </div>
-            </div>
+                <div className="flex items-center gap-3">
+                  <Avatar name={selected.name} idx={selectedIdx} size="w-11 h-11 text-sm" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[#24292E] text-[13px] font-semibold truncate">{selected.name}</span>
+                    <span className="text-[#9EA5AD] text-[11px] truncate">{selected.address}</span>
+                  </div>
+                </div>
 
-            <p className="text-[#9EA5AD] text-[11px] text-center">
-              ID: {selected.id}
-            </p>
+                <p className="text-[#9EA5AD] text-[11px] text-center">
+                  ID: {selected.id}
+                </p>
 
-            {selected.bio && (
-              <p className="text-[#676E76] text-[12px] leading-relaxed">{selected.bio}</p>
-            )}
+                {selected.bio && (
+                  <p className="text-[#676E76] text-[12px] leading-relaxed">{selected.bio}</p>
+                )}
 
-            <div className="h-px bg-[#EBEEF5]" />
+                <div className="h-px bg-[#EBEEF5]" />
 
-            <div className="flex flex-col gap-2">
-              <span className="text-[#24292E] text-[12px] font-semibold">Users</span>
-              {selected.userCount === 0 ? (
-                <span className="text-[#9EA5AD] text-[11px]">
-                  {selected.isMain ? "You manage this branch directly — add a senior staff account if needed." : "No users assigned yet."}
-                </span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {selected.firstUser && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[#24292E] text-[12px] font-semibold">Users</span>
+                  {selected.userCount === 0 ? (
+                    <span className="text-[#9EA5AD] text-[11px]">
+                      {selected.isMain ? "You manage this branch directly — add a senior staff account if needed." : "No users assigned yet."}
+                    </span>
+                  ) : (
                     <div className="flex items-center gap-2">
-                      <Avatar name={selected.firstUser.fullName} idx={selectedIdx} size="w-7 h-7 text-[11px]" />
-                      <span className="text-[#24292E] text-[12px]">{selected.firstUser.fullName}</span>
+                      {selected.firstUser && (
+                        <div className="flex items-center gap-2">
+                          <Avatar name={selected.firstUser.fullName} idx={selectedIdx} size="w-7 h-7 text-[11px]" />
+                          <span className="text-[#24292E] text-[12px]">{selected.firstUser.fullName}</span>
+                        </div>
+                      )}
+                      {selected.userCount > 1 && (
+                        <span className="text-[#9EA5AD] text-[11px]">+{selected.userCount - 1} more</span>
+                      )}
                     </div>
                   )}
-                  {selected.userCount > 1 && (
-                    <span className="text-[#9EA5AD] text-[11px]">+{selected.userCount - 1} more</span>
-                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="h-px bg-[#EBEEF5]" />
+                <div className="h-px bg-[#EBEEF5]" />
 
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[#24292E] text-[12px] font-semibold">Timing</span>
-              <span className="text-[#676E76] text-[11px]">Today: {selected.status === "active" ? selected.todayHours : "—"}</span>
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[#24292E] text-[12px] font-semibold">Timing</span>
+                  <span className="text-[#676E76] text-[11px]">Today: {selected.status === "active" ? selected.todayHours : "—"}</span>
+                </div>
 
-            <div className="h-px bg-[#EBEEF5]" />
+                <div className="h-px bg-[#EBEEF5]" />
 
-            <div className="flex items-center justify-between">
-              <span className="text-[#24292E] text-[12px] font-semibold">Appointments Today</span>
-              <span className="text-[#5476FC] text-[15px] font-semibold">{selected.status === "active" ? selected.consultationsToday : "—"}</span>
-            </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#24292E] text-[12px] font-semibold">Appointments Today</span>
+                  <span className="text-[#5476FC] text-[15px] font-semibold">{selected.status === "active" ? selected.consultationsToday : "—"}</span>
+                </div>
 
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[#24292E] text-[12px] font-semibold">Patients</span>
-                <span className="text-[#9EA5AD] text-[11px]">Last 8 Days</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#24292E] text-[12px] font-semibold">Patients</span>
+                    <span className="text-[#9EA5AD] text-[11px]">Last 8 Days</span>
+                  </div>
+                  <MiniTrendChart data={selected.patientsTrend ?? []} height={110} />
+                </div>
+
+                {selected.status === "active" ? (
+                  <button
+                    onClick={() => router.push(`/clinic/branches/${selected.id}`)}
+                    className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    View Profile
+                  </button>
+                ) : selected.status === "details_pending" ? (
+                  <button
+                    onClick={() => router.push(`/clinic/branches/${selected.id}/complete-setup`)}
+                    className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    Complete Setup
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-[#9EA5AD] text-center mt-2">
+                    {selected.status === "requested" && "Awaiting platform admin review."}
+                    {selected.status === "pending_approval" && "Details submitted — awaiting final approval."}
+                    {selected.status === "rejected" && "This branch request was rejected."}
+                  </p>
+                )}
               </div>
-              <MiniTrendChart data={selected.patientsTrend ?? []} height={110} />
             </div>
-
-            {selected.status === "active" ? (
-              <button
-                onClick={() => router.push(`/clinic/branches/${selected.id}`)}
-                className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                View Profile
-              </button>
-            ) : selected.status === "details_pending" ? (
-              <button
-                onClick={() => router.push(`/clinic/branches/${selected.id}/complete-setup`)}
-                className="w-full mt-2 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                Complete Setup
-              </button>
-            ) : (
-              <p className="text-[11px] text-[#9EA5AD] text-center mt-2">
-                {selected.status === "requested" && "Awaiting platform admin review."}
-                {selected.status === "pending_approval" && "Details submitted — awaiting final approval."}
-                {selected.status === "rejected" && "This branch request was rejected."}
-              </p>
-            )}
-          </div>
-          </div>
           </>
         )}
       </div>

@@ -18,6 +18,26 @@ function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Maps getUserMedia/LiveKit device errors to text a doctor can act on,
+// instead of surfacing raw browser messages like "Could not start video source".
+function mediaErrorMessage(e: any, device: "camera" | "microphone"): string {
+  const label = device === "camera" ? "Camera" : "Microphone";
+  switch (e?.name) {
+    case "NotReadableError":
+      return `${label} is being used by another app — close it and retry`;
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return `${label} permission denied — check your browser/OS settings`;
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return `No ${device} detected`;
+    case "OverconstrainedError":
+      return `${label} doesn't support the required settings`;
+    default:
+      return `Could not start ${device}${e?.message ? `: ${e.message}` : ""}`;
+  }
+}
+
 interface ChatMsg { id: string; sender: "you" | "patient"; name: string; text: string; time: string; }
 
 interface RemoteVideoTile {
@@ -61,6 +81,11 @@ function ConsultRoom() {
   const [error, setError] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  // Camera/mic failing to start (e.g. device in use, OS permission) is a
+  // separate, recoverable condition from a LiveKit room connection failure —
+  // kept out of `error` so it never blocks the "waiting for patient" / remote
+  // video UI, which only checks `error`.
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [timer, setTimer] = useState(0);
 
   // Chat
@@ -269,9 +294,8 @@ function ConsultRoom() {
           });
         });
 
-        await room.localParticipant.setCameraEnabled(true);
-        await room.localParticipant.setMicrophoneEnabled(true);
-
+        // Fire these as soon as the room itself is connected — they must not
+        // depend on the local camera/mic actually starting (see below).
         apiFetch(`/api/appointments/${appointmentId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -282,6 +306,29 @@ function ConsultRoom() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ inCall: true }),
         }).catch(() => { });
+
+        // Camera/mic are handled in their own try/catch, independently of
+        // each other and of the room connection above. A device failing to
+        // start (e.g. "Could not start video source" when it's already in
+        // use by another app) is common and recoverable — it must not be
+        // reported as a room "Connection error", and one device failing
+        // must not stop the other from being attempted.
+        try {
+          await room.localParticipant.setCameraEnabled(true);
+        } catch (camErr: any) {
+          if (!cancelled) {
+            setCamOn(false);
+            setMediaError(mediaErrorMessage(camErr, "camera"));
+          }
+        }
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+        } catch (micErr: any) {
+          if (!cancelled) {
+            setMicOn(false);
+            setMediaError(prev => prev ?? mediaErrorMessage(micErr, "microphone"));
+          }
+        }
       } catch (e: any) {
         if (!cancelled) setError(`Connection error: ${e?.message}`);
       }
@@ -362,6 +409,34 @@ function ConsultRoom() {
 
   const toggleMic = async () => { await roomRef.current?.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); };
   const toggleCam = async () => { await roomRef.current?.localParticipant.setCameraEnabled(!camOn); setCamOn(v => !v); };
+
+  // Retries only whichever device actually failed to start — no room
+  // reconnect, no page reload. Safe to call repeatedly (e.g. right after
+  // closing whatever app was holding the camera).
+  const retryMedia = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    setMediaError(null);
+    let camErrMsg: string | null = null;
+    let micErrMsg: string | null = null;
+    if (!camOn) {
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+        setCamOn(true);
+      } catch (e: any) {
+        camErrMsg = mediaErrorMessage(e, "camera");
+      }
+    }
+    if (!micOn) {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        setMicOn(true);
+      } catch (e: any) {
+        micErrMsg = mediaErrorMessage(e, "microphone");
+      }
+    }
+    if (camErrMsg || micErrMsg) setMediaError(camErrMsg ?? micErrMsg);
+  }, [camOn, micOn]);
 
   const fetchAvailableDoctors = useCallback(async () => {
     if (!appointmentId) return;
@@ -803,6 +878,13 @@ function ConsultRoom() {
                 : "bg-red-50 border-red-100 text-red-600"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${followUpStatus === "accepted" ? "bg-emerald-500" : "bg-red-500"}`} />{followUpToast}
+            </div>
+          )}
+          {mediaError && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full text-amber-700 text-[10px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              {mediaError}
+              <button onClick={retryMedia} className="underline font-bold hover:text-amber-900">Retry</button>
             </div>
           )}
           <button onClick={openEhrPanel}

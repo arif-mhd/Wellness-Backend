@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import SetAvailabilityForm from "@/components/profile/SetAvailabilityForm";
 import DoctorsTimingTab from "@/components/clinic/DoctorsTimingTab";
 import AppointmentsTimingTab from "@/components/clinic/AppointmentsTimingTab";
+import ClinicLeaveCalendarView from "@/components/clinic/ClinicLeaveCalendarView";
 import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 
 interface BranchOption { id: string; name: string; status: string; }
@@ -72,7 +73,7 @@ function ClinicSchedulesContent() {
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"appointments" | "clinic-timing" | "doctors-timing">("clinic-timing");
+  const [activeTab, setActiveTab] = useState<"appointments" | "clinic-timing" | "doctors-timing" | "leave-calendar">("clinic-timing");
   const [initialAvailability, setInitialAvailability] = useState<string[] | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -158,6 +159,14 @@ function ClinicSchedulesContent() {
         >
           Doctors Timing
         </button>
+        <button
+          onClick={() => setActiveTab("leave-calendar")}
+          className={`px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all ${activeTab === "leave-calendar" ? "bg-black text-white" : "bg-[#D0D5DD] text-[#344054] hover:bg-[#B0B8C4]"
+            }`}
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Leave Calendar
+        </button>
       </div>
 
       {hasMultipleBranches && (
@@ -228,6 +237,12 @@ function ClinicSchedulesContent() {
       {activeTab === "doctors-timing" && (
         <DesktopOnlyWrapper>
           <DoctorsTimingTab qs={qs} />
+        </DesktopOnlyWrapper>
+      )}
+
+      {activeTab === "leave-calendar" && (
+        <DesktopOnlyWrapper>
+          <ClinicLeaveCalendarView qs={qs} />
         </DesktopOnlyWrapper>
       )}
     </div>

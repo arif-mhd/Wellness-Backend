@@ -213,10 +213,10 @@ function ManageDoctorsContent() {
     const displayName = doc.fullName?.startsWith("Dr.") ? doc.fullName : `Dr. ${doc.fullName}`;
     const mainSpecialty = doc.specialty ?? "General Physician";
     const secondarySpecialty = doc.specializations?.[0]?.name ?? "";
-    
+
     // Avoid showing "ENT + ENT" if the user entered the same string in both fields
     const isDuplicate = secondarySpecialty && mainSpecialty.toLowerCase() === secondarySpecialty.toLowerCase();
-    
+
     const specialties = (secondarySpecialty && !isDuplicate)
       ? [mainSpecialty, "+", secondarySpecialty]
       : [mainSpecialty, "", ""];
@@ -447,7 +447,7 @@ function ManageDoctorsContent() {
         {selectedDoctor && (
           <>
             {showMobileDetails && (
-              <div 
+              <div
                 className="xl:hidden fixed inset-0 z-40 bg-[#1E1E1E]/60 backdrop-blur-sm"
                 onClick={() => setShowMobileDetails(false)}
               />
@@ -460,7 +460,7 @@ function ManageDoctorsContent() {
               <div className="xl:hidden w-full flex justify-center mb-4 pb-2">
                 <div className="w-12 h-1.5 bg-[#D6DEFF] rounded-full" />
               </div>
-              <button 
+              <button
                 className="xl:hidden absolute top-5 right-5 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-white transition-colors"
                 onClick={() => setShowMobileDetails(false)}
               >
@@ -469,75 +469,75 @@ function ManageDoctorsContent() {
 
               <h2 className="text-[#24292E] text-[15px] font-bold mb-5">Doctor Details</h2>
 
-            {/* Profile snippet */}
-            <div className="flex items-center gap-3 mb-6">
-              <AvatarPlaceholder name={selectedDoctor.fullName} avatarUrl={selectedDoctor.avatarUrl} size="w-12 h-12" />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[#24292E] text-[13px] font-bold truncate">
-                  {selectedDoctor.fullName?.startsWith("Dr.") ? selectedDoctor.fullName : `Dr. ${selectedDoctor.fullName}`}
-                </span>
-                <span className="text-[#9EA5AD] text-[11px] font-medium truncate">Lic:{selectedDoctor.license ?? "—"}</span>
-                <span className={`${selectedDoctor.isOnline ? "text-[#179353]" : "text-[#9EA5AD]"} text-[11px] font-medium mt-0.5`}>
-                  {selectedDoctor.isOnline ? "Available" : "Not Available"}
-                </span>
-              </div>
-            </div>
-
-            <div className="h-px bg-[#D6DEFF] mb-5 w-full" />
-
-            {/* Details Grid */}
-            <div className="flex flex-col gap-3 mb-8">
-              {[
-                { label: "Emirates ID", val: selectedDoctor.emiratesId ?? "—" },
-                { label: "Gender", val: selectedDoctor.gender?.toUpperCase() ?? "—" },
-                { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
-                { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
-                { label: "Location", val: selectedDoctor.address ?? "—" },
-                { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
-                { label: "Email", val: selectedDoctor.email ?? "—" },
-                { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
-                { label: "Office Phone", val: "—" },
-                { label: "Languages", val: formatLanguages(selectedDoctor.languages) },
-              ].map((row, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <span className="text-[#24292E] text-[12px] font-medium">{row.label}</span>
-                  <span className="text-[#676E76] text-[11px] text-right truncate w-32">{row.val}</span>
+              {/* Profile snippet */}
+              <div className="flex items-center gap-3 mb-6">
+                <AvatarPlaceholder name={selectedDoctor.fullName} avatarUrl={selectedDoctor.avatarUrl} size="w-12 h-12" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[#24292E] text-[13px] font-bold truncate">
+                    {selectedDoctor.fullName?.startsWith("Dr.") ? selectedDoctor.fullName : `Dr. ${selectedDoctor.fullName}`}
+                  </span>
+                  <span className="text-[#9EA5AD] text-[11px] font-medium truncate">Lic:{selectedDoctor.license ?? "—"}</span>
+                  <span className={`${selectedDoctor.isOnline ? "text-[#179353]" : "text-[#9EA5AD]"} text-[11px] font-medium mt-0.5`}>
+                    {selectedDoctor.isOnline ? "Available" : "Not Available"}
+                  </span>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-2 mb-8">
-              <Link href={`/clinic/doctors/${selectedDoctor.id}${doctorLinkQs(selectedDoctor)}`} className="w-full flex items-center justify-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all">
-                View Profile
-              </Link>
-              <button className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all">
-                Message
-              </button>
-            </div>
+              <div className="h-px bg-[#D6DEFF] mb-5 w-full" />
 
-            {/* Timing Section */}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[#24292E] text-[13px] font-bold uppercase">TIMING</span>
-              <Link href={`/clinic/doctors/${selectedDoctor.id}?tab=schedules${doctorLinkQs(selectedDoctor) ? `&branchId=${selectedDoctor.clinicId}` : ""}`} className="text-[#24292E] hover:text-[#5476FC] transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-              </Link>
-            </div>
-
-            <div className="flex flex-col gap-2.5 mb-6">
-              {TIMING_DAYS.map(({ label, dow }) => {
-                const daySlots = (selectedDoctor.slots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                const hours = daySlots.length > 0 ? daySlots.map((s) => `${fmt12(s.startTime)} to ${fmt12(s.endTime)}`).join(", ") : "Not available";
-                return (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-[#676E76] text-[12px]">{label}</span>
-                    <span className="text-[#24292E] text-[12px] font-medium text-right max-w-[60%] truncate" title={hours}>{hours}</span>
+              {/* Details Grid */}
+              <div className="flex flex-col gap-3 mb-8">
+                {[
+                  { label: "Emirates ID", val: selectedDoctor.emiratesId ?? "—" },
+                  { label: "Gender", val: selectedDoctor.gender?.toUpperCase() ?? "—" },
+                  { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
+                  { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
+                  { label: "Location", val: selectedDoctor.address ?? "—" },
+                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
+                  { label: "Email", val: selectedDoctor.email ?? "—" },
+                  { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
+                  { label: "Office Phone", val: "—" },
+                  { label: "Languages", val: formatLanguages(selectedDoctor.languages) },
+                ].map((row, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="text-[#24292E] text-[12px] font-medium">{row.label}</span>
+                    <span className="text-[#676E76] text-[11px] text-right truncate w-32">{row.val}</span>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
 
-          </div>
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 mb-8">
+                <Link href={`/clinic/doctors/${selectedDoctor.id}${doctorLinkQs(selectedDoctor)}`} className="w-full flex items-center justify-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all">
+                  View Profile
+                </Link>
+                <button className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-sm hover:shadow-md transition-all">
+                  Message
+                </button>
+              </div>
+
+              {/* Timing Section */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[#24292E] text-[13px] font-bold uppercase">TIMING</span>
+                <Link href={`/clinic/doctors/${selectedDoctor.id}?tab=schedules${doctorLinkQs(selectedDoctor) ? `&branchId=${selectedDoctor.clinicId}` : ""}`} className="text-[#24292E] hover:text-[#5476FC] transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                </Link>
+              </div>
+
+              <div className="flex flex-col gap-2.5 mb-6">
+                {TIMING_DAYS.map(({ label, dow }) => {
+                  const daySlots = (selectedDoctor.slots ?? []).filter((s) => s.dayOfWeek === dow && s.isActive).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                  const hours = daySlots.length > 0 ? daySlots.map((s) => `${fmt12(s.startTime)} to ${fmt12(s.endTime)}`).join(", ") : "Not available";
+                  return (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-[#676E76] text-[12px]">{label}</span>
+                      <span className="text-[#24292E] text-[12px] font-medium text-right max-w-[60%] truncate" title={hours}>{hours}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
           </>
         )}
 

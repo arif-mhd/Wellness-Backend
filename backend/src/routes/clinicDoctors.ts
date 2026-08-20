@@ -17,6 +17,7 @@ import {
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds, hasPermission, getActorPermissionState } from "../utils/clinicScope";
+import { sendPushToUser } from "../utils/pushNotifications";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -270,6 +271,44 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
     res.json({ doctors: populated });
   } catch (err) {
     console.error("Fetch clinic doctors error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/clinics/absences?branchId= ─────────────────────────────────────
+// Flattens every doctor-in-scope's absences[] into one list for the Leave
+// Calendar view — same scope resolution as GET / (doctors list) so "All"
+// vs a specific branch behaves identically to the rest of Schedules & Timing.
+router.get("/absences", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
+  if (!scope) return;
+  const clinicIds = scopeToClinicIds(scope);
+
+  try {
+    let resources: any[] = [];
+    if (clinicIds.length > 0) {
+      const { clause, parameters } = buildInClause("c.clinicId", clinicIds);
+      const result = await doctorsContainer.items
+        .query({
+          query: `SELECT c.id, c.fullName, c.avatarUrl, c.absences FROM c WHERE ${clause} AND c.status = 'approved'`,
+          parameters,
+        })
+        .fetchAll();
+      resources = result.resources;
+    }
+
+    const absences = resources.flatMap((doc: any) =>
+      (doc.absences ?? []).map((abs: any) => ({
+        ...abs,
+        doctorId: doc.id,
+        doctorName: doc.fullName,
+        doctorAvatarUrl: doc.avatarUrl ?? null,
+      }))
+    );
+
+    res.json({ absences });
+  } catch (err) {
+    console.error("Fetch clinic absences error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -723,7 +762,7 @@ router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: Ses
 // be selected in the URL must not 400. Same fix as POST /:id/verify-slots.
 router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const actorId = req.session!.getUserId();
-  const { status } = req.body;
+  const { status, reason } = req.body;
 
   if (status !== "approved" && status !== "rejected") {
     res.status(400).json({ error: "Invalid status." });
@@ -746,12 +785,18 @@ router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (re
       return;
     }
 
+    const now = new Date().toISOString();
     const currentAbsences = doctor.absences ?? [];
     let updated = false;
     const updatedAbsences = currentAbsences.map((abs: any) => {
       if (abs.id === req.params.absenceId) {
         updated = true;
-        return { ...abs, status };
+        return {
+          ...abs,
+          status,
+          statusUpdatedAt: now,
+          statusReason: status === "rejected" && typeof reason === "string" && reason.trim() ? reason.trim() : null,
+        };
       }
       return abs;
     });
@@ -761,7 +806,20 @@ router.patch("/:id/absences/:absenceId/status", requireRole("clinic"), async (re
       return;
     }
 
-    await doctorsContainer.items.upsert({ ...doctor, absences: updatedAbsences, updatedAt: new Date().toISOString() });
+    await doctorsContainer.items.upsert({ ...doctor, absences: updatedAbsences, updatedAt: now });
+
+    // Best-effort real-time nudge — the doctor portal is web-only so this is
+    // usually a no-op (see sendPushToUser), but harmless either way. The
+    // authoritative record of the decision is the stamped statusUpdatedAt
+    // above, which doctorNotifications.ts derives an in-app notification from
+    // on next poll, same convention as slotsVerifiedAt/slotsRejectedAt.
+    sendPushToUser(
+      doctor.id,
+      status === "approved" ? "Absence request approved" : "Absence request declined",
+      status === "approved"
+        ? "Your clinic approved your leave request."
+        : "Your clinic did not approve your leave request."
+    ).catch(() => {});
 
     res.json({ status: "OK", absences: updatedAbsences });
   } catch (err) {

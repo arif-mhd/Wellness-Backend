@@ -55,7 +55,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
           setIsManuallyOffline(d.isManuallyOffline ?? false);
           if (!id) id = setInterval(fetchStatus, 30_000);
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     fetchStatus();
     return () => { cancelled = true; if (id) clearInterval(id); };
@@ -76,14 +76,14 @@ export function useSidebar() {
   if (!context) {
     return {
       isOpen: true,
-      setIsOpen: () => {},
+      setIsOpen: () => { },
       isMobileOpen: false,
-      setIsMobileOpen: () => {},
+      setIsMobileOpen: () => { },
       showWaitingRoom: false,
-      setShowWaitingRoom: () => {},
+      setShowWaitingRoom: () => { },
       isOnline: true,
       isManuallyOffline: false,
-      setOnlineState: () => {},
+      setOnlineState: () => { },
     };
   }
   return context;

@@ -2,3 +2,16 @@ core_config_version: 0
 
 port: 8080
 host: 0.0.0.0
+
+# The mobile app manages its access token manually (captures it once at
+# sign-in, stores it in SecureStore, reuses it for every request) and has no
+# refresh-token flow wired up anywhere — so once an access token expires,
+# the session is dead until the user logs in again, regardless of how
+# recently/actively they were using the app. The SuperTokens default here is
+# 3600 seconds (1 hour), which was causing users to be logged out roughly
+# hourly. Raised to 30 days as a stopgap until real token refresh is
+# implemented client-side. Tradeoff: a stolen/leaked access token stays
+# valid for this whole window instead of 1 hour — acceptable short-term
+# given tokens are stored in SecureStore (OS keychain/keystore), not
+# acceptable as a permanent fix for a healthcare app.
+access_token_validity: 2592000
