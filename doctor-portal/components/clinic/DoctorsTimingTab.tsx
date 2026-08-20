@@ -170,6 +170,22 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
     }
   };
 
+  const handleRejectAbsence = async (absenceId: string) => {
+    if (!selectedDoctorId) return;
+    const reason = window.prompt("Reason for declining this leave request (optional):") ?? "";
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${selectedDoctorId}/absences/${absenceId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected", reason }),
+      });
+      if (!res.ok) throw new Error("Failed to decline absence");
+      await loadDoctors();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   if (loading) return <div className="text-center text-sm text-[#A0A8B0] py-12">Loading doctors...</div>;
   if (doctors.length === 0) return <div className="text-center text-sm text-[#A0A8B0] py-12">No doctors found in this clinic.</div>;
 
@@ -292,12 +308,20 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                           <>
                             <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
                             {canManage && (
-                              <button
-                                onClick={() => handleApproveAbsence(abs.id)}
-                                className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
-                              >
-                                APPROVE
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleRejectAbsence(abs.id)}
+                                  className="px-4 py-1.5 bg-white border border-gray-200 text-gray-600 text-[12px] font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                  REJECT
+                                </button>
+                                <button
+                                  onClick={() => handleApproveAbsence(abs.id)}
+                                  className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
+                                >
+                                  APPROVE
+                                </button>
+                              </>
                             )}
                           </>
                         ) : abs.status === "rejected" ? (

@@ -405,6 +405,26 @@ router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res:
     };
     await doctorsContainer.items.upsert(updatedDoctor);
 
+    // Let the clinic's senior staff/admin know a leave request is waiting on
+    // them — without this, the only way to discover it was to stumble onto
+    // the Doctors Timing tab. Mirrors the doctor_schedule_pending notify
+    // below in PUT /slots.
+    if (doctor.clinicId) {
+      try {
+        const org = await loadOrgDocForClinicId(doctor.clinicId);
+        if (org) {
+          await notifyClinic(org.id, {
+            type: "absence_pending",
+            title: "Leave Request Awaiting Approval",
+            body: `Dr. ${doctor.fullName ?? "A doctor"} marked an absence (${duration}) for your review.`,
+            referenceId: newAbsence.id,
+          });
+        }
+      } catch (err) {
+        console.error("[doctors] Failed to notify clinic of pending absence:", err);
+      }
+    }
+
     res.status(201).json({ status: "OK", absences: updatedDoctor.absences });
   } catch (err) {
     console.error("Create absence error:", err);

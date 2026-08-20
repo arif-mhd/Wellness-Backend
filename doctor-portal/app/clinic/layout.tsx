@@ -39,6 +39,15 @@ function notificationIcon(type: string) {
       </div>
     );
   }
+  if (type === "absence_pending" || type === "doctor_schedule_pending") {
+    return (
+      <div className="w-9 h-9 rounded-full shrink-0 bg-amber-50 flex items-center justify-center text-amber-500">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3M3 11h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
+        </svg>
+      </div>
+    );
+  }
   return (
     <div className="w-9 h-9 rounded-full shrink-0 bg-slate-100 flex items-center justify-center text-slate-400">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,8 +77,8 @@ interface ClinicSearchResults {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  doctor:      "bg-[#5476FC]/10 text-[#5476FC]",
-  patient:     "bg-purple-50 text-purple-600",
+  doctor: "bg-[#5476FC]/10 text-[#5476FC]",
+  patient: "bg-purple-50 text-purple-600",
   appointment: "bg-amber-50 text-amber-600",
 };
 const TYPE_LABELS: Record<string, string> = {
@@ -164,11 +173,10 @@ function ClinicSearch() {
     <div ref={wrapperRef} className="flex items-center justify-end relative">
       {/* Animated expanding search bar */}
       <div
-        className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out rounded-full ${
-          searchExpanded
+        className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out rounded-full ${searchExpanded
             ? "w-[300px] ring-2 ring-[#5476FC]/20 bg-white shadow-sm border border-[#EBEEF5]"
             : "w-0 opacity-0 pointer-events-none border-transparent"
-        }`}
+          }`}
       >
         <div className="pl-4 pr-1 flex items-center shrink-0">
           {loading ? (
@@ -209,9 +217,8 @@ function ClinicSearch() {
         id="clinic-search-btn"
         onClick={() => setSearchExpanded(true)}
         aria-label="Open search"
-        className={`w-12 h-12 bg-white hover:bg-[#5476FC]/5 rounded-full flex items-center justify-center text-[#3D4B5A] hover:text-[#5476FC] border border-[#EBEEF5] transition-all ${
-          searchExpanded ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100"
-        }`}
+        className={`w-12 h-12 bg-white hover:bg-[#5476FC]/5 rounded-full flex items-center justify-center text-[#3D4B5A] hover:text-[#5476FC] border border-[#EBEEF5] transition-all ${searchExpanded ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100"
+          }`}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <circle cx="11" cy="11" r="7" strokeLinecap="round" strokeLinejoin="round" />
@@ -371,7 +378,7 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
   const handleMarkAllAsRead = async () => {
     const unread = notifications.filter((n) => !n.isRead);
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await Promise.all(unread.map((n) => apiFetch(`/api/clinics/payments/notifications/${n.id}/read`, { method: "PATCH" }).catch(() => {})));
+    await Promise.all(unread.map((n) => apiFetch(`/api/clinics/payments/notifications/${n.id}/read`, { method: "PATCH" }).catch(() => { })));
   };
 
   useEffect(() => {

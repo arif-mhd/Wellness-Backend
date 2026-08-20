@@ -22,7 +22,9 @@ type DoctorNotificationType =
   | "doctor_approved"
   | "doctor_rejected"
   | "slots_verified"
-  | "slots_rejected";
+  | "slots_rejected"
+  | "absence_approved"
+  | "absence_rejected";
 
 // Maps each app-toggle key to the notification types it gates.
 // patient_waiting is always shown (critical — can't be disabled).
@@ -30,7 +32,7 @@ const TOGGLE_GATES: Record<string, DoctorNotificationType[]> = {
   appointments: ["appointment_booked"],
   messages:     ["new_message"],
   reminders:    ["followup_reminder"],
-  system:       ["support_reply", "doctor_approved", "doctor_rejected", "slots_verified", "slots_rejected"],
+  system:       ["support_reply", "doctor_approved", "doctor_rejected", "slots_verified", "slots_rejected", "absence_approved", "absence_rejected"],
 };
 
 interface DoctorNotification {
@@ -238,6 +240,26 @@ async function buildNotificationsForDoctor(doctorId: string): Promise<DoctorNoti
         link: `/dashboard/schedule`,
         isRead: false,
         createdAt: doctorDoc.slotsRejectedAt,
+      });
+    }
+
+    for (const abs of doctorDoc.absences ?? []) {
+      if (!abs.statusUpdatedAt || abs.status === "pending") continue;
+      const type: DoctorNotificationType = abs.status === "approved" ? "absence_approved" : "absence_rejected";
+      if (!allowed(type)) continue;
+      notifications.push({
+        id: `${type}:${doctorId}:${abs.id}:${abs.statusUpdatedAt}`,
+        doctorId,
+        type,
+        title: abs.status === "approved" ? "Absence request approved" : "Absence request was not approved",
+        body: abs.status === "approved"
+          ? "Your clinic approved your leave request."
+          : abs.statusReason
+            ? String(abs.statusReason).slice(0, 100)
+            : "Your clinic did not approve your leave request.",
+        link: `/dashboard/schedule`,
+        isRead: false,
+        createdAt: abs.statusUpdatedAt,
       });
     }
   }
