@@ -768,6 +768,7 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
 router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Response) => {
   const userId = req.session!.getUserId();
   const { id } = req.params;
+  const { reason } = req.body ?? {};
 
   try {
     const { resource: apt } = await appointmentsContainer.item(id, id).read();
@@ -791,7 +792,12 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     }
 
     const cancelledReason = isPatient ? "cancelled_by_patient" : isClinic ? "cancelled_by_clinic" : "cancelled_by_doctor";
-    const updated = { ...apt, status: "cancelled", cancelledReason, updatedAt: new Date().toISOString() };
+    // `cancelledReason` (above) encodes WHO cancelled; `patientCancelReason` is
+    // the free-text/preset WHY, only meaningful when the patient is the one
+    // cancelling — left undefined (and thus omitted from the stored doc) for
+    // doctor/clinic-initiated cancellations, which don't send it.
+    const patientCancelReason = isPatient && typeof reason === "string" && reason.trim() ? reason.trim() : apt.patientCancelReason;
+    const updated = { ...apt, status: "cancelled", cancelledReason, patientCancelReason, updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
 
     const now = new Date().toISOString();
