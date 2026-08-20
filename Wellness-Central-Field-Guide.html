@@ -1,0 +1,1431 @@
+<title>Wellness Central Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --accent:#5476FC;
+    --accent-2:#8457FE;
+    --accent-soft:#EEF1FF;
+    --ink:#181B2E;
+    --ink-soft:#4B5170;
+    --paper:#FAFAFC;
+    --surface:#FFFFFF;
+    --surface-2:#F3F4FA;
+    --line:#E4E7F2;
+    --line-soft:#EEF0F8;
+    --good:#1F9D65;
+    --good-soft:#E8F7EF;
+    --warn:#B7791F;
+    --warn-soft:#FBF1DE;
+    --bad:#DC3545;
+    --bad-soft:#FCEBEC;
+    --m-get:#2563EB;      --m-get-soft:#E9EFFE;
+    --m-post:#16A34A;     --m-post-soft:#E7F7EE;
+    --m-patch:#D97706;    --m-patch-soft:#FCF0DE;
+    --m-put:#7C3AED;      --m-put-soft:#F1EBFD;
+    --m-delete:#DC2626;   --m-delete-soft:#FDEAEA;
+    --shadow: 0 1px 2px rgba(24,27,46,0.04), 0 8px 24px -12px rgba(24,27,46,0.12);
+    --radius: 14px;
+    --font-display:'Marcellus', Georgia, 'Times New Roman', serif;
+    --font-body:'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --accent:#8CA2FF;
+      --accent-2:#B79CFF;
+      --accent-soft:#20264A;
+      --ink:#EDEFFB;
+      --ink-soft:#AEB3D6;
+      --paper:#0E1020;
+      --surface:#151830;
+      --surface-2:#1B1E3A;
+      --line:#2A2E52;
+      --line-soft:#22254A;
+      --good:#4ADE9B;
+      --good-soft:#122A22;
+      --warn:#F0B84E;
+      --warn-soft:#332507;
+      --bad:#FF6B7A;
+      --bad-soft:#331519;
+      --m-get:#7EA2FF;      --m-get-soft:#182241;
+      --m-post:#4ADE9B;     --m-post-soft:#102A20;
+      --m-patch:#F0B84E;    --m-patch-soft:#302205;
+      --m-put:#C4A6FF;      --m-put-soft:#241C3D;
+      --m-delete:#FF7A86;   --m-delete-soft:#33161a;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --accent:#8CA2FF;
+    --accent-2:#B79CFF;
+    --accent-soft:#20264A;
+    --ink:#EDEFFB;
+    --ink-soft:#AEB3D6;
+    --paper:#0E1020;
+    --surface:#151830;
+    --surface-2:#1B1E3A;
+    --line:#2A2E52;
+    --line-soft:#22254A;
+    --good:#4ADE9B;
+    --good-soft:#122A22;
+    --warn:#F0B84E;
+    --warn-soft:#332507;
+    --bad:#FF6B7A;
+    --bad-soft:#331519;
+    --m-get:#7EA2FF;      --m-get-soft:#182241;
+    --m-post:#4ADE9B;     --m-post-soft:#102A20;
+    --m-patch:#F0B84E;    --m-patch-soft:#302205;
+    --m-put:#C4A6FF;      --m-put-soft:#241C3D;
+    --m-delete:#FF7A86;   --m-delete-soft:#33161a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:15.5px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent-soft); color:var(--ink); }
+
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+  a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;
+  }
+
+  code, .mono{ font-family:var(--font-mono); }
+  code{
+    background:var(--surface-2);
+    border:1px solid var(--line-soft);
+    padding:0.1em 0.4em;
+    border-radius:6px;
+    font-size:0.86em;
+  }
+  pre{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    overflow-x:auto;
+    font-family:var(--font-mono);
+    font-size:0.82em;
+    line-height:1.6;
+  }
+  pre code{ background:none; border:none; padding:0; }
+
+  h1,h2,h3,h4{
+    font-family:var(--font-display);
+    font-weight:400;
+    color:var(--ink);
+    text-wrap:balance;
+    line-height:1.2;
+  }
+
+  /* ---------- layout shell ---------- */
+  #shell{
+    display:grid;
+    grid-template-columns: 292px minmax(0,1fr);
+    min-height:100vh;
+  }
+  #nav-toggle{ display:none; }
+  .navbar{
+    position:sticky; top:0; align-self:start;
+    height:100vh;
+    overflow-y:auto;
+    background:var(--surface);
+    border-right:1px solid var(--line);
+    padding:22px 18px 60px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:4px;
+    padding:2px 4px 14px;
+    border-bottom:1px solid var(--line-soft);
+    margin-bottom:14px;
+  }
+  .brand-mark{
+    width:34px; height:34px; border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:var(--shadow);
+  }
+  .brand-mark svg{ width:18px; height:18px; }
+  .brand-text .t1{ font-family:var(--font-display); font-size:1.05rem; line-height:1.1; color:var(--ink); }
+  .brand-text .t2{ font-size:0.68rem; color:var(--ink-soft); letter-spacing:0.06em; text-transform:uppercase; }
+
+  .navgroup{ margin-bottom:4px; }
+  .navgroup > .navlabel{
+    display:block;
+    font-size:0.68rem;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:600;
+    padding:16px 10px 6px;
+  }
+  .navlink{
+    display:block;
+    padding:7px 10px;
+    border-radius:8px;
+    font-size:0.87rem;
+    color:var(--ink-soft);
+    line-height:1.35;
+  }
+  .navlink:hover{ background:var(--surface-2); color:var(--ink); text-decoration:none; }
+  .navlink.top{ color:var(--ink); font-weight:600; }
+  .navlink.sub{ padding-left:20px; font-size:0.82rem; }
+
+  main{ min-width:0; padding: 48px clamp(20px,5vw,72px) 120px; }
+  .content{ max-width:800px; margin:0 auto; }
+
+  .kicker{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--accent); font-weight:600; margin-bottom:10px;
+  }
+  header.hero{ padding: 8px 0 40px; border-bottom:1px solid var(--line); margin-bottom:40px;}
+  header.hero h1{ font-size:clamp(2.1rem,4vw,2.9rem); margin:0 0 14px; }
+  header.hero p.lede{ font-size:1.08rem; color:var(--ink-soft); max-width:620px; margin:0 0 22px; }
+
+  section.doc-section{ margin-bottom:64px; scroll-margin-top:24px; }
+  section.doc-section h2{ font-size:1.7rem; margin:0 0 6px; scroll-margin-top:24px; }
+  section.doc-section h2 .num{ color:var(--accent); font-family:var(--font-mono); font-size:0.6em; vertical-align:middle; margin-right:10px; }
+  .section-sub{ color:var(--ink-soft); font-size:0.98rem; margin:0 0 28px; max-width:620px; }
+
+  h3{ font-size:1.22rem; margin:34px 0 10px; scroll-margin-top:24px; }
+  h3 .file-badge{ display:block; font-family:var(--font-mono); font-size:0.62rem; color:var(--ink-soft); font-weight:400; margin-top:3px; letter-spacing:0; }
+  h4{ font-size:1.02rem; margin:22px 0 8px; color:var(--ink); }
+
+  p{ margin:0 0 14px; }
+  ul,ol{ padding-left:1.3em; margin:0 0 14px; }
+  li{ margin-bottom:6px; }
+
+  .callout{
+    border:1px solid var(--line);
+    border-left:3px solid var(--accent);
+    background:var(--accent-soft);
+    border-radius:10px;
+    padding:14px 16px;
+    margin:18px 0;
+    font-size:0.92rem;
+  }
+  .callout.warn{ border-left-color:var(--warn); background:var(--warn-soft); }
+  .callout.good{ border-left-color:var(--good); background:var(--good-soft); }
+  .callout.bad{ border-left-color:var(--bad); background:var(--bad-soft); }
+  .callout .callout-label{ font-weight:600; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; display:block; margin-bottom:5px; }
+  .callout p:last-child{ margin-bottom:0; }
+
+  .filepath{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    background:var(--surface-2);
+    border:1px solid var(--line-soft);
+    border-radius:6px;
+    padding:2px 8px;
+    margin: 2px 0;
+  }
+  .filepath.block{ display:block; width:fit-content; margin:6px 0 14px; }
+
+  table{ width:100%; border-collapse:collapse; margin:14px 0 22px; font-size:0.88rem; }
+  caption{ text-align:left; caption-side:top; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-bottom:6px;}
+  thead th{ text-align:left; font-size:0.7rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-soft); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--line); }
+  tbody td{ padding:9px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+  tbody tr:last-child td{ border-bottom:none; }
+  .tablewrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; margin:14px 0 22px; }
+  .tablewrap table{ margin:0; }
+  .tablewrap thead th:first-child, .tablewrap tbody td:first-child{ padding-left:14px; }
+
+  .ep{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:0.82rem; white-space:nowrap;}
+  .m{ display:inline-block; font-family:var(--font-mono); font-weight:600; font-size:0.68rem; letter-spacing:0.03em; padding:2px 7px; border-radius:5px; }
+  .m-get{ color:var(--m-get); background:var(--m-get-soft); }
+  .m-post{ color:var(--m-post); background:var(--m-post-soft); }
+  .m-patch{ color:var(--m-patch); background:var(--m-patch-soft); }
+  .m-put{ color:var(--m-put); background:var(--m-put-soft); }
+  .m-delete{ color:var(--m-delete); background:var(--m-delete-soft); }
+
+  details.filegroup{
+    border:1px solid var(--line);
+    border-radius:12px;
+    margin:14px 0;
+    background:var(--surface);
+    overflow:hidden;
+  }
+  details.filegroup[open]{ box-shadow:var(--shadow); }
+  details.filegroup summary{
+    cursor:pointer;
+    list-style:none;
+    padding:13px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-weight:600;
+    background:var(--surface-2);
+  }
+  details.filegroup summary::-webkit-details-marker{ display:none; }
+  details.filegroup summary .arrow{ transition:transform 0.15s ease; color:var(--ink-soft); flex-shrink:0; }
+  details.filegroup[open] summary .arrow{ transform:rotate(90deg); }
+  details.filegroup summary .stitle{ display:flex; flex-direction:column; gap:2px; }
+  details.filegroup summary .stitle .sname{ font-family:var(--font-mono); font-size:0.86rem; color:var(--ink); }
+  details.filegroup summary .stitle .sdesc{ font-family:var(--font-body); font-weight:400; font-size:0.78rem; color:var(--ink-soft); }
+  details.filegroup .fbody{ padding:16px; }
+  details.filegroup .fbody > p:first-child{ margin-top:0; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px 18px;
+    background:var(--surface);
+  }
+  .card h4{ margin-top:0; }
+
+  .steplist{ counter-reset:step; list-style:none; padding-left:0; margin:20px 0; }
+  .steplist > li{
+    counter-increment:step;
+    position:relative;
+    padding-left:44px;
+    margin-bottom:20px;
+  }
+  .steplist > li::before{
+    content:counter(step);
+    position:absolute; left:0; top:-1px;
+    width:30px; height:30px; border-radius:50%;
+    background:var(--accent-soft); color:var(--accent);
+    font-family:var(--font-mono); font-weight:600; font-size:0.85rem;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .steplist > li strong{ display:block; margin-bottom:3px; color:var(--ink); }
+
+  .tag{
+    display:inline-block; font-size:0.68rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase;
+    padding:2px 8px; border-radius:999px; background:var(--surface-2); color:var(--ink-soft); border:1px solid var(--line);
+    margin:0 4px 4px 0;
+  }
+  .tag.accent{ background:var(--accent-soft); color:var(--accent); border-color:transparent; }
+
+  hr.rule{ border:none; border-top:1px solid var(--line); margin:40px 0; }
+
+  .glossary dt{ font-family:var(--font-mono); font-weight:600; color:var(--ink); margin-top:14px; }
+  .glossary dd{ margin:4px 0 0; color:var(--ink-soft); }
+
+  footer.docfoot{
+    max-width:800px; margin:60px auto 0; padding-top:24px; border-top:1px solid var(--line);
+    color:var(--ink-soft); font-size:0.85rem;
+  }
+
+  @media (max-width: 900px){
+    #shell{ grid-template-columns: 1fr; }
+    .navbar{
+      position:fixed; inset:0 auto 0 0; width:280px; z-index:40;
+      transform:translateX(-100%); transition:transform 0.2s ease;
+      box-shadow: 20px 0 60px rgba(0,0,0,0.2);
+    }
+    #nav-toggle:checked ~ #shell .navbar{ transform:translateX(0); }
+    .navscrim{
+      display:none; position:fixed; inset:0; background:rgba(10,10,20,0.4); z-index:30;
+    }
+    #nav-toggle:checked ~ #shell .navscrim{ display:block; }
+    .menubtn{
+      position:fixed; top:14px; left:14px; z-index:50;
+      width:42px; height:42px; border-radius:10px;
+      background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow);
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+    }
+    main{ padding:80px 20px 100px; }
+  }
+  @media (min-width:901px){ .menubtn, .navscrim{ display:none; } }
+</style>
+
+<input type="checkbox" id="nav-toggle">
+<label for="nav-toggle" class="menubtn" aria-label="Toggle navigation">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</label>
+
+<div id="shell">
+<label class="navscrim" for="nav-toggle"></label>
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l3-3 3 4 4-8 3 5H21"/></svg></div>
+    <div class="brand-text"><div class="t1">Wellness Central</div><div class="t2">Field Guide</div></div>
+  </div>
+
+  <div class="navgroup">
+    <a class="navlink top" href="#start">Start Here</a>
+    <a class="navlink sub" href="#glossary">Glossary</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#architecture">1. The Big Picture</a>
+    <a class="navlink sub" href="#arch-apps">Five apps, one backend</a>
+    <a class="navlink sub" href="#arch-auth">Shared login (SuperTokens)</a>
+    <a class="navlink sub" href="#arch-db">The database (Cosmos DB)</a>
+    <a class="navlink sub" href="#arch-deploy">Where it all runs</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#video">2. Video Calling</a>
+    <a class="navlink sub" href="#video-mental">How LiveKit works</a>
+    <a class="navlink sub" href="#video-backend">Backend logic</a>
+    <a class="navlink sub" href="#video-doctor">Doctor portal</a>
+    <a class="navlink sub" href="#video-patient">Patient app</a>
+    <a class="navlink sub" href="#video-lifecycle">Full call, step by step</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#chat">3. Chat &amp; Messaging</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#fhir">4. FHIR (Medical Records Exchange)</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#backend">5. Backend API Reference</a>
+    <a class="navlink sub" href="#be-platform">Platform admin routes</a>
+    <a class="navlink sub" href="#be-clinic">Clinic &amp; doctor routes</a>
+    <a class="navlink sub" href="#be-patient">Patient-facing routes</a>
+    <a class="navlink sub" href="#be-commerce">Pharmacy, lab &amp; vaccines</a>
+    <a class="navlink sub" href="#be-shared">Shared / cross-app routes</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#doctor-portal">6. Doctor Portal</a>
+    <a class="navlink sub" href="#dp-doctor">Doctor-facing screens</a>
+    <a class="navlink sub" href="#dp-clinic">Clinic-admin screens</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#admin-portal">7. Admin Portal</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#patient-app">8. Patient App</a>
+  </div>
+  <div class="navgroup">
+    <a class="navlink top" href="#pharmacy-portal">9. Pharmacy Portal</a>
+  </div>
+</nav>
+
+<main>
+<div class="content">
+
+<header class="hero" id="start">
+  <span class="kicker">Engineering field guide</span>
+  <h1>Wellness Central, end to end</h1>
+  <p class="lede">A plain-language map of every app, endpoint, and workflow in the Wellness Central platform — what it does, who uses it, and exactly which file it lives in. Written so a newcomer can follow it, and detailed enough that nothing is left out.</p>
+  <p class="section-sub" style="margin:0;">Five codebases make up the platform: a shared <strong>backend</strong> (Express/TypeScript + Azure Cosmos DB), a <strong>doctor portal</strong> serving both individual doctors and clinic staff, an <strong>admin portal</strong> for the platform's own operators, a <strong>pharmacy portal</strong> for medicine sellers, and a <strong>patient mobile app</strong> (Expo/React Native). This guide walks through all five.</p>
+</header>
+
+<section class="doc-section" id="glossary">
+  <h2>Glossary</h2>
+  <p class="section-sub">Six terms come up constantly in this guide. Knowing them up front makes everything else click faster.</p>
+  <dl class="glossary">
+    <dt>SuperTokens</dt>
+    <dd>The self-hosted login system every app shares. It proves <em>who</em> someone is (their user ID) and tracks <em>what roles</em> they hold ("patient", "doctor", "admin", etc). It does not, by itself, know anything about clinics or appointments.</dd>
+    <dt>Cosmos DB</dt>
+    <dd>Microsoft Azure's NoSQL document database — the platform's single source of truth for almost everything. Instead of spreadsheet-style tables with fixed columns, each "container" (Cosmos's word for a table) just stores loose JSON documents. There are no joins between containers; related data is either duplicated or fetched separately and stitched together in code.</dd>
+    <dt>LiveKit</dt>
+    <dd>A hosted video/audio infrastructure service. It handles the hard parts of real-time video (WebRTC) so the platform's own code only has to hand out short-lived access tokens and connect to a named "room."</dd>
+    <dt>FHIR</dt>
+    <dd>("Fast Healthcare Interoperability Resources", said "fire") — an international standard for exchanging medical records between different healthcare systems in a common JSON shape.</dd>
+    <dt>requireRole()</dt>
+    <dd>A single backend gatekeeper function every protected API endpoint uses. It checks that a request carries a valid login session <em>and</em> that the caller holds one of the specific roles the endpoint requires.</dd>
+    <dt>EMR / EHR</dt>
+    <dd><strong>EMR</strong> (Electronic Medical Record) is the clinical note for <em>one single visit</em> — what was discussed, prescribed, and recommended at that appointment. <strong>EHR</strong> (Electronic Health Record) is the patient's whole history — every past EMR, stitched into one timeline.</dd>
+  </dl>
+</section>
+
+<section class="doc-section" id="architecture">
+  <h2><span class="num">01</span>The Big Picture</h2>
+  <p class="section-sub">Before diving into any one app, it helps to see how the five pieces fit together — because almost every feature described later in this guide leans on the same three foundations: one shared login system, one shared database, and one backend that every frontend talks to.</p>
+
+  <h3 id="arch-apps">Five apps, one backend</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>App</th><th>Built with</th><th>Used by</th><th>Where it lives</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Backend</strong></td><td>Express + TypeScript, Azure Cosmos DB, some Postgres</td><td>— (every other app talks to this)</td><td><span class="filepath">wellness-platform/backend</span></td></tr>
+        <tr><td><strong>Doctor Portal</strong></td><td>Next.js (web)</td><td>Individual doctors, <em>and</em> clinic owners/staff</td><td><span class="filepath">wellness-platform/doctor-portal</span></td></tr>
+        <tr><td><strong>Admin Portal</strong></td><td>Next.js (web)</td><td>Wellness Central's own platform operators</td><td><span class="filepath">wellness-platform/admin-portal</span></td></tr>
+        <tr><td><strong>Pharmacy Portal</strong></td><td>Next.js (web)</td><td>Pharmacy owners/staff fulfilling medicine orders</td><td><span class="filepath">wellness-platform/pharmacy-portal</span></td></tr>
+        <tr><td><strong>Patient App</strong></td><td>Expo / React Native (iOS, Android, web)</td><td>Patients and their family members</td><td><span class="filepath">Wellness App/Wellness</span> — a separate repo</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>One detail worth flagging early: the doctor portal is really <em>two apps sharing one codebase</em>. Its <span class="filepath">app/dashboard/*</span> routes are the individual doctor's own workspace; its <span class="filepath">app/clinic/*</span> routes are an entirely separate clinic-admin/senior-staff workspace, for managing multiple doctors, branches, and staff. Which one a logged-in user sees depends purely on their role. Section 6 covers both halves.</p>
+
+  <h3 id="arch-auth">Shared login, one gatekeeper</h3>
+  <p>All five apps authenticate against the exact same <strong>SuperTokens</strong> deployment — one flat pool of users, not five separate ones. SuperTokens itself runs as its own small service (<span class="filepath">wellness-platform/supertokens</span>, a Docker image backed by Postgres), and the backend connects to it via <span class="filepath">backend/src/config/supertokens.ts</span>.</p>
+  <div class="callout">
+    <span class="callout-label">The question everyone asks first</span>
+    <p>If patients, doctors, clinics, and admins all log into the <em>same</em> system, what stops a doctor's credentials from working on the patient app? Nothing at the login layer — SuperTokens only knows "this is user X, and X holds these roles." Roles are assigned at signup (a patient-app registration always adds the <code>patient</code> role; a clinic registration adds <code>clinic_pending</code>, and so on). The real wall is <strong><code>requireRole()</code></strong>, in <span class="filepath">backend/src/middleware/requireRole.ts</span> — every sensitive API endpoint wraps itself in it, and it checks the caller's roles against whatever the endpoint requires. So a doctor's login token is technically valid on every app, but every patient-only endpoint would reject it, because "doctor" isn't in the list of accepted roles. (The patient app also does its own extra role check right after login, purely so it can show a friendly "no patient account found" message instead of a confusing empty dashboard.)</p>
+  </div>
+  <p>Roles used across the platform: <span class="tag accent">patient</span><span class="tag accent">doctor</span><span class="tag accent">doctor_pending</span><span class="tag accent">clinic</span><span class="tag accent">clinic_pending</span><span class="tag accent">pharmacy</span><span class="tag accent">pharmacy_pending</span><span class="tag accent">admin</span>. The <code>_pending</code> variants exist because doctors, clinics, and pharmacies all go through an approval queue before they can act as the real thing — see Section 7 (Admin Portal) for how that queue works.</p>
+  <p>Two independent, finer-grained <strong>permission</strong> systems sit on top of roles, both following the same "default-allow, only an explicit no removes access" rule:</p>
+  <ul>
+    <li><strong>Clinic staff permissions</strong> (<span class="filepath">backend/src/utils/clinicScope.ts</span>) — restrict what a branch-employee login can do inside the clinic portal: <code>manage_doctors</code>, <code>manage_patients</code>, <code>manage_appointments</code>, <code>manage_schedules</code>, <code>view_analytics</code>, <code>manage_insurance</code>, <code>manage_payment</code>. The clinic <em>owner's</em> own account always has every permission — this can only ever restrict a hired staff account.</li>
+    <li><strong>Doctor self-service permissions</strong> (<span class="filepath">backend/src/utils/doctorPermissions.ts</span>) — lets a clinic restrict what a doctor they employ can change about their own dashboard: <code>manage_own_schedule</code>, <code>manage_own_profile</code>, <code>view_analytics</code>, <code>manage_account_settings</code>.</li>
+  </ul>
+
+  <h3 id="arch-db">The database: Cosmos DB</h3>
+  <p>Cosmos DB is a <strong>NoSQL document database</strong> — worth pausing on for anyone used to spreadsheets or SQL. There's no fixed set of columns and no <code>JOIN</code> between tables; each "container" just holds a pile of JSON documents, and two documents in the same container can even have different fields. Every container also has a mandatory <strong>partition key</strong> — a field Cosmos uses to physically group documents together for fast lookups; querying <em>across</em> partitions (e.g. "every order that touches this one pharmacy," when orders are filed by patient) is explicitly slower and the code calls this out with comments wherever it happens.</p>
+  <p>The platform runs roughly 35 containers. The ones worth knowing by name:</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Container</th><th>Partition key</th><th>Holds</th></tr></thead>
+      <tbody>
+        <tr><td><code>patients</code> / <code>doctors</code> / <code>admins</code> / <code>pharmacies</code> / <code>clinics</code></td><td><code>/id</code></td><td>One profile document per account</td></tr>
+        <tr><td><code>appointments</code></td><td><code>/id</code></td><td>Every booking — the record that a lot of this guide revolves around</td></tr>
+        <tr><td><code>messages</code> / <code>clinicMessages</code></td><td><code>/conversationId</code></td><td>Chat history — kept in two <em>separate</em> containers on purpose (Section 3)</td></tr>
+        <tr><td><code>notifications</code> / <code>adminNotifications</code></td><td><code>/patientId</code> or <code>/id</code></td><td>In-app notification feeds for every role</td></tr>
+        <tr><td><code>medicineOrders</code>, <code>labBookings</code>, <code>vaccinationBookings</code></td><td><code>/patientId</code></td><td>Commerce/booking history</td></tr>
+        <tr><td><code>foodLogs</code>, <code>workoutLogs</code>, <code>weightLogs</code>, <code>pregnancyLogs</code>, <code>menstrualLogs</code>…</td><td><code>/patientId</code></td><td>Patient self-tracked wellness data</td></tr>
+        <tr><td><code>activityLogs</code></td><td><code>/source</code></td><td>Platform-wide audit trail (who did what, across every app)</td></tr>
+        <tr><td><code>otpCodes</code></td><td><code>/email</code>, 10-min auto-expiry</td><td>One-time verification codes for every OTP-gated flow</td></tr>
+        <tr><td><code>sosCodes</code></td><td><code>/patientId</code></td><td>Short-lived emergency-access codes (Section 8)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="arch-deploy">Where it all runs</h3>
+  <ul>
+    <li>The <strong>backend</strong> is a two-stage Docker build deployed to <strong>Google Cloud Run</strong> (<span class="filepath">backend/Dockerfile</span>, deployed via <code>gcloud run deploy</code>).</li>
+    <li><strong>SuperTokens</strong> runs as its own small container (<span class="filepath">wellness-platform/supertokens/Dockerfile</span>), independent of the backend.</li>
+    <li>The three <strong>Next.js portals</strong> (doctor, admin, pharmacy) have no Dockerfile or CI config of their own — consistent with each being deployed through Vercel's zero-config Git integration (push to <code>main</code>, Vercel builds and deploys automatically).</li>
+    <li>The <strong>patient app</strong> is built and shipped through Expo's own tooling, separate from the rest of the monorepo.</li>
+    <li>File storage (avatars, ID scans, prescriptions, lab/scan uploads) goes through <strong>Azure Blob Storage</strong> (<span class="filepath">backend/src/config/blob.ts</span>), always as time-limited signed URLs rather than public links. Transactional email (OTP codes, etc.) goes through <strong>Resend</strong> (<span class="filepath">backend/src/config/resend.ts</span>) — there is no SMS provider; every OTP is delivered by email. Push notifications ride on Expo's own push gateway (Section covers this again where relevant) rather than talking to Apple/Google directly.</li>
+  </ul>
+</section>
+
+<section class="doc-section" id="video">
+  <h2><span class="num">02</span>Video Calling — LiveKit</h2>
+  <p class="section-sub">This is the most involved feature in the whole platform, so it gets the deepest treatment. Every online consultation — doctor and patient seeing each other face to face — runs through this system.</p>
+
+  <h3 id="video-mental">How LiveKit actually works</h3>
+  <p><strong>WebRTC</strong> is the browser/phone technology that lets two devices stream audio and video directly to each other with very low latency. Used raw, it's notoriously hard: negotiating a connection, working around firewalls, reconnecting after a network blip are all hard problems on their own.</p>
+  <p><strong>LiveKit</strong> is a hosted service that wraps WebRTC and solves all of that. Instead of two devices connecting directly, everyone connects to a LiveKit media server, and it forwards each participant's audio/video to everyone else in the same <strong>room</strong>. Two concepts matter for reading the rest of this section:</p>
+  <ul>
+    <li><strong>Room</strong> — a named channel on the LiveKit server. In this platform, a room <em>is</em> one appointment's call, and the room's name is simply the appointment's own ID. LiveKit auto-creates a room the instant the first participant joins it — there is no separate "create room" step anywhere in this codebase.</li>
+    <li><strong>Access token</strong> — a short-lived, signed permission slip ("this identity may join this room, and may publish/subscribe to audio, video, and small data messages"). Only a server holding the LiveKit API key + secret can mint one, which is why every call starts with a client asking the backend for a token — the frontend never holds the secret itself.</li>
+  </ul>
+  <p>LiveKit also supports sending small binary messages to everyone in a room — its <strong>data channel</strong>. This platform leans on that constantly, for things well beyond video: in-call text chat, "a specialist wants to join," and "the doctor is proposing a follow-up appointment" all ride on this same mechanism, entirely separate from the camera/mic tracks.</p>
+  <div class="callout">
+    <span class="callout-label">Worth knowing</span>
+    <p>LiveKit itself has no concept of "appointments," "no-shows," or "doctors." Everything about appointment status, no-show detection, and waiting rooms described below is business logic this platform built <em>on top of</em> LiveKit's plain connect/disconnect events — tracked through ordinary REST calls to the Express backend, not anything LiveKit reports on its own.</p>
+  </div>
+
+  <h3 id="video-backend">Backend: rooms, tokens, and the no-show logic</h3>
+  <p><span class="filepath block">backend/src/config/livekit.ts</span> holds the API key/secret, and deliberately <strong>throws at startup</strong> if they're missing — no dev fallback, because a baked-in secret would let anyone reading the repo forge a token and eavesdrop on a live consultation. All of the actual call logic lives inside <span class="filepath">backend/src/routes/appointments.ts</span>, interleaved with the rest of appointment booking.</p>
+
+  <h4>The room name is just the appointment ID</h4>
+  <p>When an online appointment is booked, the backend stamps <code>livekitRoom: id</code> straight onto the appointment document — the same human-readable ID used everywhere else (e.g. <code>APT-20260819-DRSMITH-A3F9B2</code>). There's no separate "room" entity to look up; the appointment <em>is</em> the room. In-person visits get <code>livekitRoom: null</code>.</p>
+
+  <h4>Minting a token</h4>
+  <p><code>GET /api/appointments/:id/livekit-token</code> is what both doctor and patient call to get in. It checks the caller is genuinely one of the two parties on the appointment (403s everyone else), then builds a token scoped to exactly that room:</p>
+  <pre><code>const at = new AccessToken(livekitApiKey, livekitApiSecret, {
+  identity: userId,          // how LiveKit tells participants apart
+  name:     participantName, // display name shown in the call UI
+  ttl:      2 * 60 * 60,     // valid for 2 hours
+});
+at.addGrant({
+  roomJoin: true, room: apt.livekitRoom,
+  canPublish: true, canSubscribe: true, canPublishData: true,
+});</code></pre>
+  <p>A quirk worth noting: doctor and patient are handed <em>different</em> LiveKit WebSocket URLs (<code>LIVEKIT_WS_URL_DOCTOR</code> vs <code>LIVEKIT_WS_URL_PATIENT</code>) — a development-environment accommodation (doctor connects from a browser on the same machine as the dev LiveKit server, patient connects from a phone on the LAN), that in production would point both at the same real server.</p>
+
+  <h4>Presence tracking — the real heart of the feature</h4>
+  <p>There is <strong>no LiveKit webhook</strong> anywhere in this backend (confirmed by searching every route file). Instead of trusting LiveKit's own server-side events, the app rolls its own presence system: both doctor and patient apps call <code>PATCH /api/appointments/:id/call-presence</code> with <code>{ inCall: true }</code> the moment their own connection succeeds, and <code>{ inCall: false }</code> on disconnect. This single endpoint is what decides, after the fact, whether a call actually happened:</p>
+  <ol>
+    <li>Race-safe writes: Cosmos optimistic-concurrency (<code>ETag</code>) with a retry loop, so near-simultaneous doctor/patient updates can't silently clobber each other.</li>
+    <li><code>callStartedAt</code> is stamped the first moment <em>both</em> sides are simultaneously <code>inCall: true</code> — proof a real call happened.</li>
+    <li>When both sides have since left: if <code>callStartedAt</code> was ever set → appointment becomes <strong><code>completed</code></strong>. If it was <em>never</em> set (the two sides were never in the room together) → appointment becomes <strong><code>cancelled</code></strong> with <code>cancelledReason: "no_show"</code>.</li>
+    <li>The first time the doctor's presence flips true, a push notification goes to the patient ("Dr. X has joined — please join soon to avoid a no-show cancellation") — the only real nudge, since there's no hard timer.</li>
+  </ol>
+  <div class="callout warn">
+    <span class="callout-label">A real architectural trade-off</span>
+    <p>Because there's no server-side webhook, the completed-vs-no-show decision depends entirely on each client faithfully calling <code>call-presence</code> on both connect <em>and</em> disconnect. If an app crashes mid-call without running its cleanup step, that update never arrives. The only backstop is a lazy end-of-day sweep — <code>autoExpireStaleAppointments()</code> in <span class="filepath">backend/src/utils/appointmentSweep.ts</span> — which runs every time anyone lists their appointments, and auto-cancels anything still <code>scheduled</code>/<code>in_progress</code> once its calendar day has fully passed.</p>
+  </div>
+  <p>Two more presence-style signals worth knowing: <code>PATCH /:id/waiting</code> (patient pings this the moment they open the waiting-room screen — powers the doctor portal's "Online Now" list, independent of whether a call has started), and <code>PATCH /:id/status</code> (only the primary doctor can set this; the doctor portal fires <code>status: "in_progress"</code> automatically the instant their own LiveKit connection succeeds — this is exactly what unlocks the patient's "Join Call" button, described below).</p>
+
+  <h4>Inviting a specialist mid-call</h4>
+  <p>A primary doctor can pull a second doctor into an ongoing call. <code>POST /:id/invite-specialist</code> mints the specialist a token for the <em>same</em> room and pushes a <code>specialist_invite</code> message over the LiveKit data channel so the patient's consent modal pops up live, with no polling. The patient answers via <code>POST /:id/specialist-respond</code> (also echoed back over the data channel); the specialist actually joins via <code>GET /:id/specialist-join</code>.</p>
+
+  <h4>Proposing a follow-up</h4>
+  <p>Mid-call, the doctor can propose a follow-up date/time (<code>POST /:id/send-followup</code>), sent to the patient over the same data channel. If the patient accepts (<code>POST /:id/followup-respond</code>), a brand-new appointment document is created immediately — with its own fresh <code>livekitRoom</code> — and a <code>followup_accepted</code> data message (or <code>followup_declined</code>) is sent back into the room so the doctor's screen updates live.</p>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Every video-call-related endpoint</caption>
+      <thead><tr><th>Endpoint</th><th>Who</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/livekit-token</td><td>doctor or patient</td><td>Mint a room-join token</td></tr>
+        <tr><td class="ep"><span class="m m-patch">PATCH</span>/appointments/:id/waiting</td><td>patient</td><td>Mark "I'm in the waiting room"</td></tr>
+        <tr><td class="ep"><span class="m m-patch">PATCH</span>/appointments/:id/call-presence</td><td>doctor or patient</td><td>Report in-call / left-call — drives completed vs. no-show</td></tr>
+        <tr><td class="ep"><span class="m m-patch">PATCH</span>/appointments/:id/status</td><td>primary doctor</td><td>Manual lifecycle transition (fires <code>in_progress</code> on connect)</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/available-doctors</td><td>primary doctor</td><td>List specialists eligible to invite</td></tr>
+        <tr><td class="ep"><span class="m m-post">POST</span>/appointments/:id/invite-specialist</td><td>primary doctor</td><td>Invite a specialist into the room</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/specialist-join</td><td>invited specialist</td><td>Accept + get a token for the same room</td></tr>
+        <tr><td class="ep"><span class="m m-post">POST</span>/appointments/:id/specialist-respond</td><td>patient</td><td>Accept/decline the specialist invite</td></tr>
+        <tr><td class="ep"><span class="m m-post">POST</span>/appointments/:id/send-followup</td><td>primary doctor</td><td>Propose a follow-up date/time</td></tr>
+        <tr><td class="ep"><span class="m m-post">POST</span>/appointments/:id/followup-respond</td><td>patient</td><td>Accept (books a new appointment) or decline</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="video-doctor">Doctor portal: the consultation screen</h3>
+  <p>The doctor's live-call screen is <span class="filepath">doctor-portal/app/appointments/consult/page.tsx</span> — reached by clicking "Connect Now" from the Waiting Room (<span class="filepath">doctor-portal/app/appointments/waitingroom/page.tsx</span>; a similarly-named but misspelled folder, <span class="filepath">app/appointment/waitigrrom</span>, is kept only as a redirect for old links). A near-identical screen, <span class="filepath">doctor-portal/app/video-calls/page.tsx</span>, is used exclusively by an <em>invited specialist</em> joining an existing call, not the primary doctor.</p>
+  <p>On mount, it builds a <code>livekit-client</code> <code>Room</code>, requests a token, connects, then immediately fires <code>call-presence: true</code> and <code>status: in_progress</code>. While connected, the doctor can: toggle mic/camera; use an in-call <strong>Chat</strong> tab (ephemeral — LiveKit data messages only, never saved, gone once the call ends); fill out the <strong>EMR</strong> tab (the structured clinical note — saved via <code>POST /:id/emr</code>, a completely separate, persisted system from the ephemeral chat); open a read-only <strong>EHR</strong> side panel (the patient's full history, plus any linked external FHIR data — Section 4); invite a <strong>Specialist</strong>; or propose a <strong>Follow-up</strong>.</p>
+  <p>Ending the call: if the patient is still connected, a confirmation modal appears first ("The patient is still in the call") to prevent an accidental hang-up. Confirming disconnects LiveKit and reports <code>call-presence: false</code>, which is what lets the backend's completed/no-show logic run.</p>
+
+  <h3 id="video-patient">Patient app: waiting room and in-call screen</h3>
+  <p>Files: <span class="filepath">app/waiting-room.tsx</span> → <span class="filepath">app/video-call.tsx</span> → <span class="filepath">app/call-paused.tsx</span> (if things go sideways) → <span class="filepath">app/rate-experience.tsx</span>. The LiveKit SDK itself is wrapped defensively in <span class="filepath">utils/LiveKitMobile.tsx</span>, which <code>try/catch</code>-guards the native import and falls back to a harmless no-op stub if the native WebRTC module isn't available (e.g. running in plain Expo Go) — so a missing native module degrades gracefully instead of crashing the whole app.</p>
+  <p>The waiting room pings <code>PATCH /:id/waiting</code> on mount, then polls the appointment every 5 seconds. Critically, the <strong>"Join Call" button stays disabled and grey</strong> until <code>status === "in_progress"</code> — which, recall, only becomes true the instant the doctor's own connection succeeds. This structurally prevents a patient from ever walking into an empty room.</p>
+  <p>Once in the call, leaving has three distinct, deliberately different paths:</p>
+  <ul>
+    <li><strong>The doctor leaves first</strong> — the patient is routed straight to the rating screen (there's no one left to talk to).</li>
+    <li><strong>The patient taps End while the doctor is still connected</strong> — instead of ending outright, they're routed to <strong><code>call-paused.tsx</code></strong> ("Dr. X is still in the call — Rejoin?"), specifically to catch accidental hang-ups or network blips without prematurely ending a consult the doctor is actively running. From there, "Rejoin" reconnects cleanly; "End Consultation" (or the doctor also leaving in the meantime, which this screen polls for) forwards to the rating screen.</li>
+    <li><strong>An invited specialist leaves</strong> (not the primary doctor) — the patient just sees a toast and stays in the call.</li>
+  </ul>
+  <p>Every exit path reports <code>call-presence: false</code> as its cleanup step — the trigger for the backend's completed/no-show decision described above.</p>
+
+  <h3 id="video-lifecycle">A full call, start to finish</h3>
+  <ol class="steplist">
+    <li><strong>Booking.</strong> Patient books an online visit; the appointment is created with <code>livekitRoom</code> already set to its own ID.</li>
+    <li><strong>Waiting room.</strong> Patient opens the waiting-room screen, marks themselves present, and starts polling for the doctor.</li>
+    <li><strong>Doctor connects.</strong> Doctor clicks "Connect Now" — this is the moment the LiveKit room is actually created on the server, since the doctor arrives first. <code>status</code> flips to <code>in_progress</code>.</li>
+    <li><strong>Patient's button unlocks.</strong> The patient's next poll sees <code>in_progress</code> and enables "Join Call."</li>
+    <li><strong>Patient connects.</strong> Both sides are now in the same room; LiveKit begins forwarding audio/video. <code>callStartedAt</code> is stamped the instant both are simultaneously present.</li>
+    <li><strong>In-call.</strong> Video tiles render, mic/camera toggle, ephemeral chat, optional specialist invite or follow-up proposal — all riding on the same LiveKit data channel.</li>
+    <li><strong>Doctor ends.</strong> Both sides report <code>call-presence: false</code>; since <code>callStartedAt</code> was set, the appointment becomes <strong>completed</strong>.</li>
+    <li><strong>Post-call.</strong> Patient rates the experience, then sees a summary sourced from whatever EMR the doctor saved during the call.</li>
+  </ol>
+  <p>Two edge cases worth naming explicitly: if the doctor connects and later leaves <em>without the patient ever joining</em>, <code>callStartedAt</code> was never set, so the appointment is marked <strong>cancelled — no-show</strong> instead of completed. If <em>neither side ever joins at all</em>, the call-presence logic never fires either way — that's what the end-of-day <code>autoExpireStaleAppointments()</code> sweep exists to catch, marking it <code>cancelled — auto_expired</code>.</p>
+</section>
+
+<section class="doc-section" id="chat">
+  <h2><span class="num">03</span>Chat &amp; Messaging</h2>
+  <p class="section-sub">The platform runs <strong>two completely separate chat systems</strong> that happen to share the same transport technology but never mix data — plus one unrelated AI screen that just happens to share a name with one of them.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>Patient ↔ Doctor chat</h4>
+      <p style="margin-bottom:0;">The clinical conversation between a patient (or a family-member profile) and a doctor they have an appointment with.<br><span class="filepath">backend/src/routes/messages.ts</span> · Cosmos container <code>messages</code></p>
+    </div>
+    <div class="card">
+      <h4>Clinic staff chat</h4>
+      <p style="margin-bottom:0;">An internal-operations chat between a clinic owner, that clinic's branch staff, and the doctors on that branch's roster.<br><span class="filepath">backend/src/routes/clinicMessages.ts</span> · Cosmos container <code>clinicMessages</code></p>
+    </div>
+  </div>
+  <p>They're deliberately kept in <strong>separate Cosmos containers</strong> with different conversation-ID prefixes (<code>chat:...</code> vs <code>staffchat:...</code>) specifically so a query bug in one system could never leak the other's data.</p>
+  <div class="callout warn">
+    <span class="callout-label">Not the same thing</span>
+    <p>The patient app also has a screen literally named <span class="filepath">app/chat.tsx</span> — but it isn't doctor messaging at all. It's a Gemini-powered <strong>AI wellness assistant</strong> (<code>POST /api/wellness/chat</code>) that helps a patient describe symptoms and, if warranted, walks them toward booking a real doctor. Real doctor chat lives in <span class="filepath">app/doctor-chat.tsx</span> and <span class="filepath">app/message-doctor.tsx</span> instead.</p>
+  </div>
+
+  <h4>How "real-time" actually works here</h4>
+  <p>Neither classic WebSockets nor polling — the platform reuses <strong>LiveKit's data channel</strong> (the same one that carries in-call chat and specialist/follow-up signaling during video calls) as a lightweight real-time bus for persisted chat too. The flow is identical on both sides:</p>
+  <ol class="steplist">
+    <li><strong>Load history.</strong> A normal REST call (<code>GET /api/messages/:conversationId</code>) reads saved messages from Cosmos.</li>
+    <li><strong>Get a token.</strong> <code>GET /api/messages/token?channel=chat:{profileId}:{doctorId}</code> mints a LiveKit token scoped to a room named after the conversation.</li>
+    <li><strong>Connect and listen.</strong> The client joins that LiveKit room purely for its data channel, listening for <code>chat_message</code> packets.</li>
+    <li><strong>Sending a message</strong> always writes to the backend <em>first</em> (<code>POST /api/messages/:conversationId</code> — the durable source of truth), then re-broadcasts the same message over the data channel so the other party sees it appear instantly if they're currently connected. If they aren't connected right now, they simply see it the next time they open the conversation — there's no server-side push through LiveKit itself.</li>
+  </ol>
+
+  <h4>Who can message whom</h4>
+  <p>Patient-doctor chat is gated to an <strong>existing appointment</strong>: the backend's <code>hasAppointment()</code> check (in <span class="filepath">messages.ts</span>) requires a non-cancelled appointment between that specific profile and that doctor before a token or message will be accepted — a patient can't cold-message an arbitrary doctor. The patient app mirrors this visually in <span class="filepath">app/message-doctor.tsx</span>, splitting "Your Doctors" (tap to chat) from "Other Doctors" (tap prompts "Book Appointment First"). Clinic staff chat instead enforces a strict role-pair whitelist (org owner ↔ their own staff; staff ↔ doctors on their own branch; staff ↔ their own owner) — no direct owner↔doctor or cross-branch chats.</p>
+
+  <h4>What's tracked, and what isn't</h4>
+  <ul>
+    <li><strong>Read receipts:</strong> yes, simply — opening a conversation (<code>GET /:conversationId</code>) marks the other party's messages read as a side effect. There's no per-message delivery/read tick shown in the UI.</li>
+    <li><strong>Attachments:</strong> no. Every message document and every chat UI is text-only.</li>
+    <li><strong>Push notifications on a new message:</strong> <strong>not implemented</strong>. Neither <span class="filepath">messages.ts</span> nor <span class="filepath">clinicMessages.ts</span> calls the push-notification helper that other features (like appointment events) use — a user only learns of a new message by having the chat screen open, or later noticing the unread badge.</li>
+  </ul>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Endpoints (identical shape for both systems — swap the base path)</caption>
+      <thead><tr><th>Endpoint</th><th>Base path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td class="ep"><span class="m m-get">GET</span>/token?channel=…</td><td rowspan="4"><code>/api/messages</code><br><span style="color:var(--ink-soft);font-weight:400;">and</span><br><code>/api/clinic-messages</code></td><td>Mint a LiveKit token for the conversation's room</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/conversations</td><td>List every thread for the caller</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/:conversationId</td><td>Full history; marks the other side's messages read</td></tr>
+        <tr><td class="ep"><span class="m m-post">POST</span>/:conversationId</td><td>Send a message (persists to Cosmos)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Files</h4>
+  <p><strong>Backend:</strong> <span class="filepath">backend/src/routes/messages.ts</span>, <span class="filepath">backend/src/routes/clinicMessages.ts</span><br>
+  <strong>Doctor portal:</strong> <span class="filepath">doctor-portal/app/dashboard/messages/page.tsx</span> (Patients / Senior Staff toggle in one screen), <span class="filepath">doctor-portal/app/clinic/messages/page.tsx</span><br>
+  <strong>Patient app:</strong> <span class="filepath">app/message-doctor.tsx</span> (doctor picker), <span class="filepath">app/doctor-chat.tsx</span> (the actual thread), <span class="filepath">services/messagingService.ts</span> (the API client), <span class="filepath">utils/LiveKitMobile.tsx</span> (safe SDK wrapper)</p>
+</section>
+
+<section class="doc-section" id="fhir">
+  <h2><span class="num">04</span>FHIR — Exchanging Records With the Outside World</h2>
+
+  <h4>What FHIR is, in plain terms</h4>
+  <p><strong>FHIR</strong> (Fast Healthcare Interoperability Resources) is an international standard that lets different healthcare systems — a hospital's own EHR, a lab system, an insurer, a telehealth app like this one — exchange a patient's clinical data without every vendor inventing its own incompatible format. The core unit is a <strong>resource</strong>: a standardized JSON shape for one kind of clinical fact. A <code>Patient</code> resource holds demographics; an <code>Encounter</code> is one visit; an <code>Observation</code> is one measurement (a vital sign, a lab result); a <code>Condition</code> is a diagnosis; a <code>MedicationRequest</code> is a prescription.</p>
+
+  <div class="callout">
+    <span class="callout-label">Honest scope, up front</span>
+    <p>This is a <strong>read-only client</strong> that fetches FHIR resources from an external server and displays them alongside the platform's own native records — it does <em>not</em> generate FHIR resources from this platform's own data for anyone else to consume. If you're picturing "this platform exports its own patients as FHIR," that isn't what's built; the direction is inbound only, pulling in a patient's external history from elsewhere.</p>
+  </div>
+
+  <p>Today, "elsewhere" is the <strong>public HAPI FHIR R4 sandbox</strong> (<code>https://hapi.fhir.org/baseR4</code>) — explicitly a stand-in, per code comments, for the clinic's real "Cortex" EMR once production credentials exist (<span class="filepath">backend/src/config/fhir.ts</span>). A patient's Cosmos record carries an optional <code>fhirPatientId</code> linking them to a record on that server; the backend queries it live, on every page load, with no caching.</p>
+
+  <h4>What's actually covered</h4>
+  <p>Read (consumed): <span class="tag">Patient</span><span class="tag">Encounter</span><span class="tag">Observation</span><span class="tag">DocumentReference</span><span class="tag">Composition</span><span class="tag">Condition</span><span class="tag">MedicationRequest</span> — 7 of the dozens of standard FHIR types. <strong>Not covered at all:</strong> Procedure, AllergyIntolerance, Immunization, DiagnosticReport, CarePlan, insurance-related resources, bulk export, or subscriptions. There's no validation against the FHIR spec, and no authentication to the FHIR server yet (fine for a public sandbox; flagged in code comments as needing OAuth2/SMART-on-FHIR before pointing at a real EMR).</p>
+  <p>Linking a patient to an external record is currently a <strong>manual, one-off developer action</strong> — a CLI script (<span class="filepath">backend/src/data/seedFhirDemo.ts</span>), not anything reachable from the product UI.</p>
+
+  <h4>Where the logic lives</h4>
+  <p><span class="filepath">backend/src/services/fhirClient.ts</span> is the low-level HTTP client (handles pagination, parses FHIR error bodies). <span class="filepath">backend/src/services/fhirService.ts</span> turns raw FHIR JSON into simple display shapes — the closest thing to a "mapping layer" in the codebase, but note it maps <em>FHIR → internal display shape</em>, the opposite direction of a true export feature.</p>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Endpoints — deliberately split for security</caption>
+      <thead><tr><th>Endpoint</th><th>Who</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="ep"><span class="m m-get">GET</span>/api/fhir/me</td><td>patient, self only</td><td>Resolves <code>fhirPatientId</code> from the <em>caller's own</em> record server-side — no ID parameter accepted, so a patient can never view someone else's</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/fhir/encounters</td><td>doctor, on that appointment only</td><td>Re-verifies the doctor is authorized on <em>this specific</em> appointment first</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/fhir/notes</td><td>same</td><td>Notes/documents</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/fhir/observations</td><td>same</td><td>Vitals/labs</td></tr>
+        <tr><td class="ep"><span class="m m-get">GET</span>/appointments/:id/fhir/context</td><td>same</td><td>Conditions + medications</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The code's own comments record that this file used to also expose an unscoped patient-search endpoint any doctor could call on any patient — that's since been removed as a security fix, leaving only the appointment-scoped routes above.</p>
+
+  <h4>Where it shows up</h4>
+  <p><strong>Doctor portal:</strong> <span class="filepath">doctor-portal/components/video-call/EhrPanel.tsx</span> renders a "External EMR Records — Live · FHIR" section during a consult, fed by <span class="filepath">doctor-portal/app/appointments/consult/page.tsx</span>. <strong>Patient app:</strong> <span class="filepath">app/record-detail.tsx</span> shows the same data via <span class="filepath">services/recordsService.ts</span>'s <code>getMyExternalRecords()</code> — fetched independently of the native record so a slow FHIR call never blocks the rest of the screen. <strong>Admin portal:</strong> no FHIR code anywhere — it's exclusively a doctor-portal / patient-app / backend concern.</p>
+</section>
+
+<section class="doc-section" id="backend">
+  <h2><span class="num">05</span>Backend API Reference</h2>
+  <p class="section-sub">Around 50 route files live in <span class="filepath">backend/src/routes/</span>, each wired up in <span class="filepath">backend/src/index.ts</span>. They're grouped below by who calls them. Click any file to expand its full endpoint list — every one of them requires a valid login (<code>verifySession</code>) unless stated otherwise, and most also require a specific role via <code>requireRole(...)</code>.</p>
+
+  <div class="callout good">
+    <span class="callout-label">Patterns that repeat everywhere</span>
+    <p><strong>Approval queues</strong> — doctors, clinics, pharmacies, pharmacy products, insurance policies, and fee changes all follow the same shape: a <code>status</code> field starting at <code>pending</code>, an approve/reject endpoint, and (for accounts) a SuperTokens role that flips in lockstep (e.g. <code>doctor_pending</code> → <code>doctor</code>). <strong>Soft-delete, never hard-delete</strong> — removing a doctor or deactivating a patient just flips a status field (so appointment history survives) and calls SuperTokens' <code>revokeAllSessionsForUser</code> so any already-open session dies immediately. <strong>Never trust the client for money or authorization fields</strong> — an appointment's price, an insurance policy's verified status, and the payment method for in-person visits are always resolved or re-checked server-side, regardless of what the client sends.</p>
+  </div>
+
+  <h3 id="be-platform">Platform admin routes</h3>
+  <p class="section-sub">Called exclusively by the <strong>Admin Portal</strong> — Wellness Central's own operators, not any clinic. All gated <code>requireRole("admin")</code>.</p>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminClinics.ts</span><span class="sdesc">Clinic onboarding queue — the two-phase branch approval flow</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/pending</span>, <span class="ep"><span class="m m-get">GET</span>/approved</span>, <span class="ep"><span class="m m-get">GET</span>/:id</span> — listing/lookup by status</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:orgId/branches/:branchId/approve</span> — <strong>two-phase</strong>: a freshly-requested branch (<code>requested</code>) is first approved to <code>details_pending</code> (clinic must then submit a full profile); a fully-detailed branch (<code>pending_approval</code>) is approved straight to <code>active</code></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:orgId/branches/:branchId/reject</span></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/approve</span> — swaps role <code>clinic_pending</code>→<code>clinic</code>, also auto-activates any branches already fully detailed</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/reject</span>, <span class="ep"><span class="m m-post">POST</span>/</span> (admin creates a pre-approved clinic directly), <span class="ep"><span class="m m-post">POST</span>/upload</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminDoctors.ts</span><span class="sdesc">Legacy independent-doctor onboarding (clinics now manage their own doctors instead)</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/pending</span> / <span class="ep"><span class="m m-get">GET</span>/approved</span> (with computed stats: consultations, prescriptions, rating) / <span class="ep"><span class="m m-get">GET</span>/:id</span></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/approve</span> — swaps <code>doctor_pending</code>→<code>doctor</code></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/reject</span>, <span class="ep"><span class="m m-get">GET</span>/:id/diagnosis</span>, <span class="ep"><span class="m m-get">GET</span>/:id/reviews</span></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/verify-slots</span> — promotes a pending schedule change to live</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/</span> (admin creates a pre-approved doctor), <span class="ep"><span class="m m-post">POST</span>/upload</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminPharmacy.ts</span><span class="sdesc">Pharmacy + product approval queue</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/</span> — admin directly creates (optionally auto-approves) a pharmacy</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/pending</span> / <span class="ep"><span class="m m-get">GET</span>/approved</span>, <span class="ep"><span class="m m-post">POST</span>/:id/approve</span> (role swap), <span class="ep"><span class="m m-post">POST</span>/:id/reject</span></li>
+        <li><span class="ep"><span class="m m-get">GET</span>/products/pending</span> / <span class="ep"><span class="m m-get">GET</span>/products/approved</span>, <span class="ep"><span class="m m-post">POST</span>/products/:id/approve|reject</span></li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/products/:id/prescription</span> — toggle "requires prescription"</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/products/:id/flag</span> — hides a listing without deleting it (content moderation)</li>
+        <li><span class="ep"><span class="m m-delete">DELETE</span>/products/:id</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminPatients.ts</span><span class="sdesc">Full patient directory + EHR access + account deactivation</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> / <span class="ep"><span class="m m-get">GET</span>/:patientId</span></li>
+        <li><span class="ep"><span class="m m-get">GET</span>/:patientId/ehr</span> — the full longitudinal record: standing profile + every past appointment's EMR across every doctor</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/:patientId/status</span> — toggles active/deactivated; deactivating also revokes every active session immediately, not just blocking future logins</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminLab.ts / adminVaccines.ts</span><span class="sdesc">Diagnostic lab and vaccine catalogue management</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>adminLab.ts</strong>: <span class="ep"><span class="m m-post">POST</span>/</span> (create a lab, auto-approved), <span class="ep"><span class="m m-post">POST</span>/:labId/tests</span>, <span class="ep"><span class="m m-get">GET</span>/</span>, <span class="ep"><span class="m m-get">GET</span>/:labId/tests</span>, <span class="ep"><span class="m m-patch">PATCH</span>/tests/:id/toggle</span></li>
+        <li><strong>adminVaccines.ts</strong>: <span class="ep"><span class="m m-post">POST</span>/</span>, <span class="ep"><span class="m m-get">GET</span>/</span> / <span class="ep"><span class="m m-get">GET</span>/:id</span>, <span class="ep"><span class="m m-patch">PATCH</span>/:id</span>, <span class="ep"><span class="m m-patch">PATCH</span>/:id/toggle</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminOrders.ts</span><span class="sdesc">Cross-pharmacy medicine order oversight</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul><li><span class="ep"><span class="m m-get">GET</span>/</span> — every order, across every pharmacy · <span class="ep"><span class="m m-get">GET</span>/:orderId</span> · <span class="ep"><span class="m m-patch">PATCH</span>/:orderId/status</span> — admin can force-set status anywhere in the pipeline</li></ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminFeeRequests.ts / adminInsuranceVerifications.ts</span><span class="sdesc">Two approval queues for money-adjacent changes</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Fee requests</strong> — clinics/doctors propose a consultation-fee change; admin approves (applies it directly to the clinic/doctor record) or rejects with a reason. <span class="ep"><span class="m m-get">GET</span>/?status=</span>, <span class="ep"><span class="m m-post">POST</span>/:id/approve</span>, <span class="ep"><span class="m m-post">POST</span>/:id/reject</span></li>
+        <li><strong>Insurance verifications</strong> — since policies live nested inside <code>patient.insurance[]</code> (no dedicated container), this scans every patient for pending entries. <span class="ep"><span class="m m-get">GET</span>/?status=</span>, <span class="ep"><span class="m m-post">POST</span>/:patientId/:insuranceId/approve|reject</span> — only acts on entries still <code>pending</code>, preventing a double-review</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminDashboard.ts / adminSearch.ts / adminReports.ts</span><span class="sdesc">Home-screen analytics, global search, and PDF report generation</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/dashboard/stats?range=</span> — calendar-aligned bookings/cancellations/ratings with % change vs. the prior period</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/dashboard/tasks</span> — pending approvals aggregated <em>live</em> from source data (no separate "task" table exists — a task just disappears once the record changes state)</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/search?q=</span> — cross-entity substring search (doctors, clinics, patients, appointments)</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/reports/preview</span> and <span class="ep"><span class="m m-post">POST</span>/reports/generate</span> — the latter streams back a full branded PDF (charts hand-drawn with PDFKit) across nine report types</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminSettings.ts / adminRoles.ts / adminNotifications.ts / adminActivityLog.ts / adminArticles.ts</span><span class="sdesc">Platform configuration, internal RBAC, notification feed, audit log, content CMS</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Settings</strong> — <span class="ep"><span class="m m-get">GET</span>/PUT /settings/profile</span>, <span class="ep">/settings/platform</span> (one shared config doc, merged not replaced), <span class="ep"><span class="m m-post">POST</span>/settings/upload-policy</span> (Privacy Policy / Terms HTML)</li>
+        <li><strong>Roles</strong> — a coarser, separate permission system from the clinic/doctor one in Section 1: four flags (<code>medicalRecords</code>, <code>prescription</code>, <code>emrUpdates</code>, <code>systemConfig</code>) toggleable per doctor, patient, or admin. <span class="ep"><span class="m m-get">GET</span>/doctors|patients|admins</span>, <span class="ep"><span class="m m-patch">PATCH</span>/:role/:userId/permissions</span></li>
+        <li><strong>Notifications</strong> — same "derive live, sync only new ones" pattern used throughout the platform: pending approvals, open tickets, low ratings, SOS events all computed fresh, then diffed against what's already saved so read/unread state never resets</li>
+        <li><strong>Activity log</strong> — <span class="ep"><span class="m m-get">GET</span>/activity-logs?source=&amp;page=</span>, paginated read of the audit trail every other route writes into</li>
+        <li><strong>Articles</strong> — CMS for the patient app's wellness content library: <span class="ep">CRUD</span> plus <span class="ep"><span class="m m-patch">PATCH</span>/:id/flag</span> (moderation — hides without deleting) and a one-time <span class="ep"><span class="m m-post">POST</span>/seed</span> dev helper</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">adminEarnings.ts</span><span class="sdesc">Platform-wide financial rollup</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul><li><span class="ep"><span class="m m-get">GET</span>/summary</span> — total/cash/insurance earnings across every completed, paid appointment platform-wide · <span class="ep"><span class="m m-get">GET</span>/clinics</span> — per-clinic rollup · <span class="ep"><span class="m m-get">GET</span>/clinics/:orgId/doctors</span> — per-doctor breakdown within one clinic</li></ul>
+    </div>
+  </details>
+
+  <h3 id="be-clinic">Clinic &amp; doctor routes</h3>
+  <p class="section-sub">Called by the <strong>Doctor Portal</strong> — both its individual-doctor half (<code>app/dashboard</code>) and its clinic-admin half (<code>app/clinic</code>).</p>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">doctors.ts</span><span class="sdesc">A doctor's own self-service dashboard endpoints</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/me</span>, <span class="ep"><span class="m m-put">PUT</span>/profile</span> (gated by the <code>manage_own_profile</code> permission)</li>
+        <li><span class="ep"><span class="m m-put">PUT</span>/slots</span> — writes to <code>tempSlots</code> + <code>slotsPending</code> rather than the live schedule directly; if clinic-employed, notifies the clinic that a review is needed</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/slots</span>, <span class="ep"><span class="m m-get">GET</span>/absences</span>, <span class="ep"><span class="m m-post">POST</span>/absences</span> (409s with a conflict list if a booked appointment overlaps — never auto-cancels it)</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/:id/available-slots?date=</span> — <strong>public</strong>; computes real open slots = weekly schedule − absences − already-booked − past times</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> — <strong>public</strong> doctor directory, deliberately stripped of sensitive fields (Emirates ID, DOB, bank details)</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/online-status</span>, <span class="ep"><span class="m m-patch">PATCH</span>/notifications</span></li>
+      </ul>
+      <p style="margin-top:12px;">Notably <em>absent</em>: doctors have no self-service change-password, 2FA toggle, or account-delete endpoint here — those live in <code>clinicDoctors.ts</code> instead, since the employing clinic is the vetting authority for its own doctors' credentials.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinicDoctors.ts</span><span class="sdesc">Everything a clinic can do to a doctor it employs</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/</span> — clinic creates a doctor with real credentials, live immediately (gated <code>manage_doctors</code>) — no approval queue, since the clinic itself is the vetting authority</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> / <span class="ep"><span class="m m-get">GET</span>/:id</span> — roster with computed stats, <span class="ep"><span class="m m-patch">PATCH</span>/:id</span> — edit profile</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/reset-password</span>, <span class="ep"><span class="m m-post">POST</span>/:id/2fa/enable|disable</span> — clinic-controlled, no OTP step (the clinic's own session <em>is</em> the authorization)</li>
+        <li><span class="ep"><span class="m m-put">PUT</span>/:id/slots</span> — clinic sets a doctor's schedule <em>directly live</em>, no pending step</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/verify-slots</span> / <span class="ep">reject-slots</span> — approve/decline a doctor's own self-submitted schedule change</li>
+        <li><span class="ep"><span class="m m-delete">DELETE</span>/:id</span> — soft-delete (<code>status: "deleted"</code>) + immediate session revocation</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinics.ts</span><span class="sdesc">Clinic self-registration, own-profile management, and the public clinic directory</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/register</span> — public, OTP-gated; role <code>clinic_pending</code></li>
+        <li><span class="ep"><span class="m m-get">GET</span>/me</span> — a branch-staff login gets their personal doc merged with their branch's business identity from the parent org doc</li>
+        <li><span class="ep"><span class="m m-put">PUT</span>/profile</span> — the onboarding wizard's save step; branches by whether the caller is a branch-user or the org owner</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/dashboard</span> — one-call aggregation (today/yesterday counts, revenue, waiting patients, 8-day trend) — all computed live, nothing pre-stored</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/analytics</span> — same underlying data, gated by <code>view_analytics</code></li>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> — <strong>public</strong> clinic directory · <span class="ep"><span class="m m-get">GET</span>/:id</span> — <strong>public</strong> single profile</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinicBranches.ts</span><span class="sdesc">Multi-location clinic management (org owner only)</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> / <span class="ep"><span class="m m-get">GET</span>/:branchId</span> — with computed stats per branch</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/POST /:branchId/users</span>, <span class="ep"><span class="m m-patch">PATCH</span>/:branchId/users/:userId</span>, <span class="ep"><span class="m m-post">POST</span>/:branchId/users/:userId/reset-password</span>, <span class="ep"><span class="m m-delete">DELETE</span>/:branchId/users/:userId</span> — branch staff-account CRUD (same real-credentials-immediately pattern as clinic doctors)</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/add-request</span> — <strong>phase 1</strong> of adding a branch: name/address/license only, status <code>requested</code></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:branchId/submit-details</span> — <strong>phase 2</strong>, only usable once admin approved phase 1; full profile + schedule, status → <code>pending_approval</code> for final admin sign-off</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinicAppointments.ts / clinicPatients.ts / clinicFeedback.ts / clinicSearch.ts</span><span class="sdesc">Clinic-wide views across every doctor on the roster</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Appointments</strong> — <span class="ep"><span class="m m-get">GET</span>/</span> every appointment across the clinic's doctors, enriched with a computed primary diagnosis</li>
+        <li><strong>Patients</strong> — <span class="ep"><span class="m m-get">GET</span>/</span> the clinic's roster, <em>derived from appointments</em> (patients aren't a clinic-owned entity — anyone who's ever booked with one of this clinic's doctors counts); gated <code>manage_patients</code></li>
+        <li><strong>Feedback</strong> — <span class="ep"><span class="m m-get">GET</span>/</span> reviews fanned out across the doctor roster, <span class="ep"><span class="m m-patch">PATCH</span>/:id/reply</span> — the clinic's public reply</li>
+        <li><strong>Search</strong> — <span class="ep"><span class="m m-get">GET</span>/search?q=</span> — scoped to the caller's own clinic/branch(es)</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinicInsurance.ts / clinicPermissions.ts</span><span class="sdesc">Accepted insurance policies, and the staff/doctor permission editor</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Insurance</strong> — <span class="ep"><span class="m m-get">GET</span>/by-doctor/:doctorId</span> (patient-facing, used at booking) · <span class="ep">CRUD</span> on the clinic's accepted policy list, gated <code>manage_insurance</code>. Matching a patient's own free-text provider name against a clinic's policy name uses a lenient case-insensitive substring match — there's no shared provider-ID system between the two.</li>
+        <li><strong>Permissions</strong> — <span class="ep"><span class="m m-get">GET</span>/PATCH /:targetId</span> and <span class="ep"><span class="m m-patch">PATCH</span>/branch/:branchId/all</span> (bulk apply to every staff account in a branch) — this is the backend for the "User Roles" screen described in Section 6</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">clinicPayments.ts</span><span class="sdesc">Clinic financials — earnings, withdrawals, fee changes, bank details</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/summary</span> — total/cash/insurance earnings minus processed withdrawals = balance</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/doctors</span> / <span class="ep">doctors/:id/summary</span> — per-doctor earnings</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/history?category=</span> — payment history; a <code>dr-share</code> row computes as fee × doctor-share%</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/fee-change-request</span>, <span class="ep"><span class="m m-post">POST</span>/withdrawal-request</span>, <span class="ep"><span class="m m-patch">PATCH</span>/bank-account</span>, <span class="ep"><span class="m m-patch">PATCH</span>/doctor-share</span> — all OTP-gated on the frontend before submission</li>
+      </ul>
+      <div class="callout warn" style="margin-top:12px;"><span class="callout-label">Mocked, not real money movement</span><p>A withdrawal request is recorded as real bookkeeping (<code>status: "processed"</code> immediately) but never actually calls a payment rail — there is no live payout integration anywhere in this codebase.</p></div>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">doctorNotifications.ts</span><span class="sdesc">The doctor portal's notification bell</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Same "derive live from source data, sync only new ones" pattern as the admin notification feed: new bookings, waiting patients (always shown — "critical"), unread messages, pending follow-ups, support-ticket replies, and application-status changes, filtered against the doctor's own saved notification toggles. <span class="ep"><span class="m m-get">GET</span>/</span>, <span class="ep"><span class="m m-patch">PATCH</span>/:id/read</span>, <span class="ep"><span class="m m-patch">PATCH</span>/read-all</span>.</p>
+    </div>
+  </details>
+
+  <h3 id="be-patient">Patient-facing routes</h3>
+  <p class="section-sub">Called by the <strong>Patient App</strong>.</p>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">patients.ts</span><span class="sdesc">Registration and every patient self-service setting</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/register</span> — public, requires a <em>verified</em> OTP doc for the email first (can't be bypassed by calling the API directly)</li>
+        <li><span class="ep"><span class="m m-put">PUT</span>/profile</span>, <span class="ep">/allergies</span>, <span class="ep">/medications</span>, <span class="ep">/chronic-diseases</span>, <span class="ep">/fitness-profile</span>, <span class="ep">/insurance</span>, <span class="ep">/emergency-contacts</span>, <span class="ep">/notification-preferences</span>, <span class="ep">/privacy-preferences</span> — merge-style profile updates</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/profile</span> — overrides <code>email</code> with the SuperTokens-authoritative login address, never trusting a possibly-stale Cosmos field</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/profiles</span> — self + every family member, as a switchable profile list</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/avatar</span>, <span class="ep">/family/:memberId/avatar</span></li>
+        <li><span class="ep"><span class="m m-get">GET</span>/POST /family</span> (max 4 additional members = 5 profiles total, enforced server-side), <span class="ep"><span class="m m-put">PUT</span>/DELETE /family/:memberId</span>, plus per-member allergies/medications/chronic-diseases/fitness-profile variants</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/sessions</span>, <span class="ep"><span class="m m-delete">DELETE</span>/sessions/:handle</span>, <span class="ep"><span class="m m-post">POST</span>/sessions/revoke-all</span></li>
+        <li><span class="ep"><span class="m m-post">POST</span>/change-password</span> — re-verifies the current password with a real SuperTokens sign-in attempt before allowing the change</li>
+        <li><span class="ep"><span class="m m-delete">DELETE</span>/me</span> — soft-deletes (<code>status: "deleted"</code>), preserving order/appointment history</li>
+      </ul>
+      <div class="callout" style="margin-top:12px;"><span class="callout-label">A quiet anti-fraud detail</span><p><code>PUT /insurance</code> never trusts a client-supplied policy <code>status</code> — any brand-new entry, or one whose provider/policy-ID/plan changed, is force-reset to <code>pending</code> server-side; an unchanged entry keeps whatever admin already verified. A patient can never self-approve their own insurance.</p></div>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">appointments.ts</span><span class="sdesc">Booking, EMR, follow-ups, specialist invites — the core engine (video-call parts covered in Section 2)</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/</span> — books an appointment. In-person visits are always <code>pay_at_clinic</code> (server-forced); insurance payment is only accepted if the policy is <code>active</code> <em>and</em> actually matches one of the doctor's clinic's accepted policies; the price is always resolved server-side from the doctor's fee, never trusted from the client. Generates a human-readable ID like <code>APT-20260819-DRSMITH-A3F9B2</code>.</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span>, <span class="ep">/doctor</span>, <span class="ep">/doctor/tasks</span>, <span class="ep">/:id</span> — listings/lookups per role</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/:id/cancel</span> — role-aware, notifies whichever party didn't initiate it</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/:id/mark-paid</span> — flips an in-person visit's payment status once collected at the front desk</li>
+        <li><span class="ep"><span class="m m-patch">PATCH</span>/:id/reschedule</span> — revalidates the new slot against real availability</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/pre-visit</span> — patient-submitted intake form</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:id/emr</span> / <span class="ep"><span class="m m-get">GET</span>/:id/emr</span> — the single-encounter clinical note (see the callout below)</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/:id/ehr</span> — the patient's <em>longitudinal</em> record, assembled from every past EMR</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/patient/:patientId/notes</span></li>
+      </ul>
+      <div class="callout" style="margin-top:12px;">
+        <span class="callout-label">How the EMR survives a multi-doctor consult</span>
+        <p>Medicines and labs are tagged with a <code>contributorDoctorId</code> so a specialist's additions never wipe the primary doctor's entries — saving replaces only <em>this doctor's own</em> tagged entries and keeps everyone else's untouched. Free-text sections are shallow-merged the same way. Addenda are strictly <strong>append-only</strong>, timestamped and signed at write time — a correction is always a new addendum, never an edit, mirroring real EMR audit-trail conventions.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">wellness.ts</span><span class="sdesc">Food/fitness tracking, AI features, assessments, saved routines</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/analyze-food-image</span> — sends a base64 food photo to Google Gemini (tries <code>gemini-3.5-flash</code> → <code>2.5-flash</code> → <code>2.0-flash</code> in order), returns the detected food + nutrition estimate</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/chat</span> — the "Dr. Wellness" AI assistant, system-prompted to refuse off-topic questions and append a hidden marker when it thinks the patient should book a real doctor (the frontend turns that into a booking prompt)</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/foods?q=</span> — local food database first, falls back to the public Open Food Facts API if fewer than 5 local matches</li>
+        <li><span class="ep">CRUD /food-log</span>, <span class="ep">/exercises</span>, <span class="ep">CRUD /workout-log</span> (+ <span class="ep">/workout-log/bulk</span>) — calories burned computed from the patient's own logged body weight</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/daily-summary?date=&amp;profileId=</span> — a day's food + workout totals, grouped by meal</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/assessments</span>, <span class="ep">/assessments/history</span>, <span class="ep"><span class="m m-post">POST</span>/assessments/submit</span> — health-assessment quiz system</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/routines/discovery</span>, <span class="ep">CRUD /routines</span> — saved workout routine library</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/GET /weight-log</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">menstrual.ts</span><span class="sdesc">Cycle prediction engine — the most algorithmically sophisticated module in the platform</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Cycle math:</strong> ovulation is placed a fixed ~14 days <em>before</em> the next predicted period (the luteal phase is biologically the stable part of a cycle, not the follicular phase); the fertile window is ovulation −5 to +1 days, matching real sperm-survival biology</li>
+        <li><strong>Cycle-length learning:</strong> takes the <em>median</em> gap between logged period start dates (robust to one outlier month), only counting gaps in the plausible 18–60 day range</li>
+        <li><strong>Irregularity detection</strong> trips on any of three independent signals: a single gap outside 21–35 days, more than a 9-day spread between the shortest and longest gap, or a standard deviation above 7 days across gaps</li>
+        <li><strong>BBT ovulation confirmation:</strong> scans daily basal body temperature for a sustained rise of ≥0.2°C above the prior 6-day average, held 3+ consecutive days — a genuine fertility-tracking technique, not a guess</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/insights</span> — the full computed payload (phase, predicted dates, irregularity flag, BBT-confirmed ovulation if available); recomputed fresh on every read, never cached</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">pregnancy.ts</span><span class="sdesc">Pregnancy tracking, including a gestational-diabetes sub-log</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep">CRUD /profile</span> — weeks/days pregnant, due date; deleting only wipes the <em>specific</em> profile requested, never cascades to family members</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/PUT /log</span>, <span class="ep"><span class="m m-get">GET</span>/log/history</span> — daily mood/symptoms/weight/water/pill-tracker log</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/scan</span> — ultrasound/scan image or PDF upload, replacing any prior scan for that date</li>
+        <li><span class="ep"><span class="m m-put">PUT</span>/DELETE /diabetes</span> — nested gestational-diabetes log merged into the same day's document</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">services.ts / articles.ts / sos.ts</span><span class="sdesc">Unified order history, the patient-facing article reader, and the emergency-access flow</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>services.ts</strong> — <span class="ep"><span class="m m-get">GET</span>/history</span>: a unified "everything I've ordered or booked" feed, normalizing medicine orders, lab bookings, vaccination bookings, and completed/cancelled consultations into one shape, sorted newest-first. Uses <code>Promise.allSettled</code> so one failing data source never breaks the whole feed.</li>
+        <li><strong>articles.ts</strong> — read-only mirror of the admin CMS, excluding anything flagged</li>
+        <li><strong>sos.ts</strong> — <span class="ep"><span class="m m-post">POST</span>/generate</span> (patient — a cryptographically random 6-digit code, 15-minute expiry, single-use), <span class="ep"><span class="m m-post">POST</span>/verify</span> (doctor — validates the code and returns the patient's full medical profile, since a responding doctor may have no prior relationship with this patient), <span class="ep"><span class="m m-get">GET</span>/admin/all</span> (admin oversight)</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3 id="be-commerce">Pharmacy, lab &amp; vaccines</h3>
+  <p class="section-sub">The three "book or buy something" verticals — each follows the same shape: a public catalogue, a patient-facing booking/order endpoint, and a fulfiller-facing status pipeline.</p>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">pharmacy.ts + medicineOrders.ts</span><span class="sdesc">Pharmacy self-service (pharmacy-portal) and patient ordering (patient app) — split across two files sharing one base path</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><strong>pharmacy.ts</strong> (pharmacy-portal side, <code>requireRole("pharmacy")</code>): <span class="ep"><span class="m m-get">GET</span>/catalogue</span> &amp; <span class="ep">/catalogue/:id</span> (public — approved, unflagged products only), <span class="ep"><span class="m m-post">POST</span>/register</span> (public, OTP-gated), <span class="ep"><span class="m m-get">GET</span>/PUT /me</span>, <span class="ep">CRUD /products</span>, <span class="ep"><span class="m m-get">GET</span>/orders</span> (this pharmacy's own queue), <span class="ep"><span class="m m-patch">PATCH</span>/orders/:id/status</span> (restricted to <code>shipped</code>/<code>delivered</code> — a pharmacy can't self-confirm or cancel).</p>
+      <p><strong>medicineOrders.ts</strong> (patient-app side, <code>requireRole("patient")</code>): <span class="ep"><span class="m m-post">POST</span>/orders</span> (validates real live stock, decrements it after creating the order), <span class="ep"><span class="m m-get">GET</span>/my-orders</span> — deliberately renamed from <code>/orders</code>, because <code>pharmacy.ts</code>'s staff-only <code>GET /orders</code> is mounted first at the same base path and would otherwise permanently shadow it — <span class="ep"><span class="m m-patch">PATCH</span>/orders/:id/cancel</span>, <span class="ep"><span class="m m-post">POST</span>/prescriptions/upload</span> &amp; <span class="ep">/prescriptions</span>.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">lab.ts / vaccines.ts</span><span class="sdesc">Diagnostic test bookings and vaccination bookings — near-identical shape</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-get">GET</span>/</span> — public catalogue browsing</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/bookings</span> — validates every item, computes the total, mock-paid immediately; a lab test flagged <code>requires_doctor_approval</code> can carry an optional consultation date/slot</li>
+        <li><span class="ep"><span class="m m-get">GET</span>/bookings</span> / <span class="ep">/bookings/:id</span> (supports <code>?profileId=</code> for family-member scoping), <span class="ep"><span class="m m-patch">PATCH</span>/bookings/:id/cancel</span></li>
+        <li>Lab bookings additionally support <span class="ep"><span class="m m-patch">PATCH</span>/bookings/:id/status</span> — the patient walks the booking through <code>awaiting → confirmed → analyzing → results</code> themselves</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3 id="be-shared">Shared across every app</h3>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">auth.ts</span><span class="sdesc">Who am I, right now?</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><span class="ep"><span class="m m-get">GET</span>/auth/me</span> — called by every app right after login; returns <code>{ userId, roles, profile }</code>, combining SuperTokens' role data with the Postgres profile row. (Actual signup/signin/password-reset for the shared tenant is auto-handled by SuperTokens' own <code>/auth/*</code> routes, customized in <span class="filepath">backend/src/config/supertokens.ts</span> — there's no separate registration endpoint here.)</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">otp.ts</span><span class="sdesc">The shared 6-digit code infrastructure behind every registration, reset, and 2FA flow</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><span class="ep"><span class="m m-post">POST</span>/send</span> — public; rate-limited to one per 60 seconds per email+purpose; emails the code via Resend (in non-production, a failed send logs the code to the console instead of failing, so local testing never needs a verified sender domain). <span class="ep"><span class="m m-post">POST</span>/verify</span> — max 5 attempts, marks the doc verified (doesn't delete it — some flows read the verified flag again later).</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">internal.ts</span><span class="sdesc">The one route file no human ever calls</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><span class="ep"><span class="m m-post">POST</span>/appointment-reminders/sweep</span> — called roughly every minute by Google Cloud Scheduler, guarded by a shared-secret header instead of a login session. Scans every scheduled appointment and pushes a reminder at the 30-minute and 10-minute marks, using per-appointment flags so a stage never fires twice even if a scheduler tick is missed.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">support.ts</span><span class="sdesc">Help-desk tickets, shared by all four apps</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><span class="ep"><span class="m m-post">POST</span>/</span> — any logged-in role can open a ticket; <span class="ep"><span class="m m-get">GET</span>/</span> / <span class="ep">/:ticketId</span> — the submitter's own tickets only</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:ticketId/comments</span> — submitter follow-ups and admin comments share one thread</li>
+        <li><span class="ep"><span class="m m-post">POST</span>/:ticketId/attachments</span> — up to 5 files, 10MB each</li>
+        <li>Admin side: <span class="ep"><span class="m m-get">GET</span>/admin/all</span>, <span class="ep"><span class="m m-patch">PATCH</span>/admin/:id/reply</span> (the single "official" reply, distinct from the comment thread), <span class="ep"><span class="m m-post">POST</span>/admin/:id/comments</span>, <span class="ep"><span class="m m-patch">PATCH</span>/admin/:id/status</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">notifications.ts / doctorNotifications.ts / adminNotifications.ts</span><span class="sdesc">One notification model, three role-specific inboxes</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>The patient inbox (<span class="filepath">notifications.ts</span>) is the simplest: <span class="ep"><span class="m m-get">GET</span>/?limit=&amp;unread_only=&amp;profileId=</span> (cursor-style pagination — fetches one extra row to compute <code>hasMore</code> without a separate count query), <span class="ep"><span class="m m-patch">PATCH</span>/:id/read</span>, <span class="ep"><span class="m m-patch">PATCH</span>/read-all</span> (optionally scoped to one family-member profile, so marking your own notifications read never silently marks a family member's read too). The doctor and admin inboxes are covered above — same "derive live, sync new ones only" pattern, different source data per role.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">reminders.ts / feedback.ts / pushTokens.ts</span><span class="sdesc">Medication reminders, the ratings system, and push-notification device registration</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>reminders.ts</strong> — plain patient-owned <span class="ep">CRUD</span> for medication reminders</li>
+        <li><strong>feedback.ts</strong> — keyed by a <code>folder</code> field (<code>appointment</code> for doctor reviews, <code>pharmacy</code> for pharmacy reviews). <span class="ep"><span class="m m-post">POST</span>/</span> is <strong>public</strong> — called by the patient app right after a completed appointment or order; <span class="ep"><span class="m m-get">GET</span>/doctor</span>, <span class="ep">/pharmacy</span>, <span class="ep">/pharmacy/stats</span>, <span class="ep">/admin</span> per role</li>
+        <li><strong>pushTokens.ts</strong> — <span class="ep"><span class="m m-post">POST</span>/</span> registers/refreshes a device's Expo push token (idempotent, safe on every app open), <span class="ep"><span class="m m-delete">DELETE</span>/</span> unregisters it on sign-out so a logged-out device stops getting another account's notifications</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">messages.ts / clinicMessages.ts / fhir.ts</span><span class="sdesc">Covered in full detail in Sections 3 and 4</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Patient↔doctor chat and clinic-staff chat live in <a href="#chat">Section 3, Chat &amp; Messaging</a>. The external medical-records proxy lives in <a href="#fhir">Section 4, FHIR</a>.</p></div>
+  </details>
+
+  <h3>Middleware, config &amp; utilities worth knowing</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>File</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><span class="filepath">middleware/requireRole.ts</span></td><td>The single authorization gatekeeper described in Section 1 — validates the session, then checks the caller's roles against whatever the route requires</td></tr>
+        <tr><td><span class="filepath">utils/activityLogger.ts</span></td><td><code>logActivity()</code> — a best-effort audit-log write (never throws) used across nearly every write endpoint in the admin/clinic/doctor routes</td></tr>
+        <tr><td><span class="filepath">utils/appointmentSweep.ts</span></td><td><code>autoExpireStaleAppointments()</code> — the lazy end-of-day cleanup mentioned in Section 2</td></tr>
+        <tr><td><span class="filepath">utils/clinicScope.ts</span> / <span class="filepath">utils/doctorPermissions.ts</span></td><td>The two permission systems described in Section 1</td></tr>
+        <tr><td><span class="filepath">utils/pushNotifications.ts</span></td><td><code>sendPushToUser()</code> — batches Expo push sends in groups of 100, prunes permanently-dead device tokens, always best-effort</td></tr>
+        <tr><td><span class="filepath">config/blob.ts</span> / <span class="filepath">config/resend.ts</span> / <span class="filepath">config/cosmos.ts</span> / <span class="filepath">config/livekit.ts</span> / <span class="filepath">config/fhir.ts</span></td><td>Third-party service wiring — Azure Blob Storage, Resend email, Cosmos DB containers, LiveKit, the external FHIR sandbox</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="doc-section" id="doctor-portal">
+  <h2><span class="num">06</span>Doctor Portal</h2>
+  <p class="section-sub">One Next.js codebase, two audiences: individual doctors under <span class="filepath">app/dashboard/*</span>, and clinic owners/staff under <span class="filepath">app/clinic/*</span>. Shared auth screens live under <span class="filepath">app/auth/*</span>, and the consultation itself under <span class="filepath">app/appointments/*</span> (covered in depth in Section 2). Every screen talks to the backend through <span class="filepath">doctor-portal/lib/apiFetch.ts</span>, a fetch wrapper that attaches the SuperTokens token and silently retries once after a session refresh if a request comes back 401.</p>
+
+  <h3>Shared auth &amp; onboarding</h3>
+  <p>There's no self-serve doctor signup anywhere — a doctor account is always created <em>by</em> a clinic (Add Doctor wizard, below). Only clinics register themselves:</p>
+  <ol class="steplist">
+    <li><strong>Register a clinic</strong> — <span class="filepath">app/auth/signup/page.tsx</span>, a 5-step wizard: verify email/phone → OTP → basic details → create password → success. Registering doesn't establish a session by itself, so the last step immediately signs in with the same credentials before handing off to the profile wizard.</li>
+    <li><strong>Complete Profile</strong> — <span class="filepath">app/auth/complete-profile/page.tsx</span>, a second, longer wizard: owner's personal info → accepted insurances → company info (license, address, logo, payment settings) → weekly availability. A "Do you operate additional branches?" prompt loops the company-info + availability pair again per extra branch. Ends with an "awaiting admin review" message.</li>
+    <li><strong>Login</strong> — <span class="filepath">app/auth/login/page.tsx</span>. After a successful sign-in, the app reads the session's roles and branches: an unfinished <code>clinic_pending</code> account goes back into the profile wizard; a finished one goes to an "awaiting approval" screen; an approved clinic goes straight to <code>/clinic</code>; a doctor with 2FA enabled is routed to a one-time code screen first.</li>
+  </ol>
+  <p>Password reset (<span class="filepath">app/auth/forgot-password</span> → <span class="filepath">reset-otp</span> → <span class="filepath">reset-password</span>) is a shared three-step OTP flow used by both doctors and clinics. Two-factor login (<span class="filepath">app/auth/two-factor</span>) is <strong>not self-service for doctors</strong> — a doctor can never turn their own 2FA on or off; only the employing clinic can, from that doctor's detail page.</p>
+
+  <h3 id="dp-doctor">Doctor-facing screens</h3>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/dashboard/page.tsx</span><span class="sdesc">Dashboard home — greeting, stats, today's appointments, availability toggle</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>A live "patients waiting online" counter, three stat cards (consultations today, tasks to complete, revenue this month, each with a day/month-over-month % change computed client-side), today's appointment list with inline "Consult Now" buttons, a weekly-availability panel, and a "Today's Tasks" panel. Also polls for specialist-invite notifications every 10 seconds — if another doctor invites this one into an active call, a toast with Join/Decline appears regardless of what screen they're on.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/dashboard/patients/page.tsx · prescriptions/page.tsx · schedule/page.tsx</span><span class="sdesc">Patient directory, task inbox, and schedule management</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Consulted Patients</strong> — a read-only directory built client-side from the doctor's own completed appointments, deduplicated to one row per patient, with search and gender/diagnosis filters.</li>
+        <li><strong>Tasks</strong> (despite the route name "prescriptions") — the doctor's actual to-do inbox: <em>upcoming consultations</em> and <em>pending EMR</em> (a completed visit with no clinical note saved yet), both derived server-side by <code>GET /appointments/doctor/tasks</code>.</li>
+        <li><strong>Schedules</strong> — four tabs: List and Calendar views of booked appointments, a weekly working-hours editor, and an absences manager.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/dashboard/sos/page.tsx</span><span class="sdesc">Emergency record access — a doctor helping a patient they've never met</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>A four-step flow: license number (a length check only — the code candidly notes real cross-checking against an external registry isn't implemented) → OTP sent to the doctor's own registered email → the patient's shared 6-digit SOS code → full EHR access, rendered through the same panel used mid-consultation. The UI explicitly states access is fully audited.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/dashboard/messages · analytics · help</span><span class="sdesc">Chat, performance analytics, and the support-ticket system</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><strong>Messages</strong> toggles between "Patients" and "Senior Staff" conversations in one screen — see Section 3. <strong>Analytics</strong> reuses the same revenue/consultation math as the dashboard, plus dedicated report components (consultation outcomes, diagnostics status, screening recommendations, a patient-ratings sidebar). <strong>Help</strong> is the doctor's own support-ticket inbox, mirrored almost exactly on the clinic side.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/dashboard/profile · account-settings · notifications · payments</span><span class="sdesc">Self-service settings — and one screen that isn't real yet</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Profile</strong> — inline-editable sections (personal details, per-Emirate consultation fees); every "Edit" pencil is hidden unless the doctor's own <code>manage_own_profile</code> permission allows it.</li>
+        <li><strong>Account Settings</strong> — deliberately thin: just a timezone selector. A static note explains password changes, 2FA, and account deletion are all clinic-managed, pointing the doctor to their administrator.</li>
+        <li><strong>Notifications</strong> — email frequency + per-category in-app toggles.</li>
+        <li><strong>Payments</strong> — <span class="tag" style="background:var(--warn-soft);color:var(--warn);border-color:transparent;">Not wired up</span> the earnings figures and bank accounts shown here are hardcoded placeholder values with no backend calls at all — a genuine gap compared to the clinic side's fully-wired equivalent below. Worth knowing if this screen ever gets flagged as "broken."</li>
+      </ul>
+    </div>
+  </details>
+
+  <h4>The appointment lifecycle, doctor's-eye view</h4>
+  <ol class="steplist">
+    <li><strong>Scheduled.</strong> Booked by a patient; appears on the Dashboard, the Appointments hub (<span class="filepath">app/appointments/page.tsx</span>), and Schedules.</li>
+    <li><strong>Pre-visit review.</strong> If the patient filled in a questionnaire, the doctor can review it (<span class="filepath">app/appointments/previsit-form/page.tsx</span>) before starting.</li>
+    <li><strong>Waiting room.</strong> Shows which patients have actually signalled they're present, distinct from just "scheduled."</li>
+    <li><strong>In-progress.</strong> Online visits open the LiveKit call screen (Section 2); in-person visits open <span class="filepath">app/appointments/complete-emr/page.tsx</span> directly instead — since there's no video call, opening this screen <em>is</em> the doctor starting the visit, and it flips status to <code>in_progress</code> itself.</li>
+    <li><strong>Completed.</strong> Moves into the Patients directory, Analytics revenue, and — if no EMR was ever saved — resurfaces as a "pending EMR" task.</li>
+  </ol>
+
+  <h3 id="dp-clinic">Clinic-admin-facing screens</h3>
+  <p>Everything under <span class="filepath">app/clinic/*</span>. Most controls here are gated by the clinic staff permission system introduced in Section 1 — the clinic owner's own account is always unrestricted; a hired staff account can be individually restricted per permission key.</p>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/page.tsx</span><span class="sdesc">Clinic dashboard home — the multi-branch-aware version of the doctor dashboard</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Clinic-wide stat cards, a "Doctors Available" grid, and a task-approval workflow: a doctor's requested schedule change gets an inline "Approve" button right there. Accepts a <code>?branchId=</code> query param — present, it scopes every fetch to that one branch; absent, an org owner sees an aggregate view across every active branch they operate.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/doctors + doctors/add + doctors/[id]</span><span class="sdesc">The clinic's full doctor-management console</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><strong>List</strong> — filterable roster with per-doctor stats. <strong>Add Doctor</strong> — a 3-step wizard (personal info → medical/career info with certificate uploads and per-Emirate rates → create credentials) that creates both the doctor's record and login in one call. <strong>Detail page</strong> is the single most feature-dense screen in the whole portal — from here a clinic can edit the doctor's profile, delete the account, toggle online status, <strong>reset their password</strong>, <strong>enable/disable their 2FA</strong> (the only place in the app this happens), edit their weekly schedule directly, and approve or reject a schedule change the doctor submitted themselves.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/branches + branches/[branchId] + branches/[branchId]/complete-setup</span><span class="sdesc">Multi-location clinic management</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>A branch moves through <code>requested</code> → <code>details_pending</code> (admin approved the request; clinic must now fill in the full profile via Complete Setup) → <code>pending_approval</code> (submitted, awaiting final admin sign-off) → <code>active</code>. Note the org's own original location has no separate database record of its own — it <em>is</em> the org document's top-level fields, just surfaced here as a synthetic "main branch" row. The branch detail page is a tabbed console (Users/Managers, Doctors, Appointments, Licenses, Timings, Insurances, Payments, Analytics, Ratings) — this is where branch staff-login accounts actually get created, and where the "Senior" staff labeling convention is applied (purely a UI convention: the first account created for a branch is labeled Senior — there's no separate backend role for it).</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/appointments · patients · insurance</span><span class="sdesc">Clinic-wide views spanning every doctor on the roster</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><strong>Appointments</strong> — every appointment across every doctor, with per-row reschedule and cancel actions the clinic can take on a doctor's behalf. <strong>Patients</strong> — the clinic's roster derived from booking history, not a separate owned entity. <strong>Insurance</strong> — manage accepted policies per branch; since a policy belongs to exactly one branch, "Add Policy" is blocked client-side if a multi-branch clinic hasn't picked a specific branch first.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/payment/page.tsx</span><span class="sdesc">The clinic's financial hub — earnings, per-doctor breakdown, withdrawals</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Earnings summary, per-doctor drill-down, a filterable transaction history with a "Mark Paid" action for pending cash visits, and three <strong>OTP-gated</strong> sensitive actions: requesting a fee change (goes into the admin approval queue — see Section 7), requesting a withdrawal, and updating the bank account or doctor-share percentage. Each requires a fresh one-time code sent to the clinic owner's own email before the change takes effect.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/analytics · profile · settings · schedules · feedback · messages · help</span><span class="sdesc">Remaining clinic-admin screens</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Analytics mirrors the doctor-side report components, fed clinic-wide data. Profile is the clinic's public identity page; Settings covers the more operational details (address, phone, year established) — notably, <strong>no</strong> password/2FA section exists here either; the clinic owner's own login security isn't self-service anywhere in this app. Schedules covers clinic-wide timing across appointments, the clinic's own hours, and every doctor's hours in one place. Feedback splits clinic reviews from per-doctor reviews, with an optional clinic reply thread. Messages and Help mirror their doctor-side counterparts, scoped to the clinic's own staff/doctors.</p>
+    </div>
+  </details>
+
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/clinic/accounts/page.tsx</span><span class="sdesc">"User Roles" — where the whole permission system from Section 1 is actually administered</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Three tabs — Branches, Doctors, Staff. Selecting a doctor or staff account opens an "Access" panel with the relevant permission toggles (the 7-key staff set or the 4-key doctor set from Section 1), saved individually or, for a whole branch at once, via a "Save for all users" bulk action. Reachable only by the org owner — a branch-staff account sees a plain "available to the clinic owner" message instead.</p>
+    </div>
+  </details>
+</section>
+
+<section class="doc-section" id="admin-portal">
+  <h2><span class="num">07</span>Admin Portal</h2>
+  <p class="section-sub">The platform's own control tower — used by Wellness Central's own staff, not any clinic. Every dashboard page is wrapped in a route guard that re-verifies the session against the backend on mount, so a stale cached token alone is never trusted. The sidebar covers eighteen sections; grouped by purpose below.</p>
+
+  <h3>Onboarding queues — the platform's core approval workflow</h3>
+  <p>Five separate domains — <strong>Clinics</strong>, <strong>Doctors</strong>, <strong>Pharmacy</strong>, <strong>Fee Requests</strong>, and <strong>Insurance Verifications</strong> — all follow the identical two-tab shape: a pending queue and an approved/history list, with Approve and Reject (the latter always capturing a typed reason shown back to the submitter).</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>Clinics <span class="tag accent">nested approval</span></h4>
+      <p style="margin-bottom:0;">Onboarding queue plus a five-step "Add Clinic" wizard for admin-initiated onboarding. Multi-branch orgs get a <em>second</em>, nested approval layer — each additional branch is reviewed independently of the parent org.</p>
+    </div>
+    <div class="card">
+      <h4>Doctors <span class="tag accent">schedule review</span></h4>
+      <p style="margin-bottom:0;">Six-step Add Doctor wizard. A doctor's detail page shows an amber banner whenever they've edited their own availability post-approval, with a one-click "Verify Now" to promote the pending schedule to live.</p>
+    </div>
+    <div class="card">
+      <h4>Pharmacy <span class="tag accent">two-level</span></h4>
+      <p style="margin-bottom:0;">Pharmacies <em>and</em> their individual products are approved independently — a pharmacy can be live while a specific new product it added still waits for review.</p>
+    </div>
+    <div class="card">
+      <h4>Fee Requests &amp; Insurance <span class="tag accent">side-by-side diff</span></h4>
+      <p style="margin-bottom:0;">Both show the old value against the requested new one directly side by side before an admin decides — old consultation rate vs. new, or an unverified policy's details as submitted.</p>
+    </div>
+  </div>
+
+  <h3>Directories &amp; oversight</h3>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Patients</span><span class="sdesc">Full clinical record access, platform-wide — the most sensitive screen in the app</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>A patient's profile page gives an admin unrestricted read access to every clinical note across every doctor that patient has ever seen — reason for visit, exam findings, prescribed medicines, doctor addenda, the works — for support/dispute purposes. The one action available is deactivate/activate, which (as covered in Section 5) also revokes every active session immediately.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Pharmacy inventory, Lab Service, Vaccination</span><span class="sdesc">Catalogue and stock oversight — three slightly different models</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Pharmacy stock supports a <strong>Flag/Unflag</strong> action per product — content moderation that hides a listing without deleting it, preserving history. Lab Service has <em>no</em> approval queue at all in the UI — new labs go live immediately, since these are platform-authored catalogue entries, not third-party submissions being vetted. Vaccination is likewise a straight catalogue editor with a live-preview pane mirroring exactly what the patient app will render.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Emergencies, Feedback, Support</span><span class="sdesc">Read/respond oversight screens</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p><strong>Emergencies</strong> is a read-only monitor of the SOS feature (Section 5) — the actual verification happens doctor-side; admin just watches. <strong>Feedback</strong> aggregates every rating platform-wide with no moderation action attached. <strong>Support</strong> is the admin-facing helpdesk inbox — status toggle, a threaded comment view, and a separate "official reply" field distinct from the ongoing comment thread.</p></div>
+  </details>
+
+  <h3>Finance, content &amp; internal access control</h3>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Earnings, Orders</span><span class="sdesc">Financial and fulfillment oversight</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p><strong>Earnings</strong> — only the Consultations tab is wired up; Pharmacy, Lab, and Radiology tabs are explicit "Coming Soon" placeholders. <strong>Orders</strong> — a status-pipeline dropdown lets admin walk any pharmacy order through <code>confirmed → processing → shipped → delivered</code> or cancel it directly.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Roles</span><span class="sdesc">Internal RBAC — for doctors and patients too, not just other admins</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Three tabs (Doctors / Patients / Admin), each toggling four flags: <code>medicalRecords</code>, <code>prescription</code>, <code>emrUpdates</code>, <code>systemConfig</code>. This is a separate, coarser system from the clinic/doctor permission model in Section 1 — worth not conflating the two when reading the codebase. Toggles are staged as a draft and only committed on explicit Save, with an "unsaved changes" guard if the admin tries to switch users mid-edit.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Articles</span><span class="sdesc">The CMS behind the patient app's wellness content library</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Standard CRUD plus Flag/Unflag (hides from the patient app without deleting) and a one-time "Seed Articles" developer convenience that bulk-creates sample content if the library is empty.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Activity Log</span><span class="sdesc">The platform-wide audit trail, browsable</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Every meaningful action across admin, doctor, patient, pharmacy, and lab sources is expected to land here — filterable by source and a coarse time window. Purely read/browse; no action is taken from this screen. This is the same log every <code>logActivity()</code> call in the backend writes into.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">Settings</span><span class="sdesc">Ten configuration panels — some live, some deliberately not yet</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p><strong>Backend-connected:</strong> admin's own profile, general defaults, notification preferences, appointment rules (max bookings/day, cancellation-notice window), maintenance/backup scheduling, security settings (password-expiry policy and the admin's own 2FA toggle — the same OTP flow used at login once enabled), and Privacy Policy/Terms document uploads.</p>
+      <p><strong>UI-only placeholders</strong> (explicit in code comments — no backend calls at all yet): Platform Fee Management (per-specialty commission editor), Payments (withdrawal frequency, primary bank account), and Insurance Providers (enable/disable toggles per insurer). Worth knowing these look finished but don't persist anything.</p>
+    </div>
+  </details>
+
+  <h3>Two front-end-only screens worth flagging</h3>
+  <div class="callout warn">
+    <span class="callout-label">Forms builder — designed, not shipped</span>
+    <p>The Forms section (<span class="filepath">app/dashboard/forms/*</span>) is a fully-built, genuinely impressive drag-and-drop form designer — 14 field types, a live canvas, a properties panel — but none of its three pages make a single network call. The list is a hardcoded array; "Save Changes" just navigates back without persisting anything. There is no <code>adminForms.ts</code> backend route. Treat it as a designed-but-unwired feature, likely intended for custom pre-visit intake forms.</p>
+  </div>
+</section>
+
+<section class="doc-section" id="patient-app">
+  <h2><span class="num">08</span>Patient App</h2>
+  <p class="section-sub">Built with Expo/React Native and file-based routing under <span class="filepath">app/</span> — this is the only piece of the platform living in a separate repository. One idea threads through almost every screen here, so it's worth stating up front.</p>
+
+  <div class="callout">
+    <span class="callout-label">The idea that shapes everything below</span>
+    <p>A patient can add up to <strong>4 family members</strong> (5 profiles total, self included) and switch which one is "active" from anywhere in the app — handled by <span class="filepath">context/ActiveProfileContext.tsx</span>. Nearly every screen that shows or edits personal data threads an optional <code>profileId</code>/<code>memberId</code> through its API calls for exactly this reason: viewing allergies, booking an appointment, checking notifications, or editing a photo all need to know <em>which</em> of the account's profiles is currently in view.</p>
+  </div>
+
+  <h3>Onboarding &amp; auth</h3>
+  <p>Splash → 3-slide walkthrough → email/phone entry (<span class="filepath">app/onboarding/login.tsx</span>) → password (<span class="filepath">email-login.tsx</span>, a raw fetch to <code>/auth/signin</code> rather than the SDK's own sign-in call, followed by a role check confirming the account actually holds the <code>patient</code> role — since the shared login tenant means a doctor's or clinic's credentials would otherwise sign in here too). Registration (<span class="filepath">register.tsx</span> → OTP → <span class="filepath">enter-otp.tsx</span>, which is what actually calls <code>POST /patients/register</code>) leads into a 4-step profile wizard: complete-profile → allergies → medications → chronic-diseases, each save-able or skippable, each reused later for onboarding a new family member by passing a <code>memberId</code>. 2FA login and password reset are separate three/four-step OTP flows mirroring the doctor portal's pattern.</p>
+
+  <h3>Home, search &amp; booking</h3>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">app/(tabs)/index.tsx</span><span class="sdesc">Home — personalized around whichever profile is active</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Search bar, quick-links grid, top clinics, and a "Health Guides" carousel that's <strong>re-ranked client-side</strong> per the active profile — a pure scoring function boosts articles by gender, pregnancy status, chronic conditions, and age (a diabetic profile sees diabetes content scored higher, a pregnant self-profile sees Pregnancy content boosted). Switching the active profile reshuffles the whole list.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">search-doctors.tsx · doctor-profile.tsx · clinics.tsx · clinic-profile.tsx</span><span class="sdesc">Finding a doctor or clinic</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Free-text search is layered with a <strong>symptom-to-specialty map</strong> — typing "chest pain" surfaces cardiologists even though no doctor record mentions the symptom directly. Doctor and clinic profiles show live stats, ratings, and availability pulled straight from the backend.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">new-appointment.tsx → payment-options.tsx → appointment-booked.tsx</span><span class="sdesc">The booking flow itself</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>Choose "For Me" or a family member, state the reason for visit, then <span class="filepath">payment-options.tsx</span> — the <strong>one</strong> checkout screen in the whole app with real insurance matching: it fetches the doctor's clinic's accepted policies and cross-references the patient's own verified ones, offering only genuine matches. Confirming here is what actually calls <code>POST /api/appointments</code>; every other purchase flow in the app (pharmacy, lab, vaccination) creates its order/booking on its own separate payment-options screen instead.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">pre-visit-form.tsx · waiting-room.tsx · video-call.tsx · rate-experience.tsx · diagnostics-medication.tsx</span><span class="sdesc">The consultation itself and what follows it</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <p>Pre-visit intake, waiting room, and the video call itself are covered in full in <a href="#video">Section 2</a>. After the call: <strong>rate-experience.tsx</strong> resolves the reviewer's identity directly via SuperTokens rather than the app's usual context, specifically to sidestep a timing race right after a call ends. <strong>diagnostics-medication.tsx</strong> is the "here's your prescription" screen — it <em>polls</em> the appointment up to 8 times, 3 seconds apart, waiting for the doctor's saved EMR to appear, showing "Checking for prescription…" in the meantime rather than a dead end.</p>
+    </div>
+  </details>
+
+  <h3>Appointments &amp; records</h3>
+  <p><span class="filepath">app/(tabs)/doctors.tsx</span> — the Doctors tab: recent doctors plus an Upcoming/Past/Cancelled appointment list for the active profile. <span class="filepath">app/my-records.tsx</span> — searchable past-visit history, with a rich welcome state and suggested doctors for a brand-new user. <span class="filepath">app/record-detail.tsx</span> — one appointment's full record: chief complaint, doctor's notes, prescriptions, lab orders, payment — plus, when linked, the external FHIR section from Section 4.</p>
+
+  <h3>Profile &amp; family members</h3>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">(tabs)/profile/index.tsx · details.tsx · personal-info.tsx · edit-personal.tsx</span><span class="sdesc">The profile home and the "who am I editing" chain</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>The Profile tab shows a "Viewing [X]'s profile — not yours" banner with a "Switch back" link whenever a family member is active — a deliberate guard against silently editing the wrong person's data. The account owner's email is locked here (it's their login credential, shown but read-only); a family member's email is a normal editable field, since members have no login of their own.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">family.tsx · add-member.tsx · allergies.tsx · medications.tsx · chronic-diseases.tsx · drug-details.tsx</span><span class="sdesc">Managing the household</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody"><p>A grid of profiles with an "Add" tile, enforcing the 4-additional-members cap client-side before even opening the add form. Adding a member reuses the exact same allergies/medications/chronic-disease onboarding screens from initial signup, scoped by a <code>memberId</code> param. <strong>drug-details.tsx</strong> is a per-medication accordion editor (dosage, frequency, start/end dates) that saves back into the same medications object.</p></div>
+  </details>
+  <details class="filegroup">
+    <summary><div class="stitle"><span class="sname">insurance.tsx · wallet.tsx · reminders.tsx · support.tsx · raise-issue.tsx · settings*.tsx</span><span class="sdesc">Everything else under Profile</span></div><svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg></summary>
+    <div class="fbody">
+      <ul>
+        <li><strong>Insurance</strong> — add/view policies grouped Active / Waiting / Rejected; every new entry starts <code>pending</code>, since only an admin can verify one (Section 7).</li>
+        <li><strong>Wallet</strong> — balance + transaction history, account-level (not per-family-member).</li>
+        <li><strong>Reminders</strong> — a month calendar for medication reminders, with an add/delete modal.</li>
+        <li><strong>Support / Raise an Issue</strong> — the same ticket system used platform-wide (Section 5), with photo attachments.</li>
+        <li><strong>Settings — Account</strong> — change password, 2FA toggle, active-sessions list, sign-out-everywhere, and account deletion: deleting the whole account cascades to every family member automatically (they're sub-records, not separate accounts); deleting a single member leaves the account untouched and switches the active profile back to self. <strong>Settings — Notifications / Privacy / Language</strong> round out the section.</li>
+      </ul>
+    </div>
+  </details>
+
+  <h3>Buying medicine, booking tests, booking vaccinations</h3>
+  <p>Three parallel commerce flows under <span class="filepath">app/(buy-medicines)/*</span>, <span class="filepath">app/lab-booking/*</span>, and <span class="filepath">app/vaccination/*</span> — each shaped the same way: browse a public catalogue → assign items to one or more patients (self or family members, up to 6) → set a preference (home visit vs. in-clinic, for lab/vaccination) → a dedicated payment-options screen → a success screen → a detail/tracking screen.</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>Pharmacy</h4>
+      <p>The only flow with a real prescription-verification step (<span class="filepath">add-prescription.tsx</span> — upload a photo, or look up by eRx number/Emirates ID, the latter two currently simulated with a timeout rather than a real backend check). Three dedicated failure screens (expired / unclear / unverified) each offer "Try Again" or "Consult a Doctor" instead of a dead end.</p>
+    </div>
+    <div class="card">
+      <h4>Lab tests</h4>
+      <p>A test flagged <code>requires_doctor_approval</code> routes the flow through an extra consultation-time picker before checkout — DOH/DHA/MOH-style compliance messaging appears inline on the test's detail page.</p>
+    </div>
+    <div class="card">
+      <h4>Vaccination</h4>
+      <p>The booking call itself happens on the <em>success</em> screen rather than the payment screen, guarded by a <code>useRef</code> so it can never fire twice even on a re-render — a deliberate defense against double-booking.</p>
+    </div>
+  </div>
+  <div class="callout warn" style="margin-top:18px;">
+    <span class="callout-label">Payment is mocked everywhere</span>
+    <p>Every "credit card" list across all four checkout flows (appointments, pharmacy, lab, vaccination) is a static, fake array — there is no real payment gateway anywhere in this codebase. Selecting a card and confirming simply marks the order paid server-side. Insurance is the one exception with real logic behind it, and only on the appointment-booking flow — the pharmacy/lab/vaccination checkouts still show a hardcoded insurance list rather than the patient's actual saved policies.</p>
+  </div>
+
+  <h3>Wellness, fitness &amp; cycle tracking</h3>
+  <p><span class="filepath">app/(tabs)/wellness.tsx</span> is the hub, fanning out into three substantial sub-systems, all under <span class="filepath">app/wellness/*</span>:</p>
+  <ul>
+    <li><strong>Fitness &amp; nutrition</strong> — a questionnaire computes calorie/macro targets client-side (TDEE formula) on first use, then a dashboard tracks food (search or AI photo-scan via the Gemini endpoint from Section 5), workouts (routine library or free exercise logging, with a live timed logging screen), and weight, all readable as daily/weekly summaries.</li>
+    <li><strong>Menstrual tracking</strong> — the richest UI wrapper around the cycle-prediction engine described in Section 5: a calendar, a forecast timeline, 90-day trend charts, symptom pattern analysis, and phase-specific self-care tips.</li>
+    <li><strong>Pregnancy tracking</strong> — due-date setup, a gestational-age dashboard, daily symptom/mood logging, a scan-report photo upload, a dedicated gestational-diabetes tracker, and week-by-week educational content (purely local, no network call).</li>
+    <li><strong>Assessments</strong> — a quiz system (BMI, pain scale, dietary habits, etc.) that produces a risk-level result with recommended labs and doctors matched to the outcome.</li>
+  </ul>
+
+  <h3>Articles, SOS, notifications</h3>
+  <p><strong>Articles</strong> (<span class="filepath">app/articles/index.tsx</span>, <span class="filepath">app/article/[id].tsx</span>) share the same profile-aware ranking used on Home. <strong>SOS</strong> (<span class="filepath">app/sos.tsx</span> → <span class="filepath">app/emergency-code.tsx</span>) is a press-and-hold button generating the 15-minute emergency code from Section 5, with an explicit warning to share it only with a real medical responder. <strong>Notifications</strong> (<span class="filepath">app/notifications.tsx</span>) has an All/Unread filter and scopes "Mark all read" to the currently active profile specifically, so switching to a family member and clearing their notifications never silently clears the account owner's own unread ones too.</p>
+
+  <h3>Reviews</h3>
+  <p>There's no standalone "leave a review" screen — rating collection is embedded as a post-transaction step in three places, all posting to the same <code>POST /api/feedback</code> endpoint with a <code>folder</code> discriminator: <span class="filepath">rate-experience.tsx</span> (post-call, <code>folder: "appointment"</code>), the pharmacy order-success/summary screens (<code>folder: "pharmacy"</code>), and the lab-booking success screen (<code>folder: "lab"</code>).</p>
+</section>
+
+<section class="doc-section" id="pharmacy-portal">
+  <h2><span class="num">09</span>Pharmacy Portal</h2>
+  <p class="section-sub">The staff-facing back office for pharmacies fulfilling the medicine orders patients place through the app's buy-medicines flow. A fully-built Next.js app — not a stub — running on its own at <span class="filepath">wellness-platform/pharmacy-portal</span>.</p>
+  <p>Registration is self-serve (<span class="filepath">app/auth/register/page.tsx</span>, a 3-step wizard) but gated: a new account holds <code>pharmacy_pending</code> and sits on a holding screen ("Application Under Review") until an admin approves it in the Admin Portal (Section 7), at which point the role flips to <code>pharmacy</code>.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Screen</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="filepath">dashboard/page.tsx</span></td><td>KPI cards, a 6-month revenue/orders chart built from real order data, recent products/orders</td></tr>
+        <tr><td><span class="filepath">dashboard/orders/page.tsx</span></td><td>Incoming patient orders; advance status <code>confirmed → shipped → delivered</code></td></tr>
+        <tr><td><span class="filepath">dashboard/inventory/page.tsx</span> + <span class="filepath">[id]/page.tsx</span></td><td>Product list and single-product view/edit/delete</td></tr>
+        <tr><td><span class="filepath">dashboard/add-product/page.tsx</span></td><td>Rich product form — batch number, expiry, reorder level, prescription-required flag, image upload</td></tr>
+        <tr><td><span class="filepath">dashboard/feedback</span> / <span class="filepath">analytics</span></td><td>Patient ratings and review stats for this pharmacy</td></tr>
+        <tr><td><span class="filepath">dashboard/settings</span> / <span class="filepath">help</span></td><td>Profile, password/2FA, notification preferences; the same support-ticket system used everywhere else</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <span class="callout-label">Why the backend has two files for "pharmacy"</span>
+    <p><span class="filepath">backend/src/routes/pharmacy.ts</span> is this portal's own router (<code>requireRole("pharmacy")</code>) — plus two <strong>public</strong> catalogue endpoints the patient app calls directly. <span class="filepath">backend/src/routes/medicineOrders.ts</span>, despite sharing the same <code>/api/pharmacy</code> base path, is the <em>patient app's</em> router (<code>requireRole("patient")</code>) for placing and tracking orders. The pharmacy portal never calls anything in <span class="filepath">medicineOrders.ts</span>, and the patient app never calls the staff-only routes in <span class="filepath">pharmacy.ts</span> — same URL prefix, two entirely separate audiences.</p>
+  </div>
+</section>
+
+<footer class="docfoot">
+  Wellness Central Field Guide — assembled from a direct read of the platform's own source across all five codebases. File paths throughout are relative to each repo's root; the patient app is the one exception living in its own separate repository.
+</footer>
+
+</div>
+</main>
+</div>
