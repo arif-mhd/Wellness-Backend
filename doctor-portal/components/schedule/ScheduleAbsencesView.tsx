@@ -338,7 +338,7 @@ export default function ScheduleAbsencesView() {
         setFileUrl("");
         setSelectStart(null);
         setSelectEnd(null);
-        alert("Absence marked successfully.");
+        alert("Your leave request has been sent for approval.");
       } else {
         const err = await res.json();
         if (res.status === 409 && Array.isArray(err.conflicts)) {
@@ -455,7 +455,7 @@ export default function ScheduleAbsencesView() {
             className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold tracking-[-0.24px] hover:underline transition-all flex items-center gap-1.5 cursor-pointer"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
-            Mark Absence
+            Request Approval
           </button>
         </div>
       )}
@@ -646,17 +646,21 @@ export default function ScheduleAbsencesView() {
                           const cellStart = new Date(`${day.dateStr}T${timeStr}:00`);
                           const cellEnd = new Date(cellStart.getTime() + 30 * 60 * 1000);
                           const matchedAbs = absences.find((abs: any) => {
+                            if (abs.status === "rejected") return false;
                             const absStart = new Date(abs.startDate);
                             const absEnd = new Date(abs.endDate);
                             return cellStart < absEnd && cellEnd > absStart;
                           });
                           const isAbsent = !!matchedAbs;
-  
+                          const isPendingAbsence = isAbsent && matchedAbs.status === "pending";
+
                           const isSelected = !!(selectStart && selectEnd && cellStart >= selectStart && cellEnd <= selectEnd);
-  
+
                            let cellBg = "bg-white hover:bg-slate-50/50";
                            let cellBorder = "border-b border-[#EBEEF5]/40";
-                           if (isAbsent) {
+                           if (isPendingAbsence) {
+                             cellBg = "bg-[#FDF0C8] hover:bg-[#FCE7A8]";
+                           } else if (isAbsent) {
                              cellBg = "bg-[#F38B8B] hover:bg-[#E27777]";
                            } else if (isSelected) {
                              cellBg = "bg-[#BAC7FF] hover:bg-[#A3B4FF]";
@@ -687,7 +691,7 @@ export default function ScheduleAbsencesView() {
                                      fontFamily: "Outfit, sans-serif",
                                    }}
                                  >
-                                   {formatAbsenceRange(matchedAbs)}
+                                   {formatAbsenceRange(matchedAbs)}{isPendingAbsence ? " (Pending approval)" : ""}
                                  </div>
                                )}
                              </button>
@@ -762,12 +766,28 @@ export default function ScheduleAbsencesView() {
                       </button>
                     )}
                   </div>
+                  <span
+                    className={`self-start px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                      log.status === "pending"
+                        ? "bg-amber-100 text-amber-700"
+                        : log.status === "rejected"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {log.status === "pending" ? "Pending" : log.status === "rejected" ? "Rejected" : "Approved"}
+                  </span>
                   <div
                     className="text-[10px] text-[#9EA5AD] leading-[1.5]"
                     style={{ fontFamily: "Outfit, sans-serif" }}
                   >
                     {log.reason}
                   </div>
+                  {log.status === "rejected" && log.statusReason && (
+                    <div className="text-[10px] text-red-500 leading-[1.5]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      Clinic's note: {log.statusReason}
+                    </div>
+                  )}
 
                   {log.fileUrl && (
                     <a
@@ -806,7 +826,7 @@ export default function ScheduleAbsencesView() {
                 className="text-[#24292E] font-semibold text-[17px] tracking-[-0.34px]"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                Mark Absence
+                Request Approval
               </h3>
               <button
                 onClick={() => setShowMarkAbsence(false)}
@@ -957,7 +977,7 @@ export default function ScheduleAbsencesView() {
                 className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                Confirm Absence
+                Send Request
               </button>
             </div>
 

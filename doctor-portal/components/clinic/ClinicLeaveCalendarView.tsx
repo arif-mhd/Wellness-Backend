@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import { useClinicPermissions } from "@/lib/useClinicPermissions";
 
 interface ClinicAbsence {
   id: string;
@@ -37,10 +38,13 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [actingOnId, setActingOnId] = useState<string | null>(null);
+  const { can } = useClinicPermissions();
+  const canManage = can("manage_schedules");
 
   const loadAbsences = useCallback(() => {
     setLoading(true);
-    apiFetch(`/api/clinics/absences${qs}`)
+    apiFetch(`/api/clinics/doctors/absences${qs}`)
       .then((r) => r.json())
       .then((data) => setAbsences(Array.isArray(data.absences) ? data.absences : []))
       .catch(() => setAbsences([]))
@@ -50,6 +54,41 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
   useEffect(() => {
     loadAbsences();
   }, [loadAbsences]);
+
+  const handleApprove = async (abs: ClinicAbsence) => {
+    setActingOnId(abs.id);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${abs.doctorId}/absences/${abs.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (!res.ok) throw new Error("Failed to approve absence");
+      await loadAbsences();
+    } catch (err: any) {
+      alert(err.message ?? "Failed to approve absence.");
+    } finally {
+      setActingOnId(null);
+    }
+  };
+
+  const handleReject = async (abs: ClinicAbsence) => {
+    const reason = window.prompt("Reason for declining this leave request (optional):") ?? "";
+    setActingOnId(abs.id);
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${abs.doctorId}/absences/${abs.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected", reason }),
+      });
+      if (!res.ok) throw new Error("Failed to decline absence");
+      await loadAbsences();
+    } catch (err: any) {
+      alert(err.message ?? "Failed to decline absence.");
+    } finally {
+      setActingOnId(null);
+    }
+  };
 
   const filteredAbsences = useMemo(
     () => (statusFilter === "all" ? absences : absences.filter((a) => a.status === statusFilter)),
@@ -154,7 +193,7 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
       <div className="flex flex-col xl:flex-row gap-6 items-start w-full">
         <div className="flex-1 min-w-0 bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-sm">
           {loading ? (
-            <div className="text-center text-sm text-[#9EA5AD] py-12">Loading leave calendar...</div>
+            <div className="text-center text-sm text-[#9EA5AD] py-12" style={{ fontFamily: "Outfit, sans-serif" }}>Loading leave calendar...</div>
           ) : (
             <div className="border border-[#EBEEF5] rounded-[14px] overflow-hidden">
               <div className="grid grid-cols-7 bg-[#F9FAFC]">
@@ -202,7 +241,7 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
                             </div>
                           ))}
                           {dayAbsences.length > 3 && (
-                            <span className="text-[9px] font-semibold text-[#9EA5AD] pl-1">+{dayAbsences.length - 3} more</span>
+                            <span className="text-[9px] font-semibold text-[#9EA5AD] pl-1" style={{ fontFamily: "Outfit, sans-serif" }}>+{dayAbsences.length - 3} more</span>
                           )}
                         </div>
                       </button>
@@ -222,11 +261,11 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
           </span>
 
           {!selectedDay ? (
-            <p className="text-xs text-[#9EA5AD]">Click a day on the calendar to see who's on leave.</p>
+            <p className="text-xs text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>Click a day on the calendar to see who's on leave.</p>
           ) : selectedDayAbsences.length === 0 ? (
-            <p className="text-xs text-[#9EA5AD]">No doctors on leave this day.</p>
+            <p className="text-xs text-[#9EA5AD]" style={{ fontFamily: "Outfit, sans-serif" }}>No doctors on leave this day.</p>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" style={{ fontFamily: "Outfit, sans-serif" }}>
               {selectedDayAbsences.map((abs) => (
                 <div key={abs.id} className="flex items-start gap-3 p-3.5 rounded-[16px] bg-[#F9FAFC] border border-[#EBEEF5]/60">
                   {abs.doctorAvatarUrl ? (
@@ -253,6 +292,29 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
                     </div>
                     <span className="text-[10px] text-[#9EA5AD]">{abs.duration}</span>
                     <span className="text-[10px] text-[#676E76] leading-relaxed">{abs.reason}</span>
+
+                    {abs.status === "pending" && (
+                      canManage ? (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <button
+                            onClick={() => handleReject(abs)}
+                            disabled={actingOnId === abs.id}
+                            className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-[10px] font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                          >
+                            REJECT
+                          </button>
+                          <button
+                            onClick={() => handleApprove(abs)}
+                            disabled={actingOnId === abs.id}
+                            className="px-3 py-1 bg-black text-white text-[10px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                          >
+                            APPROVE
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] text-gray-400 italic mt-1">No permission to approve/reject</span>
+                      )
+                    )}
                   </div>
                 </div>
               ))}

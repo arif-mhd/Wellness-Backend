@@ -275,7 +275,7 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
   }
 });
 
-// ─── GET /api/clinics/absences?branchId= ─────────────────────────────────────
+// ─── GET /api/clinics/doctors/absences?branchId= ─────────────────────────────
 // Flattens every doctor-in-scope's absences[] into one list for the Leave
 // Calendar view — same scope resolution as GET / (doctors list) so "All"
 // vs a specific branch behaves identically to the rest of Schedules & Timing.
