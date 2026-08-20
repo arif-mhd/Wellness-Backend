@@ -242,6 +242,33 @@ const EMPTY_INTAKE: WellnessIntake = {
   additionalNotes: null,
 };
 
+// Gemini's JSON mode occasionally still wraps its output in a ```json fence
+// or adds stray whitespace/prose around the object despite responseSchema —
+// try a plain parse first, then fall back to stripping a fence, then to
+// grabbing the first {...} block, before giving up.
+function tryParseWellnessJson(text: string): any | null {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch { /* fall through */ }
+
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) {
+    try {
+      return JSON.parse(fenced[1]);
+    } catch { /* fall through */ }
+  }
+
+  const braced = trimmed.match(/\{[\s\S]*\}/);
+  if (braced) {
+    try {
+      return JSON.parse(braced[0]);
+    } catch { /* fall through */ }
+  }
+
+  return null;
+}
+
 function sanitizeIntake(raw: any): WellnessIntake {
   return {
     primaryReason: typeof raw?.primaryReason === "string" ? raw.primaryReason : null,
@@ -303,10 +330,23 @@ RULES:
 
 SYMPTOM INTAKE (this is the core of your job):
 - You are given the patient's current message, the conversation history, and the "intake so far" (a JSON object representing everything already gathered — may be all-null on the first turn).
-- When the patient describes any symptom or health complaint, your job is to have a natural back-and-forth to fill in "intake": primaryReason, symptoms, onset (when it started), location (which body part / side — e.g. left, right, bilateral), severity, duration, conditions (existing chronic conditions, if mentioned), medications (current medications, if mentioned), allergies (if mentioned), additionalNotes (anything else relevant).
-- Ask ONE focused follow-up question per turn for whatever's most clinically useful and still missing — do not interrogate with a rigid checklist, and do not ask about fields the patient has no reason to know or hasn't implied are relevant (e.g. don't force a "conditions" question if nothing suggests it matters).
-- ALWAYS return the full merged intake object — carry forward every field you already knew from "intake so far" plus whatever new information this turn added. Never null out something you already learned.
-- Once you have at least primaryReason plus onset or location or severity (enough to meaningfully point toward a specialist), set readyForRecommendation=true, recommendedSpecialty to the best match, and suggestBooking=true, and let "reply" summarize what you understood and offer to show relevant doctors. Until then, readyForRecommendation=false and recommendedSpecialty=null.
+- When the patient describes any symptom or health complaint, your job is to interview them like a real triage nurse would — asking clinically specific questions about THAT symptom, not a generic template. "How long has this been going on?" is a weak, generic question; a specific, clinically useful one is tailored to what was actually reported. Fill "intake" as you go: primaryReason, symptoms, onset (when it started), location (which body part / side — e.g. left, right, bilateral), severity, duration, conditions (existing chronic conditions, if mentioned), medications (current medications, if mentioned), allergies (if mentioned), additionalNotes (every other clinically relevant detail you uncover — associated symptoms, what makes it better/worse, red flags, anything a doctor would want to know that doesn't fit the other fields).
+- Ask ONE focused, symptom-specific question per turn. Use these as a guide for the kind of specific probing expected per complaint type (generalize this reasoning to any symptom, don't treat it as an exhaustive list):
+  - Fever: measured temperature, chills/sweating, rash, associated pain, recent travel or sick contacts.
+  - Sore throat: difficulty or pain swallowing, fever, cough, hoarseness, swollen/tender glands in the neck.
+  - Headache: one-sided or both sides, throbbing vs. constant, nausea or light/sound sensitivity, vision changes, worse with movement.
+  - Eye problems: which eye or both, redness, discharge, vision changes, light sensitivity, recent injury or foreign body.
+  - Abdominal/stomach pain: exact location (upper/lower, left/right), relation to eating, nausea/vomiting, bowel changes, blood in stool.
+  - Chest pain: radiating to arm/jaw, shortness of breath, sweating, brought on by exertion, palpitations.
+  - Cough/breathing issues: dry or productive cough, color of phlegm, wheezing, shortness of breath, chest tightness.
+  - Skin issues (rash/acne): appearance and spread, itching, new products/foods/medications, fever.
+  - Joint/back pain: which joint(s) or region, swelling or redness, injury history, worse with movement or rest.
+  - Ear pain: one or both ears, hearing changes, discharge, recent cold or water exposure.
+  - Dizziness: spinning vs. lightheaded, triggered by standing up, associated fainting or hearing changes.
+  - Menstrual/pregnancy-related: cycle regularity, pain pattern, last period, pregnancy possibility.
+  Do not interrogate with a rigid checklist and do not ask about fields the patient has no reason to know or hasn't implied are relevant (e.g. don't force a "conditions" question if nothing suggests it matters) — but do keep asking real clinical follow-ups (aim for at least 2-3 exchanges gathering specifics) before concluding, rather than settling for the first vague answer.
+- ALWAYS return the full merged intake object — carry forward every field you already knew from "intake so far" plus whatever new information this turn added, including specifics from the guide above folded into "additionalNotes" or "symptoms". Never null out something you already learned.
+- Only set readyForRecommendation=true once you have primaryReason PLUS at least two more concrete details (from onset/location/severity/duration/additionalNotes) — including at least one symptom-specific detail from the guide above, not just a generic timeframe. Until then, keep asking; readyForRecommendation stays false and recommendedSpecialty stays null. Once ready, set recommendedSpecialty to the best match and suggestBooking=true, and let "reply" summarize everything you understood (a short recap) and offer to show relevant doctors.
 - If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors.
 
 Valid values for recommendedSpecialty (choose the closest match; use "General Physician" if unclear):
@@ -337,19 +377,31 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
 
   try {
     const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-    let responseText: string | null = null;
+    let parsed: any = null;
     let lastError: any = null;
 
+    // Historical model turns are re-sent as minimal JSON envelopes (not the
+    // raw plain-language reply) so the model keeps seeing its own past turns
+    // in the same JSON-only format the system prompt demands — mixing in
+    // plain-text history was found to make the model drift into replying in
+    // plain text itself as the conversation grew, which then failed to parse.
     const contents = [
       ...(Array.isArray(history) ? history : [])
         .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
-        .map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
+        .map((h: any) => ({
+          role: h.role,
+          parts: [{ text: h.role === "model" ? JSON.stringify({ reply: h.text }) : h.text }],
+        })),
       {
         role: "user",
         parts: [{ text: `Intake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}` }],
       },
     ];
 
+    // Try every fallback model until one returns a response that actually
+    // parses as valid JSON — previously a single model returning malformed
+    // JSON aborted the whole request instead of falling back, which is what
+    // caused the intermittent "having trouble connecting" errors mid-chat.
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -372,8 +424,13 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
           throw new Error(`HTTP ${r.status}: ${body}`);
         }
         const data = await r.json() as any;
-        responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
         if (!responseText) throw new Error("Empty response");
+
+        const candidate = tryParseWellnessJson(responseText);
+        if (!candidate) throw new Error("Model returned malformed JSON");
+
+        parsed = candidate;
         console.log(`[wellness-chat] ✓ model=${model}`);
         break;
       } catch (err: any) {
@@ -382,15 +439,8 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
       }
     }
 
-    if (!responseText) {
+    if (!parsed) {
       throw new Error(`All models failed: ${lastError?.message}`);
-    }
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(responseText.trim());
-    } catch {
-      throw new Error("Model returned malformed JSON");
     }
 
     if (parsed.offTopic === true) {
