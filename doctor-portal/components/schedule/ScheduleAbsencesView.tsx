@@ -171,6 +171,41 @@ export default function ScheduleAbsencesView() {
     setShowMarkAbsence(true);
   };
 
+  // ── Full-day (or multi-day) leave, bypassing the hourly grid entirely ────
+  const [showFullDayPicker, setShowFullDayPicker] = useState(false);
+  const [fullDayStart, setFullDayStart] = useState("");
+  const [fullDayEnd, setFullDayEnd] = useState("");
+
+  const openFullDayPicker = () => {
+    const today = toLocalDateInputValue(new Date());
+    setFullDayStart(today);
+    setFullDayEnd(today);
+    setShowFullDayPicker(true);
+  };
+
+  const handleConfirmFullDayRange = () => {
+    if (!fullDayStart || !fullDayEnd) {
+      alert("Please select a start and end date.");
+      return;
+    }
+    const start = new Date(`${fullDayStart}T00:00:00`);
+    // Midnight of the day AFTER fullDayEnd, not 23:59:59 of fullDayEnd itself
+    // — that keeps the range an exact multiple of 24h so it reports as a
+    // clean "1 day(s)"/"2 day(s)" instead of "23.99.. hour(s)".
+    const end = new Date(`${fullDayEnd}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+    if (end <= start) {
+      alert("End date cannot be before start date.");
+      return;
+    }
+    setStartDate(start.toISOString());
+    setEndDate(end.toISOString());
+    setSelectStart(null);
+    setSelectEnd(null);
+    setShowFullDayPicker(false);
+    setShowMarkAbsence(true);
+  };
+
   // Date navigation states
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
@@ -447,15 +482,23 @@ export default function ScheduleAbsencesView() {
   return (
     <div className="flex flex-col gap-5 w-full select-none relative">
       
-      {/* Top action link below tabs */}
+      {/* Top action links below tabs */}
       {can("manage_own_schedule") && (
-        <div className="flex justify-start">
+        <div className="flex justify-start items-center gap-4">
           <button
             onClick={handleMarkAbsenceClick}
             className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold tracking-[-0.24px] hover:underline transition-all flex items-center gap-1.5 cursor-pointer"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
             Request Approval
+          </button>
+          <span className="text-[#EBEEF5]">|</span>
+          <button
+            onClick={openFullDayPicker}
+            className="text-[#5476FC] hover:text-[#4065FB] text-xs font-semibold tracking-[-0.24px] hover:underline transition-all flex items-center gap-1.5 cursor-pointer"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          >
+            Mark Full Day(s)
           </button>
         </div>
       )}
@@ -815,6 +858,83 @@ export default function ScheduleAbsencesView() {
         </div>
 
       </div>
+
+      {/* ── Full Day(s) Picker Modal ──────────────────────────────────────────── */}
+      {showFullDayPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white border border-[#EBEEF5] rounded-[24px] p-6 shadow-[0_12px_50px_rgba(0,0,0,0.15)] w-full max-w-[420px] mx-4 flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3
+                className="text-[#24292E] font-semibold text-[17px] tracking-[-0.34px]"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Mark Full Day(s) as Leave
+              </h3>
+              <button
+                onClick={() => setShowFullDayPicker(false)}
+                className="w-7 h-7 rounded-full hover:bg-[#F5F6FA] flex items-center justify-center text-[#9EA5AD] hover:text-[#383F45] transition-all"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1.5 10.5l9-9M1.5 1.5l9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-[#9EA5AD] text-[11px] -mt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Marks the entire day (or range of days) as unavailable, instead of picking hourly slots.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+                From
+              </span>
+              <input
+                type="date"
+                max="9999-12-31"
+                value={fullDayStart}
+                onChange={(e) => {
+                  setFullDayStart(e.target.value);
+                  if (fullDayEnd < e.target.value) setFullDayEnd(e.target.value);
+                }}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[12px] p-3 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[#9EA5AD] text-[9px] font-bold uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
+                To
+              </span>
+              <input
+                type="date"
+                max="9999-12-31"
+                min={fullDayStart || undefined}
+                value={fullDayEnd}
+                onChange={(e) => setFullDayEnd(e.target.value)}
+                className="w-full bg-[#F9FAFC] border border-[#EBEEF5] rounded-[12px] p-3 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={() => setShowFullDayPicker(false)}
+                className="flex-1 py-3 rounded-[14px] bg-[#EEF2FF] text-[#243D7F] hover:bg-[#E4EAFF] font-bold text-[13px] tracking-[-0.26px] transition-all"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmFullDayRange}
+                className="flex-1 py-3 rounded-[14px] bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#758FFF] hover:to-[#4065FB] text-white font-bold text-[13px] tracking-[-0.26px] transition-all duration-200"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Interactive Mark Absence Modal ────────────────────────────────────── */}
       {showMarkAbsence && (

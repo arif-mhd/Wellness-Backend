@@ -710,7 +710,9 @@ router.post("/:id/absences", requireRole("clinic"), async (req: SessionRequest, 
     const now = new Date().toISOString();
     const startObj = new Date(startDate);
     const endObj = new Date(endDate);
-    const diffHours = (endObj.getTime() - startObj.getTime()) / (1000 * 60 * 60);
+    // Rounded to the nearest whole hour before formatting — see the doctor's
+    // own POST /absences in doctors.ts for why an unrounded float breaks this.
+    const diffHours = Math.round((endObj.getTime() - startObj.getTime()) / (1000 * 60 * 60));
     const duration = diffHours >= 24 ? `${Math.round(diffHours / 24)} day(s)` : `${diffHours} hour(s)`;
 
     const newAbsence = {
@@ -757,6 +759,93 @@ router.delete("/:id/absences/:absenceId", requireRole("clinic"), async (req: Ses
 // ─── PATCH /api/clinics/doctors/:id/absences/:absenceId/status ──────────────
 // Ownership is checked against every clinic id the caller can act as
 // (getActorClinicIds), not a single resolved branch scope — the Doctors
+// ─── GET /api/clinics/doctors/:id/absences/:absenceId/conflicts ─────────────
+// Lets the approver check, at decision time, whether any appointments now
+// fall inside the requested window — a new booking can land there between
+// the doctor's original request (which was conflict-free at that moment)
+// and the staff member getting around to approving it.
+router.get("/:id/absences/:absenceId/conflicts", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  try {
+    const actorPerms = await getActorPermissionState(actorId);
+    if (!hasPermission(actorPerms, "manage_schedules")) {
+      res.status(403).json({ error: "You don't have permission to manage schedules." });
+      return;
+    }
+    const allowedClinicIds = await getActorClinicIds(actorId);
+    const { resource: doctor } = await doctorsContainer
+      .item(req.params.id, req.params.id)
+      .read()
+      .catch(() => ({ resource: undefined as any }));
+    if (!doctor || !allowedClinicIds.includes(doctor.clinicId)) {
+      res.status(404).json({ error: "Doctor not found." });
+      return;
+    }
+
+    const absence = (doctor.absences ?? []).find((a: any) => a.id === req.params.absenceId);
+    if (!absence) {
+      res.status(404).json({ error: "Absence not found." });
+      return;
+    }
+
+    const { startDate, endDate } = absence;
+    const rangeStart = new Date(new Date(startDate).getTime() - 30 * 60 * 1000).toISOString();
+    const appts = await queryDocuments<any>(appointmentsContainer, {
+      query: `SELECT c.id, c.patientId, c.scheduledAt, c.reason, c.durationMins, c.familyMemberId FROM c
+              WHERE c.doctorId = @doctorId
+                AND c.status != 'cancelled'
+                AND c.scheduledAt >= @rangeStart
+                AND c.scheduledAt <= @rangeEnd`,
+      parameters: [
+        { name: "@doctorId", value: doctor.id },
+        { name: "@rangeStart", value: rangeStart },
+        { name: "@rangeEnd", value: endDate },
+      ],
+    });
+
+    const conflicts = [];
+    for (const a of appts) {
+      const apptStart = new Date(a.scheduledAt);
+      const apptEnd = new Date(apptStart.getTime() + (a.durationMins || 30) * 60 * 1000);
+      if (apptStart < new Date(endDate) && apptEnd > new Date(startDate)) {
+        let patientName = "Unknown Patient";
+        let patientAvatarUrl = null;
+        let patientDob = null;
+        try {
+          const { resource: patient } = await patientsContainer.item(a.patientId, a.patientId).read();
+          if (patient) {
+            patientName = patient.fullName ?? patientName;
+            patientAvatarUrl = patient.avatarUrl ?? null;
+            patientDob = patient.dateOfBirth ?? patient.dob ?? null;
+            if (a.familyMemberId && patient.familyMembers) {
+              const member = patient.familyMembers.find((m: any) => m.id === a.familyMemberId);
+              if (member) {
+                patientName = member.fullName ?? patientName;
+                patientAvatarUrl = member.avatarUrl ?? patientAvatarUrl;
+                patientDob = member.dateOfBirth ?? member.dob ?? patientDob;
+              }
+            }
+          }
+        } catch { }
+
+        conflicts.push({
+          id: a.id,
+          patientName,
+          patientAvatarUrl,
+          patientDob,
+          scheduledAt: a.scheduledAt,
+          reason: a.reason ?? "General Consultation",
+        });
+      }
+    }
+
+    res.json({ conflicts });
+  } catch (err) {
+    console.error("Check clinic absence conflicts error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // Timing tab lists doctors across every branch at once when viewing "All",
 // so approving an absence for a doctor outside whichever branch happens to
 // be selected in the URL must not 400. Same fix as POST /:id/verify-slots.

@@ -155,6 +155,38 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
     }
   };
 
+  const [conflictsByAbsenceId, setConflictsByAbsenceId] = useState<Record<string, any[] | "loading">>({});
+
+  const handleCheckAbsenceConflicts = async (absenceId: string) => {
+    if (!selectedDoctorId) return;
+    // Toggle closed if already expanded.
+    if (conflictsByAbsenceId[absenceId] !== undefined) {
+      setConflictsByAbsenceId((prev) => {
+        const next = { ...prev };
+        delete next[absenceId];
+        return next;
+      });
+      return;
+    }
+    setConflictsByAbsenceId((prev) => ({ ...prev, [absenceId]: "loading" }));
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${selectedDoctorId}/absences/${absenceId}/conflicts`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Failed (${res.status})`);
+      }
+      const data = await res.json();
+      setConflictsByAbsenceId((prev) => ({ ...prev, [absenceId]: data.conflicts ?? [] }));
+    } catch (err: any) {
+      setConflictsByAbsenceId((prev) => {
+        const next = { ...prev };
+        delete next[absenceId];
+        return next;
+      });
+      alert(err.message ?? "Failed to check appointments for this window.");
+    }
+  };
+
   const handleApproveAbsence = async (absenceId: string) => {
     if (!selectedDoctorId) return;
     try {
@@ -293,47 +325,91 @@ export default function DoctorsTimingTab({ qs = "" }: { qs?: string }) {
                 <p className="text-[13px] text-gray-400">No absences recorded.</p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {selectedDoctor.absences.map((abs: any) => (
-                    <div key={abs.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[14px] font-semibold text-gray-800">
-                          {new Date(abs.startDate).toLocaleDateString()} · {new Date(abs.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(abs.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className="text-[12px] font-medium text-gray-500">
-                          {abs.duration} · {abs.reason}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {abs.status === "pending" ? (
-                          <>
-                            <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
-                            {canManage ? (
+                  {selectedDoctor.absences.map((abs: any) => {
+                    const conflictState = conflictsByAbsenceId[abs.id];
+                    return (
+                      <div key={abs.id} className="flex flex-col gap-3 p-4 border border-gray-100 rounded-xl bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[14px] font-semibold text-gray-800">
+                              {new Date(abs.startDate).toLocaleDateString()} · {new Date(abs.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(abs.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[12px] font-medium text-gray-500">
+                              {abs.duration} · {abs.reason}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 justify-end">
+                            {abs.status === "pending" ? (
                               <>
-                                <button
-                                  onClick={() => handleRejectAbsence(abs.id)}
-                                  className="px-4 py-1.5 bg-white border border-gray-200 text-gray-600 text-[12px] font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-                                >
-                                  REJECT
-                                </button>
-                                <button
-                                  onClick={() => handleApproveAbsence(abs.id)}
-                                  className="px-4 py-1.5 bg-black text-white text-[12px] font-semibold rounded-lg hover:bg-gray-800 transition-colors"
-                                >
-                                  APPROVE
-                                </button>
+                                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[11px] font-bold rounded-full">Pending</span>
+                                {canManage ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleCheckAbsenceConflicts(abs.id)}
+                                      className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-semibold rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap"
+                                    >
+                                      {conflictState !== undefined ? "HIDE APPOINTMENTS" : "CHECK APPOINTMENTS"}
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectAbsence(abs.id)}
+                                      className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-semibold rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap"
+                                    >
+                                      REJECT
+                                    </button>
+                                    <button
+                                      onClick={() => handleApproveAbsence(abs.id)}
+                                      className="px-3 py-1.5 bg-black text-white text-[11px] font-semibold rounded-lg hover:bg-gray-800 transition-colors whitespace-nowrap"
+                                    >
+                                      APPROVE
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-[11px] text-gray-400 italic">No permission to approve/reject</span>
+                                )}
                               </>
+                            ) : abs.status === "rejected" ? (
+                              <span className="px-3 py-1 bg-red-100 text-red-700 text-[11px] font-bold rounded-full">Rejected</span>
                             ) : (
-                              <span className="text-[11px] text-gray-400 italic">No permission to approve/reject</span>
+                              <span className="px-3 py-1 bg-green-100 text-green-700 text-[11px] font-bold rounded-full">Approved</span>
                             )}
-                          </>
-                        ) : abs.status === "rejected" ? (
-                          <span className="px-3 py-1 bg-red-100 text-red-700 text-[11px] font-bold rounded-full">Rejected</span>
-                        ) : (
-                          <span className="px-3 py-1 bg-green-100 text-green-700 text-[11px] font-bold rounded-full">Approved</span>
+                          </div>
+                        </div>
+
+                        {conflictState !== undefined && (
+                          <div className="border-t border-gray-200 pt-3">
+                            {conflictState === "loading" ? (
+                              <p className="text-[12px] text-gray-400">Checking scheduled appointments...</p>
+                            ) : conflictState.length === 0 ? (
+                              <p className="text-[12px] text-emerald-600 font-medium">No appointments booked during this window — safe to approve.</p>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <p className="text-[12px] font-semibold text-amber-700">
+                                  {conflictState.length} appointment{conflictState.length > 1 ? "s" : ""} booked during this window:
+                                </p>
+                                {conflictState.map((apt: any) => (
+                                  <div key={apt.id} className="flex items-center gap-3 p-2.5 bg-white border border-gray-100 rounded-lg">
+                                    {apt.patientAvatarUrl ? (
+                                      <img src={apt.patientAvatarUrl} alt={apt.patientName} className="w-7 h-7 rounded-full object-cover shrink-0 border border-gray-100" />
+                                    ) : (
+                                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-semibold text-[10px] shrink-0">
+                                        {(apt.patientName || "?").slice(0, 1).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-[12px] font-semibold text-gray-800 truncate">{apt.patientName}</span>
+                                      <span className="text-[11px] text-gray-500">
+                                        {new Date(apt.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · {apt.reason}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
