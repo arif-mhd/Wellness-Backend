@@ -104,6 +104,19 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
           </div>
         </div>
 
+        {/* Narrative summary generated from the full chat transcript — shown
+            alongside the raw Q&A fields below, not in place of them. */}
+        {form?.visitSummary && (
+          <div className="flex flex-col gap-1 w-full bg-[#F8F9FF] border border-[#EEF2FF] rounded-[10px] p-4">
+            <span className="text-[#5476FC] text-[11px] font-semibold uppercase tracking-wide">
+              Visit Summary
+            </span>
+            <p className="text-[#24292E] text-[12px] leading-[18px] whitespace-pre-line">
+              {form.visitSummary}
+            </p>
+          </div>
+        )}
+
         {/* Form Q&A fields */}
         <div className="flex flex-col gap-0 w-full">
           {fields.map((field, i) => (

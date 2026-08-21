@@ -365,6 +365,12 @@ export default function EhrPanel({ open, onClose, loading, data, fhirLoading, fh
               {data.preVisitData && (
                 <div className="px-6 py-4 border-b border-gray-100 flex flex-col gap-2">
                   <p className="text-[#24292e] font-bold text-xs uppercase tracking-wide text-gray-400">Pre-Visit Questionnaire</p>
+                  {data.preVisitData.visitSummary && (
+                    <div className="bg-[#F8F9FF] border border-[#EEF2FF] rounded-lg p-3">
+                      <p className="text-[10px] text-[#5476FC] uppercase font-bold mb-1">Visit Summary</p>
+                      <p className="text-xs text-[#24292e] whitespace-pre-line">{data.preVisitData.visitSummary}</p>
+                    </div>
+                  )}
                   {data.preVisitData.primaryReason && (
                     <div><p className="text-[10px] text-gray-400 uppercase font-bold">Primary Reason</p><p className="text-xs text-[#24292e]">{data.preVisitData.primaryReason}</p></div>
                   )}

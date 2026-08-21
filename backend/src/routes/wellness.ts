@@ -356,6 +356,35 @@ Example symptom → specialty reasoning:
 ${SPECIALTY_HINTS_TEXT}`;
 }
 
+// ── Deterministic off-topic pre-filter ───────────────────────────────────────
+// The prompt instructs the model to set offTopic=true for unrelated requests,
+// but that's self-reported and the weaker fallback models (gemini-2.5-flash,
+// gemini-2.0-flash) don't always honor it — e.g. answering a coding question
+// outright instead of redirecting. These patterns catch the most unambiguous
+// non-health requests *before* spending a model call on them, so those cases
+// are redirected deterministically instead of depending on model compliance.
+// Intentionally narrow (multi-word phrases, not bare keywords like "movie" or
+// "football") to avoid false-positives on real symptom messages that happen
+// to mention an unrelated word in passing (e.g. "hurt my knee playing
+// football"). Anything not clearly matching one of these still goes to the
+// model, which has full conversational context to judge — this is a
+// defense-in-depth layer for the obvious cases, not a full classifier.
+const OBVIOUS_OFF_TOPIC_PATTERNS: RegExp[] = [
+  /```/, // code fences
+  /\b(write|generate|debug|fix)\b[^.?!]{0,30}\b(code|program|script|function|algorithm|sql query|regex)\b/i,
+  /\b(who (won|is winning)|election result|president of|prime minister of|political party)\b/i,
+  /\b(football|cricket|basketball|tennis|soccer)\b[^.?!]{0,20}\b(score|match result|highlights|league table)\b/i,
+  /^\s*[\d+\-*/^().\s]{3,}=?\s*\??\s*$/, // pure arithmetic, no words at all
+  /\b(movie review|watch(ed)? (a |the )?(movie|tv show)|netflix series|celebrity gossip)\b/i,
+];
+
+function isObviouslyOffTopic(message: string): boolean {
+  return OBVIOUS_OFF_TOPIC_PATTERNS.some((re) => re.test(message));
+}
+
+const OFF_TOPIC_REPLY =
+  "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!";
+
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking }
@@ -363,6 +392,19 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
+    return;
+  }
+
+  const intakeSoFarForFilter = sanitizeIntake(intake ?? EMPTY_INTAKE);
+  if (isObviouslyOffTopic(message)) {
+    res.json({
+      reply: OFF_TOPIC_REPLY,
+      offTopic: true,
+      intake: intakeSoFarForFilter,
+      readyForRecommendation: false,
+      suggestBooking: false,
+      recommendedSpecialty: null,
+    });
     return;
   }
 
@@ -445,7 +487,7 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
 
     if (parsed.offTopic === true) {
       res.json({
-        reply: parsed.reply || "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!",
+        reply: parsed.reply || OFF_TOPIC_REPLY,
         offTopic: true,
         intake: intakeSoFar,
         readyForRecommendation: false,
@@ -455,17 +497,161 @@ router.post("/chat", async (req: SessionRequest, res: Response) => {
       return;
     }
 
+    const mergedIntake = sanitizeIntake(parsed.intake);
+
+    // The model is instructed to only recommend a specialty once it has
+    // primaryReason plus at least two more concrete details, but that rule
+    // lives in the prompt only — weaker fallback models (gemini-2.5-flash,
+    // gemini-2.0-flash) don't reliably honor it and will jump straight to a
+    // recommendation after a single vague message. Re-check it here so the
+    // chat behaves consistently regardless of which model answered. Direct,
+    // symptom-less booking requests (primaryReason left null on purpose) are
+    // exempt — that's the model's intended fast path, not premature triage.
+    const detailCount = [
+      mergedIntake.onset,
+      mergedIntake.location,
+      mergedIntake.severity,
+      mergedIntake.duration,
+      mergedIntake.additionalNotes,
+    ].filter((v) => typeof v === "string" && v.trim().length > 0).length;
+
+    const isSymptomDriven = !!mergedIntake.primaryReason;
+    const hasEnoughDetail = detailCount >= 2;
+
+    let readyForRecommendation = parsed.readyForRecommendation === true;
+    let suggestBooking = parsed.suggestBooking === true;
+    let recommendedSpecialty = typeof parsed.recommendedSpecialty === "string" ? parsed.recommendedSpecialty : null;
+
+    if (isSymptomDriven && !hasEnoughDetail) {
+      readyForRecommendation = false;
+      suggestBooking = false;
+      recommendedSpecialty = null;
+    }
+
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
       offTopic: false,
-      intake: sanitizeIntake(parsed.intake),
-      readyForRecommendation: parsed.readyForRecommendation === true,
-      recommendedSpecialty: typeof parsed.recommendedSpecialty === "string" ? parsed.recommendedSpecialty : null,
-      suggestBooking: parsed.suggestBooking === true,
+      intake: mergedIntake,
+      readyForRecommendation,
+      recommendedSpecialty,
+      suggestBooking,
     });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
     res.status(500).json({ error: "Chat is temporarily unavailable. Please try again." });
+  }
+});
+
+// Gemini structured-output schema for POST /visit-summary.
+const VISIT_SUMMARY_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    summary: { type: "STRING" },
+  },
+  required: ["summary"],
+};
+
+function buildVisitSummarySystemPrompt(): string {
+  return `You are writing a pre-visit clinical note for a doctor, based on a conversation between a patient and Dr. Wellness (a triage chatbot) plus the structured symptom details already extracted from that conversation.
+
+You will be given the full conversation transcript and the structured intake object. Write ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
+
+RULES:
+- "summary" is a short clinical note in third person, professional register (e.g. "Patient reports right-sided ear pain since yesterday, moderate severity, no discharge or hearing loss reported."), 2-5 sentences.
+- Base it ONLY on what the patient actually said in the transcript or what is present in the structured intake — never invent, assume, or infer symptoms, timing, or severity that weren't stated.
+- Do not diagnose, do not suggest a condition name, do not recommend treatment — this is a summary of reported symptoms for the doctor to review, not an assessment.
+- If the transcript contains little or no symptom information (e.g. it was a direct booking request with no complaint described), write a brief neutral note stating that, e.g. "Patient booked directly without describing specific symptoms in chat."
+- Write in plain sentences, not a bulleted list — the structured fields are already shown separately alongside this summary.`;
+}
+
+// ── POST /api/wellness/visit-summary ─────────────────────────────────────────
+// Body: { history: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
+// Returns: { summary: string }
+//
+// Generates a fresh narrative pre-visit note from the FULL chat transcript at
+// the moment the patient reviews/submits the pre-visit questionnaire after
+// booking — deliberately a separate call from /chat (not reused from a
+// mid-conversation turn) so it reflects anything said up to and including the
+// doctor-picking / booking part of the conversation, not just the state when
+// readyForRecommendation first fired.
+router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
+  const { history = [], intake } = req.body;
+  if (!Array.isArray(history) || history.length === 0) {
+    res.status(400).json({ error: "history is required" });
+    return;
+  }
+
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  if (!apiKey) {
+    res.status(500).json({ error: "AI chat is not configured." });
+    return;
+  }
+
+  const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
+  const systemPrompt = buildVisitSummarySystemPrompt();
+
+  const transcriptText = history
+    .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
+    .map((h: any) => `${h.role === "user" ? "Patient" : "Dr. Wellness"}: ${h.text}`)
+    .join("\n");
+
+  try {
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+    let parsed: any = null;
+    let lastError: any = null;
+
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [
+              {
+                role: "user",
+                parts: [{
+                  text: `Conversation transcript:\n${transcriptText}\n\nStructured intake (JSON): ${JSON.stringify(intakeSoFar)}`,
+                }],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 400,
+              temperature: 0.4,
+              responseMimeType: "application/json",
+              responseSchema: VISIT_SUMMARY_RESPONSE_SCHEMA,
+            },
+          }),
+        });
+        if (!r.ok) {
+          const body = (await r.text()).replace(/\s+/g, " ").trim();
+          throw new Error(`HTTP ${r.status}: ${body}`);
+        }
+        const data = await r.json() as any;
+        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        if (!responseText) throw new Error("Empty response");
+
+        const candidate = tryParseWellnessJson(responseText);
+        if (!candidate) throw new Error("Model returned malformed JSON");
+
+        parsed = candidate;
+        console.log(`[wellness-visit-summary] ✓ model=${model}`);
+        break;
+      } catch (err: any) {
+        console.warn(`[wellness-visit-summary] ${model} failed:`, err?.message);
+        lastError = err;
+      }
+    }
+
+    if (!parsed) {
+      throw new Error(`All models failed: ${lastError?.message}`);
+    }
+
+    res.json({ summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "" });
+  } catch (err: any) {
+    console.error("[wellness-visit-summary] error:", err?.message);
+    res.status(500).json({ error: "Could not generate visit summary." });
   }
 });
 

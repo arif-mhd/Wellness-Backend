@@ -1353,7 +1353,7 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
 
     const {
       primaryReason, symptoms, severity, duration, onset, location,
-      conditions, medications, allergies, additionalNotes, source,
+      conditions, medications, allergies, additionalNotes, source, visitSummary,
     } = req.body;
 
     const updated = {
@@ -1369,6 +1369,10 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
         medications:      medications      ?? "",
         allergies:        allergies        ?? "",
         additionalNotes:  additionalNotes  ?? "",
+        // AI-generated narrative pre-visit note (see /api/wellness/visit-summary)
+        // — a separate written recap alongside the structured fields above,
+        // not a replacement for them. Empty for manual (non-chat) bookings.
+        visitSummary:     typeof visitSummary === "string" ? visitSummary : "",
         source:           source === "ai_chat" ? "ai_chat" : "manual",
         submittedAt:      new Date().toISOString(),
       },
