@@ -43,7 +43,13 @@ function mapToPatient(apt: any, index: number): Patient {
     allergies: apt.preVisitData.allergies || "None",
     primaryConcern: apt.preVisitData.primaryReason || apt.reason || "Consultation",
     smokes: Array.isArray(apt.preVisitData.symptoms) ? apt.preVisitData.symptoms.join(", ") : (apt.preVisitData.symptoms || "None"),
+    onset: apt.preVisitData.onset,
+    location: apt.preVisitData.location,
+    severity: apt.preVisitData.severity,
+    duration: apt.preVisitData.duration,
     drinks: apt.preVisitData.additionalNotes || "None",
+    visitSummary: apt.preVisitData.visitSummary || "",
+    source: apt.preVisitData.source,
   } : {
     isQuestionnaire: false,
     chronicIllnesses: apt.patientChronicIllnesses || "None reported",

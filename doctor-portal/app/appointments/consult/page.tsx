@@ -112,6 +112,10 @@ function ConsultRoom() {
   const [showUnsavedEmrPrompt, setShowUnsavedEmrPrompt] = useState(false);
   const [showRejoinOrEndPrompt, setShowRejoinOrEndPrompt] = useState(false);
 
+  // Patient's pre-visit form (manual or AI-chat collected) — read-only, shown
+  // as its own tab in the EMR left-nav alongside Intake plan etc.
+  const [preVisitData, setPreVisitData] = useState<any | null>(null);
+
   // EHR panel
   const [ehrOpen, setEhrOpen] = useState(false);
   const [ehrLoading, setEhrLoading] = useState(false);
@@ -295,12 +299,19 @@ function ConsultRoom() {
         });
 
         // Fire these as soon as the room itself is connected — they must not
-        // depend on the local camera/mic actually starting (see below).
+        // depend on the local camera/mic actually starting (see below). This
+        // is what flips the appointment to "in_progress" so the patient's
+        // waiting-room "Join Call" button activates (it polls for that
+        // status) — a silent failure here means the doctor's video connects
+        // fine but the patient never sees the button light up, so a failure
+        // is logged instead of swallowed to make that failure mode visible.
         apiFetch(`/api/appointments/${appointmentId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "in_progress" }),
-        }).catch(() => { });
+        }).then((r) => {
+          if (!r.ok) r.text().then((t) => console.error(`[consult] Failed to mark appointment in_progress (HTTP ${r.status}):`, t));
+        }).catch((err) => console.error("[consult] Failed to mark appointment in_progress:", err));
         apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -528,7 +539,8 @@ function ConsultRoom() {
       try {
         const res = await apiFetch(`/api/appointments/${appointmentId}/emr`);
         if (res.ok) {
-          const { emr } = await res.json();
+          const { emr, preVisitData: pvd } = await res.json();
+          setPreVisitData(pvd ?? null);
           if (emr) {
             if (emr.sections) setEmrSections({ ...EMPTY_EMR_SECTIONS, ...emr.sections });
             if (emr.visitInfo) setVisitInfo({ ...EMPTY_VISIT_INFO, ...emr.visitInfo });
@@ -1200,6 +1212,7 @@ function ConsultRoom() {
                       visitInfo={visitInfo}
                       onVisitInfoChange={setVisitInfo}
                       onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
+                      preVisitData={preVisitData}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <AddMedicines medicines={medicines} onChange={setMedicines} />

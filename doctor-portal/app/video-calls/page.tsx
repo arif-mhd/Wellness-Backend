@@ -80,6 +80,10 @@ function VideoCallInner() {
   // Patient profile for the snapshot strip + HPI pre-fill
   const [patientProfile, setPatientProfile] = useState<any | null>(null);
 
+  // Patient's pre-visit form (manual or AI-chat collected) — read-only, shown
+  // as its own tab in the EMR left-nav alongside Intake plan etc.
+  const [preVisitData, setPreVisitData] = useState<any | null>(null);
+
   // Current doctor identity — used by AddMedicines/AddLabs to identify own entries
   const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
 
@@ -350,8 +354,9 @@ function VideoCallInner() {
         try {
           const profRes = await apiFetch(`/api/appointments/${appointmentId}/ehr`);
           if (profRes.ok) {
-            const { profile } = await profRes.json();
+            const { profile, preVisitData: pvd } = await profRes.json();
             setPatientProfile(profile ?? null);
+            setPreVisitData(pvd ?? null);
           }
         } catch { /* non-fatal */ }
 
@@ -1037,6 +1042,7 @@ function VideoCallInner() {
                       visitInfo={visitInfo}
                       onVisitInfoChange={setVisitInfo}
                       onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
+                      preVisitData={preVisitData}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
