@@ -241,6 +241,8 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
       primaryConcern: apt.preVisitData.primaryReason || apt.reason || "Consultation",
       smokes: Array.isArray(apt.preVisitData.symptoms) ? apt.preVisitData.symptoms.join(", ") : (apt.preVisitData.symptoms || "None"),
       drinks: apt.preVisitData.additionalNotes || "None",
+      visitSummary: apt.preVisitData.visitSummary || "",
+      source: apt.preVisitData.source,
     } : {
       isQuestionnaire: false,
       chronicIllnesses: apt.patientChronicIllnesses,

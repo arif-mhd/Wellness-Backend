@@ -744,15 +744,56 @@ function toPublicDoctor(doc: any) {
   };
 }
 
+// Doctors type their specialty as free text during onboarding (see
+// DoctorMedicalCareerForm in doctor-portal — plain <input>, not constrained
+// to the SPECIALTIES list in constants/specialties.ts), so real documents
+// hold values like "ENT", "Ortho", "Gynecology", "Nuerology" rather than the
+// chatbot's canonical "ENT Specialist" / "Orthopedic Surgeon" /
+// "Gynecologist". A strict equality filter matches almost nothing in
+// practice. Strip the common medical-title suffix ("-ology"/"-ologist",
+// "-iatry"/"-iatrist", "specialist", "surgeon", "physician", etc.) from both
+// sides so e.g. "Gynecology" and "Gynecologist" reduce to the same stem
+// "gynec" before comparing — this does not correct outright misspellings
+// (e.g. "Nuerology"), only naming-convention differences.
+const SPECIALTY_SUFFIXES = [
+  "ologists", "ologist", "ology",
+  "iatrists", "iatrist", "iatry",
+  "surgeons", "surgeon", "surgery",
+  "specialists", "specialist",
+  "physicians", "physician",
+  "ists", "ist", "ies", "y",
+];
+
+function stemSpecialty(raw: string): string {
+  const cleaned = raw.trim().toLowerCase().replace(/[^a-z\s]/g, "").trim();
+  for (const suffix of SPECIALTY_SUFFIXES) {
+    if (cleaned.endsWith(suffix) && cleaned.length - suffix.length >= 3) {
+      return cleaned.slice(0, -suffix.length).trim();
+    }
+  }
+  return cleaned;
+}
+
+function specialtyMatches(doctorSpecialty: string, wanted: string): boolean {
+  const a = doctorSpecialty.trim().toLowerCase();
+  const b = wanted.trim().toLowerCase();
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+
+  const stemA = stemSpecialty(a);
+  const stemB = stemSpecialty(b);
+  if (!stemA || !stemB) return false;
+  return stemA === stemB || stemA.includes(stemB) || stemB.includes(stemA);
+}
+
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors.
 // Optional ?clinicId= filters to just that clinic's roster (used by the
 // Clinic Profile screen's "Doctors Available" section) — additive, existing
 // callers that don't pass it are unaffected.
 // Optional ?specialization= (alias ?specialty=) filters by specialty — used
-// by the Dr. Wellness chatbot's doctor recommendations. Matched case-
-// insensitively in-memory since Cosmos SQL API has no case-insensitive
-// operator usable with parameterized queries here.
+// by the Dr. Wellness chatbot's doctor recommendations. See specialtyMatches
+// above for why this isn't a plain equality check.
 router.get("/", async (req: Request, res: Response) => {
   const clinicId = typeof req.query.clinicId === "string" ? req.query.clinicId : null;
   const specialization = typeof req.query.specialization === "string"
@@ -771,7 +812,7 @@ router.get("/", async (req: Request, res: Response) => {
     const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
 
     const filtered = specialization
-      ? resources.filter((doc: any) => (doc.specialty ?? "").toLowerCase() === specialization.toLowerCase())
+      ? resources.filter((doc: any) => specialtyMatches(doc.specialty ?? "", specialization))
       : resources;
 
     res.json({ doctors: filtered.map(toPublicDoctor) });

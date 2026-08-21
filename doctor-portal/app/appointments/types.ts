@@ -10,6 +10,8 @@ export interface PreVisitForm {
   location?: string;
   severity?: string;
   duration?: string;
+  /** Narrative pre-visit note generated from the full chat transcript — shown alongside the structured fields above, not in place of them. Empty for manual (non-chat) bookings. */
+  visitSummary?: string;
   /** 'ai_chat' = gathered by the Dr. Wellness chatbot; 'manual' = patient filled the form directly. */
   source?: 'ai_chat' | 'manual';
 }
