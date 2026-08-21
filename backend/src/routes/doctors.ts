@@ -378,7 +378,10 @@ router.post("/absences", requireRole("doctor"), async (req: SessionRequest, res:
     const startObj = new Date(startDate);
     const endObj = new Date(endDate);
     const diffMs = endObj.getTime() - startObj.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
+    // Round to the nearest whole hour before formatting — an unrounded
+    // float (e.g. a "full day" range ending at 23:59:59 rather than exactly
+    // 24h later) would otherwise print as "23.9997222222222 hour(s))".
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
     let duration = `${diffHours} hour(s)`;
     if (diffHours >= 24) {
       const diffDays = Math.round(diffHours / 24);
