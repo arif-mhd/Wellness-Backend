@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { getUser } from "supertokens-node";
+import SuperTokens, { getUser } from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
@@ -927,8 +927,10 @@ router.post("/change-password", requireRole("patient"), async (req: SessionReque
 });
 
 // ── DELETE /api/patients/me ──────────────────────────────────────────────────
-// Marks the patient's account as deleted and revokes the current session.
-// Data is preserved so appointment and order history remains intact.
+// Marks the patient's account as deleted, revokes the current session, and
+// deletes the SuperTokens login (frees the email for re-registration and
+// stops the password from ever working again). The Cosmos doc itself is kept
+// (just flagged) so appointment and order history remains intact.
 router.delete("/me", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const userId = req.session!.getUserId();
   try {
@@ -942,6 +944,7 @@ router.delete("/me", requireRole("patient"), async (req: SessionRequest, res: Re
     });
 
     await req.session!.revokeSession();
+    await SuperTokens.deleteUser(userId);
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Patient delete account error:", err);

@@ -27,6 +27,8 @@ interface CatalogueProduct {
   strength?: string | null;
   manufacturer?: string | null;
   category?: string;
+  /** "pharmacy" = in a pharmacy's stock; "external" = RxNorm reference match, not orderable */
+  source?: "pharmacy" | "external";
 }
 
 interface AddMedicinesProps {
@@ -64,7 +66,7 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
     searchDebounce.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8`);
+        const res = await fetch(`${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8&external=true`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(
@@ -74,6 +76,7 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
               strength: p.strength,
               manufacturer: p.manufacturer,
               category: p.category,
+              source: p.source,
             }))
           );
         }
@@ -118,7 +121,7 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
       timing,
       frequency,
       instructions: instructions.trim() || "Take as directed",
-      productId: selectedProduct?.id,
+      productId: selectedProduct?.source === "external" ? undefined : selectedProduct?.id,
       manufacturer: selectedProduct?.manufacturer ?? undefined,
     };
 
@@ -214,7 +217,12 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
                           onClick={() => handlePickProduct(p)}
                           className="w-full text-left px-4 py-2.5 hover:bg-[#F5F6FA] transition-colors border-b border-[#F5F6FA] last:border-0"
                         >
-                          <p className="text-[12px] font-bold text-[#383F45]">{p.name} {p.strength ?? ""}</p>
+                          <p className="text-[12px] font-bold text-[#383F45]">
+                            {p.name} {p.strength ?? ""}
+                            {p.source === "external" && (
+                              <span className="text-[9px] font-semibold text-slate-400 italic ml-1">(reference — not in pharmacy stock)</span>
+                            )}
+                          </p>
                           <p className="text-[10px] text-slate-400">{p.manufacturer ?? p.category ?? ""}</p>
                         </button>
                       ))

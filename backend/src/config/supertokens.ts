@@ -4,7 +4,7 @@ import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
-import { patientsContainer, doctorsContainer } from "./cosmos";
+import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
 
 // Browser-based portals that are allowed to make CORS requests.
@@ -140,11 +140,13 @@ export function initSuperTokens(): void {
                 const userId = response.user.id;
                 try {
                   const { resource: patient } = await patientsContainer.item(userId, userId).read();
-                  if (patient && patient.status === "deactivated") {
+                  if (patient && (patient.status === "deactivated" || patient.status === "deleted")) {
                     await Session.revokeAllSessionsForUser(userId);
                     return {
                       status: "GENERAL_ERROR",
-                      message: "Your account has been deactivated. Please contact support.",
+                      message: patient.status === "deleted"
+                        ? "This account no longer exists."
+                        : "Your account has been deactivated. Please contact support.",
                     } as any;
                   }
                 } catch {
@@ -162,6 +164,19 @@ export function initSuperTokens(): void {
                   }
                 } catch {
                   // Not a doctor or no profile doc yet — allow sign-in.
+                }
+
+                try {
+                  const { resource: clinicUser } = await clinicsContainer.item(userId, userId).read();
+                  if (clinicUser && clinicUser.status === "deleted") {
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "This account no longer exists.",
+                    } as any;
+                  }
+                } catch {
+                  // Not a clinic/branch user or no profile doc yet — allow sign-in.
                 }
               }
 

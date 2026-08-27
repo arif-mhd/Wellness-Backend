@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
+import { searchRxnorm } from "../services/rxnormService";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -15,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // Supports ?search=, ?category=, ?limit=, ?skip= query params.
 router.get("/catalogue", async (req: Request, res: Response) => {
   try {
-    const { search, category, limit = "50", skip = "0" } = req.query as Record<string, string>;
+    const { search, category, limit = "50", skip = "0", external } = req.query as Record<string, string>;
 
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
@@ -63,7 +64,7 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     });
 
     // Adapt to the Medicine shape the patient app expects
-    const medicines = resources
+    const medicines: any[] = resources
       .slice(parseInt(skip), parseInt(skip) + parseInt(limit))
       .map((p: any) => ({
         id:                   p.id,
@@ -85,8 +86,50 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         benefits:             p.benefits ?? null,
         sideEffects:          p.sideEffects ?? null,
         howToUse:             p.howToUse ?? null,
-        pharmacyRating:       getAverage(p.pharmacyId)
+        pharmacyRating:       getAverage(p.pharmacyId),
+        source:               "pharmacy" as const,
       }));
+
+    // Opt-in widening beyond pharmacy stock — used by the doctor-portal prescription
+    // search, which needs real allopathic drug names even when no pharmacy carries them.
+    // Never applied by default so the patient buy-medicines flow only ever shows
+    // items that are actually orderable.
+    if ((external === "true" || external === "1") && search && search.trim().length >= 3) {
+      const localNames = new Set(medicines.map((m) => m.name.toLowerCase()));
+      const rxNames = new Set<string>();
+      const rxCandidates = await searchRxnorm(search.trim(), 10);
+
+      for (const c of rxCandidates) {
+        const key = c.name.toLowerCase();
+        if (localNames.has(key) || rxNames.has(key)) continue;
+        rxNames.add(key);
+        medicines.push({
+          id: `rxnorm-${c.rxcui}`,
+          name: c.name,
+          generic_name: null,
+          category: null,
+          form: null,
+          strength: null,
+          manufacturer: null,
+          description: null,
+          price: null,
+          stock_quantity: 0,
+          requires_prescription: null,
+          image_url: null,
+          is_active: false,
+          numberOfTablets: null,
+          productSummary: null,
+          recommendedFor: null,
+          benefits: null,
+          sideEffects: null,
+          howToUse: null,
+          pharmacyRating: 0,
+          source: "external" as const,
+          system: "allopathic" as const,
+          rxcui: c.rxcui,
+        });
+      }
+    }
 
     res.json(medicines);
   } catch (err) {
