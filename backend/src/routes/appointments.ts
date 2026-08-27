@@ -13,7 +13,7 @@ import {
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
-import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic } from "../utils/clinicScope";
+import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic, buildInClause } from "../utils/clinicScope";
 import { resolveAppointmentActor } from "../utils/appointmentAuth";
 import { sendPushToUser } from "../utils/pushNotifications";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
@@ -117,7 +117,7 @@ function generateAppointmentId(doctorName: string, scheduledAt: string): string 
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
-  const { doctorId, scheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId } = req.body;
+  const { doctorId, scheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId, consultationLanguage } = req.body;
 
   if (!doctorId || !scheduledAt || !reason) {
     res.status(400).json({ error: "doctorId, scheduledAt, and reason are required." });
@@ -205,6 +205,12 @@ router.post("/", requireRole("patient"), async (req: SessionRequest, res: Respon
       createdAt: now,
       updatedAt: now,
       familyMemberId: familyMemberId ?? null,
+      // The language the patient asked this doctor to consult in — chosen
+      // from the doctor's own spoken languages at booking time. Optional:
+      // older appointments and any created before this field existed simply
+      // won't have it. Also read by the live-transcript agent to configure
+      // that call's speech-to-text language.
+      consultationLanguage: typeof consultationLanguage === "string" && consultationLanguage.trim() ? consultationLanguage.trim() : null,
     };
 
     await appointmentsContainer.items.create(appointment);
@@ -257,25 +263,37 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
     // ever completing (still "scheduled" or stuck "in_progress").
     await autoExpireStaleAppointments(appointments);
 
-    // Enrich with doctor name (and, when the doctor belongs to a clinic, the clinic name)
-    const enriched = await Promise.all(
-      appointments.map(async (apt) => {
-        try {
-          const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
-          const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
-          return {
-            ...apt,
-            doctorName: doctor?.fullName ?? "Unknown Doctor",
-            doctorSpecialty: doctor?.specialty ?? "",
-            doctorAvatarUrl: doctor?.avatarUrl ?? null,
-            clinicName,
-            clinicAddress,
-          };
-        } catch {
-          return { ...apt, doctorName: "Unknown Doctor", doctorSpecialty: "", doctorAvatarUrl: null, clinicName: null, clinicAddress: null };
-        }
+    // Enrich with doctor name (and, when the doctor belongs to a clinic, the
+    // clinic name) — one batched lookup per unique doctor/clinic instead of a
+    // point-read per appointment, since the same doctor is often reused
+    // across many of a patient's appointments.
+    const doctorIds = Array.from(new Set(appointments.map((a) => a.doctorId).filter(Boolean)));
+    const { clause: doctorClause, parameters: doctorParams } = buildInClause("c.id", doctorIds);
+    const doctors = doctorIds.length
+      ? await queryDocuments<any>(doctorsContainer, { query: `SELECT * FROM c WHERE ${doctorClause}`, parameters: doctorParams })
+      : [];
+    const doctorsById = new Map(doctors.map((d) => [d.id, d]));
+
+    const clinicIds = Array.from(new Set(doctors.map((d) => d.clinicId).filter(Boolean)));
+    const clinicDisplayById = new Map<string, { name: string | null; address: string | null }>();
+    await Promise.all(
+      clinicIds.map(async (cid) => {
+        clinicDisplayById.set(cid, await resolveDoctorClinicDisplay(cid));
       })
     );
+
+    const enriched = appointments.map((apt) => {
+      const doctor = doctorsById.get(apt.doctorId);
+      const clinicDisplay = doctor?.clinicId ? clinicDisplayById.get(doctor.clinicId) : undefined;
+      return {
+        ...apt,
+        doctorName: doctor?.fullName ?? "Unknown Doctor",
+        doctorSpecialty: doctor?.specialty ?? "",
+        doctorAvatarUrl: doctor?.avatarUrl ?? null,
+        clinicName: clinicDisplay?.name ?? null,
+        clinicAddress: clinicDisplay?.address ?? null,
+      };
+    });
 
     res.json({ appointments: enriched });
   } catch (err) {
@@ -300,11 +318,20 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
     // ever completing (still "scheduled" or stuck "in_progress").
     await autoExpireStaleAppointments(appointments);
 
-    const enriched = await Promise.all(
-      appointments.map(async (apt) => {
+    // Batch-fetch every unique patient once instead of a point-read per
+    // appointment (an account can have multiple appointments across family
+    // members, but they all resolve back to the same patient document).
+    const doctorPatientIds = Array.from(new Set(appointments.map((a) => a.patientId).filter(Boolean)));
+    const { clause: doctorPatientClause, parameters: doctorPatientParams } = buildInClause("c.id", doctorPatientIds);
+    const doctorViewPatients = doctorPatientIds.length
+      ? await queryDocuments<any>(patientsContainer, { query: `SELECT * FROM c WHERE ${doctorPatientClause}`, parameters: doctorPatientParams })
+      : [];
+    const doctorViewPatientsById = new Map(doctorViewPatients.map((p) => [p.id, p]));
+
+    const enriched = appointments.map((apt) => {
         try {
-          const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
-          
+          const patient = doctorViewPatientsById.get(apt.patientId);
+
           let patientName = patient?.fullName ?? "Unknown Patient";
           let patientEmail = patient?.email ?? "";
           let patientPhone = patient?.phone ?? "";
@@ -420,8 +447,7 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
             patientAllergies: "None",
           };
         }
-      })
-    );
+    });
 
     res.json({ appointments: enriched });
   } catch (err) {
@@ -454,23 +480,27 @@ router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, r
         (apt.status === "completed" && !apt.emr)
     );
 
-    const enriched = await Promise.all(
-      relevant.map(async (apt) => {
+    const taskPatientIds = Array.from(new Set(relevant.map((a) => a.patientId).filter(Boolean)));
+    const { clause: taskPatientClause, parameters: taskPatientParams } = buildInClause("c.id", taskPatientIds);
+    const taskPatients = taskPatientIds.length
+      ? await queryDocuments<any>(patientsContainer, { query: `SELECT * FROM c WHERE ${taskPatientClause}`, parameters: taskPatientParams })
+      : [];
+    const taskPatientsById = new Map(taskPatients.map((p) => [p.id, p]));
+
+    const enriched = relevant.map((apt) => {
         let patientName = "Unknown Patient";
         let patientEmail = "";
         let patientAvatarUrl: string | null = null;
         let patientAge: number | null = null;
-        try {
-          const { resource: patient } = await patientsContainer.item(apt.patientId, apt.patientId).read();
-          patientName = patient?.fullName ?? patientName;
-          patientEmail = patient?.email ?? "";
-          patientAvatarUrl = patient?.avatarUrl ?? null;
-          const dob = patient?.dateOfBirth ?? patient?.dob;
-          if (dob) {
-            const diff = Date.now() - new Date(dob).getTime();
-            patientAge = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-          }
-        } catch { /* keep defaults */ }
+        const patient = taskPatientsById.get(apt.patientId);
+        patientName = patient?.fullName ?? patientName;
+        patientEmail = patient?.email ?? "";
+        patientAvatarUrl = patient?.avatarUrl ?? null;
+        const dob = patient?.dateOfBirth ?? patient?.dob;
+        if (dob) {
+          const diff = Date.now() - new Date(dob).getTime();
+          patientAge = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+        }
 
         const isUpcoming = apt.status === "scheduled";
 
@@ -491,8 +521,7 @@ router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, r
           appointmentId: apt.id,
           visitType: apt.visitType === "offline" ? "offline" : "online",
         };
-      })
-    );
+    });
 
     enriched.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
@@ -1627,14 +1656,14 @@ router.get("/:id/ehr", requireRole("doctor"), async (req: SessionRequest, res: R
 
     const doctorIds = Array.from(new Set(allAppointments.map((a) => a.doctorId).filter(Boolean)));
     const doctorNames: Record<string, string> = {};
-    await Promise.all(doctorIds.map(async (did) => {
-      try {
-        const { resource: doc } = await doctorsContainer.item(did, did).read();
-        doctorNames[did] = doc?.fullName ?? "Unknown Doctor";
-      } catch {
-        doctorNames[did] = "Unknown Doctor";
-      }
-    }));
+    const { clause: ehrDoctorClause, parameters: ehrDoctorParams } = buildInClause("c.id", doctorIds);
+    const ehrDoctors = doctorIds.length
+      ? await queryDocuments<any>(doctorsContainer, { query: `SELECT * FROM c WHERE ${ehrDoctorClause}`, parameters: ehrDoctorParams })
+      : [];
+    const ehrDoctorsById = new Map(ehrDoctors.map((d) => [d.id, d]));
+    doctorIds.forEach((did) => {
+      doctorNames[did] = ehrDoctorsById.get(did)?.fullName ?? "Unknown Doctor";
+    });
 
     const visitHistory = allAppointments
       .filter((a) => a.emr || a.status === "completed")

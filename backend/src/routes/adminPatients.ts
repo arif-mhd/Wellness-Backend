@@ -8,6 +8,7 @@ import {
   queryDocuments,
 } from "../config/cosmos";
 import { resolveProfileDisplay, getAllProfiles } from "../utils/profile";
+import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 
@@ -82,14 +83,14 @@ router.get("/:patientId/ehr", requireRole("admin"), async (req: Request, res: Re
 
     const doctorIds = Array.from(new Set(allAppointments.map((a) => a.doctorId).filter(Boolean)));
     const doctorNames: Record<string, string> = {};
-    await Promise.all(doctorIds.map(async (did) => {
-      try {
-        const { resource: doc } = await doctorsContainer.item(did, did).read();
-        doctorNames[did] = doc?.fullName ?? "Unknown Doctor";
-      } catch {
-        doctorNames[did] = "Unknown Doctor";
-      }
-    }));
+    if (doctorIds.length) {
+      const { clause, parameters } = buildInClause("c.id", doctorIds);
+      const fetchedDoctors = await queryDocuments<any>(doctorsContainer, { query: `SELECT * FROM c WHERE ${clause}`, parameters });
+      const doctorsById = new Map(fetchedDoctors.map((d) => [d.id, d]));
+      doctorIds.forEach((did) => {
+        doctorNames[did] = doctorsById.get(did)?.fullName ?? "Unknown Doctor";
+      });
+    }
 
     const visitHistory = allAppointments
       .filter((a) => a.emr || a.status === "completed")

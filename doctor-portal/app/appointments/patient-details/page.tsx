@@ -59,6 +59,7 @@ function PatientDetailsContent() {
               preVisitFormDate: dob,
               accountOwnerName: match.familyMemberId ? match.accountOwnerName : undefined,
               profileRelationship: match.familyMemberId ? match.profileRelationship : undefined,
+              consultationLanguage: match.consultationLanguage || null,
               // Prefer the actual pre-visit questionnaire (manual or AI-chat
               // collected) when the patient submitted one — this previously
               // always fell through to the generic branch below, silently

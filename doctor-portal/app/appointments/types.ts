@@ -47,4 +47,6 @@ export interface Patient {
   profileRelationship?: string;
   /** Online (video call) vs in-person visit — governs which consultation screen "Consult Now" opens. */
   visitType?: 'online' | 'offline';
+  /** Language the patient asked to consult in, chosen from this doctor's own spoken languages at booking time. Unset for appointments booked before this existed. */
+  consultationLanguage?: string | null;
 }

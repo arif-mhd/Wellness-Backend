@@ -192,7 +192,7 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
     const userId = req.session!.getUserId();
     const {
       fullName, name, phone, emiratesId, exrNumber, email, gender, bloodGroup,
-      dob, maritalStatus, height, weight, location, language,
+      dob, maritalStatus, height, weight, location, language, displayLanguage,
     } = req.body;
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
@@ -218,6 +218,13 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
       ...(weight       !== undefined && { weight }),
       ...(location     !== undefined && { location }),
       ...(language     !== undefined && { language }),
+      // Deliberately a separate field from `language` — that one means "what
+      // language does this patient speak" (used for doctor-language
+      // matching at booking time); this one means "what language should the
+      // app's own UI display in". Settings > Language used to write the
+      // `language` field directly, silently overwriting whatever spoken
+      // language the patient had set on their profile — see settings-language.tsx.
+      ...(displayLanguage !== undefined && { displayLanguage }),
       updatedAt: new Date().toISOString(),
     };
 

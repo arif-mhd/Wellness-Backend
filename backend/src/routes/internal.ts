@@ -7,6 +7,8 @@ import {
   notificationsContainer,
 } from "../config/cosmos";
 import { sendPushToUser } from "../utils/pushNotifications";
+import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
+import { deepgramCodeForLanguage } from "../utils/languages";
 
 const router = Router();
 
@@ -104,6 +106,114 @@ router.post("/appointment-reminders/sweep", async (req: Request, res: Response) 
   } catch (err) {
     console.error("[appointment-reminders] sweep failed:", err);
     res.status(500).json({ error: "Sweep failed" });
+  }
+});
+
+// POST /api/internal/appointments/expire-stale
+// Proactively runs the same auto-expire logic that GET /api/appointments
+// (and its clinic/doctor equivalents) already run lazily on every read — this
+// just does it ahead of time on a schedule (e.g. hourly via Cloud Scheduler)
+// so those read paths almost never find anything left to expire, instead of
+// writing to Cosmos as a side effect of a GET request. Purely additive: the
+// lazy per-request check stays in place as a safety net for anything this
+// sweep missed between runs.
+router.post("/appointments/expire-stale", async (req: Request, res: Response) => {
+  const secret = process.env.INTERNAL_CRON_SECRET;
+  if (!secret) {
+    res.status(500).json({ error: "INTERNAL_CRON_SECRET not configured" });
+    return;
+  }
+  if (req.headers["x-internal-secret"] !== secret) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  try {
+    const { resources: candidates } = await appointmentsContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.status = 'scheduled' OR c.status = 'in_progress'",
+      })
+      .fetchAll();
+
+    const checked = candidates.length;
+    await autoExpireStaleAppointments(candidates as any[]);
+    const expired = candidates.filter((apt: any) => apt.status === "cancelled").length;
+
+    res.json({ status: "OK", checked, expired });
+  } catch (err) {
+    console.error("[appointments/expire-stale] sweep failed:", err);
+    res.status(500).json({ error: "Sweep failed" });
+  }
+});
+
+// GET /api/internal/appointments/:id/language
+// Called by the live-transcript agent worker right after it joins a call's
+// room (the room name is the appointment id — see livekitRoom in
+// appointments.ts) to find out which language, if any, the patient asked
+// this doctor to consult in, so the STT session can be configured for it
+// instead of guessing/auto-detecting.
+router.get("/appointments/:id/language", async (req: Request, res: Response) => {
+  const secret = process.env.INTERNAL_CRON_SECRET;
+  if (!secret) {
+    res.status(500).json({ error: "INTERNAL_CRON_SECRET not configured" });
+    return;
+  }
+  if (req.headers["x-internal-secret"] !== secret) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(req.params.id, req.params.id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found" });
+      return;
+    }
+    res.json({
+      consultationLanguage: apt.consultationLanguage ?? null,
+      deepgramLanguageCode: deepgramCodeForLanguage(apt.consultationLanguage),
+    });
+  } catch (err) {
+    console.error("[appointments/:id/language] failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/internal/appointments/:id/transcript
+// Called by the live-transcript agent worker once a call ends, with the full
+// buffered transcript for that consultation.
+router.post("/appointments/:id/transcript", async (req: Request, res: Response) => {
+  const secret = process.env.INTERNAL_CRON_SECRET;
+  if (!secret) {
+    res.status(500).json({ error: "INTERNAL_CRON_SECRET not configured" });
+    return;
+  }
+  if (req.headers["x-internal-secret"] !== secret) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const { transcript } = req.body;
+  if (!Array.isArray(transcript)) {
+    res.status(400).json({ error: "transcript must be an array" });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(req.params.id, req.params.id).read();
+    if (!apt) {
+      res.status(404).json({ error: "Appointment not found" });
+      return;
+    }
+    await appointmentsContainer.items.upsert({
+      ...apt,
+      transcript,
+      transcriptSavedAt: new Date().toISOString(),
+    });
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("[appointments/:id/transcript] failed:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
