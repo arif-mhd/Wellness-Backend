@@ -19,6 +19,16 @@ function parseLocalTime(isoString: string): Date {
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
+interface Absence {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  duration: string;
+  status: "pending" | "approved" | "rejected";
+  statusReason?: string | null;
+}
+
 interface Doctor {
   id: string;
   fullName: string;
@@ -50,6 +60,7 @@ interface Doctor {
   prescriptions?: number;
   rating?: number;
   avgConsultation?: number;
+  absences?: Absence[];
 }
 
 interface Consultation {
@@ -446,6 +457,35 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   }, [consultations, consultFilter, consultSearch]);
 
   const newConsults = useMemo(() => filteredConsultations.filter(isActiveNow), [filteredConsultations]);
+
+  // Aggregate leave stats — only approved absences count as leave actually
+  // taken; pending/rejected are shown in the list but excluded from totals
+  // so the aggregate reflects real time off, not requests still in flight.
+  // Rendered as "Xd Yh" rather than a fractional day count (e.g. "0.1 days"
+  // for a 1-hour absence reads as noise, not information).
+  const leaveStats = useMemo(() => {
+    const approved = (doctor?.absences ?? []).filter((a) => a.status === "approved");
+    const totalMinutes = approved.reduce((sum, a) => {
+      const ms = new Date(a.endDate).getTime() - new Date(a.startDate).getTime();
+      return sum + Math.max(0, ms / (1000 * 60));
+    }, 0);
+    const totalHoursRounded = Math.round(totalMinutes / 60);
+    const days = Math.floor(totalHoursRounded / 24);
+    const hours = totalHoursRounded % 24;
+    const label = totalHoursRounded === 0
+      ? "0h"
+      : [days > 0 ? `${days}d` : null, hours > 0 ? `${hours}h` : null].filter(Boolean).join(" ");
+    return {
+      approvedCount: approved.length,
+      pendingCount: (doctor?.absences ?? []).filter((a) => a.status === "pending").length,
+      totalTakenLabel: label,
+    };
+  }, [doctor?.absences]);
+
+  const sortedAbsences = useMemo(
+    () => [...(doctor?.absences ?? [])].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()),
+    [doctor?.absences]
+  );
   const allConsults = filteredConsultations;
   const selectedConsult = consultations.find((c) => c.id === selectedConsultId) ?? filteredConsultations[0] ?? null;
 
@@ -724,6 +764,56 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                   );
                 })}
               </div>
+            </div>
+
+            <div>
+              <h3 className="text-[#24292E] text-[14px] font-bold mb-4">Leave History</h3>
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                <div className="rounded-xl p-3 flex flex-col items-center justify-center gap-0.5 bg-[#F3F6FF] border border-[#5476FC]/20">
+                  <span className="text-[18px] font-bold text-[#5476FC]">{leaveStats.approvedCount}</span>
+                  <span className="text-[10px] font-medium text-[#676E76] text-center">Leaves Approved</span>
+                </div>
+                <div className="rounded-xl p-3 flex flex-col items-center justify-center gap-0.5 bg-[#F9FAFB] border border-[#E4E8F0]">
+                  <span className="text-[18px] font-bold text-[#24292E]">{leaveStats.totalTakenLabel}</span>
+                  <span className="text-[10px] font-medium text-[#676E76] text-center">Total Leave Taken</span>
+                </div>
+                <div className="rounded-xl p-3 flex flex-col items-center justify-center gap-0.5 bg-amber-50 border border-amber-200">
+                  <span className="text-[18px] font-bold text-amber-700">{leaveStats.pendingCount}</span>
+                  <span className="text-[10px] font-medium text-[#676E76] text-center">Awaiting Approval</span>
+                </div>
+              </div>
+
+              {sortedAbsences.length === 0 ? (
+                <p className="text-[12px] text-[#A7AAB4]">No leave requests recorded.</p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
+                  {sortedAbsences.map((abs) => (
+                    <div key={abs.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[#F9FAFB] border border-[#E4E8F0]">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[11px] font-semibold text-[#24292E]">
+                          {new Date(abs.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
+                          <span className="text-[#676E76] font-medium">
+                            {new Date(abs.startDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – {new Date(abs.endDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-[#A7AAB4] truncate">{abs.duration} · {abs.reason}</span>
+                      </div>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[9px] font-bold shrink-0 ${
+                          abs.status === "pending"
+                            ? "bg-amber-100 text-amber-700"
+                            : abs.status === "rejected"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {abs.status === "pending" ? "Pending" : abs.status === "rejected" ? "Rejected" : "Approved"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

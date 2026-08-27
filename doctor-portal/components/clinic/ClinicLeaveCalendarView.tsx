@@ -39,6 +39,7 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [actingOnId, setActingOnId] = useState<string | null>(null);
+  const [conflictsByAbsenceId, setConflictsByAbsenceId] = useState<Record<string, any[] | "loading">>({});
   const { can } = useClinicPermissions();
   const canManage = can("manage_schedules");
 
@@ -87,6 +88,34 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
       alert(err.message ?? "Failed to decline absence.");
     } finally {
       setActingOnId(null);
+    }
+  };
+
+  const handleCheckConflicts = async (abs: ClinicAbsence) => {
+    if (conflictsByAbsenceId[abs.id] !== undefined) {
+      setConflictsByAbsenceId((prev) => {
+        const next = { ...prev };
+        delete next[abs.id];
+        return next;
+      });
+      return;
+    }
+    setConflictsByAbsenceId((prev) => ({ ...prev, [abs.id]: "loading" }));
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${abs.doctorId}/absences/${abs.id}/conflicts`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Failed (${res.status})`);
+      }
+      const data = await res.json();
+      setConflictsByAbsenceId((prev) => ({ ...prev, [abs.id]: data.conflicts ?? [] }));
+    } catch (err: any) {
+      setConflictsByAbsenceId((prev) => {
+        const next = { ...prev };
+        delete next[abs.id];
+        return next;
+      });
+      alert(err.message ?? "Failed to check appointments for this window.");
     }
   };
 
@@ -295,22 +324,51 @@ export default function ClinicLeaveCalendarView({ qs = "" }: { qs?: string }) {
 
                     {abs.status === "pending" && (
                       canManage ? (
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <button
-                            onClick={() => handleReject(abs)}
-                            disabled={actingOnId === abs.id}
-                            className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-[10px] font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-                          >
-                            REJECT
-                          </button>
-                          <button
-                            onClick={() => handleApprove(abs)}
-                            disabled={actingOnId === abs.id}
-                            className="px-3 py-1 bg-black text-white text-[10px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
-                          >
-                            APPROVE
-                          </button>
-                        </div>
+                        <>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <button
+                              onClick={() => handleCheckConflicts(abs)}
+                              className="px-2 py-1 bg-white border border-gray-200 text-gray-600 text-[9px] font-semibold rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap"
+                            >
+                              {conflictsByAbsenceId[abs.id] !== undefined ? "HIDE APPTS" : "CHECK APPTS"}
+                            </button>
+                            <button
+                              onClick={() => handleReject(abs)}
+                              disabled={actingOnId === abs.id}
+                              className="px-2 py-1 bg-white border border-gray-200 text-gray-600 text-[9px] font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              REJECT
+                            </button>
+                            <button
+                              onClick={() => handleApprove(abs)}
+                              disabled={actingOnId === abs.id}
+                              className="px-2 py-1 bg-black text-white text-[9px] font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              APPROVE
+                            </button>
+                          </div>
+
+                          {conflictsByAbsenceId[abs.id] !== undefined && (
+                            <div className="mt-2 pt-2 border-t border-[#EBEEF5]">
+                              {conflictsByAbsenceId[abs.id] === "loading" ? (
+                                <p className="text-[10px] text-gray-400">Checking scheduled appointments...</p>
+                              ) : (conflictsByAbsenceId[abs.id] as any[]).length === 0 ? (
+                                <p className="text-[10px] text-emerald-600 font-medium">No appointments booked — safe to approve.</p>
+                              ) : (
+                                <div className="flex flex-col gap-1.5">
+                                  <p className="text-[10px] font-semibold text-amber-700">
+                                    {(conflictsByAbsenceId[abs.id] as any[]).length} appointment(s) booked during this window:
+                                  </p>
+                                  {(conflictsByAbsenceId[abs.id] as any[]).map((apt) => (
+                                    <div key={apt.id} className="text-[10px] text-gray-600">
+                                      {apt.patientName} — {new Date(apt.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <span className="text-[9px] text-gray-400 italic mt-1">No permission to approve/reject</span>
                       )

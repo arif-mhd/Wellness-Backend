@@ -223,9 +223,98 @@ function VisitInformationTab({
   );
 }
 
+// ── Pre-visit form tab content (read-only) ──────────────────────────────────────
+// The patient's own pre-visit questionnaire (manual or AI-chat collected) —
+// shown as-is, not editable here (edited by the doctor's own notes in the
+// other tabs instead). Mirrors PreVisitFormModal's field set.
+
+interface PreVisitFormData {
+  primaryReason?: string | null;
+  symptoms?: string[] | string | null;
+  onset?: string | null;
+  location?: string | null;
+  severity?: string | null;
+  duration?: string | null;
+  conditions?: string | null;
+  medications?: string | null;
+  allergies?: string | null;
+  additionalNotes?: string | null;
+  visitSummary?: string | null;
+  source?: "ai_chat" | "manual" | null;
+}
+
+function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
+  if (!data) {
+    return (
+      <div className="flex flex-col gap-3">
+        <span className="text-slate-800 text-[14px] font-bold">Pre-visit form</span>
+        <p className="text-[#9EA5AD] text-[12px]">
+          This patient hasn&apos;t submitted a pre-visit form for this appointment.
+        </p>
+      </div>
+    );
+  }
+
+  const symptoms = Array.isArray(data.symptoms) ? data.symptoms.join(", ") : (data.symptoms ?? "");
+  const fields: { label: string; value?: string | null }[] = [
+    { label: "Primary reason", value: data.primaryReason },
+    { label: "Symptoms", value: symptoms },
+    { label: "When it started", value: data.onset },
+    { label: "Location / side", value: data.location },
+    { label: "Severity", value: data.severity },
+    { label: "Duration", value: data.duration },
+    { label: "Existing conditions", value: data.conditions },
+    { label: "Current medications", value: data.medications },
+    { label: "Allergies", value: data.allergies },
+    { label: "Additional notes", value: data.additionalNotes },
+  ].filter((f) => f.value && f.value.trim().length > 0);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <span className="text-slate-800 text-[14px] font-bold">Pre-visit form</span>
+        {data.source === "ai_chat" && (
+          <span className="bg-[#EEF2FF] text-[#5476FC] text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap">
+            Collected by Dr. Wellness AI
+          </span>
+        )}
+      </div>
+
+      {data.visitSummary && (
+        <div className="bg-[#F8F9FF] border border-[#EEF2FF] rounded-xl p-4 flex flex-col gap-1">
+          <span className="text-[#5476FC] text-[10px] font-bold uppercase tracking-wide">Visit Summary</span>
+          <p className="text-[#24292E] text-[12px] leading-[18px] whitespace-pre-line">{data.visitSummary}</p>
+        </div>
+      )}
+
+      {fields.length === 0 ? (
+        <p className="text-[#9EA5AD] text-[12px]">No further details were submitted.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {fields.map((f) => (
+            <div key={f.label} className="flex flex-col gap-0.5">
+              <span className="text-[11px] text-[#9EA5AD] uppercase font-bold tracking-wide">{f.label}</span>
+              <p className="text-[12px] text-[#383F45] font-semibold leading-relaxed whitespace-pre-line">{f.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function hasPreVisitContent(data: PreVisitFormData | null): boolean {
+  if (!data) return false;
+  return !!(
+    data.primaryReason || data.onset || data.location || data.severity || data.duration ||
+    data.conditions || data.medications || data.allergies || data.additionalNotes ||
+    data.visitSummary || (Array.isArray(data.symptoms) ? data.symptoms.length > 0 : !!data.symptoms)
+  );
+}
+
 // ── Left-nav tab definitions ────────────────────────────────────────────────────
 
-type TabKey = "visitInformation" | keyof EmrSections;
+type TabKey = "visitInformation" | "preVisitForm" | keyof EmrSections;
 
 interface SubField {
   label: string;
@@ -246,6 +335,7 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  { key: "preVisitForm", title: "Pre-visit form" },
   {
     key: "reasonForVisit",
     title: "Intake plan",
@@ -393,6 +483,8 @@ interface ConsultationNotesProps {
   visitInfo: VisitInfo;
   onVisitInfoChange: (v: VisitInfo) => void;
   onScheduleFollowUp?: () => void;
+  /** Patient's submitted pre-visit form for this appointment, read-only. */
+  preVisitData?: PreVisitFormData | null;
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
@@ -502,6 +594,7 @@ export default function IntakePlan({
   visitInfo,
   onVisitInfoChange,
   onScheduleFollowUp,
+  preVisitData,
 }: ConsultationNotesProps) {
   const activeTab = openSection ?? "reasonForVisit";
   const [showMobileModal, setShowMobileModal] = useState(false);
@@ -586,6 +679,8 @@ export default function IntakePlan({
             const isActive = activeTab === tab.key;
             const hasContent = tab.key === "visitInformation"
               ? hasVisitInfoContent(visitInfo)
+              : tab.key === "preVisitForm"
+              ? hasPreVisitContent(preVisitData ?? null)
               : !!sections[tab.key as keyof EmrSections]?.trim();
             return (
               <button
@@ -623,6 +718,8 @@ export default function IntakePlan({
             
             {activeTab === "visitInformation" ? (
               <VisitInformationTab visitInfo={visitInfo} onChange={onVisitInfoChange} />
+            ) : activeTab === "preVisitForm" ? (
+              <PreVisitFormTab data={preVisitData ?? null} />
             ) : activeTabDef?.subFields ? (
               <SubFieldsTab
                 title={activeTabDef.title}

@@ -60,7 +60,25 @@ function PatientDetailsContent() {
               accountOwnerName: match.familyMemberId ? match.accountOwnerName : undefined,
               profileRelationship: match.familyMemberId ? match.profileRelationship : undefined,
               consultationLanguage: match.consultationLanguage || null,
-              preVisitForm: {
+              // Prefer the actual pre-visit questionnaire (manual or AI-chat
+              // collected) when the patient submitted one — this previously
+              // always fell through to the generic branch below, silently
+              // dropping everything Dr. Wellness gathered in chat.
+              preVisitForm: match.preVisitData ? {
+                isQuestionnaire: true,
+                chronicIllnesses: match.preVisitData.conditions || "None reported",
+                currentMedications: match.preVisitData.medications || "None",
+                allergies: match.preVisitData.allergies || "None",
+                primaryConcern: match.preVisitData.primaryReason || match.reason || "Consultation",
+                smokes: Array.isArray(match.preVisitData.symptoms) ? match.preVisitData.symptoms.join(", ") : (match.preVisitData.symptoms || "None"),
+                onset: match.preVisitData.onset,
+                location: match.preVisitData.location,
+                severity: match.preVisitData.severity,
+                duration: match.preVisitData.duration,
+                drinks: match.preVisitData.additionalNotes || "None",
+                visitSummary: match.preVisitData.visitSummary || "",
+                source: match.preVisitData.source,
+              } : {
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
                 currentMedications: match.patientCurrentMedications || "None",
                 allergies: match.patientAllergies || "None",
