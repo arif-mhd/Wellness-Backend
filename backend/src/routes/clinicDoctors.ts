@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
-import { listUsersByAccountInfo } from "supertokens-node";
+import SuperTokens, { listUsersByAccountInfo } from "supertokens-node";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import RecipeUserId from "supertokens-node/lib/build/recipeUserId";
@@ -1011,6 +1011,7 @@ router.delete("/:id", requireRole("clinic"), async (req: SessionRequest, res: Re
     });
 
     await Session.revokeAllSessionsForUser(doctor.id);
+    await SuperTokens.deleteUser(doctor.id);
 
     logActivity({
       source: "clinic",

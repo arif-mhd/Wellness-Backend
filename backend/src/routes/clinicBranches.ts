@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
+import SuperTokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
@@ -413,6 +414,7 @@ router.delete("/:branchId/users/:userId", requireRole("clinic"), async (req: Ses
 
     await clinicsContainer.items.upsert({ ...user, status: "deleted", deletedAt: new Date().toISOString() });
     await Session.revokeAllSessionsForUser(user.id);
+    await SuperTokens.deleteUser(user.id);
 
     logActivity({
       source: "clinic",
