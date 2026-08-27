@@ -72,21 +72,19 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 
     const patientIds = Array.from(new Set(appointments.map((a) => a.patientId).filter(Boolean)));
     const patientById: Record<string, any> = {};
-    await Promise.all(patientIds.map(async (id) => {
-      try {
-        const { resource } = await patientsContainer.item(id, id).read();
-        if (resource) patientById[id] = resource;
-      } catch { /* skip */ }
-    }));
+    if (patientIds.length) {
+      const { clause, parameters } = buildInClause("c.id", patientIds);
+      const fetched = await queryDocuments<any>(patientsContainer, { query: `SELECT * FROM c WHERE ${clause}`, parameters });
+      fetched.forEach((p) => { patientById[p.id] = p; });
+    }
 
     const doctorIds = Array.from(new Set(appointments.map((a) => a.doctorId).filter(Boolean)));
     const doctorById: Record<string, any> = {};
-    await Promise.all(doctorIds.map(async (id) => {
-      try {
-        const { resource } = await doctorsContainer.item(id, id).read();
-        if (resource) doctorById[id] = resource;
-      } catch { /* skip */ }
-    }));
+    if (doctorIds.length) {
+      const { clause, parameters } = buildInClause("c.id", doctorIds);
+      const fetched = await queryDocuments<any>(doctorsContainer, { query: `SELECT * FROM c WHERE ${clause}`, parameters });
+      fetched.forEach((d) => { doctorById[d.id] = d; });
+    }
 
     const groups: Record<string, any[]> = {};
     for (const apt of appointments) {
@@ -189,12 +187,11 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
 
     const doctorIds = Array.from(new Set(appointments.map((a) => a.doctorId).filter(Boolean)));
     const doctorById: Record<string, any> = {};
-    await Promise.all(doctorIds.map(async (id) => {
-      try {
-        const { resource } = await doctorsContainer.item(id, id).read();
-        if (resource) doctorById[id] = resource;
-      } catch { /* skip */ }
-    }));
+    if (doctorIds.length) {
+      const { clause, parameters } = buildInClause("c.id", doctorIds);
+      const fetched = await queryDocuments<any>(doctorsContainer, { query: `SELECT * FROM c WHERE ${clause}`, parameters });
+      fetched.forEach((d) => { doctorById[d.id] = d; });
+    }
 
     const age = calcAge(identity.dob);
 

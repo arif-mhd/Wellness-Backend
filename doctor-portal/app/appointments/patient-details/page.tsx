@@ -59,6 +59,7 @@ function PatientDetailsContent() {
               preVisitFormDate: dob,
               accountOwnerName: match.familyMemberId ? match.accountOwnerName : undefined,
               profileRelationship: match.familyMemberId ? match.profileRelationship : undefined,
+              consultationLanguage: match.consultationLanguage || null,
               preVisitForm: {
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
                 currentMedications: match.patientCurrentMedications || "None",

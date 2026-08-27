@@ -3,6 +3,17 @@ import { Pool } from "pg";
 const dbHost = process.env.DB_HOST || "localhost";
 const isUnixSocket = dbHost.startsWith("/");
 
+// Caps how many connections a single instance can open to Postgres and how
+// long a query waits for one before failing fast — without this, `pg`
+// defaults to max:10 per instance with no ceiling on how many instances can
+// exist, so a Cloud Run scale-out could still open far more connections than
+// Postgres allows, and a starved pool would hang requests instead of erroring.
+const poolLimits = {
+  max: parseInt(process.env.DB_POOL_MAX || "10"),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+};
+
 export const pool = new Pool(
   isUnixSocket
     ? {
@@ -10,6 +21,7 @@ export const pool = new Pool(
         database: process.env.DB_NAME || "wellness_db",
         user: process.env.DB_USER || "postgres",
         password: process.env.DB_PASSWORD,
+        ...poolLimits,
       }
     : {
         host: dbHost,
@@ -17,6 +29,7 @@ export const pool = new Pool(
         database: process.env.DB_NAME || "wellness_db",
         user: process.env.DB_USER || "postgres",
         password: process.env.DB_PASSWORD,
+        ...poolLimits,
       }
 );
 

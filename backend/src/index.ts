@@ -2,6 +2,7 @@ import "dotenv/config"; // Must be the very first import
 
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import SuperTokens from "supertokens-node";
 import { middleware, errorHandler } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
@@ -62,6 +63,7 @@ import clinicMessagesRouter from "./routes/clinicMessages";
 import servicesRouter from "./routes/services";
 import fhirRouter from "./routes/fhir";
 import internalRouter from "./routes/internal";
+import metaRouter from "./routes/meta";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
 initSuperTokens();
@@ -86,6 +88,23 @@ app.use(
 
 // MUST be before SuperTokens middleware so /auth/* routes can read the body
 app.use(express.json({ limit: "50mb" }));
+
+// Safety net against a runaway client (buggy polling loop, retry storm, or
+// actual abuse) taking down the API for everyone else. Set deliberately high
+// per IP — well above what even many staff on one shared clinic/hospital
+// network polling every 10-30s could ever add up to — so this only ever
+// trips for something clearly pathological (a tight retry loop, a DoS
+// attempt), never for real usage. Cloud Scheduler's internal callers and the
+// health check are exempt since they're already secret/IP-scoped, not user traffic.
+const apiRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 2000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === "/health" || req.path.startsWith("/api/internal"),
+  message: { error: "Too many requests, please slow down and try again shortly." },
+});
+app.use(apiRateLimiter);
 
 // SuperTokens middleware handles all /auth/* routes automatically
 app.use(middleware());
@@ -180,6 +199,7 @@ app.use("/api/fhir", fhirRouter);
 // Internal endpoints for server-to-server callers (Cloud Scheduler), not
 // logged-in users — guarded by a shared secret inside the router itself.
 app.use("/api/internal", internalRouter);
+app.use("/api/meta", metaRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

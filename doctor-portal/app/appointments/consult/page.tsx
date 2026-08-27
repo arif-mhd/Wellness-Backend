@@ -88,6 +88,12 @@ function ConsultRoom() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [timer, setTimer] = useState(0);
 
+  // Live transcript captions — published by the transcript-agent worker via
+  // LiveKit's standard transcription channel, not something this page itself
+  // produces. Only the most recent lines are kept; the full transcript is
+  // saved server-side once the call ends.
+  const [captions, setCaptions] = useState<{ id: string; speaker: string; text: string }[]>([]);
+
   // Chat
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -271,6 +277,16 @@ function ConsultRoom() {
       if (cancelled) return;
       if (didConnectRef.current) setEnded(true);
       else setError("Could not connect to the call. Please try again.");
+    });
+    room.on(RoomEvent.TranscriptionReceived, (segments, participant) => {
+      if (cancelled) return;
+      const finalSegments = segments.filter(s => s.final && s.text.trim());
+      if (finalSegments.length === 0) return;
+      const speaker = participant?.identity === room.localParticipant.identity ? "You" : patientName;
+      setCaptions(prev => [
+        ...prev.slice(-4),
+        ...finalSegments.map(s => ({ id: s.id, speaker, text: s.text })),
+      ]);
     });
 
     async function init() {
@@ -992,6 +1008,18 @@ function ConsultRoom() {
               </div>
               <p className="text-white/70 text-[9px] text-center mt-0.5 font-medium">You</p>
             </div>
+
+            {/* Live transcript captions */}
+            {captions.length > 0 && (
+              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 max-w-[70%] flex flex-col items-center gap-1 pointer-events-none">
+                {captions.slice(-2).map(c => (
+                  <div key={c.id} className="bg-black/60 rounded-lg px-3 py-1.5 text-center">
+                    <span className="text-[#8AA0FF] text-[10px] font-semibold mr-1">{c.speaker}:</span>
+                    <span className="text-white text-[11px]">{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Call controls */}
             <div className="absolute bottom-3 z-20 flex items-center gap-2" style={{ left: "50%", transform: "translateX(calc(-50% - 72px))" }}>
