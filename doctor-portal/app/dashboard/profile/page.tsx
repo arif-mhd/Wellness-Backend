@@ -16,6 +16,16 @@ const EMIRATES = [
 
 const CONSULTATION_TIMES = [10, 15, 20, 30, 45, 60];
 
+// Same vocabulary as DoctorPersonalInfoForm/OwnersPersonalInfoForm (onboarding)
+// and backend's SUPPORTED_LANGUAGES — languages must stay a string[] end to
+// end, since the mobile app's booking screen does Array.isArray(doc.languages)
+// to decide whether to show the consultation-language picker at all.
+const ALL_LANGUAGES = [
+  "Arabic", "English", "Hindi", "Urdu", "Malayalam", "Tamil", "Tagalog",
+  "Bengali", "Punjabi", "Sinhalese", "Nepali", "French", "German", "Spanish",
+  "Chinese", "Japanese", "Korean", "Russian", "Persian", "Turkish", "Amharic",
+];
+
 // ── Small helpers ──────────────────────────────────────────────────────────────
 
 function EditBtn({ onClick }: { onClick: () => void }) {
@@ -71,7 +81,7 @@ function EditableFieldRow({ label, value, onChange, disabled = false, type = "te
 type Doctor = Record<string, any>;
 
 type FormData = {
-  languages: string;
+  languages: string[];
   consultationTimeLimitMins: number;
   bio: string;
   phone: string;
@@ -92,7 +102,10 @@ function buildFormData(doc: Doctor): FormData {
     fpe[em.key] = doc.feesPerEmirate?.[em.key] ?? doc.fees ?? "";
   }
   return {
-    languages:                doc.languages                ?? "",
+    languages:                Array.isArray(doc.languages) ? doc.languages
+                              : (typeof doc.languages === "string" && doc.languages.trim()
+                                  ? doc.languages.split(",").map((l: string) => l.trim()).filter(Boolean)
+                                  : []),
     consultationTimeLimitMins: doc.consultationTimeLimitMins ?? 15,
     bio:                      doc.bio                      ?? "",
     phone:                    doc.phone                    ?? "",
@@ -113,7 +126,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<FormData | null>(null);
   // draft copies per section for cancel support
-  const [draftLang, setDraftLang] = useState("");
+  const [draftLang, setDraftLang] = useState<string[]>([]);
   const [draftConsult, setDraftConsult] = useState(15);
   const [draftBio, setDraftBio] = useState("");
   const [draftPersonal, setDraftPersonal] = useState({ phone: "", gender: "", maritalStatus: "" });
@@ -290,19 +303,33 @@ export default function ProfilePage() {
             </div>
             {editLang ? (
               <>
-                <input
-                  value={draftLang}
-                  onChange={e => setDraftLang(e.target.value)}
-                  placeholder="e.g. English, Arabic"
+                {draftLang.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {draftLang.map((lang) => (
+                      <span key={lang} className="flex items-center gap-1 bg-[#E8EEFF] text-[#182A6F] text-[11px] font-medium rounded-full px-2.5 py-1">
+                        {lang}
+                        <button onClick={() => setDraftLang(draftLang.filter((l) => l !== lang))} className="text-[#182A6F]/60 hover:text-[#182A6F]">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <select
+                  value=""
+                  onChange={e => { if (e.target.value) setDraftLang([...draftLang, e.target.value]); }}
                   className="text-xs bg-[#F5F6FA] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#5476FC]/30 border border-transparent focus:border-[#5476FC]"
-                />
+                >
+                  <option value="">+ Add a language</option>
+                  {ALL_LANGUAGES.filter((l) => !draftLang.includes(l)).map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
                 <InlineEditBtns
                   onCancel={() => setEditLang(false)}
                   onSave={async () => { await saveSection({ languages: draftLang }); setEditLang(false); }}
                 />
               </>
             ) : (
-              <span className="text-[#24292E] text-xs font-medium">{fd.languages || "—"}</span>
+              <span className="text-[#24292E] text-xs font-medium">{fd.languages.join(", ") || "—"}</span>
             )}
           </div>
 
