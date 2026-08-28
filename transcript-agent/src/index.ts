@@ -30,17 +30,41 @@ interface TranscriptLine {
   endedAt: string;
 }
 
-async function fetchDeepgramLanguage(appointmentId: string): Promise<string | null> {
+interface CallLanguages {
+  doctorId: string | null;
+  patientId: string | null;
+  doctorDeepgramLanguageCode: string | null;
+  patientDeepgramLanguageCode: string | null;
+}
+
+const NO_LANGUAGES: CallLanguages = {
+  doctorId: null,
+  patientId: null,
+  doctorDeepgramLanguageCode: null,
+  patientDeepgramLanguageCode: null,
+};
+
+async function fetchLanguages(appointmentId: string): Promise<CallLanguages> {
   try {
     const res = await fetch(`${BACKEND_URL}/api/internal/appointments/${appointmentId}/language`, {
       headers: { "x-internal-secret": INTERNAL_SECRET! },
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { deepgramLanguageCode: string | null };
-    return data.deepgramLanguageCode;
+    if (!res.ok) return NO_LANGUAGES;
+    const data = (await res.json()) as {
+      doctorId: string | null;
+      patientId: string | null;
+      doctorDeepgramLanguageCode: string | null;
+      patientDeepgramLanguageCode: string | null;
+    };
+    return {
+      doctorId: data.doctorId ?? null,
+      patientId: data.patientId ?? null,
+      doctorDeepgramLanguageCode: data.doctorDeepgramLanguageCode ?? null,
+      patientDeepgramLanguageCode: data.patientDeepgramLanguageCode ?? null,
+    };
   } catch (err) {
-    console.error(`[transcript-agent] Failed to fetch language for ${appointmentId}:`, err);
-    return null;
+    console.error(`[transcript-agent] Failed to fetch languages for ${appointmentId}:`, err);
+    return NO_LANGUAGES;
   }
 }
 
@@ -70,9 +94,10 @@ export default defineAgent({
       return;
     }
 
-    const deepgramLanguageCode = await fetchDeepgramLanguage(appointmentId);
+    const { doctorId, patientId, doctorDeepgramLanguageCode, patientDeepgramLanguageCode } =
+      await fetchLanguages(appointmentId);
     console.log(
-      `[transcript-agent] Joined room ${appointmentId} — STT language: ${deepgramLanguageCode ?? "auto-detect"}`
+      `[transcript-agent] Joined room ${appointmentId} — doctor STT: ${doctorDeepgramLanguageCode ?? "auto-detect"}, patient STT: ${patientDeepgramLanguageCode ?? "auto-detect"}`
     );
 
     const transcript: TranscriptLine[] = [];
@@ -82,11 +107,20 @@ export default defineAgent({
       (track, publication, participant) => {
         if (track.kind !== TrackKind.KIND_AUDIO) return;
 
+        // Each side of the call speaks their own language regardless of what
+        // the other was asked to speak — the doctor's audio must be decoded
+        // with the language they were booked to speak, the patient's (or
+        // family member's) with their own profile language, not each other's.
+        const speakerLanguageCode =
+          participant.identity === doctorId ? doctorDeepgramLanguageCode
+          : participant.identity === patientId ? patientDeepgramLanguageCode
+          : null;
+
         const deepgramSTT = new deepgram.STT({
           apiKey: DEEPGRAM_API_KEY,
           model: "nova-3",
-          ...(deepgramLanguageCode
-            ? { language: deepgramLanguageCode, detectLanguage: false }
+          ...(speakerLanguageCode
+            ? { language: speakerLanguageCode, detectLanguage: false }
             : { detectLanguage: true }),
           interimResults: true,
           smartFormat: true,
@@ -131,7 +165,7 @@ export default defineAgent({
                     text: alt.text.trim(),
                     startTime: BigInt(Math.round(alt.startTime * 1000)),
                     endTime: BigInt(Math.round(alt.endTime * 1000)),
-                    language: deepgramLanguageCode ?? alt.language ?? "",
+                    language: speakerLanguageCode ?? alt.language ?? "",
                     final: true,
                   },
                 ],

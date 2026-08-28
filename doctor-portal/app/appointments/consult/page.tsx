@@ -288,7 +288,7 @@ function ConsultRoom() {
       if (finalSegments.length === 0) return;
       const speaker = participant?.identity === room.localParticipant.identity ? "You" : patientName;
       setCaptions(prev => [
-        ...prev.slice(-4),
+        ...prev.slice(-9),
         ...finalSegments.map(s => ({ id: s.id, speaker, text: s.text })),
       ]);
     });
@@ -1024,7 +1024,7 @@ function ConsultRoom() {
             {/* Live transcript captions */}
             {captions.length > 0 && (
               <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 max-w-[70%] flex flex-col items-center gap-1 pointer-events-none">
-                {captions.slice(-2).map(c => (
+                {captions.slice(-6).map(c => (
                   <div key={c.id} className="bg-black/60 rounded-lg px-3 py-1.5 text-center">
                     <span className="text-[#8AA0FF] text-[10px] font-semibold mr-1">{c.speaker}:</span>
                     <span className="text-white text-[11px]">{c.text}</span>

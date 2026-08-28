@@ -169,9 +169,28 @@ router.get("/appointments/:id/language", async (req: Request, res: Response) => 
       res.status(404).json({ error: "Appointment not found" });
       return;
     }
+
+    // consultationLanguage is what the DOCTOR was booked to speak — only
+    // ever applies to the doctor's own audio track. The patient (or family
+    // member the appointment is actually for) speaks their own language
+    // regardless of what the doctor was asked to speak, so each side of the
+    // call needs its own STT language rather than one shared value.
+    let patientLanguage: string | null = null;
+    const { resource: account } = await patientsContainer.item(apt.patientId, apt.patientId).read();
+    if (apt.familyMemberId) {
+      const member = (account?.familyMembers as any[] | undefined)?.find((m) => m.id === apt.familyMemberId);
+      patientLanguage = member?.language ?? null;
+    } else {
+      patientLanguage = account?.language ?? null;
+    }
+
     res.json({
+      doctorId: apt.doctorId,
+      patientId: apt.patientId,
       consultationLanguage: apt.consultationLanguage ?? null,
-      deepgramLanguageCode: deepgramCodeForLanguage(apt.consultationLanguage),
+      doctorDeepgramLanguageCode: deepgramCodeForLanguage(apt.consultationLanguage),
+      patientLanguage,
+      patientDeepgramLanguageCode: deepgramCodeForLanguage(patientLanguage),
     });
   } catch (err) {
     console.error("[appointments/:id/language] failed:", err);
