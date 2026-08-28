@@ -97,14 +97,24 @@ export default defineAgent({
     const { doctorId, patientId, doctorDeepgramLanguageCode, patientDeepgramLanguageCode } =
       await fetchLanguages(appointmentId);
     console.log(
-      `[transcript-agent] Joined room ${appointmentId} — doctor STT: ${doctorDeepgramLanguageCode ?? "auto-detect"}, patient STT: ${patientDeepgramLanguageCode ?? "auto-detect"}`
+      `[transcript-agent] Joined room ${appointmentId} — doctorId=${doctorId} (STT ${doctorDeepgramLanguageCode ?? "auto-detect"}), patientId=${patientId} (STT ${patientDeepgramLanguageCode ?? "auto-detect"})`
     );
+
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      console.log(`[transcript-agent] Participant connected: identity=${participant.identity} name=${participant.name}`);
+    });
+    for (const participant of room.remoteParticipants.values()) {
+      console.log(`[transcript-agent] Already-present participant: identity=${participant.identity} name=${participant.name}`);
+    }
 
     const transcript: TranscriptLine[] = [];
 
     room.on(
       RoomEvent.TrackSubscribed,
       (track, publication, participant) => {
+        console.log(
+          `[transcript-agent] TrackSubscribed: identity=${participant.identity} kind=${track.kind} source=${publication.source}`
+        );
         if (track.kind !== TrackKind.KIND_AUDIO) return;
 
         // Each side of the call speaks their own language regardless of what
@@ -115,6 +125,10 @@ export default defineAgent({
           participant.identity === doctorId ? doctorDeepgramLanguageCode
           : participant.identity === patientId ? patientDeepgramLanguageCode
           : null;
+
+        console.log(
+          `[transcript-agent] Starting STT for identity=${participant.identity} — language=${speakerLanguageCode ?? "auto-detect"}`
+        );
 
         const deepgramSTT = new deepgram.STT({
           apiKey: DEEPGRAM_API_KEY,
@@ -136,8 +150,14 @@ export default defineAgent({
         speechStream.updateInputStream(new AudioStream(track) as any);
 
         (async () => {
+          console.log(`[transcript-agent] STT stream opened for identity=${participant.identity}`);
+          let sawFirstEvent = false;
           try {
             for await (const event of speechStream) {
+              if (!sawFirstEvent) {
+                sawFirstEvent = true;
+                console.log(`[transcript-agent] First STT event for identity=${participant.identity}: ${event.type}`);
+              }
               if (event.type !== SpeechEventType.FINAL_TRANSCRIPT) continue;
               const alt = event.alternatives?.[0];
               if (!alt?.text?.trim()) continue;
