@@ -36,6 +36,11 @@ export const weightLogsContainer: Container = db.container("weightLogs");
 /** Routines — partition key: /patientId (user-saved workout routines) */
 export const routinesContainer: Container = db.container("routines");
 
+/** Diet plans — partition key: /patientId (doctor-assigned diet plans; only one
+ *  doc per patient has status "active" at a time — see routes/appointments.ts
+ *  POST /:id/diet-plan and routes/wellness.ts GET /diet-plan) */
+export const dietPlansContainer: Container = db.container("dietPlans");
+
 /** Assessment results — partition key: /patientId (completed health assessments) */
 export const assessmentResultsContainer: Container = db.container("assessmentResults");
 
@@ -146,6 +151,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "workoutLogs",  partitionKey: { paths: ["/patientId"] } },
     { id: "weightLogs",   partitionKey: { paths: ["/patientId"] } },
     { id: "routines",           partitionKey: { paths: ["/patientId"] } },
+    { id: "dietPlans",          partitionKey: { paths: ["/patientId"] } },
     { id: "assessmentResults",  partitionKey: { paths: ["/patientId"] } },
     { id: "pregnancyProfiles",  partitionKey: { paths: ["/patientId"] } },
     { id: "pregnancyLogs",      partitionKey: { paths: ["/patientId"] } },

@@ -1,7 +1,8 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
-import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer } from "../config/cosmos";
+import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
+import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
@@ -655,6 +656,66 @@ router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
   }
 });
 
+// ── GET /api/wellness/diet-plan ──────────────────────────────────────────────
+// Returns the patient's current doctor-assigned diet plan, if the doctor has
+// toggled it visible (status "active"). Returns { dietPlan: null } otherwise —
+// the app falls back to self-service tracking in that case.
+router.get("/diet-plan", async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+
+    const { resources } = await dietPlansContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.status = @active ORDER BY c.updatedAt DESC",
+        parameters: [{ name: "@pid", value: profileId }, { name: "@active", value: "active" }],
+      },
+      { partitionKey: profileId }
+    ).fetchAll();
+
+    res.json({ dietPlan: resources[0] ?? null });
+  } catch (err) {
+    console.error("Fetch active diet plan error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/wellness/diet-plan/history ──────────────────────────────────────
+router.get("/diet-plan/history", async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+
+    const { resources } = await dietPlansContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.visibleToPatient = true ORDER BY c.updatedAt DESC",
+        parameters: [{ name: "@pid", value: profileId }],
+      },
+      { partitionKey: profileId }
+    ).fetchAll();
+
+    res.json({ dietPlans: resources });
+  } catch (err) {
+    console.error("Fetch diet plan history error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/wellness/diet-plan/:id/progress ─────────────────────────────────
+router.get("/diet-plan/:id/progress", async (req: SessionRequest, res: Response) => {
+  try {
+    const patientId = req.session!.getUserId();
+    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+
+    const progress = await computeDietPlanProgress(profileId, req.params.id);
+    if (!progress.plan) { res.status(404).json({ error: "Diet plan not found" }); return; }
+    res.json(progress);
+  } catch (err) {
+    console.error("Fetch diet plan progress error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /api/wellness/foods?q=rice ───────────────────────────────────────────
 // 1. Search local DB first.
 // 2. If query provided and local results < 5, fall back to Open Food Facts and
@@ -689,7 +750,7 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
       foodName: clientFoodName, image: clientImage, per100g: clientPer100g,
-      profileId } = req.body;
+      profileId, dietPlanId } = req.body;
 
     if (!date || !meal || !foodId || quantity == null) {
       res.status(400).json({ error: "date, meal, foodId and quantity are required" });
@@ -731,6 +792,7 @@ router.post("/food-log", async (req: SessionRequest, res: Response) => {
       protein: nutrition.protein,
       fat: nutrition.fat,
       carbs: nutrition.carbs,
+      dietPlanId: dietPlanId ?? null,
       loggedAt: new Date().toISOString(),
     };
 

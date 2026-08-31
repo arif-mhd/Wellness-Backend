@@ -9,6 +9,7 @@ import {
   doctorsContainer,
   queryDocuments,
   notificationsContainer,
+  dietPlansContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
@@ -22,6 +23,7 @@ import { livekitApiKey, livekitApiSecret } from "../config/livekit";
 import { devFallbackOrThrow } from "../utils/env";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
+import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -1610,6 +1612,184 @@ router.get("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: R
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
+// ─── PUT /api/appointments/:id/diet-plan ────────────────────────────────────
+// Doctor drafts/updates the diet plan for this encounter's patient. This can
+// be called repeatedly while the doctor is still editing (e.g. live during a
+// consultation) without affecting what the patient currently sees.
+//
+// Body: { title, notes?, meals, targetCalories?, targetMacros?, restrictions?,
+//         visibleToPatient: boolean }
+//
+// visibleToPatient is the "reflect to patient" toggle from the consult screen:
+//   - false → the draft is saved but NOT surfaced to the patient at all.
+//   - true  → this plan becomes the patient's single active plan. Any
+//             previously active plan for this patient is superseded.
+router.put("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id } = req.params;
+  const { title, notes, meals, targetCalories, targetMacros, restrictions, visibleToPatient } = req.body;
+
+  if (!title || !Array.isArray(meals)) {
+    res.status(400).json({ error: "title and meals are required" });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const patientId = apt.patientId;
+    const now = new Date().toISOString();
+
+    // Reuse the existing draft for this appointment if one exists, so repeated
+    // saves during the same consult update in place rather than creating dupes.
+    const { resources: existingForAppt } = await dietPlansContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.appointmentId = @aid",
+        parameters: [{ name: "@pid", value: patientId }, { name: "@aid", value: id }],
+      },
+      { partitionKey: patientId }
+    ).fetchAll();
+    const existing = existingForAppt[0];
+
+    const plan = {
+      id: existing?.id ?? crypto.randomUUID(),
+      patientId,
+      doctorId,
+      appointmentId: id,
+      title,
+      notes: notes ?? "",
+      meals,
+      targetCalories: targetCalories ?? null,
+      targetMacros: targetMacros ?? null,
+      restrictions: restrictions ?? [],
+      visibleToPatient: !!visibleToPatient,
+      status: visibleToPatient ? "active" : "draft",
+      startDate: existing?.startDate ?? now,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    if (visibleToPatient) {
+      // Only one active plan per patient at a time — supersede any other.
+      const { resources: activePlans } = await dietPlansContainer.items.query(
+        {
+          query: "SELECT * FROM c WHERE c.patientId = @pid AND c.status = @active AND c.id != @id",
+          parameters: [
+            { name: "@pid", value: patientId },
+            { name: "@active", value: "active" },
+            { name: "@id", value: plan.id },
+          ],
+        },
+        { partitionKey: patientId }
+      ).fetchAll();
+
+      for (const prior of activePlans) {
+        await dietPlansContainer.items.upsert({
+          ...prior,
+          status: "superseded",
+          visibleToPatient: false,
+          endDate: now,
+          updatedAt: now,
+        });
+      }
+    }
+
+    await dietPlansContainer.items.upsert(plan);
+    res.json({ dietPlan: plan });
+  } catch (err) {
+    console.error("Save diet plan error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/diet-plan ────────────────────────────────────
+// Doctor reads back the diet-plan draft/active-plan tied to this appointment —
+// used to restore the consult screen's diet plan tab on reload/rejoin.
+router.get("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read();
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const { resources } = await dietPlansContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.patientId = @pid AND c.appointmentId = @aid",
+        parameters: [{ name: "@pid", value: apt.patientId }, { name: "@aid", value: id }],
+      },
+      { partitionKey: apt.patientId }
+    ).fetchAll();
+
+    res.json({ dietPlan: resources[0] ?? null });
+  } catch (err) {
+    console.error("Fetch diet plan error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/doctor/diet-plans/:patientId ─────────────────────
+// Doctor views a patient's diet-plan history (across all encounters) —
+// used outside a live consult to review or revise a previously assigned plan.
+router.get("/doctor/diet-plans/:patientId", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { patientId } = req.params;
+
+  try {
+    const { resources } = await dietPlansContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.updatedAt DESC",
+        parameters: [{ name: "@pid", value: patientId }],
+      },
+      { partitionKey: patientId }
+    ).fetchAll();
+
+    // Only show this doctor plans they authored, or that belong to a patient
+    // they've actually treated (appointment relationship), matching the same
+    // scoping used elsewhere for doctor↔patient access.
+    const { resources: sharedAppointments } = await appointmentsContainer.items.query(
+      {
+        query: "SELECT VALUE COUNT(1) FROM c WHERE c.patientId = @pid AND c.doctorId = @did",
+        parameters: [{ name: "@pid", value: patientId }, { name: "@did", value: doctorId }],
+      }
+    ).fetchAll();
+    if (!sharedAppointments[0]) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    res.json({ dietPlans: resources });
+  } catch (err) {
+    console.error("Fetch diet plan history error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/doctor/diet-plans/:patientId/:planId/progress ────
+// Doctor views the patient's logged adherence against a specific diet plan.
+router.get("/doctor/diet-plans/:patientId/:planId/progress", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { patientId, planId } = req.params;
+
+  try {
+    const { resources: sharedAppointments } = await appointmentsContainer.items.query(
+      {
+        query: "SELECT VALUE COUNT(1) FROM c WHERE c.patientId = @pid AND c.doctorId = @did",
+        parameters: [{ name: "@pid", value: patientId }, { name: "@did", value: doctorId }],
+      }
+    ).fetchAll();
+    if (!sharedAppointments[0]) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const progress = await computeDietPlanProgress(patientId, planId);
+    res.json(progress);
+  } catch (err) {
+    console.error("Fetch diet plan progress error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/doctor/tasks (see below) ──────────────────────────
 
 // ─── GET /api/appointments/:id/ehr ───────────────────────────────────────────
 // Doctor fetches the patient's full longitudinal Electronic Health Record:

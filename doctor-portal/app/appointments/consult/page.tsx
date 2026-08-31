@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
+import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN } from "@/components/video-call/AddDietPlan";
 import EhrPanel from "@/components/video-call/EhrPanel";
 
 function fmt(d: Date) {
@@ -114,6 +115,11 @@ function ConsultRoom() {
   const [emrSaveError, setEmrSaveError] = useState<string | null>(null);
   const [emrSavedAtLeastOnce, setEmrSavedAtLeastOnce] = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
+
+  // Diet plan
+  const [dietPlan, setDietPlan] = useState<DietPlanDraft>(EMPTY_DIET_PLAN);
+  const [dietPlanVisible, setDietPlanVisible] = useState(false);
+  const [togglingDietPlanVisible, setTogglingDietPlanVisible] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
   const [showUnsavedEmrPrompt, setShowUnsavedEmrPrompt] = useState(false);
   const [showRejoinOrEndPrompt, setShowRejoinOrEndPrompt] = useState(false);
@@ -573,6 +579,62 @@ function ConsultRoom() {
     })();
   }, [appointmentId]);
 
+  // Restore any previously saved diet-plan draft for this appointment
+  useEffect(() => {
+    if (!appointmentId) return;
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/appointments/${appointmentId}/diet-plan`);
+        if (res.ok) {
+          const { dietPlan: saved } = await res.json();
+          if (saved) {
+            setDietPlan({
+              title: saved.title ?? "",
+              notes: saved.notes ?? "",
+              meals: saved.meals ?? [],
+              targetCalories: saved.targetCalories != null ? String(saved.targetCalories) : "",
+              restrictions: Array.isArray(saved.restrictions) ? saved.restrictions.join(", ") : (saved.restrictions ?? ""),
+            });
+            setDietPlanVisible(!!saved.visibleToPatient);
+          }
+        }
+      } catch {
+        // ignore — start with a blank diet plan
+      }
+    })();
+  }, [appointmentId]);
+
+  const saveDietPlan = async (visibleToPatient: boolean) => {
+    const res = await apiFetch(`/api/appointments/${appointmentId}/diet-plan`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: dietPlan.title || "Diet Plan",
+        notes: dietPlan.notes,
+        meals: dietPlan.meals,
+        targetCalories: dietPlan.targetCalories ? Number(dietPlan.targetCalories) : null,
+        restrictions: dietPlan.restrictions
+          ? dietPlan.restrictions.split(",").map((r) => r.trim()).filter(Boolean)
+          : [],
+        visibleToPatient,
+      }),
+    });
+    if (!res.ok) throw new Error("Could not save the diet plan.");
+  };
+
+  const toggleDietPlanVisible = async () => {
+    const next = !dietPlanVisible;
+    setTogglingDietPlanVisible(true);
+    setDietPlanVisible(next); // optimistic
+    try {
+      await saveDietPlan(next);
+    } catch {
+      setDietPlanVisible(!next); // revert on failure
+    } finally {
+      setTogglingDietPlanVisible(false);
+    }
+  };
+
   const saveEmr = async () => {
     setSavingEmr(true);
     setEmrSaveError(null);
@@ -583,6 +645,11 @@ function ConsultRoom() {
         body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
       });
       if (res.ok) {
+        // Also persist the diet-plan draft (keeps current visibleToPatient state —
+        // the toggle is the only thing that changes patient-facing visibility).
+        if (dietPlan.title.trim() || dietPlan.meals.length > 0) {
+          try { await saveDietPlan(dietPlanVisible); } catch { /* non-fatal */ }
+        }
         setEmrSavedAtLeastOnce(true);
         setEmrSaved(true);
         setTimeout(() => setEmrSaved(false), 2500);
@@ -1246,6 +1313,13 @@ function ConsultRoom() {
                       <AddMedicines medicines={medicines} onChange={setMedicines} />
                       <AddLabs labs={labs} onChange={setLabs} />
                     </div>
+                    <AddDietPlan
+                      plan={dietPlan}
+                      onChange={setDietPlan}
+                      visibleToPatient={dietPlanVisible}
+                      onToggleVisible={toggleDietPlanVisible}
+                      togglingVisible={togglingDietPlanVisible}
+                    />
                   </div>
                 )}
               </div>

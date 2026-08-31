@@ -23,7 +23,7 @@ interface PatientProfileModalProps {
   appointmentId?: string | null;
 }
 
-type ProfileTab = "Consultations" | "Medications" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
+type ProfileTab = "Consultations" | "Medications" | "Diet Plan" | "Labs" | "Radiology" | "Diagnostics" | "Vaccinations" | "Allergies" | "Surgeries";
 
 // ── Real consultation type (from backend appointments) ──────────────────────
 interface RealConsultation {
@@ -117,7 +117,7 @@ const CheckboxIcon = ({ checked, onChange }: { checked: boolean; onChange: () =>
   </button>
 );
 
-const TABS: ProfileTab[] = ["Consultations", "Medications", "Labs", "Radiology", "Diagnostics", "Vaccinations", "Allergies", "Surgeries"];
+const TABS: ProfileTab[] = ["Consultations", "Medications", "Diet Plan", "Labs", "Radiology", "Diagnostics", "Vaccinations", "Allergies", "Surgeries"];
 
 function ModalField({ label, value }: { label: string; value?: string | number | null }) {
   if (value === undefined || value === null || value === "" || value === "N/A") return null;
@@ -263,6 +263,41 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
   const [prescribedMedicines, setPrescribedMedicines] = useState<any[]>([]);
   const [labReports, setLabReports] = useState<any[]>([]);
+
+  // Diet plans assigned to this patient (across all consultations), loaded
+  // lazily the first time the Diet Plan tab is opened.
+  const [dietPlans, setDietPlans] = useState<any[]>([]);
+  const [loadingDietPlans, setLoadingDietPlans] = useState(false);
+  const [dietPlansLoaded, setDietPlansLoaded] = useState(false);
+  const [dietPlanProgress, setDietPlanProgress] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (activeTab !== "Diet Plan" || dietPlansLoaded) return;
+    (async () => {
+      setLoadingDietPlans(true);
+      try {
+        const res = await apiFetch(`/api/appointments/doctor/diet-plans/${patient.id}`);
+        if (res.ok) {
+          const { dietPlans: plans } = await res.json();
+          setDietPlans(plans ?? []);
+
+          const active = (plans ?? []).find((p: any) => p.status === "active");
+          if (active) {
+            const progRes = await apiFetch(`/api/appointments/doctor/diet-plans/${patient.id}/${active.id}/progress`);
+            if (progRes.ok) {
+              const progress = await progRes.json();
+              setDietPlanProgress((prev) => ({ ...prev, [active.id]: progress }));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load diet plans:", err);
+      } finally {
+        setLoadingDietPlans(false);
+        setDietPlansLoaded(true);
+      }
+    })();
+  }, [activeTab, dietPlansLoaded, patient.id]);
   const [labsViewMode, setLabsViewMode] = useState<"cards" | "table">(
     mode === "lab-reports" ? "table" : "cards"
   );
@@ -1023,6 +1058,95 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
           </div>
         )}
 
+        {/* Diet Plan tab content */}
+        {activeTab === "Diet Plan" && (
+          <div className="w-full animate-fade-in">
+            {loadingDietPlans ? (
+              <div className="flex items-center justify-center h-48 bg-white rounded-[12px] text-[#9EA5AD] text-[14px]">
+                Loading diet plans…
+              </div>
+            ) : dietPlans.length === 0 ? (
+              <div className="flex items-center justify-center h-48 bg-white rounded-[12px] text-[#9EA5AD] text-[14px]">
+                No diet plan has been assigned yet.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {dietPlans.map((plan) => {
+                  const progress = dietPlanProgress[plan.id];
+                  return (
+                    <div key={plan.id} className="bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm">
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
+                            {plan.title}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                            plan.status === "active" ? "bg-[#E6F7EE] text-[#179353]" :
+                            plan.status === "superseded" ? "bg-gray-100 text-gray-500" :
+                            "bg-[#FFF4E5] text-[#B5720A]"
+                          }`}>
+                            {plan.status === "active" ? "Active — visible to patient" : plan.status === "superseded" ? "Superseded" : "Draft (not visible to patient)"}
+                          </span>
+                        </div>
+                        <span className="text-[#9EA5AD] text-[11px]">
+                          Updated {new Date(plan.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                      </div>
+
+                      {plan.notes && <p className="text-[#676E76] text-[12px] leading-[1.4]">{plan.notes}</p>}
+
+                      <div className="flex flex-wrap gap-4">
+                        {plan.targetCalories && (
+                          <div className="flex flex-col gap-1 px-4 py-2 rounded-[10px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Target Calories</span>
+                            <span className="text-[#24292E] text-[13px] font-medium">{plan.targetCalories} kcal/day</span>
+                          </div>
+                        )}
+                        {plan.restrictions?.length > 0 && (
+                          <div className="flex flex-col gap-1 px-4 py-2 rounded-[10px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Restrictions</span>
+                            <span className="text-[#24292E] text-[13px] font-medium">{plan.restrictions.join(", ")}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {plan.meals?.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {plan.meals.map((meal: any) => (
+                            <div key={meal.id ?? meal.mealType} className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                              <span className="text-[#5476FC] text-[11px] font-bold uppercase tracking-wide">{meal.mealType}</span>
+                              {meal.items?.map((item: any, i: number) => (
+                                <span key={i} className="text-[#676E76] text-[12px]">{item.foodName} — {item.quantity}</span>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {progress && (
+                        <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Adherence</span>
+                            <span className="text-[#24292E] text-[18px] font-semibold">{progress.adherencePercent}%</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Days Logged</span>
+                            <span className="text-[#24292E] text-[18px] font-semibold">{progress.loggedDays}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Meals Logged</span>
+                            <span className="text-[#24292E] text-[18px] font-semibold">{progress.totalMealsLogged} / {progress.totalMealsPlanned}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Labs tab content */}
         {activeTab === "Labs" && (
           <div className="w-full animate-fade-in">
@@ -1339,7 +1463,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
         )}
 
         {/* Placeholder for other tabs */}
-        {activeTab !== "Consultations" && activeTab !== "Medications" && activeTab !== "Labs" && (
+        {activeTab !== "Consultations" && activeTab !== "Medications" && activeTab !== "Diet Plan" && activeTab !== "Labs" && (
           <div className="flex items-center justify-center h-48 bg-white rounded-[12px] text-[#9EA5AD] text-[14px]">
             {activeTab} data will appear here.
           </div>
