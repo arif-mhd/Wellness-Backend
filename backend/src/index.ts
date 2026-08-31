@@ -238,6 +238,7 @@ async function main() {
     await UserRoles.createNewRoleOrAddPermissions("admin",            []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy",         []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy_pending", []);
+    await UserRoles.createNewRoleOrAddPermissions("pharmacy_admin",   []);
     await UserRoles.createNewRoleOrAddPermissions("clinic",           []);
     await UserRoles.createNewRoleOrAddPermissions("clinic_pending",   []);
     console.log("✅ SuperTokens roles ready");
