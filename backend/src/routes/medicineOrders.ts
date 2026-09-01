@@ -60,7 +60,7 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
       payment_method:   "mock",
       source:           "shop" as const,
       appointmentId:    null,
-      clinicOrgId:      null,
+      clinicId:         null,
       createdAt:        now,
       updatedAt:        now,
     };

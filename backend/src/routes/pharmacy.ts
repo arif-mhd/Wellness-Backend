@@ -7,7 +7,6 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
-import { loadOrgDocForClinicId } from "./clinicInsurance";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -22,24 +21,24 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
 
-    // A doctor belonging to a clinic only prescribes from that clinic's own
-    // affiliated pharmacy — never the whole cross-pharmacy catalogue. If the
-    // clinic has no approved pharmacy yet (or clinicId is absent/unresolvable,
-    // e.g. an independent doctor), this falls straight through to the
-    // unrestricted query below unchanged.
+    // A doctor only prescribes from their own clinic branch's affiliated
+    // pharmacy — never the whole cross-pharmacy catalogue. Doctor.clinicId
+    // and pharmacy.clinicId share the same id space (both are stamped from
+    // resolveClinicScope's scope.scopeId — a real branch id, or the org's
+    // own id when it's acting as its main branch), so this is a direct
+    // match, no resolving up to the org. If this branch has no approved
+    // pharmacy yet (or clinicId is absent, e.g. an independent doctor), this
+    // falls straight through to the unrestricted query below unchanged.
     if (clinicId) {
-      const org = await loadOrgDocForClinicId(clinicId);
-      if (org) {
-        const { resources: clinicPharmacies } = await pharmaciesContainer.items
-          .query({
-            query: "SELECT * FROM c WHERE c.orgId = @orgId AND c.status = 'approved'",
-            parameters: [{ name: "@orgId", value: org.id }],
-          })
-          .fetchAll();
-        if (clinicPharmacies.length) {
-          query += " AND c.pharmacyId = @clinicPharmacyId";
-          params.push({ name: "@clinicPharmacyId", value: clinicPharmacies[0].id });
-        }
+      const { resources: clinicPharmacies } = await pharmaciesContainer.items
+        .query({
+          query: "SELECT * FROM c WHERE c.clinicId = @clinicId AND c.status = 'approved'",
+          parameters: [{ name: "@clinicId", value: clinicId }],
+        })
+        .fetchAll();
+      if (clinicPharmacies.length) {
+        query += " AND c.pharmacyId = @clinicPharmacyId";
+        params.push({ name: "@clinicPharmacyId", value: clinicPharmacies[0].id });
       }
     }
 
@@ -268,7 +267,7 @@ router.get("/clinic-link-request", requireRole("pharmacy"), async (req: SessionR
     const pharmacyId = req.session!.getUserId();
     const { resource } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!resource) { res.status(404).json({ error: "Pharmacy not found" }); return; }
-    res.json({ linkRequest: resource.linkRequest ?? null, orgId: resource.orgId ?? null });
+    res.json({ linkRequest: resource.linkRequest ?? null, clinicId: resource.clinicId ?? null });
   } catch (err) {
     console.error("Pharmacy clinic-link-request fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -285,8 +284,8 @@ router.post("/clinic-link-request/accept", requireRole("pharmacy"), async (req: 
 
     const updated = {
       ...pharmacy,
-      orgId: pharmacy.linkRequest.fromOrgId,
-      orgName: pharmacy.linkRequest.fromOrgName,
+      clinicId: pharmacy.linkRequest.fromClinicId,
+      clinicName: pharmacy.linkRequest.fromClinicName,
       affiliation: "linked" as const,
       linkRequest: null,
     };

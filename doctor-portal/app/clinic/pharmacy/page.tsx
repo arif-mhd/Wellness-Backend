@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface Pharmacy {
@@ -19,7 +20,7 @@ interface Pharmacy {
 interface PendingLinkRequest {
   pharmacyName: string;
   email: string;
-  linkRequest: { fromOrgId: string; fromOrgName: string; requestedAt: string };
+  linkRequest: { fromClinicId: string; fromClinicName: string; requestedAt: string };
 }
 
 const STATUS_LABEL: Record<Pharmacy["status"], string> = {
@@ -34,9 +35,19 @@ const STATUS_COLOR: Record<Pharmacy["status"], string> = {
 };
 
 export default function ClinicPharmacyPage() {
+  const searchParams = useSearchParams();
+  const branchId = searchParams.get("branchId");
+  // Every request must carry the currently-selected branch so the backend
+  // resolves the right clinic scope — a pharmacy is per-branch, not org-wide,
+  // so an org owner viewing "All branches" with no branch selected yet
+  // can't manage one until they pick a specific branch (or their own main
+  // branch, whose id equals their own account id and needs no ?branchId= at all).
+  const qs = branchId ? `?branchId=${branchId}` : "";
+
   const [loading, setLoading] = useState(true);
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
   const [pendingLinkRequest, setPendingLinkRequest] = useState<PendingLinkRequest | null>(null);
+  const [needsBranchSelection, setNeedsBranchSelection] = useState(false);
 
   const [mode, setMode] = useState<"none" | "create" | "link">("none");
   const [busy, setBusy] = useState(false);
@@ -56,9 +67,11 @@ export default function ClinicPharmacyPage() {
 
   const load = () => {
     setLoading(true);
-    apiFetch("/api/clinics/pharmacies/me")
-      .then((r) => r.json())
-      .then((data) => {
+    setNeedsBranchSelection(false);
+    apiFetch(`/api/clinics/pharmacies/me${qs}`)
+      .then(async (r) => {
+        if (r.status === 400) { setNeedsBranchSelection(true); return; }
+        const data = await r.json();
         setPharmacy(data.pharmacy ?? null);
         setPendingLinkRequest(data.pendingLinkRequest ?? null);
       })
@@ -66,14 +79,14 @@ export default function ClinicPharmacyPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [branchId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const res = await apiFetch("/api/clinics/pharmacies", {
+      const res = await apiFetch(`/api/clinics/pharmacies${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, ownerName, pharmacyName, licenseNumber, phone, location: location || null }),
@@ -96,7 +109,7 @@ export default function ClinicPharmacyPage() {
     setBusy(true);
     setError("");
     try {
-      const res = await apiFetch("/api/clinics/pharmacies/link-request", {
+      const res = await apiFetch(`/api/clinics/pharmacies/link-request${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pharmacyEmail: linkEmail }),
@@ -117,7 +130,7 @@ export default function ClinicPharmacyPage() {
   const handleCancelRequest = async () => {
     setBusy(true);
     try {
-      await apiFetch("/api/clinics/pharmacies/link-request", { method: "DELETE" });
+      await apiFetch(`/api/clinics/pharmacies/link-request${qs}`, { method: "DELETE" });
       load();
     } finally {
       setBusy(false);
@@ -125,10 +138,10 @@ export default function ClinicPharmacyPage() {
   };
 
   const handleUnlink = async () => {
-    if (!confirm("Unlink this pharmacy from your clinic? Your doctors will fall back to the full cross-pharmacy catalogue.")) return;
+    if (!confirm("Unlink this pharmacy from this branch? Its doctors will fall back to the full cross-pharmacy catalogue.")) return;
     setBusy(true);
     try {
-      await apiFetch("/api/clinics/pharmacies/me", { method: "DELETE" });
+      await apiFetch(`/api/clinics/pharmacies/me${qs}`, { method: "DELETE" });
       load();
     } finally {
       setBusy(false);
@@ -140,12 +153,20 @@ export default function ClinicPharmacyPage() {
       <div className="max-w-[560px] flex flex-col gap-5">
         <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Pharmacy</h1>
         <p className="text-[#676E76] text-[13px] -mt-2">
-          Affiliate one pharmacy with your clinic. Once linked, your doctors' "Add Medicines" search during
+          Affiliate one pharmacy with this branch. Once linked, this branch's doctors' "Add Medicines" search during
           consultations only shows that pharmacy's own stock, and orders patients place afterward route straight to it.
+          Each branch manages its own pharmacy independently.
         </p>
 
         {loading ? (
           <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
+        ) : needsBranchSelection ? (
+          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5">
+            <p className="text-[#676E76] text-[13px]">
+              Select a specific branch from the Branches page first — each branch manages its own affiliated pharmacy
+              separately.
+            </p>
+          </div>
         ) : pharmacy ? (
           <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between">

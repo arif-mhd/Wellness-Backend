@@ -451,13 +451,13 @@ function ClinicAffiliationSettings() {
       )}
 
       <div className="max-w-2xl">
-        {pharmacy?.orgId ? (
+        {pharmacy?.clinicId ? (
           <div className="p-5 rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#5476FC] flex items-center justify-center shrink-0">
               <ClinicLinkIcon />
             </div>
             <div>
-              <p className="text-[#24292E] text-sm font-semibold">Affiliated with {pharmacy.orgName ?? "a clinic"}</p>
+              <p className="text-[#24292E] text-sm font-semibold">Affiliated with {pharmacy.clinicName ?? "a clinic"}</p>
               <p className="text-[#676E76] text-[12px] mt-0.5">
                 {pharmacy.affiliation === "owned" ? "This pharmacy was created by the clinic." : "This pharmacy accepted a link invitation from the clinic."} Their doctors prescribe only from your own stock, and orders route here automatically.
               </p>
@@ -467,7 +467,7 @@ function ClinicAffiliationSettings() {
           <div className="p-5 rounded-xl border border-[#EBEEF5] bg-white shadow-sm">
             <p className="text-[#24292E] text-sm font-semibold mb-1">Clinic affiliation request</p>
             <p className="text-[#676E76] text-[12px] mb-4">
-              <strong>{pharmacy.linkRequest.fromOrgName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
+              <strong>{pharmacy.linkRequest.fromClinicName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
             </p>
             <div className="flex items-center gap-3">
               <button onClick={handleAccept} disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">

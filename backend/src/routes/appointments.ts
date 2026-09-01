@@ -1662,15 +1662,15 @@ router.post("/:id/order-medicines", requireRole("patient"), async (req: SessionR
     }
     const { items: validatedItems, total_amount } = validation;
 
-    // Trace the order back to the prescribing doctor's clinic, if any —
-    // independent doctors simply leave this null.
-    let clinicOrgId: string | null = null;
+    // Trace the order back to the prescribing doctor's own clinic branch, if
+    // any — independent doctors simply leave this null. doctor.clinicId
+    // already is the exact branch (or org-as-main-branch) scope id, the same
+    // one a pharmacy's own clinicId is stamped with, so no org resolution
+    // is needed here.
+    let clinicId: string | null = null;
     if (apt.doctorId) {
       const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().catch(() => ({ resource: undefined as any }));
-      if (doctor?.clinicId) {
-        const org = await loadOrgDocForClinicId(doctor.clinicId);
-        clinicOrgId = org?.id ?? null;
-      }
+      clinicId = doctor?.clinicId ?? null;
     }
 
     const now = new Date().toISOString();
@@ -1689,7 +1689,7 @@ router.post("/:id/order-medicines", requireRole("patient"), async (req: SessionR
       payment_method:   "mock",
       source:           "consultation" as const,
       appointmentId:    id,
-      clinicOrgId,
+      clinicId,
       createdAt:        now,
       updatedAt:        now,
     };

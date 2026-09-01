@@ -131,12 +131,14 @@ const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: Permissio
   { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
   { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon, perm: "manage_payment" },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
+  // Per-branch resource (each branch, including a branch-staff account's own
+  // branch, affiliates its own pharmacy) — unlike Branches/User Roles below,
+  // this belongs in BASE so a branch-staff account sees it too, not just the
+  // org owner.
+  { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon },
 ];
 const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
 const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
-// Org-wide resource shared by every branch, not per-branch — same
-// owner-only gating as Branches, so it's only ever appended to adminNav.
-const PHARMACY_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
@@ -188,8 +190,8 @@ export default function ClinicSidebar() {
   const withBranch = (href: string) => (branchId ? `${href}?branchId=${branchId}` : href);
 
   const adminNav = hasBranches
-    ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM, PHARMACY_NAV_ITEM]
-    : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM, PHARMACY_NAV_ITEM];
+    ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM]
+    : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
 
   const NAV_ITEMS = (isBranchUser ? BASE_NAV_ITEMS : adminNav).filter(
     (item) => !item.perm || can(item.perm)
