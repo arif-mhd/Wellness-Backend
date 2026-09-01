@@ -209,7 +209,11 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                       {paginated.map((consult) => {
                         const dateObj = parseLocalTime(consult.scheduledAt);
                         return (
-                          <div key={consult.id} className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm hover:border-[#8AA0FF] transition-all">
+                          <Link
+                            key={consult.id}
+                            href={`/clinic/appointments?apptId=${consult.id}`}
+                            className="flex flex-col md:flex-row items-start md:items-center px-5 py-4 rounded-xl border border-[#D6DEFF] bg-white shadow-sm hover:border-[#8AA0FF] transition-all cursor-pointer"
+                          >
 
                             {/* Doctor Avatar + Name */}
                             <div className="w-full md:w-[200px] flex shrink-0 items-center gap-4">
@@ -256,7 +260,7 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                               </div>
                             </div>
 
-                          </div>
+                          </Link>
                         );
                       })}
 

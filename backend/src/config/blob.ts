@@ -58,7 +58,7 @@ export function getBlobUrl(blobPath: string): string {
  * Connection strings look like:
  *   DefaultEndpointsProtocol=https;AccountName=xxx;AccountKey=yyy;EndpointSuffix=...
  */
-function parseConnectionStringCredentials(cs: string): {
+export function parseConnectionStringCredentials(cs: string): {
   accountName: string;
   accountKey: string;
 } {
@@ -68,6 +68,27 @@ function parseConnectionStringCredentials(cs: string): {
     if (idx > 0) map[part.slice(0, idx)] = part.slice(idx + 1);
   });
   return { accountName: map.AccountName, accountKey: map.AccountKey };
+}
+
+function generateSasUrlWithTtlMs(blobPath: string, ttlMs: number): string {
+  const { accountName, accountKey } = parseConnectionStringCredentials(
+    connectionString
+  );
+  const credential = new StorageSharedKeyCredential(accountName, accountKey);
+
+  const expiresOn = new Date(Date.now() + ttlMs);
+
+  const sasToken = generateBlobSASQueryParameters(
+    {
+      containerName,
+      blobName:    blobPath,
+      permissions: BlobSASPermissions.parse("r"), // read-only
+      expiresOn,
+    },
+    credential
+  ).toString();
+
+  return `https://${accountName}.blob.core.windows.net/${containerName}/${blobPath}?${sasToken}`;
 }
 
 /**
@@ -81,23 +102,20 @@ export function generateSasUrl(
   blobPath: string,
   expiresInDays = 365
 ): string {
-  const { accountName, accountKey } = parseConnectionStringCredentials(
-    connectionString
-  );
-  const credential = new StorageSharedKeyCredential(accountName, accountKey);
+  return generateSasUrlWithTtlMs(blobPath, expiresInDays * 24 * 60 * 60 * 1000);
+}
 
-  const expiresOn = new Date();
-  expiresOn.setDate(expiresOn.getDate() + expiresInDays);
-
-  const sasToken = generateBlobSASQueryParameters(
-    {
-      containerName,
-      blobName:    blobPath,
-      permissions: BlobSASPermissions.parse("r"), // read-only
-      expiresOn,
-    },
-    credential
-  ).toString();
-
-  return `https://${accountName}.blob.core.windows.net/${containerName}/${blobPath}?${sasToken}`;
+/**
+ * Same as generateSasUrl, but for content too sensitive to embed a
+ * long-lived URL for — e.g. call recordings. Mint fresh on every authorized
+ * view rather than persisting the URL itself anywhere.
+ *
+ * @param blobPath       Full path inside the container
+ * @param expiresInHours How long the SAS should be valid (default 1 hour)
+ */
+export function generateShortLivedSasUrl(
+  blobPath: string,
+  expiresInHours = 1
+): string {
+  return generateSasUrlWithTtlMs(blobPath, expiresInHours * 60 * 60 * 1000);
 }

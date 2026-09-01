@@ -1,7 +1,9 @@
 import { Router, Request, Response } from "express";
 import { verifySession } from "supertokens-node/recipe/session/framework/express";
 import { SessionRequest } from "supertokens-node/framework/express";
-import { AccessToken, RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
+import { AccessToken, RoomServiceClient, EgressClient, DataPacket_Kind } from "livekit-server-sdk";
+import { EncodedFileOutput, EncodedFileType, AzureBlobUpload } from "@livekit/protocol";
+import { parseConnectionStringCredentials } from "../config/blob";
 import { randomBytes } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -86,6 +88,38 @@ async function sendLivekitData(room: string, payload: Record<string, unknown>): 
     await svc.sendData(room, data, DataPacket_Kind.RELIABLE);
   } catch (err) {
     console.error("[sendLivekitData] Failed:", err);
+  }
+}
+
+// Starts audio-only recording of the call once both parties have acknowledged
+// the mandatory pre-call notice (see PATCH /:id/recording-consent below) — the
+// room name IS the appointment id (see transcript-agent/src/index.ts for the
+// same convention). Uploads straight to the same Azure Blob container the
+// rest of the app already uses, under a recordings/ prefix. Failure here must
+// never block the call itself from proceeding — errors are logged, not thrown.
+async function startCallRecording(appointmentId: string): Promise<string | null> {
+  try {
+    const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
+    const httpUrl = wsUrl.replace(/^wss?:\/\//, "https://");
+    const egressClient = new EgressClient(httpUrl, livekitApiKey, livekitApiSecret);
+
+    const { accountName, accountKey } = parseConnectionStringCredentials(process.env.AZURE_STORAGE_CONNECTION_STRING!);
+    const containerName = process.env.AZURE_STORAGE_CONTAINER || "wellness";
+
+    const output = new EncodedFileOutput({
+      fileType: EncodedFileType.OGG,
+      filepath: `recordings/${appointmentId}.ogg`,
+      output: {
+        case: "azure",
+        value: new AzureBlobUpload({ accountName, accountKey, containerName }),
+      },
+    });
+
+    const info = await egressClient.startRoomCompositeEgress(appointmentId, { file: output }, { audioOnly: true });
+    return info.egressId;
+  } catch (err) {
+    console.error(`[startCallRecording] Failed to start egress for appointment ${appointmentId}:`, err);
+    return null;
   }
 }
 
@@ -799,12 +833,19 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
       }
     }
 
-    let enriched = apt;
+    // The call transcript and recording pointer are only ever exposed through
+    // the dedicated, ownership-checked recording endpoints
+    // (GET /api/clinics/appointments/:id/recording, GET
+    // /api/admin/appointments/:id/recording) — this general-purpose fetch
+    // must not leak them via a plain spread.
+    const { transcript, transcriptSavedAt, recordingBlobPath, recordingEgressId, ...safeApt } = apt as any;
+
+    let enriched: any = safeApt;
     try {
       const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
       const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId);
       enriched = {
-        ...apt,
+        ...safeApt,
         doctorName: doctor?.fullName ?? apt.doctorName,
         doctorSpecialty: doctor?.specialty ?? apt.doctorSpecialty,
         doctorAvatarUrl: doctor?.avatarUrl ?? apt.doctorAvatarUrl,
@@ -1362,6 +1403,65 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
     });
   } catch (err) {
     console.error("Update call presence error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/appointments/:id/recording-consent ───────────────────────────
+// Doctor or patient acknowledges the mandatory pre-call notice — this call's
+// audio (audio only, no video) is recorded, kept for a limited retention
+// window, and may be used to verify what happened if a dispute or issue is
+// raised after the fact. Required, not optional: each call screen gates
+// connecting to the LiveKit room on this succeeding for that party. Same
+// doctor-or-patient dual-write race as call-presence above, same ETag-retry.
+router.patch("/:id/recording-consent", verifySession(), async (req: SessionRequest, res: Response) => {
+  const userId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    let updated: any;
+    for (let attempt = 0; ; attempt++) {
+      const { resource: apt } = await appointmentsContainer.item(id, id).read();
+      if (!apt) {
+        res.status(404).json({ error: "Appointment not found." });
+        return;
+      }
+
+      const isDoctor = apt.doctorId === userId;
+      const isPatient = apt.patientId === userId;
+      if (!isDoctor && !isPatient) {
+        res.status(403).json({ error: "Not authorized." });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const recordingConsent = { ...(apt.recordingConsent ?? {}) };
+      if (isDoctor) recordingConsent.doctorAckAt = now;
+      if (isPatient) recordingConsent.patientAckAt = now;
+      updated = { ...apt, recordingConsent, updatedAt: now };
+
+      try {
+        await appointmentsContainer.item(id, id).replace(updated, { accessCondition: { type: "IfMatch", condition: apt._etag } });
+        break;
+      } catch (err: any) {
+        if (err.code === 412 && attempt < 5) continue; // someone else wrote first — re-read and retry
+        throw err;
+      }
+    }
+
+    // Start recording once — the moment both sides have acknowledged, not
+    // eagerly when the room is created. Whichever party acks second is the
+    // one whose request happens to trigger this.
+    if (updated.recordingConsent?.doctorAckAt && updated.recordingConsent?.patientAckAt && !updated.recordingEgressId) {
+      const egressId = await startCallRecording(id);
+      if (egressId) {
+        await appointmentsContainer.items.upsert({ ...updated, recordingEgressId: egressId });
+      }
+    }
+
+    res.json({ status: "OK", recordingConsent: updated.recordingConsent });
+  } catch (err) {
+    console.error("Recording consent ack error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

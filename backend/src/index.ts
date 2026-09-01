@@ -29,6 +29,7 @@ import clinicPharmacyRouter from "./routes/clinicPharmacy";
 import adminFeeRequestsRouter from "./routes/adminFeeRequests";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
+import adminAppointmentsRouter from "./routes/adminAppointments";
 import adminInsuranceVerificationsRouter from "./routes/adminInsuranceVerifications";
 import appointmentsRouter from "./routes/appointments";
 import wellnessRouter from "./routes/wellness";
@@ -64,6 +65,7 @@ import clinicMessagesRouter from "./routes/clinicMessages";
 import servicesRouter from "./routes/services";
 import fhirRouter from "./routes/fhir";
 import internalRouter from "./routes/internal";
+import livekitWebhookRouter from "./routes/livekitWebhook";
 import metaRouter from "./routes/meta";
 
 // ─── 1. Initialise SuperTokens ───────────────────────────────────────────────
@@ -87,8 +89,15 @@ app.use(
   })
 );
 
-// MUST be before SuperTokens middleware so /auth/* routes can read the body
-app.use(express.json({ limit: "50mb" }));
+// MUST be before SuperTokens middleware so /auth/* routes can read the body.
+// The verify hook stashes the raw bytes on req.rawBody alongside the parsed
+// JSON — livekitWebhook.ts needs the exact raw body to check LiveKit's HMAC
+// signature, and re-serializing the parsed JSON is not guaranteed to
+// reproduce byte-for-byte what LiveKit actually signed.
+app.use(express.json({
+  limit: "50mb",
+  verify: (req, _res, buf) => { (req as any).rawBody = buf; },
+}));
 
 // Safety net against a runaway client (buggy polling loop, retry storm, or
 // actual abuse) taking down the API for everyone else. Set deliberately high
@@ -150,6 +159,7 @@ app.use("/api/patients", patientsRouter);
 
 // Admin patient management (requires admin role)
 app.use("/api/admin/patients", adminPatientsRouter);
+app.use("/api/admin/appointments", adminAppointmentsRouter);
 app.use("/api/admin/insurance-verifications", adminInsuranceVerificationsRouter);
 
 // Appointment booking + LiveKit tokens (patient + doctor roles)
@@ -202,6 +212,11 @@ app.use("/api/fhir", fhirRouter);
 // logged-in users — guarded by a shared secret inside the router itself.
 app.use("/api/internal", internalRouter);
 app.use("/api/meta", metaRouter);
+
+// LiveKit's own server-to-server webhooks (egress/recording lifecycle) —
+// authenticated by LiveKit's HMAC signature (WebhookReceiver), not the
+// x-internal-secret pattern the rest of /api/internal uses.
+app.use("/api/livekit", livekitWebhookRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
