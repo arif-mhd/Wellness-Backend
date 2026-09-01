@@ -25,6 +25,7 @@ import clinicInsuranceRouter from "./routes/clinicInsurance";
 import clinicPermissionsRouter from "./routes/clinicPermissions";
 import clinicPaymentsRouter from "./routes/clinicPayments";
 import clinicSearchRouter from "./routes/clinicSearch";
+import clinicPharmacyRouter from "./routes/clinicPharmacy";
 import adminFeeRequestsRouter from "./routes/adminFeeRequests";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
@@ -134,6 +135,7 @@ app.use("/api/clinics/insurance-policies", clinicInsuranceRouter);
 app.use("/api/clinics/permissions", clinicPermissionsRouter);
 app.use("/api/clinics/payments", clinicPaymentsRouter);
 app.use("/api/clinics/search",   clinicSearchRouter);
+app.use("/api/clinics/pharmacies", clinicPharmacyRouter);
 
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);

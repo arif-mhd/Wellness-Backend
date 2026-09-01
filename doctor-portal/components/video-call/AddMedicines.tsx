@@ -36,9 +36,11 @@ interface AddMedicinesProps {
   onChange: (medicines: Medicine[]) => void;
   /** The identity of the currently authenticated doctor — used to restrict delete to own entries */
   currentDoctorId?: string;
+  /** The doctor's own clinicId — scopes the catalogue search to that clinic's affiliated pharmacy, if any */
+  clinicId?: string;
 }
 
-export default function AddMedicines({ medicines, onChange, currentDoctorId }: AddMedicinesProps) {
+export default function AddMedicines({ medicines, onChange, currentDoctorId, clinicId }: AddMedicinesProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [medName, setMedName] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<CatalogueProduct | null>(null);
@@ -66,7 +68,8 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
     searchDebounce.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8&external=true`);
+        const clinicParam = clinicId ? `&clinicId=${encodeURIComponent(clinicId)}` : "";
+        const res = await fetch(`${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8&external=true${clinicParam}`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(
@@ -86,7 +89,7 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
         setSearching(false);
       }
     }, 300);
-  }, [medName, customMode, selectedProduct]);
+  }, [medName, customMode, selectedProduct, clinicId]);
 
   const resetForm = () => {
     setMedName("");
@@ -195,6 +198,11 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId }: A
                 {selectedProduct && (
                   <p className="text-[10px] text-[#5476FC] font-semibold">
                     {selectedProduct.strength ?? ""} {selectedProduct.manufacturer ? `· ${selectedProduct.manufacturer}` : ""}
+                  </p>
+                )}
+                {!customMode && clinicId && !selectedProduct && (
+                  <p className="text-[10px] text-[#838B95] font-medium italic">
+                    Showing your clinic pharmacy's stock
                   </p>
                 )}
 

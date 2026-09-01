@@ -2,10 +2,11 @@ import { Router, Response } from "express";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
-import { medicineOrdersContainer, prescriptionsContainer, pharmacyProductsContainer } from "../config/cosmos";
+import { medicineOrdersContainer, prescriptionsContainer } from "../config/cosmos";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
+import { validateOrderItems, decrementStockForItems } from "../utils/pharmacyOrders";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -36,37 +37,12 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
     }
 
     // Validate each item and calculate total
-    let total_amount = 0;
-    const validatedItems: any[] = [];
-
-    for (const item of items) {
-      const { resources } = await pharmacyProductsContainer.items.query({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)",
-        parameters: [{ name: "@id", value: item.medicine_id }],
-      }).fetchAll();
-
-      if (!resources.length) {
-        res.status(400).json({ error: `Product ${item.medicine_id} not found or unavailable` });
-        return;
-      }
-
-      const product = resources[0];
-      if (product.stock < item.quantity) {
-        res.status(400).json({ error: `Insufficient stock for ${product.name}` });
-        return;
-      }
-
-      validatedItems.push({
-        medicine_id:  product.id,
-        name:         product.name,
-        quantity:     item.quantity,
-        unit_price:   product.price,
-        pharmacyId:   product.pharmacyId,
-        image_url:    product.imageUrl ?? null,
-        numberOfTablets: product.numberOfTablets ?? null,
-      });
-      total_amount += product.price * item.quantity;
+    const validation = await validateOrderItems(items);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.error });
+      return;
     }
+    const { items: validatedItems, total_amount } = validation;
 
     const now = new Date().toISOString();
     const order = {
@@ -82,38 +58,15 @@ router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: 
       total_amount,
       payment_status:   "paid",   // payment is mocked
       payment_method:   "mock",
+      source:           "shop" as const,
+      appointmentId:    null,
+      clinicOrgId:      null,
       createdAt:        now,
       updatedAt:        now,
     };
 
     await medicineOrdersContainer.items.upsert(order);
-
-    // Decrement stock for each ordered product
-    for (const item of validatedItems) {
-      try {
-        const { resource: prod } = await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).read();
-        if (prod) {
-          const newStock = Math.max(0, (prod.stock ?? 0) - item.quantity);
-          let newNumberOfTablets = prod.numberOfTablets;
-          
-          if (newNumberOfTablets) {
-             const num = parseInt(newNumberOfTablets.toString(), 10);
-             if (!isNaN(num)) {
-                 newNumberOfTablets = Math.max(0, num - item.quantity).toString();
-             }
-          }
-
-          await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).replace({ 
-            ...prod, 
-            stock: newStock, 
-            numberOfTablets: newNumberOfTablets,
-            updatedAt: new Date().toISOString() 
-          });
-        }
-      } catch (stockErr) {
-        console.warn(`Stock decrement failed for ${item.medicine_id}:`, stockErr);
-      }
-    }
+    await decrementStockForItems(validatedItems);
 
     const itemNames = validatedItems.map(i => i.name).join(", ");
     logActivity({

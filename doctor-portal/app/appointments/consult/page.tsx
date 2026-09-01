@@ -115,6 +115,7 @@ function ConsultRoom() {
   const [emrSaveError, setEmrSaveError] = useState<string | null>(null);
   const [emrSavedAtLeastOnce, setEmrSavedAtLeastOnce] = useState(false);
   const [loadingEmr, setLoadingEmr] = useState(true);
+  const [clinicId, setClinicId] = useState<string | null>(null);
 
   // Diet plan
   const [dietPlan, setDietPlan] = useState<DietPlanDraft>(EMPTY_DIET_PLAN);
@@ -196,6 +197,21 @@ function ConsultRoom() {
   }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // Used to scope the medicine catalogue search to this doctor's own clinic
+  // pharmacy (falls back to the full cross-pharmacy catalogue if the doctor
+  // has no clinicId, or their clinic has no affiliated pharmacy).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/doctors/me`);
+        if (res.ok) {
+          const { doctor } = await res.json();
+          setClinicId(doctor?.clinicId ?? null);
+        }
+      } catch { /* ignore — falls back to the unscoped catalogue */ }
+    })();
+  }, []);
 
   // LiveKit connect
   useEffect(() => {
@@ -1323,7 +1339,7 @@ function ConsultRoom() {
                       preVisitData={preVisitData}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <AddMedicines medicines={medicines} onChange={setMedicines} />
+                      <AddMedicines medicines={medicines} onChange={setMedicines} clinicId={clinicId ?? undefined} />
                       <AddLabs labs={labs} onChange={setLabs} />
                     </div>
                     <AddDietPlan
