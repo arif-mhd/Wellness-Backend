@@ -292,11 +292,24 @@ function ConsultRoom() {
       if (cancelled) return;
       const finalSegments = segments.filter(s => s.final && s.text.trim());
       if (finalSegments.length === 0) return;
-      const speaker = participant?.identity === room.localParticipant.identity ? "You" : patientName;
-      setCaptions(prev => [
-        ...prev.slice(-9),
-        ...finalSegments.map(s => ({ id: s.id, speaker, text: s.text })),
-      ]);
+      // transcript-agent publishes each utterance in up to two phases: the
+      // original alone first, then (for the other side of the doctor<->
+      // patient pair, once translation resolves) a second event carrying
+      // both the same original segment id and a translated one appended.
+      // Same id → update the existing caption in place rather than adding
+      // a duplicate line.
+      const isOwn = participant?.identity === room.localParticipant.identity;
+      const original = finalSegments[0];
+      const translated = finalSegments[1];
+      const speaker = isOwn ? "You" : patientName;
+      const text = !isOwn && translated ? `${translated.text} (${original.text})` : original.text;
+      setCaptions(prev => {
+        const idx = prev.findIndex(c => c.id === original.id);
+        if (idx === -1) return [...prev.slice(-9), { id: original.id, speaker, text }];
+        const next = [...prev];
+        next[idx] = { id: original.id, speaker, text };
+        return next;
+      });
     });
 
     async function init() {
