@@ -206,10 +206,9 @@ function ManagePharmacyPageInner() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+        <div className="flex flex-col gap-5">
 
-          {/* LEFT COLUMN */}
-          <div className={`${selectedPharmacy ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
+          {/* Header & Tabs */}
 
             {/* Top Header */}
             <div className="flex items-center justify-between">
@@ -292,6 +291,12 @@ function ManagePharmacyPageInner() {
 
 
             </div>
+
+          {/* Table & Details Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+            
+            {/* LEFT COLUMN (Table & Filter) */}
+            <div className={`${selectedPharmacy ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
 
             {/* Text Filter Row */}
             <div className="hidden md:flex items-center justify-between text-[13px] font-semibold text-[#64748B] select-none mt-4">
@@ -526,12 +531,13 @@ function ManagePharmacyPageInner() {
                 </div>
               )}
             </div>
+          </div>
             
-            {/* RIGHT — Pharmacy Details Panel */}
+          {/* RIGHT — Pharmacy Details Panel */}
             {selectedPharmacy && (
               <>
                 <div className="lg:hidden fixed inset-0 bg-slate-900/40 z-[100] animate-in fade-in" onClick={() => { setSelectedPharmacyId(null); setShowRejectInput(false); setRejectReason(""); }} />
-                <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
+                <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] overflow-y-auto lg:static lg:z-auto lg:max-h-none lg:col-span-4 lg:mt-[56px] bg-white rounded-t-[2rem] lg:rounded-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:shadow-[0_2px_12px_rgba(0,0,0,0.03)] border-t lg:border border-slate-100 p-7 animate-in slide-in-from-bottom-5 lg:slide-in-from-right-3 duration-300">
 
                   {/* Header */}
                   <div className="flex items-center justify-between pb-4">
