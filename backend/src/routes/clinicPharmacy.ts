@@ -13,14 +13,21 @@ const router = Router();
 // per-branch one (unlike doctors/insurance/etc), so only the org owner
 // account may view/manage it — a branch/senior-staff account is 403'd here
 // the same way clinicBranches.ts's requireOrgOwner rejects them.
+//
+// Must resolve with allowAggregate: true — an org owner account that has
+// branches (or isMultiBranchOrg) otherwise gets 400'd by resolveClinicScope
+// demanding a ?branchId=, which makes no sense here since the pharmacy has
+// no per-branch concept at all. scope.orgId is null only for a plain
+// single-location clinic, in which case scope.actorId (the org's own id) is
+// exactly what we want — same fallback pattern as clinicInsurance.ts.
 async function requireOrgId(req: SessionRequest, res: Response): Promise<string | null> {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
   if (!scope) return null;
   if (scope.isBranchUser) {
     res.status(403).json({ error: "Only the clinic owner account can manage the pharmacy." });
     return null;
   }
-  return scope.orgId ?? scope.scopeId;
+  return scope.orgId ?? scope.actorId;
 }
 
 async function findPharmacyByOrgId(orgId: string) {
