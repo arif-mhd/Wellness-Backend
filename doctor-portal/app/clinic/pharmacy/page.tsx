@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
 interface Pharmacy {
@@ -23,6 +23,8 @@ interface PendingLinkRequest {
   linkRequest: { fromClinicId: string; fromClinicName: string; requestedAt: string };
 }
 
+interface BranchOption { id: string; name: string; status: string; isMain?: boolean; }
+
 const STATUS_LABEL: Record<Pharmacy["status"], string> = {
   pending_approval: "Pending Admin Approval",
   approved: "Active",
@@ -34,20 +36,41 @@ const STATUS_COLOR: Record<Pharmacy["status"], string> = {
   rejected: "text-[#D92D20]",
 };
 
-export default function ClinicPharmacyPage() {
+function ClinicPharmacyContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const branchId = searchParams.get("branchId");
-  // Every request must carry the currently-selected branch so the backend
-  // resolves the right clinic scope — a pharmacy is per-branch, not org-wide,
-  // so an org owner viewing "All branches" with no branch selected yet
-  // can't manage one until they pick a specific branch (or their own main
-  // branch, whose id equals their own account id and needs no ?branchId= at all).
-  const qs = branchId ? `?branchId=${branchId}` : "";
+  const branchIdParam = searchParams.get("branchId");
+
+  // Branch dropdown (same pattern as the Schedules page) — only ever
+  // populated for an org owner (GET /api/clinics/branches is owner-only;
+  // a branch/senior-staff account just gets an empty list here and manages
+  // their own branch's pharmacy directly, no picker needed). A clinic with
+  // no real sub-branches only ever has this one array entry (its own main
+  // branch), so the dropdown stays hidden and the whole branchId concept
+  // never enters the request — same single-pharmacy behavior as before.
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [branchesLoaded, setBranchesLoaded] = useState(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/api/clinics/branches")
+      .then((r) => r.json())
+      .then((data) => setBranches(Array.isArray(data.branches) ? data.branches.filter((b: BranchOption) => b.status === "active") : []))
+      .catch(() => setBranches([]))
+      .finally(() => setBranchesLoaded(true));
+  }, []);
+
+  const hasBranches = branches.length > 1;
+  // Default to the main branch until the owner explicitly picks another one
+  // from the dropdown — there's no "All branches" view for a pharmacy since
+  // it's inherently one-per-branch, unlike Schedules' aggregate option.
+  const effectiveBranchId = hasBranches ? (branchIdParam ?? branches.find((b) => b.isMain)?.id ?? branches[0]?.id ?? null) : null;
+  const activeBranchName = effectiveBranchId ? branches.find((b) => b.id === effectiveBranchId)?.name ?? "Branch" : null;
+  const qs = effectiveBranchId ? `?branchId=${effectiveBranchId}` : "";
 
   const [loading, setLoading] = useState(true);
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
   const [pendingLinkRequest, setPendingLinkRequest] = useState<PendingLinkRequest | null>(null);
-  const [needsBranchSelection, setNeedsBranchSelection] = useState(false);
 
   const [mode, setMode] = useState<"none" | "create" | "link">("none");
   const [busy, setBusy] = useState(false);
@@ -67,11 +90,9 @@ export default function ClinicPharmacyPage() {
 
   const load = () => {
     setLoading(true);
-    setNeedsBranchSelection(false);
     apiFetch(`/api/clinics/pharmacies/me${qs}`)
-      .then(async (r) => {
-        if (r.status === 400) { setNeedsBranchSelection(true); return; }
-        const data = await r.json();
+      .then((r) => r.json())
+      .then((data) => {
         setPharmacy(data.pharmacy ?? null);
         setPendingLinkRequest(data.pendingLinkRequest ?? null);
       })
@@ -79,7 +100,15 @@ export default function ClinicPharmacyPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [branchId]);
+  // Wait for the branch list to resolve first (for an org owner) so the
+  // very first fetch already carries the right default branchId instead of
+  // firing once unscoped and again once branches load.
+  useEffect(() => {
+    if (!branchesLoaded) return;
+    setMode("none");
+    setError("");
+    load();
+  }, [branchesLoaded, effectiveBranchId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +167,7 @@ export default function ClinicPharmacyPage() {
   };
 
   const handleUnlink = async () => {
-    if (!confirm("Unlink this pharmacy from this branch? Its doctors will fall back to the full cross-pharmacy catalogue.")) return;
+    if (!confirm(`Unlink this pharmacy from ${activeBranchName ?? "this branch"}? Its doctors will fall back to the full cross-pharmacy catalogue.`)) return;
     setBusy(true);
     try {
       await apiFetch(`/api/clinics/pharmacies/me${qs}`, { method: "DELETE" });
@@ -153,20 +182,41 @@ export default function ClinicPharmacyPage() {
       <div className="max-w-[560px] flex flex-col gap-5">
         <h1 className="text-[#24292E] text-[26px] font-medium tracking-tight">Pharmacy</h1>
         <p className="text-[#676E76] text-[13px] -mt-2">
-          Affiliate one pharmacy with this branch. Once linked, this branch's doctors' "Add Medicines" search during
-          consultations only shows that pharmacy's own stock, and orders patients place afterward route straight to it.
-          Each branch manages its own pharmacy independently.
+          Affiliate one pharmacy with {hasBranches ? "each branch" : "your clinic"}. Once linked, a branch's doctors'
+          "Add Medicines" search during consultations only shows that pharmacy's own stock, and orders patients place
+          afterward route straight to it.
         </p>
+
+        {hasBranches && (
+          <div className="relative self-start">
+            <button
+              onClick={() => setShowBranchDropdown((v) => !v)}
+              className="px-5 py-1.5 rounded-full text-[13px] font-medium tracking-wide transition-all flex items-center gap-1.5 bg-[#5476FC] text-white"
+            >
+              {activeBranchName ?? "Select Branch"}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {showBranchDropdown && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowBranchDropdown(false)} />
+                <div className="absolute left-0 top-9 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 w-56 z-20">
+                  {branches.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => { router.push(`/clinic/pharmacy?branchId=${b.id}`); setShowBranchDropdown(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${effectiveBranchId === b.id ? "bg-blue-50 text-blue-600" : "text-slate-700 hover:bg-slate-50"}`}
+                    >
+                      {b.name}{b.isMain ? " (Main)" : ""}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center text-sm text-[#A0A8B0] py-12">Loading...</div>
-        ) : needsBranchSelection ? (
-          <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5">
-            <p className="text-[#676E76] text-[13px]">
-              Select a specific branch from the Branches page first — each branch manages its own affiliated pharmacy
-              separately.
-            </p>
-          </div>
         ) : pharmacy ? (
           <div className="bg-white border border-[#E4E8F0] rounded-2xl p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between">
@@ -191,7 +241,7 @@ export default function ClinicPharmacyPage() {
               <div className="flex flex-col col-span-2">
                 <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Affiliation</span>
                 <span className="text-[#24292E] text-[12px]">
-                  {pharmacy.affiliation === "owned" ? "Created by your clinic" : "Linked from an existing independent pharmacy"}
+                  {pharmacy.affiliation === "owned" ? `Created by ${activeBranchName ?? "your clinic"}` : "Linked from an existing independent pharmacy"}
                 </span>
               </div>
             </div>
@@ -240,7 +290,7 @@ export default function ClinicPharmacyPage() {
           </div>
         ) : mode === "create" ? (
           <form onSubmit={handleCreate} className="bg-white border border-[#E4E8F0] rounded-2xl p-5 flex flex-col gap-4">
-            <h2 className="text-[#24292E] text-[15px] font-semibold">Create New Pharmacy</h2>
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Create New Pharmacy{activeBranchName ? ` for ${activeBranchName}` : ""}</h2>
             {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center">{error}</div>}
             <div className="flex flex-col gap-1.5">
               <label className="text-[12px] font-semibold text-[#24292E]">Pharmacy Name</label>
@@ -285,7 +335,7 @@ export default function ClinicPharmacyPage() {
           </form>
         ) : (
           <form onSubmit={handleLinkRequest} className="bg-white border border-[#E4E8F0] rounded-2xl p-5 flex flex-col gap-4">
-            <h2 className="text-[#24292E] text-[15px] font-semibold">Link Existing Pharmacy</h2>
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Link Existing Pharmacy{activeBranchName ? ` to ${activeBranchName}` : ""}</h2>
             <p className="text-[#676E76] text-[12px]">
               Enter the email address the pharmacy uses to log into the pharmacy portal. They'll need to accept the
               invitation from their own dashboard before the link takes effect.
@@ -307,5 +357,13 @@ export default function ClinicPharmacyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ClinicPharmacyPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClinicPharmacyContent />
+    </Suspense>
   );
 }
