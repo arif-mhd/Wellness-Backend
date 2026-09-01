@@ -198,7 +198,8 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
 // Public — called by pharmacy portal signup.
 // Creates a SuperTokens account with "pharmacy_pending" role and saves profile to Cosmos.
 router.post("/register", async (req: Request, res: Response) => {
-  const { email, password, ownerName, pharmacyName, licenseNumber, location, emiratesId, phone } = req.body;
+  const { password, ownerName, pharmacyName, licenseNumber, location, emiratesId, phone } = req.body;
+  const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
 
   if (!email || !password || !ownerName || !pharmacyName || !licenseNumber || !phone) {
     res.status(400).json({ error: "email, password, ownerName, pharmacyName, licenseNumber and phone are required." });
@@ -344,7 +345,8 @@ router.post("/clinic-link-requests/reject", requireRole("pharmacy"), async (req:
 router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
-    const { ownerName, pharmacyName, licenseNumber, email, phone, location, manager, operatingHours } = req.body;
+    const { ownerName, pharmacyName, licenseNumber, phone, location, manager, operatingHours } = req.body;
+    const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
 
     const { resource: existing } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!existing) {

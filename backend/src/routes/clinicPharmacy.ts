@@ -83,7 +83,8 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
   const clinicId = await requireClinicId(req, res);
   if (!clinicId) return;
 
-  const { email, password, ownerName, pharmacyName, licenseNumber, location, phone } = req.body;
+  const { password, ownerName, pharmacyName, licenseNumber, location, phone } = req.body;
+  const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
   if (!email || !password || !ownerName || !pharmacyName || !licenseNumber || !phone) {
     res.status(400).json({ error: "email, password, ownerName, pharmacyName, licenseNumber and phone are required." });
     return;
@@ -173,9 +174,12 @@ router.post("/link-request", requireRole("clinic"), async (req: SessionRequest, 
       return;
     }
 
+    // LOWER(TRIM(...)) on both sides so this still finds a pharmacy whose
+    // email was stored with different casing/whitespace before write paths
+    // normalized it (registration, profile edits) — no backfill needed.
     const { resources: matches } = await pharmaciesContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.email = @email",
+        query: "SELECT * FROM c WHERE LOWER(TRIM(c.email)) = @email",
         parameters: [{ name: "@email", value: pharmacyEmail.trim().toLowerCase() }],
       })
       .fetchAll();
