@@ -386,49 +386,62 @@ function OperatingHoursSettings() {
   );
 }
 
+interface ClinicAffiliation { clinicId: string; clinicName: string; }
+interface PendingClinicRequest { fromClinicId: string; fromClinicName: string; requestedAt: string; }
+
 function ClinicAffiliationSettings() {
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [pharmacy, setPharmacy] = useState<any | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [affiliations, setAffiliations] = useState<ClinicAffiliation[]>([]);
+  const [linkRequests, setLinkRequests] = useState<PendingClinicRequest[]>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const load = () => {
     setLoading(true);
-    pharmacyFetch("/api/pharmacy/me")
+    pharmacyFetch("/api/pharmacy/clinic-affiliations")
       .then((r) => r.json())
-      .then((data) => setPharmacy(data.pharmacy ?? null))
-      .catch(() => setPharmacy(null))
+      .then((data) => {
+        setAffiliations(Array.isArray(data.affiliations) ? data.affiliations : []);
+        setLinkRequests(Array.isArray(data.linkRequests) ? data.linkRequests : []);
+      })
+      .catch(() => { setAffiliations([]); setLinkRequests([]); })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleAccept = async () => {
-    setBusy(true);
+  const handleAccept = async (fromClinicId: string) => {
+    setBusyId(fromClinicId);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/clinic-link-request/accept", { method: "POST" });
+      const res = await pharmacyFetch("/api/pharmacy/clinic-link-requests/accept", {
+        method: "POST",
+        body: JSON.stringify({ fromClinicId }),
+      });
       if (!res.ok) throw new Error();
       setMessage({ type: 'success', text: 'Clinic affiliation accepted.' });
       load();
     } catch {
       setMessage({ type: 'error', text: 'Failed to accept the request. Please try again.' });
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
 
-  const handleReject = async () => {
-    setBusy(true);
+  const handleReject = async (fromClinicId: string) => {
+    setBusyId(fromClinicId);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/clinic-link-request/reject", { method: "POST" });
+      const res = await pharmacyFetch("/api/pharmacy/clinic-link-requests/reject", {
+        method: "POST",
+        body: JSON.stringify({ fromClinicId }),
+      });
       if (!res.ok) throw new Error();
       load();
     } catch {
       setMessage({ type: 'error', text: 'Failed to reject the request. Please try again.' });
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
 
@@ -443,6 +456,10 @@ function ClinicAffiliationSettings() {
   return (
     <div className="animate-in fade-in duration-300">
       <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Clinic Affiliation</h2>
+      <p className="text-[#676E76] text-[12px] mb-6 -mt-3">
+        Your pharmacy can serve more than one clinic or branch at a time — each accepted invitation adds another
+        affiliation below.
+      </p>
 
       {message && (
         <div className={`p-4 rounded-xl mb-6 text-[13px] font-medium flex items-center gap-3 ${message.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
@@ -450,37 +467,41 @@ function ClinicAffiliationSettings() {
         </div>
       )}
 
-      <div className="max-w-2xl">
-        {pharmacy?.clinicId ? (
-          <div className="p-5 rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] flex items-center gap-4">
+      <div className="max-w-2xl flex flex-col gap-4">
+        {affiliations.map((a) => (
+          <div key={a.clinicId} className="p-5 rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#5476FC] flex items-center justify-center shrink-0">
               <ClinicLinkIcon />
             </div>
             <div>
-              <p className="text-[#24292E] text-sm font-semibold">Affiliated with {pharmacy.clinicName ?? "a clinic"}</p>
+              <p className="text-[#24292E] text-sm font-semibold">Affiliated with {a.clinicName}</p>
               <p className="text-[#676E76] text-[12px] mt-0.5">
-                {pharmacy.affiliation === "owned" ? "This pharmacy was created by the clinic." : "This pharmacy accepted a link invitation from the clinic."} Their doctors prescribe only from your own stock, and orders route here automatically.
+                Their doctors prescribe only from your own stock, and orders route here automatically.
               </p>
             </div>
           </div>
-        ) : pharmacy?.linkRequest ? (
-          <div className="p-5 rounded-xl border border-[#EBEEF5] bg-white shadow-sm">
+        ))}
+
+        {linkRequests.map((r) => (
+          <div key={r.fromClinicId} className="p-5 rounded-xl border border-[#EBEEF5] bg-white shadow-sm">
             <p className="text-[#24292E] text-sm font-semibold mb-1">Clinic affiliation request</p>
             <p className="text-[#676E76] text-[12px] mb-4">
-              <strong>{pharmacy.linkRequest.fromClinicName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
+              <strong>{r.fromClinicName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
             </p>
             <div className="flex items-center gap-3">
-              <button onClick={handleAccept} disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
-                {busy ? "Working..." : "Accept"}
+              <button onClick={() => handleAccept(r.fromClinicId)} disabled={busyId === r.fromClinicId} className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
+                {busyId === r.fromClinicId ? "Working..." : "Accept"}
               </button>
-              <button onClick={handleReject} disabled={busy} className="px-5 py-2.5 rounded-xl border border-[#EBEEF5] text-[#676E76] font-medium text-[13px] hover:bg-[#F5F7FB] transition-all disabled:opacity-60">
+              <button onClick={() => handleReject(r.fromClinicId)} disabled={busyId === r.fromClinicId} className="px-5 py-2.5 rounded-xl border border-[#EBEEF5] text-[#676E76] font-medium text-[13px] hover:bg-[#F5F7FB] transition-all disabled:opacity-60">
                 Reject
               </button>
             </div>
           </div>
-        ) : (
+        ))}
+
+        {affiliations.length === 0 && linkRequests.length === 0 && (
           <p className="text-[#676E76] text-[13px]">
-            No clinic affiliation. Your pharmacy operates independently — a clinic can send you a link invitation
+            No clinic affiliations. Your pharmacy operates independently — a clinic can send you a link invitation
             from their own dashboard using this account's login email.
           </p>
         )}

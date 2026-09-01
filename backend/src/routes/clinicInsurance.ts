@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { clinicsContainer, doctorsContainer } from "../config/cosmos";
-import { resolveClinicScope, scopeToClinicIds, hasPermission } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, hasPermission, mainBranchFrom } from "../utils/clinicScope";
 
 const router = Router();
 
@@ -35,6 +35,19 @@ export async function loadOrgDocForClinicId(clinicId: string): Promise<any | nul
     })
     .fetchAll();
   return resources[0] ?? null;
+}
+
+// Resolves a clinicId (org's own id, or a nested branch id) to its current
+// display name — always looked up live rather than denormalized/stored, so
+// a branch rename is reflected everywhere immediately (used by the
+// clinic-pharmacy affiliation feature, which can list several clinicIds per
+// pharmacy and needs fresh names for each).
+export async function resolveClinicName(clinicId: string): Promise<string | null> {
+  const org = await loadOrgDocForClinicId(clinicId);
+  if (!org) return null;
+  if (org.id === clinicId) return mainBranchFrom(org).name;
+  const branch = (org.branches ?? []).find((b: any) => b.id === clinicId);
+  return branch?.name ?? null;
 }
 
 // ─── GET /api/clinics/insurance-policies/by-doctor/:doctorId ────────────────
