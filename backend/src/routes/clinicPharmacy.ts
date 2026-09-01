@@ -4,43 +4,34 @@ import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { pharmaciesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
-import { resolveClinicScope, mainBranchFrom } from "../utils/clinicScope";
-import { loadOrgDocForClinicId } from "./clinicInsurance";
+import { resolveClinicScope } from "../utils/clinicScope";
+import { resolveClinicName } from "./clinicInsurance";
 import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 
-// A pharmacy is affiliated with one specific clinic scope — either a real
-// branch, or the org's own top-level id acting as its main branch — not the
-// org as a whole. This mirrors exactly how a doctor's own clinicId works
-// (clinicDoctors.ts stamps scope.scopeId on doctorDoc.clinicId), so each
-// branch (including one run directly by a branch/senior-staff account) can
-// have its own distinct affiliated pharmacy. resolveClinicScope already
-// requires a specific ?branchId= from a multi-branch org owner with no
-// branch selected — that's the correct behavior here, not an error case to
-// route around.
+// A branch can only ever have ONE affiliated pharmacy (clinicId -> single
+// pharmacy), but the reverse isn't true — one pharmacy can serve several
+// clinics/branches at once, so pharmacies.clinicIds is an array. Each entry
+// is a specific branch scope (a real branch id, or the org's own id acting
+// as its main branch) — the same id space doctor.clinicId already uses, so
+// no org-level resolution is ever needed to match a doctor to "their"
+// pharmacy.
+//
+// resolveClinicScope already requires a specific ?branchId= from a
+// multi-branch org owner with no branch selected — that's the correct
+// behavior here (each branch's pharmacy is managed separately), not an
+// error case to route around.
 async function requireClinicId(req: SessionRequest, res: Response): Promise<string | null> {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return null;
   return scope.scopeId;
 }
 
-// Branches have no standalone Cosmos document — resolve the org doc that
-// owns this clinicId (whether it's the org's own id or a nested branch id)
-// and pull the display name from the right place, same idiom as
-// mainBranchFrom/branchAsPublicClinic in clinicScope.ts.
-async function resolveClinicName(clinicId: string): Promise<string | null> {
-  const org = await loadOrgDocForClinicId(clinicId);
-  if (!org) return null;
-  if (org.id === clinicId) return mainBranchFrom(org).name;
-  const branch = (org.branches ?? []).find((b: any) => b.id === clinicId);
-  return branch?.name ?? null;
-}
-
 async function findPharmacyByClinicId(clinicId: string) {
   const { resources } = await pharmaciesContainer.items
     .query({
-      query: "SELECT * FROM c WHERE c.clinicId = @clinicId",
+      query: "SELECT * FROM c WHERE ARRAY_CONTAINS(c.clinicIds, @clinicId)",
       parameters: [{ name: "@clinicId", value: clinicId }],
     })
     .fetchAll();
@@ -51,8 +42,8 @@ async function findPharmacyByClinicId(clinicId: string) {
 // Returns the affiliated pharmacy for this specific branch scope if one
 // exists, otherwise any outgoing link-request this branch has sent that's
 // still awaiting the target pharmacy's response (that pending state lives on
-// the target's own doc, under linkRequest.fromClinicId, until they accept —
-// see /link-request below).
+// the target's own doc, in linkRequests[], until they accept — see
+// /link-request below).
 router.get("/me", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const clinicId = await requireClinicId(req, res);
   if (!clinicId) return;
@@ -65,12 +56,17 @@ router.get("/me", requireRole("clinic"), async (req: SessionRequest, res: Respon
 
     const { resources: pendingMatches } = await pharmaciesContainer.items
       .query({
-        query: "SELECT c.pharmacyName, c.email, c.linkRequest FROM c WHERE c.linkRequest.fromClinicId = @clinicId",
+        query: "SELECT c.pharmacyName, c.email, c.linkRequests FROM c WHERE EXISTS(SELECT VALUE r FROM r IN c.linkRequests WHERE r.fromClinicId = @clinicId)",
         parameters: [{ name: "@clinicId", value: clinicId }],
       })
       .fetchAll();
 
-    res.json({ pharmacy: null, pendingLinkRequest: pendingMatches[0] ?? null });
+    const match = pendingMatches[0];
+    const pendingLinkRequest = match
+      ? { pharmacyName: match.pharmacyName, email: match.email, linkRequest: (match.linkRequests ?? []).find((r: any) => r.fromClinicId === clinicId) }
+      : null;
+
+    res.json({ pharmacy: null, pendingLinkRequest });
   } catch (err) {
     console.error("Clinic pharmacy me error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -81,7 +77,7 @@ router.get("/me", requireRole("clinic"), async (req: SessionRequest, res: Respon
 // Creates a brand-new pharmacy account, affiliated with this specific branch
 // scope from creation. Mirrors pharmacy.ts's public POST /register (same
 // SuperTokens signup + pending_approval gate — license/compliance review
-// stays with the platform admin either way) but stamps clinicId/affiliation
+// stays with the platform admin either way) but stamps clinicIds/affiliation
 // up front.
 router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const clinicId = await requireClinicId(req, res);
@@ -126,10 +122,9 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       licenseNumber,
       location:       location || null,
       phone,
-      clinicId,
-      clinicName,
+      clinicIds:      [clinicId],
       affiliation:    "owned" as const,
-      linkRequest:    null,
+      linkRequests:   [],
       registeredAt:   now,
       approvedAt:     null,
       approvedBy:     null,
@@ -157,9 +152,10 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
 });
 
 // ─── POST /api/clinics/pharmacies/link-request ───────────────────────────────
-// Invites an already-existing independent pharmacy to affiliate with this
-// branch scope. The pharmacy must accept via
-// /api/pharmacy/clinic-link-request/accept before the link takes effect.
+// Invites an existing pharmacy — independent, or already serving other
+// clinics — to also affiliate with this branch scope. The pharmacy must
+// accept via /api/pharmacy/clinic-link-requests/accept before the link takes
+// effect.
 router.post("/link-request", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const clinicId = await requireClinicId(req, res);
   if (!clinicId) return;
@@ -190,12 +186,9 @@ router.post("/link-request", requireRole("clinic"), async (req: SessionRequest, 
     }
 
     const pharmacy = matches[0];
-    if (pharmacy.clinicId) {
-      res.status(409).json({ error: "That pharmacy is already affiliated with a clinic." });
-      return;
-    }
-    if (pharmacy.linkRequest) {
-      res.status(409).json({ error: "That pharmacy already has a pending link request." });
+    const linkRequests: any[] = pharmacy.linkRequests ?? [];
+    if (linkRequests.some((r: any) => r.fromClinicId === clinicId)) {
+      res.status(409).json({ error: "A link request to this pharmacy is already pending." });
       return;
     }
 
@@ -203,7 +196,7 @@ router.post("/link-request", requireRole("clinic"), async (req: SessionRequest, 
 
     const updated = {
       ...pharmacy,
-      linkRequest: { fromClinicId: clinicId, fromClinicName: clinicName, requestedAt: new Date().toISOString() },
+      linkRequests: [...linkRequests, { fromClinicId: clinicId, fromClinicName: clinicName, requestedAt: new Date().toISOString() }],
     };
     await pharmaciesContainer.items.upsert(updated);
 
@@ -223,7 +216,7 @@ router.delete("/link-request", requireRole("clinic"), async (req: SessionRequest
   try {
     const { resources: matches } = await pharmaciesContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.linkRequest.fromClinicId = @clinicId",
+        query: "SELECT * FROM c WHERE EXISTS(SELECT VALUE r FROM r IN c.linkRequests WHERE r.fromClinicId = @clinicId)",
         parameters: [{ name: "@clinicId", value: clinicId }],
       })
       .fetchAll();
@@ -233,7 +226,8 @@ router.delete("/link-request", requireRole("clinic"), async (req: SessionRequest
       return;
     }
 
-    const updated = { ...matches[0], linkRequest: null };
+    const pharmacy = matches[0];
+    const updated = { ...pharmacy, linkRequests: (pharmacy.linkRequests ?? []).filter((r: any) => r.fromClinicId !== clinicId) };
     await pharmaciesContainer.items.upsert(updated);
     res.json({ status: "OK" });
   } catch (err) {
@@ -243,9 +237,9 @@ router.delete("/link-request", requireRole("clinic"), async (req: SessionRequest
 });
 
 // ─── DELETE /api/clinics/pharmacies/me ───────────────────────────────────────
-// Unlinks the current pharmacy from this branch. The pharmacy account itself
-// is untouched — it simply becomes independent again (matches its original
-// default state).
+// Unlinks the current pharmacy from this branch only — other clinics that
+// pharmacy also serves are untouched. If this was its last remaining
+// affiliation, it reverts to a fully independent pharmacy.
 router.delete("/me", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const clinicId = await requireClinicId(req, res);
   if (!clinicId) return;
@@ -257,7 +251,12 @@ router.delete("/me", requireRole("clinic"), async (req: SessionRequest, res: Res
       return;
     }
 
-    const updated = { ...pharmacy, clinicId: null, clinicName: null, affiliation: null };
+    const remainingClinicIds = (pharmacy.clinicIds ?? []).filter((id: string) => id !== clinicId);
+    const updated = {
+      ...pharmacy,
+      clinicIds: remainingClinicIds,
+      affiliation: remainingClinicIds.length ? pharmacy.affiliation : null,
+    };
     await pharmaciesContainer.items.upsert(updated);
     res.json({ status: "OK" });
   } catch (err) {

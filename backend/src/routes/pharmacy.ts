@@ -7,6 +7,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
+import { resolveClinicName } from "./clinicInsurance";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -23,16 +24,19 @@ router.get("/catalogue", async (req: Request, res: Response) => {
 
     // A doctor only prescribes from their own clinic branch's affiliated
     // pharmacy — never the whole cross-pharmacy catalogue. Doctor.clinicId
-    // and pharmacy.clinicId share the same id space (both are stamped from
-    // resolveClinicScope's scope.scopeId — a real branch id, or the org's
-    // own id when it's acting as its main branch), so this is a direct
-    // match, no resolving up to the org. If this branch has no approved
-    // pharmacy yet (or clinicId is absent, e.g. an independent doctor), this
-    // falls straight through to the unrestricted query below unchanged.
+    // and each entry in pharmacy.clinicIds share the same id space (both are
+    // stamped from resolveClinicScope's scope.scopeId — a real branch id, or
+    // the org's own id when it's acting as its main branch), so this is a
+    // direct match, no resolving up to the org. A branch can only ever have
+    // one affiliated pharmacy (enforced at link/create time), even though
+    // that pharmacy may also serve other clinics — so this is guaranteed to
+    // resolve to at most one match. If this branch has no approved pharmacy
+    // yet (or clinicId is absent, e.g. an independent doctor), this falls
+    // straight through to the unrestricted query below unchanged.
     if (clinicId) {
       const { resources: clinicPharmacies } = await pharmaciesContainer.items
         .query({
-          query: "SELECT * FROM c WHERE c.clinicId = @clinicId AND c.status = 'approved'",
+          query: "SELECT * FROM c WHERE ARRAY_CONTAINS(c.clinicIds, @clinicId) AND c.status = 'approved'",
           parameters: [{ name: "@clinicId", value: clinicId }],
         })
         .fetchAll();
@@ -260,55 +264,77 @@ router.get("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
   }
 });
 
-// ─── GET /api/pharmacy/clinic-link-request ───────────────────────────────────
-// Returns the pending clinic affiliation invite on this pharmacy's own doc, if any.
-router.get("/clinic-link-request", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+// ─── GET /api/pharmacy/clinic-affiliations ───────────────────────────────────
+// Returns every clinic/branch currently affiliated with this pharmacy (a
+// pharmacy can serve several at once), plus any pending invitations still
+// awaiting accept/reject. Names are resolved live rather than read from a
+// stored field, so a branch rename shows up immediately.
+router.get("/clinic-affiliations", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
     const { resource } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!resource) { res.status(404).json({ error: "Pharmacy not found" }); return; }
-    res.json({ linkRequest: resource.linkRequest ?? null, clinicId: resource.clinicId ?? null });
+
+    const clinicIds: string[] = resource.clinicIds ?? [];
+    const affiliations = await Promise.all(
+      clinicIds.map(async (id) => ({ clinicId: id, clinicName: (await resolveClinicName(id)) ?? "Unknown clinic" }))
+    );
+
+    res.json({ affiliations, linkRequests: resource.linkRequests ?? [] });
   } catch (err) {
-    console.error("Pharmacy clinic-link-request fetch error:", err);
+    console.error("Pharmacy clinic-affiliations fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ─── POST /api/pharmacy/clinic-link-request/accept ───────────────────────────
-router.post("/clinic-link-request/accept", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+// ─── POST /api/pharmacy/clinic-link-requests/accept ──────────────────────────
+// Body: { fromClinicId } — a pharmacy may have several pending invitations
+// at once, so the caller specifies which one to accept.
+router.post("/clinic-link-requests/accept", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
+    const { fromClinicId } = req.body;
+    if (!fromClinicId) { res.status(400).json({ error: "fromClinicId is required." }); return; }
+
     const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found" }); return; }
-    if (!pharmacy.linkRequest) { res.status(400).json({ error: "No pending link request." }); return; }
+
+    const linkRequests: any[] = pharmacy.linkRequests ?? [];
+    if (!linkRequests.some((r) => r.fromClinicId === fromClinicId)) {
+      res.status(400).json({ error: "No matching pending link request." });
+      return;
+    }
 
     const updated = {
       ...pharmacy,
-      clinicId: pharmacy.linkRequest.fromClinicId,
-      clinicName: pharmacy.linkRequest.fromClinicName,
-      affiliation: "linked" as const,
-      linkRequest: null,
+      clinicIds: [...new Set([...(pharmacy.clinicIds ?? []), fromClinicId])],
+      affiliation: pharmacy.affiliation ?? ("linked" as const),
+      linkRequests: linkRequests.filter((r) => r.fromClinicId !== fromClinicId),
     };
     await pharmaciesContainer.items.upsert(updated);
     res.json({ status: "OK", pharmacy: updated });
   } catch (err) {
-    console.error("Pharmacy clinic-link-request accept error:", err);
+    console.error("Pharmacy clinic-link-requests accept error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ─── POST /api/pharmacy/clinic-link-request/reject ───────────────────────────
-router.post("/clinic-link-request/reject", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+// ─── POST /api/pharmacy/clinic-link-requests/reject ──────────────────────────
+// Body: { fromClinicId }
+router.post("/clinic-link-requests/reject", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
+    const { fromClinicId } = req.body;
+    if (!fromClinicId) { res.status(400).json({ error: "fromClinicId is required." }); return; }
+
     const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found" }); return; }
 
-    const updated = { ...pharmacy, linkRequest: null };
+    const updated = { ...pharmacy, linkRequests: (pharmacy.linkRequests ?? []).filter((r: any) => r.fromClinicId !== fromClinicId) };
     await pharmaciesContainer.items.upsert(updated);
     res.json({ status: "OK" });
   } catch (err) {
-    console.error("Pharmacy clinic-link-request reject error:", err);
+    console.error("Pharmacy clinic-link-requests reject error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
