@@ -79,6 +79,13 @@ const AccountsIcon = ({ active }: { active: boolean }) => (
     <path d="M15 19a4 4 0 0 1 6.5-3.1" />
   </svg>
 );
+const PharmacyIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "white" : "#3D4B5A"} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.5 20.5 3.5 13.5a4 4 0 1 1 5.6-5.6l7 7a4 4 0 1 1-5.6 5.6Z" />
+    <path d="m8.5 8.5 7 7" />
+    <path d="M14.5 3.5 20.5 9.5" />
+  </svg>
+);
 const SettingsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3D4B5A" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -127,6 +134,9 @@ const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: Permissio
 ];
 const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
 const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
+// Org-wide resource shared by every branch, not per-branch — same
+// owner-only gating as Branches, so it's only ever appended to adminNav.
+const PHARMACY_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
@@ -178,8 +188,8 @@ export default function ClinicSidebar() {
   const withBranch = (href: string) => (branchId ? `${href}?branchId=${branchId}` : href);
 
   const adminNav = hasBranches
-    ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM]
-    : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
+    ? [...BASE_NAV_ITEMS, ACCOUNTS_NAV_ITEM, BRANCHES_NAV_ITEM, PHARMACY_NAV_ITEM]
+    : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM, PHARMACY_NAV_ITEM];
 
   const NAV_ITEMS = (isBranchUser ? BASE_NAV_ITEMS : adminNav).filter(
     (item) => !item.perm || can(item.perm)

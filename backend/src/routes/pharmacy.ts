@@ -7,6 +7,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
+import { loadOrgDocForClinicId } from "./clinicInsurance";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -16,10 +17,31 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // Supports ?search=, ?category=, ?limit=, ?skip= query params.
 router.get("/catalogue", async (req: Request, res: Response) => {
   try {
-    const { search, category, limit = "50", skip = "0", external } = req.query as Record<string, string>;
+    const { search, category, limit = "50", skip = "0", external, clinicId } = req.query as Record<string, string>;
 
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
+
+    // A doctor belonging to a clinic only prescribes from that clinic's own
+    // affiliated pharmacy — never the whole cross-pharmacy catalogue. If the
+    // clinic has no approved pharmacy yet (or clinicId is absent/unresolvable,
+    // e.g. an independent doctor), this falls straight through to the
+    // unrestricted query below unchanged.
+    if (clinicId) {
+      const org = await loadOrgDocForClinicId(clinicId);
+      if (org) {
+        const { resources: clinicPharmacies } = await pharmaciesContainer.items
+          .query({
+            query: "SELECT * FROM c WHERE c.orgId = @orgId AND c.status = 'approved'",
+            parameters: [{ name: "@orgId", value: org.id }],
+          })
+          .fetchAll();
+        if (clinicPharmacies.length) {
+          query += " AND c.pharmacyId = @clinicPharmacyId";
+          params.push({ name: "@clinicPharmacyId", value: clinicPharmacies[0].id });
+        }
+      }
+    }
 
     if (category) {
       query += " AND c.category = @category";
@@ -235,6 +257,59 @@ router.get("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
     res.json({ pharmacy: resource });
   } catch (err) {
     console.error("Pharmacy me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/pharmacy/clinic-link-request ───────────────────────────────────
+// Returns the pending clinic affiliation invite on this pharmacy's own doc, if any.
+router.get("/clinic-link-request", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resource } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!resource) { res.status(404).json({ error: "Pharmacy not found" }); return; }
+    res.json({ linkRequest: resource.linkRequest ?? null, orgId: resource.orgId ?? null });
+  } catch (err) {
+    console.error("Pharmacy clinic-link-request fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/pharmacy/clinic-link-request/accept ───────────────────────────
+router.post("/clinic-link-request/accept", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found" }); return; }
+    if (!pharmacy.linkRequest) { res.status(400).json({ error: "No pending link request." }); return; }
+
+    const updated = {
+      ...pharmacy,
+      orgId: pharmacy.linkRequest.fromOrgId,
+      orgName: pharmacy.linkRequest.fromOrgName,
+      affiliation: "linked" as const,
+      linkRequest: null,
+    };
+    await pharmaciesContainer.items.upsert(updated);
+    res.json({ status: "OK", pharmacy: updated });
+  } catch (err) {
+    console.error("Pharmacy clinic-link-request accept error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/pharmacy/clinic-link-request/reject ───────────────────────────
+router.post("/clinic-link-request/reject", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { resource: pharmacy } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
+    if (!pharmacy) { res.status(404).json({ error: "Pharmacy not found" }); return; }
+
+    const updated = { ...pharmacy, linkRequest: null };
+    await pharmaciesContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Pharmacy clinic-link-request reject error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

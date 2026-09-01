@@ -46,6 +46,12 @@ const CheckIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
   </svg>
 );
+const ClinicLinkIcon = () => (
+  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 20.5 3.5 13.5a4 4 0 1 1 5.6-5.6l7 7a4 4 0 1 1-5.6 5.6Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="m8.5 8.5 7 7M14.5 3.5 20.5 9.5" />
+  </svg>
+);
 
 const inputCls = "w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all";
 const labelCls = "block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5";
@@ -53,6 +59,7 @@ const labelCls = "block text-xs font-semibold text-[#676E76] uppercase tracking-
 const TABS = [
   { id: "general", label: "General Info", icon: UserIcon },
   { id: "hours", label: "Operating Hours", icon: ClockIcon },
+  { id: "clinic", label: "Clinic Affiliation", icon: ClinicLinkIcon },
   { id: "payout", label: "Payout Details", icon: CreditCardIcon },
   { id: "notifications", label: "Notifications", icon: BellIcon },
   { id: "security", label: "Security", icon: ShieldIcon },
@@ -96,6 +103,7 @@ export default function SettingsPage() {
         <div className="flex-1 min-w-0 md:px-4">
           {activeTab === "general" && <GeneralSettings />}
           {activeTab === "hours" && <OperatingHoursSettings />}
+          {activeTab === "clinic" && <ClinicAffiliationSettings />}
           {activeTab === "payout" && <PayoutSettings />}
           {activeTab === "notifications" && <NotificationSettings />}
           {activeTab === "security" && <SecuritySettings />}
@@ -373,6 +381,109 @@ function OperatingHoursSettings() {
             {saving ? 'Saving...' : 'Save Hours'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ClinicAffiliationSettings() {
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [pharmacy, setPharmacy] = useState<any | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    pharmacyFetch("/api/pharmacy/me")
+      .then((r) => r.json())
+      .then((data) => setPharmacy(data.pharmacy ?? null))
+      .catch(() => setPharmacy(null))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleAccept = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await pharmacyFetch("/api/pharmacy/clinic-link-request/accept", { method: "POST" });
+      if (!res.ok) throw new Error();
+      setMessage({ type: 'success', text: 'Clinic affiliation accepted.' });
+      load();
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to accept the request. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await pharmacyFetch("/api/pharmacy/clinic-link-request/reject", { method: "POST" });
+      if (!res.ok) throw new Error();
+      load();
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to reject the request. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-in fade-in duration-300 flex items-center justify-center h-48">
+        <div className="w-8 h-8 border-4 border-[#5476FC]/30 border-t-[#5476FC] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-in fade-in duration-300">
+      <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Clinic Affiliation</h2>
+
+      {message && (
+        <div className={`p-4 rounded-xl mb-6 text-[13px] font-medium flex items-center gap-3 ${message.type === 'success' ? 'bg-[#E2F8EB] text-[#179353] border border-[#179353]/20' : 'bg-[#FEE2E2] text-[#F25252] border border-[#FCA5A5]'}`}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="max-w-2xl">
+        {pharmacy?.orgId ? (
+          <div className="p-5 rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#5476FC] flex items-center justify-center shrink-0">
+              <ClinicLinkIcon />
+            </div>
+            <div>
+              <p className="text-[#24292E] text-sm font-semibold">Affiliated with {pharmacy.orgName ?? "a clinic"}</p>
+              <p className="text-[#676E76] text-[12px] mt-0.5">
+                {pharmacy.affiliation === "owned" ? "This pharmacy was created by the clinic." : "This pharmacy accepted a link invitation from the clinic."} Their doctors prescribe only from your own stock, and orders route here automatically.
+              </p>
+            </div>
+          </div>
+        ) : pharmacy?.linkRequest ? (
+          <div className="p-5 rounded-xl border border-[#EBEEF5] bg-white shadow-sm">
+            <p className="text-[#24292E] text-sm font-semibold mb-1">Clinic affiliation request</p>
+            <p className="text-[#676E76] text-[12px] mb-4">
+              <strong>{pharmacy.linkRequest.fromOrgName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
+            </p>
+            <div className="flex items-center gap-3">
+              <button onClick={handleAccept} disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
+                {busy ? "Working..." : "Accept"}
+              </button>
+              <button onClick={handleReject} disabled={busy} className="px-5 py-2.5 rounded-xl border border-[#EBEEF5] text-[#676E76] font-medium text-[13px] hover:bg-[#F5F7FB] transition-all disabled:opacity-60">
+                Reject
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[#676E76] text-[13px]">
+            No clinic affiliation. Your pharmacy operates independently — a clinic can send you a link invitation
+            from their own dashboard using this account's login email.
+          </p>
+        )}
       </div>
     </div>
   );

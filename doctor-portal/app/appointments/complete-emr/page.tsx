@@ -29,6 +29,7 @@ function CompleteEmrForm() {
   const [labs, setLabs] = useState<LabRecommendation[]>([]);
   const [patientProfile, setPatientProfile] = useState<any | null>(null);
   const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved, setEmrSaved] = useState(false);
@@ -46,6 +47,21 @@ function CompleteEmrForm() {
 
   useEffect(() => {
     Session.getUserId().then((id) => setCurrentDoctorId(id ?? null)).catch(() => {});
+  }, []);
+
+  // Used to scope the medicine catalogue search to this doctor's own clinic
+  // pharmacy (falls back to the full cross-pharmacy catalogue if the doctor
+  // has no clinicId, or their clinic has no affiliated pharmacy).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/doctors/me`);
+        if (res.ok) {
+          const { doctor } = await res.json();
+          setClinicId(doctor?.clinicId ?? null);
+        }
+      } catch { /* ignore — falls back to the unscoped catalogue */ }
+    })();
   }, []);
 
   useEffect(() => {
@@ -187,7 +203,7 @@ function CompleteEmrForm() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} />
+                <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />
                 <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
               </div>
             </div>

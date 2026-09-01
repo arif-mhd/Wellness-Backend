@@ -3,6 +3,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import { AccessToken, RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
 import { randomBytes } from "crypto";
+import { v4 as uuidv4 } from "uuid";
 import {
   appointmentsContainer,
   patientsContainer,
@@ -10,6 +11,7 @@ import {
   queryDocuments,
   notificationsContainer,
   dietPlansContainer,
+  medicineOrdersContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { logActivity } from "../utils/activityLogger";
@@ -24,6 +26,7 @@ import { devFallbackOrThrow } from "../utils/env";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
+import { validateOrderItems, decrementStockForItems, OrderItemInput } from "../utils/pharmacyOrders";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -1609,6 +1612,105 @@ router.get("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: R
     });
   } catch (err) {
     console.error("Fetch EMR error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/appointments/:id/order-medicines ─────────────────────────────
+// Patient turns the doctor's prescribed EMR medicines into a real pharmacy
+// order — the missing link between the consult and the existing medicineOrders
+// pipeline (medicineOrders.ts's POST /orders), which until now only the
+// unrelated "buy medicines" shop cart could reach.
+//
+// Only EMR medicine entries selected by the patient AND carrying a productId
+// (i.e. actually matched to a pharmacy's stock at prescribing time) are
+// orderable — a doctor's freehand/custom-typed entry has no inventory to bill
+// against and is silently skipped here.
+router.post("/:id/order-medicines", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id } = req.params;
+  const { medicineIds, delivery_address, notes } = req.body as {
+    medicineIds?: string[];
+    delivery_address?: string;
+    notes?: string;
+  };
+
+  if (!medicineIds?.length || !delivery_address) {
+    res.status(400).json({ error: "medicineIds and delivery_address are required" });
+    return;
+  }
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read().catch(() => ({ resource: undefined as any }));
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+    if (!apt.emr) { res.status(400).json({ error: "No prescription found for this appointment." }); return; }
+
+    const emrMedicines: any[] = apt.emr.medicines ?? [];
+    const selected = emrMedicines.filter((m) => medicineIds.includes(m.id) && m.productId);
+
+    if (!selected.length) {
+      res.status(400).json({ error: "None of the selected medicines are available for pharmacy ordering." });
+      return;
+    }
+
+    const items: OrderItemInput[] = selected.map((m) => ({ medicine_id: m.productId, quantity: 1 }));
+    const validation = await validateOrderItems(items);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { items: validatedItems, total_amount } = validation;
+
+    // Trace the order back to the prescribing doctor's clinic, if any —
+    // independent doctors simply leave this null.
+    let clinicOrgId: string | null = null;
+    if (apt.doctorId) {
+      const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().catch(() => ({ resource: undefined as any }));
+      if (doctor?.clinicId) {
+        const org = await loadOrgDocForClinicId(doctor.clinicId);
+        clinicOrgId = org?.id ?? null;
+      }
+    }
+
+    const now = new Date().toISOString();
+    const order = {
+      id:               uuidv4(),
+      patientId,
+      patient_id:       patientId,
+      profileId:        patientId,
+      items:            validatedItems,
+      delivery_address,
+      prescription_id:  null,
+      notes:            notes ?? null,
+      status:           "confirmed",
+      total_amount,
+      payment_status:   "paid",   // payment is mocked
+      payment_method:   "mock",
+      source:           "consultation" as const,
+      appointmentId:    id,
+      clinicOrgId,
+      createdAt:        now,
+      updatedAt:        now,
+    };
+
+    await medicineOrdersContainer.items.upsert(order);
+    await decrementStockForItems(validatedItems);
+
+    const itemNames = validatedItems.map((i) => i.name).join(", ");
+    logActivity({
+      source: "patient",
+      action: "Medicine Order Placed",
+      details: `Order AED ${total_amount.toFixed(2)} from consultation — ${itemNames}`,
+      performedBy: "Patient",
+      performedById: patientId,
+      entityType: "medicineOrder",
+      entityId: order.id,
+    });
+
+    res.status(201).json({ status: "OK", order });
+  } catch (err) {
+    console.error("Order medicines from EMR error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
