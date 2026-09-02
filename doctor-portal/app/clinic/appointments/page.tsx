@@ -133,6 +133,15 @@ function ClinicAppointmentsContent() {
   const { can } = useClinicPermissions();
   const canManage = can("manage_appointments");
 
+  // Call recording + transcript — fetched fresh per selected appointment
+  // (the SAS URL is short-lived, so caching it across selections would just
+  // go stale) and only for completed appointments, since that's the only
+  // time a recording could exist.
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState<{ speaker: string; text: string; startedAt: string; endedAt: string }[]>([]);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+
   useEffect(() => {
     apiFetch("/api/clinics/branches")
       .then((r) => r.json())
@@ -205,6 +214,22 @@ function ClinicAppointmentsContent() {
   useEffect(() => { setCurrentPage(1); }, [activeTab, activeMode, timeFilter, searchQuery]);
 
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? filtered[0] ?? null;
+
+  useEffect(() => {
+    setRecordingUrl(null);
+    setTranscript([]);
+    setShowTranscript(false);
+    if (!selectedAppt || selectedAppt.status !== "completed") return;
+    setRecordingLoading(true);
+    apiFetch(`/api/clinics/appointments/${selectedAppt.id}/recording`)
+      .then((r) => r.json())
+      .then((data) => {
+        setRecordingUrl(data.recordingUrl ?? null);
+        setTranscript(Array.isArray(data.transcript) ? data.transcript : []);
+      })
+      .catch(() => { setRecordingUrl(null); setTranscript([]); })
+      .finally(() => setRecordingLoading(false));
+  }, [selectedAppt?.id, selectedAppt?.status]);
 
   useEffect(() => {
     if (!selectedId && filtered.length > 0) setSelectedId(filtered[0].id);
@@ -607,6 +632,45 @@ function ClinicAppointmentsContent() {
                   )}
                 </p>
               </div>
+
+              {/* Call recording + transcript — only ever present for a
+                  completed video consultation; audio only, no video, per the
+                  recording feature's scope. */}
+              {selectedAppt.status === "completed" && (
+                <>
+                  <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
+                  <div className="flex flex-col gap-2 xl:mt-0 mt-2">
+                    <span className="text-[#24292E] text-[12px] font-semibold">Call Recording</span>
+                    {recordingLoading ? (
+                      <p className="text-[#9EA5AD] text-[11px]">Loading...</p>
+                    ) : recordingUrl ? (
+                      <audio controls src={recordingUrl} className="w-full h-9" style={{ maxWidth: "100%" }} />
+                    ) : (
+                      <p className="text-[#9EA5AD] text-[11px]">No recording available.</p>
+                    )}
+                    {transcript.length > 0 && (
+                      <>
+                        <span
+                          onClick={() => setShowTranscript((v) => !v)}
+                          className="text-[#5476FC] underline cursor-pointer font-medium text-[11px] hover:text-[#3B59DF] transition-colors"
+                        >
+                          {showTranscript ? "Hide Transcript" : "View Transcript"}
+                        </span>
+                        {showTranscript && (
+                          <div className="max-h-52 overflow-y-auto flex flex-col gap-1.5 bg-[#F9FAFB] rounded-lg p-2.5 border border-[#EBEEF5]">
+                            {transcript.map((line, i) => (
+                              <p key={i} className="text-[11px] leading-snug">
+                                <span className="font-semibold text-[#24292E]">{line.speaker}: </span>
+                                <span className="text-[#676E76]">{line.text}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
 
               {actionError && <p className="text-[11px] text-red-600">{actionError}</p>}
 

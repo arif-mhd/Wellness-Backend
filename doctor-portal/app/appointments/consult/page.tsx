@@ -77,6 +77,14 @@ function ConsultRoom() {
   const appointmentId = searchParams.get("appointmentId") ?? "";
   const patientName = searchParams.get("patientName") ?? "Patient";
 
+  // Mandatory pre-call recording notice — the call this audio is drawn from
+  // is recorded (audio only), so the room connection below is deliberately
+  // gated on this succeeding rather than being a dismissible banner.
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentSubmitting, setConsentSubmitting] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+
   const [connected, setConnected] = useState(false);
   const [ended, setEnded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -213,9 +221,10 @@ function ConsultRoom() {
     })();
   }, []);
 
-  // LiveKit connect
+  // LiveKit connect — gated on the recording-consent acknowledgment below,
+  // never connects before it succeeds.
   useEffect(() => {
-    if (roomRef.current) return;
+    if (roomRef.current || !consentGiven) return;
 
     const room = new Room();
     roomRef.current = room;
@@ -308,11 +317,24 @@ function ConsultRoom() {
       if (cancelled) return;
       const finalSegments = segments.filter(s => s.final && s.text.trim());
       if (finalSegments.length === 0) return;
-      const speaker = participant?.identity === room.localParticipant.identity ? "You" : patientName;
-      setCaptions(prev => [
-        ...prev.slice(-9),
-        ...finalSegments.map(s => ({ id: s.id, speaker, text: s.text })),
-      ]);
+      // transcript-agent publishes each utterance in up to two phases: the
+      // original alone first, then (for the other side of the doctor<->
+      // patient pair, once translation resolves) a second event carrying
+      // both the same original segment id and a translated one appended.
+      // Same id → update the existing caption in place rather than adding
+      // a duplicate line.
+      const isOwn = participant?.identity === room.localParticipant.identity;
+      const original = finalSegments[0];
+      const translated = finalSegments[1];
+      const speaker = isOwn ? "You" : patientName;
+      const text = !isOwn && translated ? `${translated.text} (${original.text})` : original.text;
+      setCaptions(prev => {
+        const idx = prev.findIndex(c => c.id === original.id);
+        if (idx === -1) return [...prev.slice(-9), { id: original.id, speaker, text }];
+        const next = [...prev];
+        next[idx] = { id: original.id, speaker, text };
+        return next;
+      });
     });
 
     async function init() {
@@ -397,7 +419,22 @@ function ConsultRoom() {
       }
       roomRef.current = null;
     };
-  }, [appointmentId]);
+  }, [appointmentId, consentGiven]);
+
+  const handleAgreeToRecording = useCallback(async () => {
+    if (!consentChecked || !appointmentId) return;
+    setConsentSubmitting(true);
+    setConsentError(null);
+    try {
+      const res = await apiFetch(`/api/appointments/${appointmentId}/recording-consent`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Failed to record your acknowledgment. Please try again.");
+      setConsentGiven(true);
+    } catch (err: any) {
+      setConsentError(err.message ?? "Failed to record your acknowledgment. Please try again.");
+    } finally {
+      setConsentSubmitting(false);
+    }
+  }, [consentChecked, appointmentId]);
 
   // Re-attach remote video when a new tile's DOM element mounts
   const setRemoteVideoRef = useCallback((participantId: string, el: HTMLVideoElement | null) => {
@@ -727,6 +764,38 @@ function ConsultRoom() {
     const t = setTimeout(() => router.push("/appointments"), 2000);
     return () => clearTimeout(t);
   }, [ended, router]);
+
+  if (!consentGiven) return (
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-96px)] bg-[#f7f9fc] px-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-[#e4e8f0] w-full max-w-[440px] p-7 flex flex-col gap-4">
+        <div className="w-12 h-12 rounded-full bg-[#5476FC]/10 flex items-center justify-center text-2xl">🎙️</div>
+        <h2 className="text-[#24292e] text-lg font-semibold">This call will be recorded</h2>
+        <p className="text-[#676e76] text-sm leading-relaxed">
+          Audio only — no video — is recorded for this consultation. The recording is kept for a limited period
+          and may be used to verify what was discussed if a dispute or issue is raised after the call.
+        </p>
+        {consentError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center">{consentError}</div>
+        )}
+        <label className="flex items-start gap-2.5 text-sm text-[#24292e] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={consentChecked}
+            onChange={(e) => setConsentChecked(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-[#5476FC]"
+          />
+          I understand and agree that this call's audio will be recorded.
+        </label>
+        <button
+          onClick={handleAgreeToRecording}
+          disabled={!consentChecked || consentSubmitting}
+          className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-sm font-medium py-3 rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {consentSubmitting ? "Please wait..." : "Continue to Call"}
+        </button>
+      </div>
+    </div>
+  );
 
   if (ended) return (
     <div className="flex flex-col items-center justify-center h-[calc(100vh-96px)] gap-4 bg-[#f7f9fc]">

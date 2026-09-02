@@ -212,6 +212,31 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
 
   const selectedVisit = visitHistory.find((v) => v.appointmentId === selectedVisitId) ?? null;
 
+  // Call recording + transcript — fetched fresh per selected visit (the SAS
+  // URL is short-lived, so caching it across selections would just go
+  // stale) and only for completed visits, since that's the only time a
+  // recording could exist.
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState<{ speaker: string; text: string; startedAt: string; endedAt: string }[]>([]);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+
+  useEffect(() => {
+    setRecordingUrl(null);
+    setTranscript([]);
+    setShowTranscript(false);
+    if (!selectedVisit || selectedVisit.status !== "completed") return;
+    setRecordingLoading(true);
+    adminFetch(`/api/admin/appointments/${selectedVisit.appointmentId}/recording`)
+      .then((r) => r.json())
+      .then((data) => {
+        setRecordingUrl(data.recordingUrl ?? null);
+        setTranscript(Array.isArray(data.transcript) ? data.transcript : []);
+      })
+      .catch(() => { setRecordingUrl(null); setTranscript([]); })
+      .finally(() => setRecordingLoading(false));
+  }, [selectedVisit?.appointmentId, selectedVisit?.status]);
+
   const isDeactivated = patient?.status === "deactivated";
 
   async function handleToggleStatus() {
@@ -452,6 +477,48 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
               {/* Details */}
               <div className="xl:col-span-8 bg-transparent">
                 <h3 className="text-[16px] font-medium text-slate-800 mb-6 px-1">Consultation Details</h3>
+
+                {/* Call recording + transcript — only ever present for a
+                    completed video consultation; audio only, no video, per
+                    the recording feature's scope. Shown regardless of
+                    whether EMR notes exist for this visit. */}
+                {selectedVisit && selectedVisit.status === "completed" && (
+                  <div className="bg-white border border-slate-100 rounded-[1.5rem] p-6 shadow-sm mb-6 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-[13px]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+                      <span>Call Recording</span>
+                    </div>
+                    <div className="pl-5 flex flex-col gap-2">
+                      {recordingLoading ? (
+                        <p className="text-[12px] font-medium text-slate-400">Loading...</p>
+                      ) : recordingUrl ? (
+                        <audio controls src={recordingUrl} className="w-full h-9" style={{ maxWidth: "420px" }} />
+                      ) : (
+                        <p className="text-[12px] font-medium text-slate-400">No recording available.</p>
+                      )}
+                      {transcript.length > 0 && (
+                        <>
+                          <span
+                            onClick={() => setShowTranscript((v) => !v)}
+                            className="text-[#5476FC] underline cursor-pointer font-medium text-[12px] hover:text-[#3B59DF] transition-colors w-fit"
+                          >
+                            {showTranscript ? "Hide Transcript" : "View Transcript"}
+                          </span>
+                          {showTranscript && (
+                            <div className="max-h-56 overflow-y-auto flex flex-col gap-1.5 bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              {transcript.map((line, i) => (
+                                <p key={i} className="text-[12px] leading-snug">
+                                  <span className="font-semibold text-slate-800">{line.speaker}: </span>
+                                  <span className="text-slate-500">{line.text}</span>
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {!selectedVisit ? (
                   <div className="bg-white border border-slate-100 rounded-[1.5rem] p-7 shadow-sm">
