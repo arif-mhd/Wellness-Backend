@@ -520,6 +520,35 @@ router.put("/emergency-contacts", requireRole("patient"), async (req: SessionReq
   }
 });
 
+// ── PUT /api/patients/addresses ───────────────────────────────────────────────
+// Body: { addresses: { id, label, addressLine1, addressLine2?, city, emirate?, isDefault }[] }
+// Whole-list replace, same convention as /emergency-contacts and /insurance.
+// The first address is normally created during onboarding; additional ones
+// (and edits/deletes) are managed from the profile's own Addresses screen.
+router.put("/addresses", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  try {
+    const userId = req.session!.getUserId();
+    const { addresses } = req.body;
+
+    let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
+    try {
+      const { resource } = await patientsContainer.item(userId, userId).read();
+      if (resource) existing = resource;
+    } catch { /* ignore */ }
+
+    await patientsContainer.items.upsert({
+      ...existing,
+      addresses: Array.isArray(addresses) ? addresses : [],
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Addresses update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── POST /api/patients/family/:memberId/avatar ───────────────────────────────
 // Uploads a family member's avatar to blob storage and stores the URL on the member object.
 router.post(
