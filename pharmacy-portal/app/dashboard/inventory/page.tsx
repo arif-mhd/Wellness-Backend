@@ -17,13 +17,12 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
 
 interface Product {
   id: string; name: string; description?: string; category: string;
-  price: number; stock: number; imageUrl?: string;
+  price: number; inStock: boolean; imageUrl?: string;
   status: "pending_approval" | "approved" | "rejected";
   createdAt: string; rejectedReason?: string;
   requiresPrescription?: boolean;
   batchNumber?: string;
   expiryDate?: string;
-  reorderLevel?: number;
   manufacturer?: string;
   strength?: string;
   flagged?: boolean;
@@ -56,6 +55,8 @@ export default function InventoryPage() {
   // Seeded from ?search= so the header search bar can deep-link here.
   const [search, setSearch]         = useState(() => searchParams.get("search") ?? "");
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const res = await apiFetch("/api/pharmacy/products");
@@ -64,6 +65,23 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleToggleStock(product: Product) {
+    setTogglingId(product.id);
+    const nextInStock = !product.inStock;
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, inStock: nextInStock } : p));
+    try {
+      const form = new FormData();
+      form.append("inStock", String(nextInStock));
+      const res = await apiFetch(`/api/pharmacy/products/${product.id}`, { method: "PUT", body: form });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Revert on failure
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, inStock: product.inStock } : p));
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   const filtered = products.filter(p => {
     const matchStatus = filter === "all" || (filter === "flagged" && p.flagged);
@@ -172,10 +190,22 @@ export default function InventoryPage() {
                 <p className="font-medium text-[#24292E] truncate text-sm" title={product.name}>{product.name}</p>
                 <p className="text-[11px] text-[#676E76] mt-0.5 uppercase tracking-wider">{product.category}</p>
 
-                <div className="flex items-center justify-between mt-3 mb-1">
+                <div className="mt-3 mb-1">
                   <span className="text-lg font-semibold text-[#5476FC]">AED {product.price.toFixed(2)}</span>
-                  <span className="text-xs text-[#676E76]">Stock: <span className="font-medium text-[#383F45]">{product.stock}</span></span>
                 </div>
+
+                <button
+                  onClick={() => handleToggleStock(product)}
+                  disabled={togglingId === product.id}
+                  className="flex items-center justify-between gap-2 py-1.5 disabled:opacity-60"
+                >
+                  <span className={`text-xs font-medium ${product.inStock ? "text-green-700" : "text-gray-500"}`}>
+                    {product.inStock ? "In Stock" : "Out of Stock"}
+                  </span>
+                  <span className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${product.inStock ? "bg-[#5476FC]" : "bg-[#D1D5DB]"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${product.inStock ? "translate-x-4" : ""}`} />
+                  </span>
+                </button>
 
                 {product.status === "rejected" && product.rejectedReason && (
                   <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5 text-[11px] text-red-600 line-clamp-2">

@@ -3,6 +3,7 @@ import { WebhookReceiver } from "livekit-server-sdk";
 import { EgressStatus } from "@livekit/protocol";
 import { appointmentsContainer } from "../config/cosmos";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
+import { updateAppointmentWithRetry } from "../utils/appointmentWrite";
 
 const router = Router();
 const receiver = new WebhookReceiver(livekitApiKey, livekitApiSecret);
@@ -29,14 +30,18 @@ router.post("/webhook", async (req: Request, res: Response) => {
         // The room name IS the appointment id — see transcript-agent's own
         // comment on the same convention.
         const appointmentId = roomName;
-        const { resource: apt } = await appointmentsContainer.item(appointmentId, appointmentId).read().catch(() => ({ resource: undefined as any }));
-        if (apt) {
-          await appointmentsContainer.items.upsert({
-            ...apt,
-            recordingBlobPath: fileResults[0].filename,
-            recordingSavedAt: new Date().toISOString(),
-          });
-        } else {
+        // ETag-protected — this fires asynchronously a few seconds after
+        // call end, squarely inside the same window a doctor's forced
+        // end-of-call EMR save (POST /:id/emr) tends to land in. A blind
+        // upsert here raced that write and could silently lose whichever
+        // one committed second, which is exactly how a completed
+        // recording's recordingBlobPath used to disappear.
+        const updated = await updateAppointmentWithRetry(appointmentId, (apt) => ({
+          ...apt,
+          recordingBlobPath: fileResults[0].filename,
+          recordingSavedAt: new Date().toISOString(),
+        }));
+        if (!updated) {
           console.error(`[livekit-webhook] Egress completed for unknown appointment ${appointmentId}`);
         }
       }

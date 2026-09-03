@@ -19,11 +19,16 @@ export type ValidateItemsResult =
   | { ok: true; items: ValidatedOrderItem[]; total_amount: number }
   | { ok: false; error: string };
 
-// Validates each requested item against live approved stock and computes the
-// order total. Shared by the direct patient-initiated shop flow
+// Validates each requested item against live approved availability and
+// computes the order total. Shared by the direct patient-initiated shop flow
 // (POST /api/pharmacy/orders in medicineOrders.ts) and the EMR-driven
 // consultation flow (POST /api/appointments/:id/order-medicines) so both
-// enforce identical stock/price rules from one place.
+// enforce identical availability/price rules from one place.
+//
+// Pharmacies flag availability with a plain in-stock/out-of-stock toggle
+// (inStock) rather than tracking exact counts, so there's no quantity-vs-
+// stock comparison here — an order is only ever rejected for being
+// completely out of stock, never for "not enough left."
 export async function validateOrderItems(items: OrderItemInput[]): Promise<ValidateItemsResult> {
   let total_amount = 0;
   const validatedItems: ValidatedOrderItem[] = [];
@@ -39,8 +44,8 @@ export async function validateOrderItems(items: OrderItemInput[]): Promise<Valid
     }
 
     const product = resources[0];
-    if (product.stock < item.quantity) {
-      return { ok: false, error: `Insufficient stock for ${product.name}` };
+    if (product.inStock === false) {
+      return { ok: false, error: `${product.name} is currently out of stock` };
     }
 
     validatedItems.push({
@@ -58,34 +63,25 @@ export async function validateOrderItems(items: OrderItemInput[]): Promise<Valid
   return { ok: true, items: validatedItems, total_amount };
 }
 
-// Decrements stock (and, where present, the parallel numberOfTablets field)
-// for each item in a just-created order. Best-effort per item — a failure on
-// one item is logged and skipped rather than failing the whole order, since
-// the order itself is already persisted by the time this runs.
-export async function decrementStockForItems(items: ValidatedOrderItem[]): Promise<void> {
-  for (const item of items) {
-    try {
-      const { resource: prod } = await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).read();
-      if (prod) {
-        const newStock = Math.max(0, (prod.stock ?? 0) - item.quantity);
-        let newNumberOfTablets = prod.numberOfTablets;
+// Converts a prescribed total unit count (e.g. "10 tablets" — frequency x
+// duration, from the doctor's EMR entry) into how many of the pharmacy's own
+// pack-sized SKUs to order. numberOfTablets is a per-pack descriptor set by
+// the pharmacy at listing time ("15 Tablets" per strip), not a running
+// count, and stock/order quantity are both tracked in that same pack unit —
+// so a doctor's per-tablet regimen has to be divided up into whole packs
+// here rather than assuming 1 pack covers it. Falls back to 1 pack when the
+// product has no parseable pack size (syrups, creams, etc.) or the doctor
+// didn't specify a total (custom/legacy entries).
+export async function resolvePackQuantity(productId: string, totalUnits: number | undefined): Promise<number> {
+  if (!totalUnits || totalUnits <= 0) return 1;
 
-        if (newNumberOfTablets) {
-          const num = parseInt(newNumberOfTablets.toString(), 10);
-          if (!isNaN(num)) {
-            newNumberOfTablets = Math.max(0, num - item.quantity).toString();
-          }
-        }
+  const { resources } = await pharmacyProductsContainer.items.query({
+    query: "SELECT c.numberOfTablets FROM c WHERE c.id = @id",
+    parameters: [{ name: "@id", value: productId }],
+  }).fetchAll();
 
-        await pharmacyProductsContainer.item(item.medicine_id, item.pharmacyId).replace({
-          ...prod,
-          stock: newStock,
-          numberOfTablets: newNumberOfTablets,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    } catch (stockErr) {
-      console.warn(`Stock decrement failed for ${item.medicine_id}:`, stockErr);
-    }
-  }
+  const packSize = resources[0]?.numberOfTablets ? parseInt(String(resources[0].numberOfTablets), 10) : NaN;
+  if (!packSize || isNaN(packSize) || packSize <= 0) return 1;
+
+  return Math.max(1, Math.ceil(totalUnits / packSize));
 }

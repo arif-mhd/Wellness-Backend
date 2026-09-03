@@ -70,9 +70,9 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
     const adminId = req.session!.getUserId();
     const { pharmacyId } = req.params;
     const {
-      name, description, category, price, stock,
+      name, description, category, price, inStock,
       requiresPrescription, batchNumber, expiryDate,
-      reorderLevel, manufacturer, strength,
+      manufacturer, strength,
     } = req.body;
 
     if (!name || !category || !price) {
@@ -103,11 +103,10 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
       description:         description || null,
       category,
       price:               parseFloat(price),
-      stock:               parseInt(stock ?? "0", 10),
+      inStock:             inStock === "false" || inStock === false ? false : true,
       requiresPrescription: requiresPrescription === true || requiresPrescription === "true",
       batchNumber:         batchNumber || null,
       expiryDate:          expiryDate || null,
-      reorderLevel:        reorderLevel ? parseInt(reorderLevel, 10) : null,
       manufacturer:        manufacturer || null,
       strength:            strength || null,
       imageUrl:            null,
@@ -414,7 +413,8 @@ router.get("/:pharmacyId/products", async (req: SessionRequest, res: Response) =
       query: "SELECT * FROM c WHERE c.pharmacyId = @pharmacyId ORDER BY c.createdAt DESC",
       parameters: [{ name: "@pharmacyId", value: pharmacyId }],
     }).fetchAll();
-    res.json({ products: resources });
+    const products = resources.map((p: any) => ({ ...p, inStock: p.inStock !== false }));
+    res.json({ products });
   } catch (err) {
     console.error("Admin pharmacy products error:", err);
     res.status(500).json({ error: "Internal server error" });

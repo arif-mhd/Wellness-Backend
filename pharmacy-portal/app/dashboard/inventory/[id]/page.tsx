@@ -22,7 +22,7 @@ interface Product {
   description?: string;
   category: string;
   price: number;
-  stock: number;
+  inStock: boolean;
   imageUrl?: string;
   status: "pending_approval" | "approved" | "rejected";
   createdAt: string;
@@ -32,7 +32,6 @@ interface Product {
   requiresPrescription?: boolean;
   batchNumber?: string;
   expiryDate?: string;
-  reorderLevel?: number;
   manufacturer?: string;
   strength?: string;
   numberOfTablets?: string;
@@ -98,6 +97,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetch();
   }, [id]);
 
+  async function handleToggleStock() {
+    if (!product) return;
+    const nextInStock = !product.inStock;
+    setProduct(prev => prev ? { ...prev, inStock: nextInStock } : prev);
+    try {
+      const form = new FormData();
+      form.append("inStock", String(nextInStock));
+      const res = await apiFetch(`/api/pharmacy/products/${product.id}`, { method: "PUT", body: form });
+      if (!res.ok) throw new Error();
+    } catch {
+      setProduct(prev => prev ? { ...prev, inStock: !nextInStock } : prev);
+    }
+  }
+
   async function handleDelete() {
     if (!product) return;
     if (!confirm("Delete this product?")) return;
@@ -136,11 +149,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       form.append("description", editing.description ?? "");
       form.append("category", editing.category);
       form.append("price", String(editing.price));
-      form.append("stock", String(editing.stock));
+      form.append("inStock", String(editing.inStock));
       form.append("requiresPrescription", String(editing.requiresPrescription ?? false));
       form.append("batchNumber", editing.batchNumber ?? "");
       form.append("expiryDate", editing.expiryDate ?? "");
-      form.append("reorderLevel", editing.reorderLevel != null ? String(editing.reorderLevel) : "");
       form.append("manufacturer", editing.manufacturer ?? "");
       form.append("strength", editing.strength ?? "");
       form.append("numberOfTablets", editing.numberOfTablets ?? "");
@@ -179,7 +191,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   );
 
   const statusCfg = STATUS_CONFIG[product.status];
-  const isLowStock = product.stock < (product.reorderLevel ?? 50);
   const categoryEmoji =
     product.category === "OTC" ? "💊" :
     product.category === "Prescription" ? "📋" :
@@ -264,17 +275,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <span className="text-[22px] font-semibold text-[#5476FC] tracking-[-0.44px]">AED {product.price.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">In Stock</span>
-              <span className={`text-[15px] font-medium ${isLowStock ? "text-[#F25252]" : "text-[#24292E]"}`}>
-                {product.stock} units {isLowStock && <span className="text-[10px] bg-[#FEE2E2] text-[#F25252] px-2 py-0.5 rounded-full ml-1.5 font-bold">Low</span>}
-              </span>
+              <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">Availability</span>
+              <button onClick={handleToggleStock} className="flex items-center gap-2.5">
+                <span className={`text-[13px] font-medium ${product.inStock ? "text-green-700" : "text-gray-500"}`}>
+                  {product.inStock ? "In Stock" : "Out of Stock"}
+                </span>
+                <span className={`relative w-10 h-6 rounded-full shrink-0 transition-colors ${product.inStock ? "bg-[#5476FC]" : "bg-[#D1D5DB]"}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${product.inStock ? "translate-x-4" : ""}`} />
+                </span>
+              </button>
             </div>
-            {product.reorderLevel != null && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">Reorder At</span>
-                <span className="text-[13px] text-[#A0A8B0] font-medium">{product.reorderLevel} units</span>
-              </div>
-            )}
           </div>
 
           {/* Action buttons */}
@@ -335,7 +345,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     : undefined
                 }
               />
-              <DetailRow label="Reorder Level" value={product.reorderLevel != null ? `${product.reorderLevel} units` : undefined} />
             </div>
           </div>
 
@@ -464,19 +473,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price (AED) *</label>
-                  <input type="number" min="0" step="0.01" value={editing.price}
-                    onChange={e => setEditing(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : prev)}
-                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Stock</label>
-                  <input type="number" min="0" value={editing.stock}
-                    onChange={e => setEditing(prev => prev ? { ...prev, stock: parseInt(e.target.value) } : prev)}
-                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price (AED) *</label>
+                <input type="number" min="0" step="0.01" value={editing.price}
+                  onChange={e => setEditing(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : prev)}
+                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
               </div>
 
               {/* Batch & stock */}
@@ -495,13 +496,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Reorder Level</label>
-                <input type="number" min="0"
-                  value={editing.reorderLevel ?? ""}
-                  onChange={e => setEditing(prev => prev ? { ...prev, reorderLevel: parseInt(e.target.value) || undefined } : prev)}
-                  placeholder="e.g. 50"
-                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
+              {/* Availability toggle */}
+              <div className="flex items-center justify-between bg-[#F8FAFC] rounded-xl p-4 border border-[#EBEEF5]">
+                <div>
+                  <p className="text-[13px] font-semibold text-[#24292E]">In Stock</p>
+                  <p className="text-[11px] text-[#A0A8B0] mt-1">Turn off the moment you run out — patients can't order it while this is off</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditing(prev => prev ? { ...prev, inStock: !prev.inStock } : prev)}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${editing.inStock ? "bg-[#5476FC]" : "bg-[#EBEEF5]"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${editing.inStock ? "translate-x-6" : ""}`} />
+                </button>
               </div>
 
               {/* Prescription toggle */}

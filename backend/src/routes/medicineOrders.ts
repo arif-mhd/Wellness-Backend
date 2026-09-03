@@ -7,7 +7,7 @@ import { medicineOrdersContainer, prescriptionsContainer } from "../config/cosmo
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
-import { validateOrderItems, decrementStockForItems } from "../utils/pharmacyOrders";
+import { validateOrderItems } from "../utils/pharmacyOrders";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -67,7 +67,6 @@ router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async
     };
 
     await medicineOrdersContainer.items.upsert(order);
-    await decrementStockForItems(validatedItems);
 
     const itemNames = validatedItems.map(i => i.name).join(", ");
     logActivity({

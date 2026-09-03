@@ -25,19 +25,18 @@ interface Product {
   description: string;
   category: string;
   price: string;
-  stock: string;
+  inStock: boolean;
   manufacturer: string;
   strength: string;
   batchNumber: string;
   expiryDate: string;
-  reorderLevel: string;
   requiresPrescription: boolean;
 }
 
 const emptyProduct = (): Product => ({
-  name: "", description: "", category: "", price: "", stock: "",
+  name: "", description: "", category: "", price: "", inStock: true,
   manufacturer: "", strength: "", batchNumber: "", expiryDate: "",
-  reorderLevel: "", requiresPrescription: false,
+  requiresPrescription: false,
 });
 
 const inputCls = "w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition";
@@ -85,6 +84,10 @@ export default function AddPharmacyPage() {
 
   const togglePrescription = (idx: number) => {
     setProducts(prev => prev.map((p, i) => i === idx ? { ...p, requiresPrescription: !p.requiresPrescription } : p));
+  };
+
+  const toggleInStock = (idx: number) => {
+    setProducts(prev => prev.map((p, i) => i === idx ? { ...p, inStock: !p.inStock } : p));
   };
 
   const addProduct = () => {
@@ -141,13 +144,12 @@ export default function AddPharmacyPage() {
             description:          p.description || null,
             category:             p.category,
             price:                p.price,
-            stock:                p.stock || "0",
+            inStock:              p.inStock,
             requiresPrescription: p.requiresPrescription,
             manufacturer:         p.manufacturer || null,
             strength:             p.strength || null,
             batchNumber:          p.batchNumber || null,
             expiryDate:           p.expiryDate || null,
-            reorderLevel:         p.reorderLevel || null,
           }),
         });
         if (!res.ok) {
@@ -352,10 +354,6 @@ export default function AddPharmacyPage() {
                         <input type="number" min="0" step="0.01" name="price" value={activeProduct.price} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="0.00" className={inputCls} />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className={labelCls}>Stock Quantity</label>
-                        <input type="number" min="0" name="stock" value={activeProduct.stock} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="0" className={inputCls} />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
                         <label className={labelCls}>Batch Number</label>
                         <input name="batchNumber" value={activeProduct.batchNumber} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="e.g. BATCH-001" className={inputCls} />
                       </div>
@@ -363,14 +361,25 @@ export default function AddPharmacyPage() {
                         <label className={labelCls}>Expiry Date</label>
                         <input type="date" max="9999-12-31" name="expiryDate" value={activeProduct.expiryDate} onChange={e => handleProductChange(activeProductIdx, e)} className={inputCls} />
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className={labelCls}>Reorder Level</label>
-                        <input type="number" min="0" name="reorderLevel" value={activeProduct.reorderLevel} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="e.g. 50" className={inputCls} />
-                      </div>
                       <div className="sm:col-span-2 flex flex-col gap-1.5">
                         <label className={labelCls}>Description</label>
                         <textarea name="description" value={activeProduct.description} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="Brief description, indications..." rows={2} className={`${inputCls} resize-none`} />
                       </div>
+                    </div>
+
+                    {/* Availability toggle */}
+                    <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+                      <div>
+                        <p className="text-[13px] font-semibold text-slate-800">In Stock</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Whether patients can order this right now</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleInStock(activeProductIdx)}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${activeProduct.inStock ? "bg-[#6A8BFF]" : "bg-slate-200"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${activeProduct.inStock ? "translate-x-6" : ""}`} />
+                      </button>
                     </div>
 
                     {/* Prescription toggle */}

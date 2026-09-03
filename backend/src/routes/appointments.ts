@@ -29,7 +29,10 @@ import { devFallbackOrThrow } from "../utils/env";
 import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
-import { validateOrderItems, decrementStockForItems, OrderItemInput } from "../utils/pharmacyOrders";
+import { validateOrderItems, resolvePackQuantity, OrderItemInput } from "../utils/pharmacyOrders";
+import PDFDocument from "pdfkit";
+import { drawPrescriptionPdf } from "../utils/prescriptionPdf";
+import { updateAppointmentWithRetry, AppointmentWriteNotAuthorizedError } from "../utils/appointmentWrite";
 
 function parseLocalTime(isoString: string): Date {
   if (!isoString) return new Date();
@@ -1456,7 +1459,10 @@ router.patch("/:id/recording-consent", verifySession(), async (req: SessionReque
     if (updated.recordingConsent?.doctorAckAt && updated.recordingConsent?.patientAckAt && !updated.recordingEgressId) {
       const egressId = await startCallRecording(id);
       if (egressId) {
-        await appointmentsContainer.items.upsert({ ...updated, recordingEgressId: egressId });
+        // ETag-protected — a blind upsert here raced the egress webhook's own
+        // write of recordingBlobPath moments later and could silently revert
+        // it, which is exactly how a completed recording used to disappear.
+        await updateAppointmentWithRetry(id, (latest) => ({ ...latest, recordingEgressId: egressId }));
       }
     }
 
@@ -1605,91 +1611,94 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
   const { sections, visitInfo, medicines, labs, addendum } = req.body;
 
   try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (!isAuthorizedDoctor(apt, doctorId)) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    // Resolve doctor name for contributor labelling
+    // Resolve doctor name for contributor labelling — doesn't depend on the
+    // appointment doc, so no need to redo this on every retry attempt below.
     let contributorName = "Doctor";
     try {
       const { resource: doc } = await doctorsContainer.item(doctorId, doctorId).read();
       contributorName = doc?.fullName ?? contributorName;
     } catch { /* use default */ }
 
-    // Safety net: drop any incoming entries that are explicitly tagged as belonging
-    // to a different doctor (the frontend should already filter these out, but we
-    // enforce it here too so a bad payload never corrupts another doctor's entries).
-    const ownIncomingMedicines = (medicines ?? []).filter(
-      (m: any) => !m.contributorDoctorId || m.contributorDoctorId === doctorId
-    );
-    const ownIncomingLabs = (labs ?? []).filter(
-      (l: any) => !l.contributorDoctorId || l.contributorDoctorId === doctorId
-    );
+    const updated = await updateAppointmentWithRetry(id, (apt) => {
+      if (!isAuthorizedDoctor(apt, doctorId)) throw new AppointmentWriteNotAuthorizedError();
 
-    // Tag the incoming entries with this doctor's identity
-    const taggedMedicines = ownIncomingMedicines.map((m: any) => ({
-      ...m,
-      contributorDoctorId: doctorId,
-      contributorName,
-    }));
-    const taggedLabs = ownIncomingLabs.map((l: any) => ({
-      ...l,
-      contributorDoctorId: doctorId,
-      contributorName,
-    }));
+      // Safety net: drop any incoming entries that are explicitly tagged as belonging
+      // to a different doctor (the frontend should already filter these out, but we
+      // enforce it here too so a bad payload never corrupts another doctor's entries).
+      const ownIncomingMedicines = (medicines ?? []).filter(
+        (m: any) => !m.contributorDoctorId || m.contributorDoctorId === doctorId
+      );
+      const ownIncomingLabs = (labs ?? []).filter(
+        (l: any) => !l.contributorDoctorId || l.contributorDoctorId === doctorId
+      );
 
-    // Merge: keep other doctors' existing entries, replace this doctor's entries
-    const existingMedicines: any[] = apt.emr?.medicines ?? [];
-    const existingLabs: any[]      = apt.emr?.labs      ?? [];
+      // Tag the incoming entries with this doctor's identity
+      const taggedMedicines = ownIncomingMedicines.map((m: any) => ({
+        ...m,
+        contributorDoctorId: doctorId,
+        contributorName,
+      }));
+      const taggedLabs = ownIncomingLabs.map((l: any) => ({
+        ...l,
+        contributorDoctorId: doctorId,
+        contributorName,
+      }));
 
-    const otherMedicines = existingMedicines.filter(
-      // Keep if it belongs to someone else OR if it's a legacy entry with no tag
-      (m: any) => m.contributorDoctorId !== doctorId
-    );
-    const otherLabs = existingLabs.filter(
-      (l: any) => l.contributorDoctorId !== doctorId
-    );
+      // Merge: keep other doctors' existing entries, replace this doctor's entries
+      const existingMedicines: any[] = apt.emr?.medicines ?? [];
+      const existingLabs: any[]      = apt.emr?.labs      ?? [];
 
-    const mergedMedicines = [...otherMedicines, ...taggedMedicines];
-    const mergedLabs      = [...otherLabs,      ...taggedLabs];
+      const otherMedicines = existingMedicines.filter(
+        // Keep if it belongs to someone else OR if it's a legacy entry with no tag
+        (m: any) => m.contributorDoctorId !== doctorId
+      );
+      const otherLabs = existingLabs.filter(
+        (l: any) => l.contributorDoctorId !== doctorId
+      );
 
-    // Merge sections: layer this doctor's section notes on top of whatever was
-    // previously saved. This prevents a specialist from wiping the primary
-    // doctor's clinical notes when they save their own additions.
-    const existingSections = apt.emr?.sections ?? {};
-    const mergedSections   = { ...existingSections, ...(sections ?? {}) };
+      const mergedMedicines = [...otherMedicines, ...taggedMedicines];
+      const mergedLabs      = [...otherLabs,      ...taggedLabs];
 
-    // Addenda are append-only: each note is timestamped and signed at write
-    // time and never edited or removed afterward, matching real EMR
-    // audit-trail conventions (a correction is a new addendum, not an edit).
-    const existingAddenda: any[] = apt.emr?.addenda ?? [];
-    const mergedAddenda = addendum && String(addendum).trim()
-      ? [
-          ...existingAddenda,
-          {
-            text: String(addendum).trim(),
-            doctorId,
-            doctorName: contributorName,
-            createdAt: new Date().toISOString(),
-          },
-        ]
-      : existingAddenda;
+      // Merge sections: layer this doctor's section notes on top of whatever was
+      // previously saved. This prevents a specialist from wiping the primary
+      // doctor's clinical notes when they save their own additions.
+      const existingSections = apt.emr?.sections ?? {};
+      const mergedSections   = { ...existingSections, ...(sections ?? {}) };
 
-    const updated = {
-      ...apt,
-      emr: {
-        sections:  mergedSections,
-        visitInfo: visitInfo ?? apt.emr?.visitInfo ?? null,
-        medicines: mergedMedicines,
-        labs:      mergedLabs,
-        addenda:   mergedAddenda,
-        savedAt:   new Date().toISOString(),
-      },
-      updatedAt: new Date().toISOString(),
-    };
-    await appointmentsContainer.items.upsert(updated);
+      // Addenda are append-only: each note is timestamped and signed at write
+      // time and never edited or removed afterward, matching real EMR
+      // audit-trail conventions (a correction is a new addendum, not an edit).
+      const existingAddenda: any[] = apt.emr?.addenda ?? [];
+      const mergedAddenda = addendum && String(addendum).trim()
+        ? [
+            ...existingAddenda,
+            {
+              text: String(addendum).trim(),
+              doctorId,
+              doctorName: contributorName,
+              createdAt: new Date().toISOString(),
+            },
+          ]
+        : existingAddenda;
+
+      return {
+        ...apt,
+        emr: {
+          sections:  mergedSections,
+          visitInfo: visitInfo ?? apt.emr?.visitInfo ?? null,
+          medicines: mergedMedicines,
+          labs:      mergedLabs,
+          addenda:   mergedAddenda,
+          savedAt:   new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    if (!updated) { res.status(404).json({ error: "Appointment not found." }); return; }
     res.json({ status: "OK", emr: updated.emr });
   } catch (err) {
+    if (err instanceof AppointmentWriteNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
     console.error("Save EMR error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
@@ -1755,7 +1764,17 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
       return;
     }
 
-    const items: OrderItemInput[] = selected.map((m) => ({ medicine_id: m.productId, quantity: 1 }));
+    // Each EMR entry's `quantity` is the doctor's prescribed total (frequency
+    // x duration, e.g. "twice daily for 5 days" = 10) — convert that into
+    // however many of the pharmacy's own pack-sized SKUs actually cover it,
+    // rather than ordering 1 pack per medicine regardless of how much was
+    // prescribed.
+    const items: OrderItemInput[] = await Promise.all(
+      selected.map(async (m) => ({
+        medicine_id: m.productId,
+        quantity: await resolvePackQuantity(m.productId, m.quantity),
+      }))
+    );
     const validation = await validateOrderItems(items);
     if (!validation.ok) {
       res.status(400).json({ error: validation.error });
@@ -1796,7 +1815,6 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
     };
 
     await medicineOrdersContainer.items.upsert(order);
-    await decrementStockForItems(validatedItems);
 
     const itemNames = validatedItems.map((i) => i.name).join(", ");
     logActivity({
@@ -1812,6 +1830,51 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
     res.status(201).json({ status: "OK", order });
   } catch (err) {
     console.error("Order medicines from EMR error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/appointments/:id/prescription-pdf ─────────────────────────────
+// Streams a downloadable PDF of this encounter's prescription — same
+// renderer/pattern as the admin analytics PDF export (pdfkit, piped directly
+// as the HTTP response), just with prescription-specific content instead of
+// report charts/tables. Reachable both right after a consultation
+// (diagnostics-medication.tsx) and later from the patient's own records
+// (record-detail.tsx) — same endpoint either way, patient-owned only.
+router.get("/:id/prescription-pdf", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+  const patientId = req.session!.getUserId();
+  const { id } = req.params;
+
+  try {
+    const { resource: apt } = await appointmentsContainer.item(id, id).read().catch(() => ({ resource: undefined as any }));
+    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
+    if (apt.patientId !== patientId) { res.status(403).json({ error: "Not authorized." }); return; }
+    const medicines = apt.emr?.medicines ?? [];
+    if (!medicines.length) { res.status(400).json({ error: "No prescription found for this appointment." }); return; }
+
+    const [{ resource: doctor }, { resource: patient }] = await Promise.all([
+      doctorsContainer.item(apt.doctorId, apt.doctorId).read().catch(() => ({ resource: undefined as any })),
+      patientsContainer.item(patientId, patientId).read().catch(() => ({ resource: undefined as any })),
+    ]);
+    const { name: clinicName, address: clinicAddress } = await resolveDoctorClinicDisplay(doctor?.clinicId ?? apt.clinicId);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="prescription-${id}.pdf"`);
+    doc.pipe(res);
+    drawPrescriptionPdf(doc, {
+      clinicName: clinicName ?? null,
+      clinicAddress,
+      doctorName: doctor?.fullName ?? apt.doctorName ?? "Doctor",
+      doctorSpecialty: doctor?.specialty ?? apt.doctorSpecialty ?? null,
+      doctorLicense: doctor?.license ?? null,
+      patientName: patient?.fullName ?? "Patient",
+      date: apt.emr?.savedAt ?? apt.scheduledAt ?? new Date().toISOString(),
+      medicines,
+    });
+    doc.end();
+  } catch (err) {
+    console.error("Prescription PDF error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
