@@ -16,10 +16,27 @@ export interface Medicine {
   instructions: string;
   productId?: string;
   manufacturer?: string;
+  /** How many days the patient should take this — drives the auto-computed quantity below */
+  durationDays?: number;
+  /** Total units (tablets/doses) to order — auto-computed from frequency x durationDays,
+   *  but editable, since dosage-per-dose ("2 tablets") isn't reliably parseable from free text.
+   *  Only meaningful for catalogue-linked (productId-bearing) entries — this is what actually
+   *  gets ordered from the pharmacy, converted into pack quantities server-side. */
+  quantity?: number;
   /** Set by the backend when the EMR is saved/loaded — used to track per-doctor contributions */
   contributorDoctorId?: string;
   contributorName?: string;
 }
+
+// "As needed" has no fixed daily count, so it's deliberately excluded — the
+// doctor sets quantity manually for that case instead of getting a
+// nonsensical auto-computed value.
+const TIMES_PER_DAY: Record<string, number> = {
+  "Once Daily": 1,
+  "Twice Daily": 2,
+  "Three times Daily": 3,
+  "Four times Daily": 4,
+};
 
 interface CatalogueProduct {
   id: string;
@@ -49,6 +66,9 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
   const [timing, setTiming] = useState("Before food");
   const [frequency, setFrequency] = useState("Twice Daily");
   const [instructions, setInstructions] = useState("");
+  const [durationDays, setDurationDays] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [quantityTouched, setQuantityTouched] = useState(false);
 
   const [searchResults, setSearchResults] = useState<CatalogueProduct[]>([]);
   const [searching, setSearching] = useState(false);
@@ -91,6 +111,20 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
     }, 300);
   }, [medName, customMode, selectedProduct, clinicId]);
 
+  // Auto-suggests total quantity (frequency x days) whenever either input
+  // changes — assumes 1 unit per dose, matching the common case ("a tablet
+  // twice a day"). Stops overwriting once the doctor has directly edited the
+  // quantity field themselves, e.g. to account for a "2 tablets per dose"
+  // regimen that free-text dosage can't be reliably parsed for.
+  useEffect(() => {
+    if (quantityTouched) return;
+    const perDay = TIMES_PER_DAY[frequency];
+    const days = parseInt(durationDays, 10);
+    if (perDay && days > 0) {
+      setQuantity(String(perDay * days));
+    }
+  }, [frequency, durationDays, quantityTouched]);
+
   const resetForm = () => {
     setMedName("");
     setSelectedProduct(null);
@@ -99,6 +133,9 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
     setTiming("Before food");
     setFrequency("Twice Daily");
     setInstructions("");
+    setDurationDays("");
+    setQuantity("");
+    setQuantityTouched(false);
     setSearchResults([]);
     setShowResults(false);
   };
@@ -126,6 +163,8 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
       instructions: instructions.trim() || "Take as directed",
       productId: selectedProduct?.source === "external" ? undefined : selectedProduct?.id,
       manufacturer: selectedProduct?.manufacturer ?? undefined,
+      durationDays: durationDays.trim() ? parseInt(durationDays, 10) : undefined,
+      quantity: quantity.trim() ? parseInt(quantity, 10) : undefined,
     };
 
     onChange([...medicines, newMed]);
@@ -293,6 +332,36 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#676E76]">Duration (days)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={durationDays}
+                    onChange={(e) => setDurationDays(e.target.value)}
+                    placeholder="e.g. 5"
+                    className="w-full h-11 px-4 rounded-xl bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#676E76]">Quantity to Order</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={quantity}
+                    onChange={(e) => { setQuantity(e.target.value); setQuantityTouched(true); }}
+                    placeholder="Auto"
+                    className="w-full h-11 px-4 rounded-xl bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC] focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+              {selectedProduct && TIMES_PER_DAY[frequency] && durationDays && (
+                <p className="text-[10px] text-[#838B95] -mt-2">
+                  Auto-calculated from {frequency.toLowerCase()} × {durationDays} days — this is what gets ordered from the pharmacy. Adjust if a dose is more than 1 unit.
+                </p>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-[12px] font-semibold text-[#676E76]">Instructions</label>
                 <textarea
@@ -347,6 +416,13 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
                   <span className="text-[#5476FC] text-[11px] font-bold">
                     {med.timing} <span className="text-[#5476FC] font-medium ml-0.5">({med.frequency})</span>
                   </span>
+                  {(med.durationDays || med.quantity) && (
+                    <span className="text-[#179353] text-[10px] font-bold">
+                      {med.durationDays ? `${med.durationDays} day${med.durationDays === 1 ? "" : "s"}` : ""}
+                      {med.durationDays && med.quantity ? " · " : ""}
+                      {med.quantity ? `Order qty: ${med.quantity}` : ""}
+                    </span>
+                  )}
                   <p className="text-[#838B95] text-[11px] leading-relaxed font-semibold">Notes: {med.instructions}</p>
                   {/* Show contributor label for medicines added by another doctor */}
                   {med.contributorName && !isOwn && (

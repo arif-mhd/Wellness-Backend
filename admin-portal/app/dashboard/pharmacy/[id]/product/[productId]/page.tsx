@@ -26,7 +26,7 @@ interface Product {
   description?: string;
   category: string;
   price: number;
-  stock: number;
+  inStock: boolean;
   imageUrl?: string;
   status: "pending_approval" | "approved" | "rejected";
   createdAt: string;
@@ -38,7 +38,6 @@ interface Product {
   requiresPrescription?: boolean;
   batchNumber?: string;
   expiryDate?: string;
-  reorderLevel?: number;
   manufacturer?: string;
   strength?: string;
   flagged?: boolean;
@@ -145,7 +144,6 @@ export default function AdminProductDetailPage({
   );
 
   const statusCfg = STATUS_CONFIG[product.status];
-  const isLowStock = product.stock < (product.reorderLevel ?? 50);
   const categoryEmoji =
     product.category === "OTC" ? "💊" :
     product.category === "Prescription" ? "📋" :
@@ -233,22 +231,12 @@ export default function AdminProductDetailPage({
                 <span className="text-[20px] font-medium text-[#6A8BFF]">AED {product.price.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-semibold">Stock</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[14px] font-medium ${isLowStock ? "text-red-500" : "text-slate-800"}`}>
-                    {product.stock} units
-                  </span>
-                  {isLowStock && (
-                    <span className="text-[10px] bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">Low</span>
-                  )}
-                </div>
+                <span className="text-[11px] text-slate-400 font-semibold">Availability</span>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${product.inStock ? "bg-teal-50 text-teal-700" : "bg-red-50 text-red-600"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${product.inStock ? "bg-teal-500" : "bg-red-500"}`} />
+                  {product.inStock ? "In Stock" : "Out of Stock"}
+                </span>
               </div>
-              {product.reorderLevel != null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 font-semibold">Reorder At</span>
-                  <span className="text-[13px] font-semibold text-slate-600">{product.reorderLevel} units</span>
-                </div>
-              )}
             </div>
 
             {/* Flag / Unflag action */}
@@ -299,10 +287,6 @@ export default function AdminProductDetailPage({
                     ? new Date(product.expiryDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
                     : undefined
                 }
-              />
-              <DetailRow
-                label="Reorder Level"
-                value={product.reorderLevel != null ? `${product.reorderLevel} units` : undefined}
               />
             </div>
 

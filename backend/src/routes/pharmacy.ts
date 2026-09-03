@@ -101,10 +101,10 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         manufacturer:         p.manufacturer ?? p.pharmacyName ?? null,
         description:          p.description ?? null,
         price:                p.price,
-        stock_quantity:       p.stock ?? 0,
+        in_stock:             p.inStock !== false,
         requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
         image_url:            p.imageUrl ?? null,
-        is_active:            (p.stock ?? 0) > 0,
+        is_active:            p.inStock !== false,
         numberOfTablets:      p.numberOfTablets ?? null,
         productSummary:       p.productSummary ?? null,
         recommendedFor:       p.recommendedFor ?? null,
@@ -178,9 +178,9 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
       id: p.id, name: p.name, generic_name: p.description ?? null,
       category: p.category, form: p.category, strength: p.strength ?? null,
       manufacturer: p.manufacturer ?? p.pharmacyName ?? null, description: p.description ?? null,
-      price: p.price, stock_quantity: p.stock ?? 0,
+      price: p.price, in_stock: p.inStock !== false,
       requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
-      image_url: p.imageUrl ?? null, is_active: (p.stock ?? 0) > 0,
+      image_url: p.imageUrl ?? null, is_active: p.inStock !== false,
       numberOfTablets: p.numberOfTablets ?? null,
       productSummary: p.productSummary ?? null,
       recommendedFor: p.recommendedFor ?? null,
@@ -387,7 +387,12 @@ router.get("/products", requireRole("pharmacy"), async (req: SessionRequest, res
       },
       { partitionKey: pharmacyId }
     ).fetchAll();
-    res.json({ products: resources });
+    // Normalize once here so every consumer (this portal, admin-portal, the
+    // toggle itself) sees a definite boolean instead of each having to
+    // remember that a legacy doc with no inStock field at all still counts
+    // as in-stock.
+    const products = resources.map((p: any) => ({ ...p, inStock: p.inStock !== false }));
+    res.json({ products });
   } catch (err) {
     console.error("Pharmacy products error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -405,7 +410,7 @@ router.get("/products/:productId", requireRole("pharmacy"), async (req: SessionR
       res.status(404).json({ error: "Product not found" });
       return;
     }
-    res.json({ product: resource });
+    res.json({ product: { ...resource, inStock: resource.inStock !== false } });
   } catch (err) {
     console.error("Pharmacy product fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -423,8 +428,8 @@ router.post(
     try {
       const pharmacyId = req.session!.getUserId();
       const {
-        name, description, category, price, stock, requiresPrescription,
-        batchNumber, expiryDate, reorderLevel, manufacturer, strength,
+        name, description, category, price, inStock, requiresPrescription,
+        batchNumber, expiryDate, manufacturer, strength,
         numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
@@ -454,11 +459,12 @@ router.post(
         description:          description || null,
         category,
         price:                parseFloat(price),
-        stock:                parseInt(stock ?? "0", 10),
+        // Pharmacies flag availability with a plain toggle rather than
+        // tracking exact counts — defaults to in-stock when not specified.
+        inStock:              inStock === "false" || inStock === false ? false : true,
         requiresPrescription: requiresPrescription === "true" || requiresPrescription === true,
         batchNumber:          batchNumber || null,
         expiryDate:           expiryDate || null,
-        reorderLevel:         reorderLevel ? parseInt(reorderLevel, 10) : null,
         manufacturer:         manufacturer || null,
         strength:             strength || null,
         numberOfTablets:      numberOfTablets || null,
@@ -501,8 +507,8 @@ router.put(
       const pharmacyId = req.session!.getUserId();
       const { productId } = req.params;
       const {
-        name, description, category, price, stock, requiresPrescription,
-        batchNumber, expiryDate, reorderLevel, manufacturer, strength,
+        name, description, category, price, inStock, requiresPrescription,
+        batchNumber, expiryDate, manufacturer, strength,
         numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
@@ -531,13 +537,12 @@ router.put(
         ...(description !== undefined && { description }),
         ...(category    && { category }),
         ...(price       && { price: parseFloat(price) }),
-        ...(stock       !== undefined && { stock: parseInt(stock, 10) }),
+        ...(inStock     !== undefined && { inStock: !(inStock === "false" || inStock === false) }),
         ...(requiresPrescription !== undefined && {
           requiresPrescription: requiresPrescription === "true" || requiresPrescription === true,
         }),
         ...(batchNumber  !== undefined && { batchNumber: batchNumber || null }),
         ...(expiryDate   !== undefined && { expiryDate: expiryDate || null }),
-        ...(reorderLevel !== undefined && { reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : null }),
         ...(manufacturer !== undefined && { manufacturer: manufacturer || null }),
         ...(strength     !== undefined && { strength: strength || null }),
         ...(numberOfTablets !== undefined && { numberOfTablets: numberOfTablets || null }),

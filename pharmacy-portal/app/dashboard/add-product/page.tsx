@@ -17,10 +17,9 @@ export default function AddProductPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory]       = useState("");
   const [price, setPrice]             = useState("");
-  const [stock, setStock]             = useState("");
+  const [inStock, setInStock]         = useState(true);
   const [batchNumber, setBatchNumber] = useState("");
   const [expiryDate, setExpiryDate]   = useState("");
-  const [reorderLevel, setReorderLevel] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [strength, setStrength]       = useState("");
   const [numberOfTablets, setNumberOfTablets] = useState("");
@@ -57,11 +56,10 @@ export default function AddProductPage() {
       form.append("description", description);
       form.append("category", category);
       form.append("price", price);
-      form.append("stock", stock || "0");
+      form.append("inStock", String(inStock));
       form.append("requiresPrescription", String(requiresPrescription));
       if (batchNumber)  form.append("batchNumber", batchNumber);
       if (expiryDate)   form.append("expiryDate", expiryDate);
-      if (reorderLevel) form.append("reorderLevel", reorderLevel);
       if (manufacturer) form.append("manufacturer", manufacturer);
       if (strength)     form.append("strength", strength);
       if (numberOfTablets) form.append("numberOfTablets", numberOfTablets);
@@ -231,15 +229,9 @@ export default function AddProductPage() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Price (AED) *</label>
-              <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Stock Quantity</label>
-              <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="0" className={inputCls} />
-            </div>
+          <div>
+            <label className={labelCls}>Price (AED) *</label>
+            <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
           </div>
         </div>
 
@@ -258,11 +250,22 @@ export default function AddProductPage() {
                 className="w-full h-12 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
             </div>
           </div>
+        </div>
 
-          <div>
-            <label className={labelCls}>Reorder Level</label>
-            <input type="number" min="0" value={reorderLevel} onChange={e => setReorderLevel(e.target.value)} placeholder="e.g. 50" className={inputCls} />
-            <p className="text-[11px] text-[#A0A8B0] mt-1.5">Alert will appear when stock falls below this level</p>
+        {/* Availability toggle */}
+        <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#24292E]">In Stock</p>
+              <p className="text-xs text-[#676E76] mt-1">Patients can only order this product while it's marked in stock — flip this off the moment you run out</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setInStock(v => !v)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${inStock ? "bg-[#5476FC]" : "bg-[#EBEEF5]"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${inStock ? "translate-x-6" : ""}`} />
+            </button>
           </div>
         </div>
 

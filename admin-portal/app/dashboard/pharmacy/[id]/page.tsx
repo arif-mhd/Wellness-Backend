@@ -50,14 +50,13 @@ interface Product {
   description?: string;
   category: string;
   price: number;
-  stock: number;
+  inStock: boolean;
   imageUrl?: string;
   status: "pending_approval" | "approved" | "rejected";
   createdAt: string;
   requiresPrescription?: boolean;
   batchNumber?: string;
   expiryDate?: string;
-  reorderLevel?: number;
   flagged?: boolean;
   flagReason?: string | null;
 }
@@ -132,9 +131,9 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
   const [addingProduct, setAddingProduct] = useState(false);
   const [addProductError, setAddProductError] = useState("");
   const emptyProductForm = () => ({
-    name: "", description: "", category: "", price: "", stock: "",
+    name: "", description: "", category: "", price: "", inStock: true,
     manufacturer: "", strength: "", batchNumber: "", expiryDate: "",
-    reorderLevel: "", requiresPrescription: false,
+    requiresPrescription: false,
   });
   const [productForm, setProductForm] = useState(emptyProductForm());
 
@@ -203,13 +202,12 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
           description:          productForm.description || null,
           category:             productForm.category,
           price:                productForm.price,
-          stock:                productForm.stock || "0",
+          inStock:              productForm.inStock,
           requiresPrescription: productForm.requiresPrescription,
           manufacturer:         productForm.manufacturer || null,
           strength:             productForm.strength || null,
           batchNumber:          productForm.batchNumber || null,
           expiryDate:           productForm.expiryDate || null,
-          reorderLevel:         productForm.reorderLevel || null,
         }),
       });
       if (res.ok) {
@@ -496,11 +494,6 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                             <th className="pb-4 pt-1 font-semibold">Batch No.</th>
                             <th className="pb-4 pt-1 font-semibold">
                               <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
-                                Quantity <DoubleCaret />
-                              </div>
-                            </th>
-                            <th className="pb-4 pt-1 font-semibold">
-                              <div className="flex items-center gap-2 cursor-pointer hover:text-slate-600">
                                 Expiry Date <DoubleCaret />
                               </div>
                             </th>
@@ -520,7 +513,6 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                         </thead>
                         <tbody className="block lg:table-row-group">
                           {stockProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item) => {
-                            const isLowStock = item.stock < (item.reorderLevel ?? 100);
                             return (
                               <tr
                                 key={item.id}
@@ -540,10 +532,6 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                   <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Batch No.</div>
                                   {item.batchNumber ?? "—"}
                                 </td>
-                                <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:pl-4 px-2">
-                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Quantity</div>
-                                  {item.stock}
-                                </td>
                                 <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:px-0 px-2">
                                   <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Expiry Date</div>
                                   {item.expiryDate ?? "—"}
@@ -559,8 +547,8 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                   ) : item.status === "rejected" ? (
                                     <span className="text-red-400">Rejected</span>
                                   ) : (
-                                    <span className={isLowStock ? "text-red-400" : "text-[#6A8BFF]"}>
-                                      {isLowStock ? "Low Stock" : "In Stock"}
+                                    <span className={item.inStock ? "text-[#6A8BFF]" : "text-red-400"}>
+                                      {item.inStock ? "In Stock" : "Out of Stock"}
                                     </span>
                                   )}
                                 </td>
@@ -716,28 +704,16 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                 />
               </div>
 
-              {/* Price + Stock */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
-                  <input
-                    type="number" min="0" step="0.01"
-                    value={productForm.price}
-                    onChange={e => setProductForm(p => ({ ...p, price: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Quantity</label>
-                  <input
-                    type="number" min="0"
-                    value={productForm.stock}
-                    onChange={e => setProductForm(p => ({ ...p, stock: e.target.value }))}
-                    placeholder="0"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"
-                  />
-                </div>
+              {/* Price */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={productForm.price}
+                  onChange={e => setProductForm(p => ({ ...p, price: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"
+                />
               </div>
 
               {/* Batch + Expiry */}
@@ -763,16 +739,19 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                 </div>
               </div>
 
-              {/* Reorder Level */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Reorder Level</label>
-                <input
-                  type="number" min="0"
-                  value={productForm.reorderLevel}
-                  onChange={e => setProductForm(p => ({ ...p, reorderLevel: e.target.value }))}
-                  placeholder="e.g. 50"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[13px] font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:border-[#6A8BFF] transition"
-                />
+              {/* Availability toggle */}
+              <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-800">In Stock</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Whether patients can order this right now</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProductForm(p => ({ ...p, inStock: !p.inStock }))}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${productForm.inStock ? "bg-[#6A8BFF]" : "bg-slate-200"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${productForm.inStock ? "translate-x-6" : ""}`} />
+                </button>
               </div>
 
               {/* Prescription toggle */}
