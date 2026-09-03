@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import multer from "multer";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { pregnancyProfilesContainer, pregnancyLogsContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 
@@ -17,6 +18,7 @@ const upload = multer({
 
 const router = Router();
 router.use(requireRole("patient"));
+router.use(requireFeature("pregnancy"));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

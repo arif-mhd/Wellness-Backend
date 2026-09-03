@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
@@ -20,7 +21,7 @@ router.use(requireRole("patient"));
 //
 // Uses Gemini API key (?key= param) — set GEMINI_API_KEY in Cloud Run env vars.
 // Create the key at: GCP Console → APIs & Services → Credentials → Create API Key
-router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
+router.post("/analyze-food-image", requireFeature("nutrition_ai"), async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
     res.status(400).json({ error: "imageBase64 is required" });
@@ -191,7 +192,7 @@ RULES:
 // the real catalog; the catalog lookup (exerciseId) itself is resolved server-side
 // via getExerciseById/searchExercises rather than trusted from the model, since
 // the model only ever sees names, not IDs.
-router.post("/parse-exercise-voice", async (req: SessionRequest, res: Response) => {
+router.post("/parse-exercise-voice", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   const { transcript, knownExerciseNames } = req.body;
   if (!transcript?.trim()) {
     res.status(400).json({ error: "transcript is required" });
@@ -555,7 +556,7 @@ const OFF_TOPIC_REPLY =
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking }
-router.post("/chat", async (req: SessionRequest, res: Response) => {
+router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
@@ -911,7 +912,7 @@ router.get("/foods", async (req: SessionRequest, res: Response) => {
 //         foodId: string, quantity: number, unit?: "grams"|"ml",
 //         // For OFF-sourced foods the client also sends the full nutrition snapshot:
 //         foodName?: string, image?: string, per100g?: { calories, protein, fat, carbs, fiber } }
-router.post("/food-log", async (req: SessionRequest, res: Response) => {
+router.post("/food-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
@@ -1021,7 +1022,7 @@ router.get("/exercises", (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/workout-log ───────────────────────────────────────────
 // Body: { date, exerciseId, sets?: [{weight, reps}], durationMinutes?: number }
-router.post("/workout-log", async (req: SessionRequest, res: Response) => {
+router.post("/workout-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, exerciseId, sets, durationMinutes, profileId } = req.body;
@@ -1323,7 +1324,7 @@ router.get("/routines", async (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/routines ───────────────────────────────────────────────
 // Body: { title, exercises: [{ exerciseId, name, image, type, defaultSets }], profileId }
-router.post("/routines", async (req: SessionRequest, res: Response) => {
+router.post("/routines", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { title, exercises, profileId } = req.body;
@@ -1366,7 +1367,7 @@ router.delete("/routines/:routineId", async (req: SessionRequest, res: Response)
 // All entries from one call share a generated sessionId (and the optional
 // sessionTitle, e.g. a routine name) so the client can group them back into
 // a single workout-history card.
-router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
+router.post("/workout-log/bulk", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, exercises, sessionTitle, profileId, sessionDurationMinutes } = req.body;
@@ -1443,7 +1444,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/weight-log ────────────────────────────────────────────
 // Body: { date: "YYYY-MM-DD", weightKg: number }
-router.post("/weight-log", async (req: SessionRequest, res: Response) => {
+router.post("/weight-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { weightKg, date, profileId } = req.body;

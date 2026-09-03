@@ -1,10 +1,12 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { articlesContainer } from "../config/cosmos";
 
 const router = Router();
 router.use(requireRole("patient"));
+router.use(requireFeature("articles"));
 
 // GET /api/articles — returns all non-flagged articles
 // Optional query: ?category=Wellness

@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import {
   menstrualProfilesContainer,
   menstrualLogsContainer,
@@ -9,6 +10,7 @@ import {
 
 const router = Router();
 router.use(requireRole("patient"));
+router.use(requireFeature("menstrual"));
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 

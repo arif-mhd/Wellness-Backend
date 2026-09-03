@@ -15,6 +15,8 @@ import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
 import clinicsRouter from "./routes/clinics";
 import adminClinicsRouter from "./routes/adminClinics";
+import adminOrganizationsRouter from "./routes/adminOrganizations";
+import adminFeatureFlagsRouter from "./routes/adminFeatureFlags";
 import adminEarningsRouter from "./routes/adminEarnings";
 import clinicDoctorsRouter from "./routes/clinicDoctors";
 import clinicAppointmentsRouter from "./routes/clinicAppointments";
@@ -151,6 +153,10 @@ app.use("/api/clinics", clinicsRouter);
 
 // Admin clinic management (requires admin role)
 app.use("/api/admin/clinics", adminClinicsRouter);
+
+// White-label organizations + per-org feature entitlements (requires admin role)
+app.use("/api/admin/organizations", adminOrganizationsRouter);
+app.use("/api/admin/organizations", adminFeatureFlagsRouter);
 app.use("/api/admin/fee-requests", adminFeeRequestsRouter);
 app.use("/api/admin/earnings", adminEarningsRouter);
 

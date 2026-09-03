@@ -16,6 +16,7 @@ import {
   medicineOrdersContainer,
 } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { logActivity } from "../utils/activityLogger";
 import { resolveProfileDisplay } from "../utils/profile";
 import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic, buildInClause } from "../utils/clinicScope";
@@ -154,7 +155,7 @@ function generateAppointmentId(doctorName: string, scheduledAt: string): string 
 
 // ─── POST /api/appointments ──────────────────────────────────────────────────
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
-router.post("/", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/", requireRole("patient"), requireFeature("appointments"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { doctorId, scheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId, consultationLanguage } = req.body;
 
@@ -1726,7 +1727,7 @@ router.get("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: R
 // (i.e. actually matched to a pharmacy's stock at prescribing time) are
 // orderable — a doctor's freehand/custom-typed entry has no inventory to bill
 // against and is silently skipped here.
-router.post("/:id/order-medicines", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/:id/order-medicines", requireRole("patient"), requireFeature("pharmacy"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { id } = req.params;
   const { medicineIds, delivery_address, notes } = req.body as {

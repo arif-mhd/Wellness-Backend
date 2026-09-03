@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { randomInt, randomBytes } from "crypto";
 import {
@@ -42,7 +43,7 @@ function deriveSosStatusAndPriority(sosCode: { usedAt: string | null; expiresAt:
 // minutes, single-use. Any previously unused code for this patient is left in
 // place (harmless — only the most recently generated one is looked up first,
 // and verify only ever matches a real, unexpired, unused code).
-router.post("/generate", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/generate", requireRole("patient"), requireFeature("sos"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
   const { reason } = req.body as { reason?: string };
 

@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { medicineOrdersContainer, prescriptionsContainer } from "../config/cosmos";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -13,7 +14,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 // ─── POST /api/pharmacy/orders ────────────────────────────────────────────────
 // Patient places a medicine order. Items are validated against real product stock.
-router.post("/orders", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { items, delivery_address, prescription_id, notes, profileId } = req.body;
@@ -185,7 +186,7 @@ router.post(
 );
 
 // ─── POST /api/pharmacy/prescriptions ────────────────────────────────────────
-router.post("/prescriptions", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/prescriptions", requireRole("patient"), requireFeature("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { image_url, pdf_url, source, profileId } = req.body;

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { vaccinesContainer, vaccinationBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
@@ -30,7 +31,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 // ─── POST /api/vaccines/bookings ──────────────────────────────────────────────
 // Patient creates a vaccination booking
-router.post("/bookings", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { items } = req.body as {
