@@ -5,6 +5,7 @@ import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -463,7 +464,7 @@ router.post(
 // "pending"; an unchanged existing entry keeps whatever status Wellness
 // Admin already set for it (active/rejected/pending), ignoring the client's
 // value entirely.
-router.put("/insurance", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.put("/insurance", requireRole("patient"), requireFeature("insurance"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
     const { insurance } = req.body;

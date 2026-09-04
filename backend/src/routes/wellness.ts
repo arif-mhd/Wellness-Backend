@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
@@ -20,7 +21,7 @@ router.use(requireRole("patient"));
 //
 // Uses Gemini API key (?key= param) — set GEMINI_API_KEY in Cloud Run env vars.
 // Create the key at: GCP Console → APIs & Services → Credentials → Create API Key
-router.post("/analyze-food-image", async (req: SessionRequest, res: Response) => {
+router.post("/analyze-food-image", requireFeature("nutrition_ai"), async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
     res.status(400).json({ error: "imageBase64 is required" });
@@ -134,7 +135,173 @@ Rules:
   }
 });
 
+// Gemini structured-output schema for POST /parse-exercise-voice.
+// Mirrors the patient app's VoiceExerciseParseResult/VoiceExerciseSet contract
+// (services/wellnessService.ts in the Wellness patient app repo).
+const VOICE_EXERCISE_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    matchedName: { type: "STRING", nullable: true },
+    name: { type: "STRING" },
+    type: { type: "STRING", nullable: true },
+    sets: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          weight: { type: "NUMBER", nullable: true },
+          reps: { type: "NUMBER", nullable: true },
+          durationMin: { type: "NUMBER", nullable: true },
+          distanceKm: { type: "NUMBER", nullable: true },
+        },
+        required: ["weight", "reps", "durationMin", "distanceKm"],
+      },
+    },
+    confidence: { type: "STRING" },
+  },
+  required: ["matchedName", "name", "type", "sets", "confidence"],
+};
 
+function buildVoiceExerciseSystemPrompt(knownExerciseNames: string[]): string {
+  return `You are a fitness logging assistant. The patient spoke a voice note while logging an exercise set; you are given the raw speech-to-text transcript. Extract the exercise being logged and respond ONLY with a single JSON object matching the supplied response schema — no prose outside the JSON.
+
+KNOWN EXERCISE NAMES (the app's exercise catalog — match against these when possible):
+${knownExerciseNames.length ? knownExerciseNames.map((n) => `- ${n}`).join("\n") : "(none provided)"}
+
+RULES:
+- "matchedName" = the exact name string from the KNOWN EXERCISE NAMES list above that best matches what the patient said, or null if nothing in the list is a reasonable match.
+- "name" = a clean, properly capitalized exercise name — use the matched known name verbatim if matchedName is set, otherwise your best interpretation of what the patient said (e.g. "bench press" → "Bench Press").
+- "type" = one of "strength", "bodyweight", "cardio" if you can tell what kind of exercise this is, or null if you genuinely cannot tell (e.g. matchedName is null and the transcript is too vague to guess a category).
+- "sets" = array of set entries the patient mentioned, in the order spoken. Each entry is {weight, reps, durationMin, distanceKm} — fill only the fields that make sense for what was said and leave the rest null (e.g. a strength set has weight+reps with durationMin/distanceKm null; a timed cardio set like "ran for 20 minutes" has durationMin set with weight/reps/distanceKm null; a distance cardio set like "cycled 5 km" has distanceKm set). weight is in the unit the patient used (assume kg if unspecified). If the patient described one set ("3 reps at 50 kilos"), return a single-element array. If they said something like "3 sets of 10 at 40 kilos", expand that into 3 identical set entries. If no set details were mentioned at all, return an empty array.
+- "confidence" = "high" if the transcript clearly named a specific exercise and numbers, "medium" if the exercise is identifiable but some details were unclear or inferred, "low" if the transcript was garbled, ambiguous, or barely related to an exercise.
+- If the transcript does not describe a workout exercise at all, still return your best-effort JSON with confidence="low", type=null, sets=[], and name set to a short paraphrase of what was heard.`;
+}
+
+// ── POST /api/wellness/parse-exercise-voice ──────────────────────────────────
+// Body: { transcript: string, knownExerciseNames?: string[] }
+// Returns: { exerciseId: string|null, name: string, type: "strength"|"bodyweight"|"cardio"|null,
+//            sets: { weight, reps, durationMin, distanceKm }[] (each number|null),
+//            confidence: "high"|"medium"|"low" }
+//
+// Used by the patient app's live exercise-logging voice input (VoiceExerciseLogger
+// -> wellnessService.parseExerciseVoice -> active-logging.tsx). The client treats
+// exerciseId && type together as "confidently matched — merge straight into the
+// session"; when either is null it falls back to asking the user to pick from a
+// search list, so we deliberately only set type when a real match was resolved.
+// The model is given the app's known exercise names so it can name-match against
+// the real catalog; the catalog lookup (exerciseId) itself is resolved server-side
+// via getExerciseById/searchExercises rather than trusted from the model, since
+// the model only ever sees names, not IDs.
+router.post("/parse-exercise-voice", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
+  const { transcript, knownExerciseNames } = req.body;
+  if (!transcript?.trim()) {
+    res.status(400).json({ error: "transcript is required" });
+    return;
+  }
+
+  const names: string[] = Array.isArray(knownExerciseNames)
+    ? knownExerciseNames.filter((n: any) => typeof n === "string" && n.trim()).slice(0, 300)
+    : [];
+
+  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  if (!apiKey) {
+    console.error("[parse-exercise-voice] GEMINI_API_KEY is not set");
+    res.status(500).json({ error: "Voice exercise logging is not configured. Please contact support." });
+    return;
+  }
+
+  const systemPrompt = buildVoiceExerciseSystemPrompt(names);
+
+  try {
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+    let parsed: any = null;
+    let lastError: any = null;
+
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: `Transcript: ${transcript}` }] }],
+            generationConfig: {
+              maxOutputTokens: 400,
+              temperature: 0.2,
+              responseMimeType: "application/json",
+              responseSchema: VOICE_EXERCISE_RESPONSE_SCHEMA,
+            },
+          }),
+        });
+        if (!r.ok) {
+          const body = (await r.text()).replace(/\s+/g, " ").trim();
+          throw new Error(`HTTP ${r.status}: ${body}`);
+        }
+        const data = await r.json() as any;
+        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        if (!responseText) throw new Error("Empty response");
+
+        const candidate = tryParseWellnessJson(responseText);
+        if (!candidate) throw new Error("Model returned malformed JSON");
+
+        parsed = candidate;
+        console.log(`[parse-exercise-voice] ✓ model=${model}`);
+        break;
+      } catch (err: any) {
+        console.warn(`[parse-exercise-voice] ${model} failed:`, err?.message);
+        lastError = err;
+      }
+    }
+
+    if (!parsed) {
+      throw new Error(`All models failed: ${lastError?.message}`);
+    }
+
+    // Resolve the model's name match against the real catalog server-side —
+    // try an exact (case-insensitive) match on the known-names list first,
+    // then fall back to the fuzzy searchExercises() used elsewhere in this
+    // file, so a slightly-off model string still resolves to a real exerciseId.
+    let matchedExercise = null as ReturnType<typeof getExerciseById> | null;
+    const matchedName = typeof parsed.matchedName === "string" ? parsed.matchedName.trim() : "";
+    if (matchedName) {
+      const exact = searchExercises(matchedName).find((e) => e.name.toLowerCase() === matchedName.toLowerCase());
+      matchedExercise = exact ?? searchExercises(matchedName)[0] ?? null;
+    }
+    if (!matchedExercise && typeof parsed.name === "string" && parsed.name.trim()) {
+      matchedExercise = searchExercises(parsed.name.trim())[0] ?? null;
+    }
+
+    const validTypes = ["strength", "bodyweight", "cardio"];
+    const cleanNum = (v: any) => (typeof v === "number" && !isNaN(v) ? v : null);
+
+    const sets = Array.isArray(parsed.sets)
+      ? parsed.sets.map((s: any) => ({
+          weight: cleanNum(s?.weight),
+          reps: cleanNum(s?.reps),
+          durationMin: cleanNum(s?.durationMin),
+          distanceKm: cleanNum(s?.distanceKm),
+        }))
+      : [];
+
+    // type stays null unless we resolved (or the model confidently guessed) a
+    // real category — the client uses `exerciseId && type` together to decide
+    // whether to auto-merge or fall back to manual exercise selection, so a
+    // guessed default here would wrongly short-circuit that fallback.
+    const modelType = validTypes.includes(parsed.type) ? parsed.type : null;
+
+    res.json({
+      exerciseId: matchedExercise?.id ?? null,
+      name: matchedExercise?.name ?? (typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : "Unknown Exercise"),
+      type: matchedExercise?.type ?? modelType,
+      sets,
+      confidence: (["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low") as "high" | "medium" | "low",
+    });
+  } catch (err: any) {
+    console.error("[parse-exercise-voice] error:", err?.message);
+    res.status(500).json({ error: "Voice parsing is temporarily unavailable. Please try again." });
+  }
+});
 
 
 // ── Open Food Facts fallback ─────────────────────────────────────────────────
@@ -389,7 +556,7 @@ const OFF_TOPIC_REPLY =
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking }
-router.post("/chat", async (req: SessionRequest, res: Response) => {
+router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
@@ -745,7 +912,7 @@ router.get("/foods", async (req: SessionRequest, res: Response) => {
 //         foodId: string, quantity: number, unit?: "grams"|"ml",
 //         // For OFF-sourced foods the client also sends the full nutrition snapshot:
 //         foodName?: string, image?: string, per100g?: { calories, protein, fat, carbs, fiber } }
-router.post("/food-log", async (req: SessionRequest, res: Response) => {
+router.post("/food-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
@@ -855,7 +1022,7 @@ router.get("/exercises", (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/workout-log ───────────────────────────────────────────
 // Body: { date, exerciseId, sets?: [{weight, reps}], durationMinutes?: number }
-router.post("/workout-log", async (req: SessionRequest, res: Response) => {
+router.post("/workout-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, exerciseId, sets, durationMinutes, profileId } = req.body;
@@ -1157,7 +1324,7 @@ router.get("/routines", async (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/routines ───────────────────────────────────────────────
 // Body: { title, exercises: [{ exerciseId, name, image, type, defaultSets }], profileId }
-router.post("/routines", async (req: SessionRequest, res: Response) => {
+router.post("/routines", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { title, exercises, profileId } = req.body;
@@ -1200,7 +1367,7 @@ router.delete("/routines/:routineId", async (req: SessionRequest, res: Response)
 // All entries from one call share a generated sessionId (and the optional
 // sessionTitle, e.g. a routine name) so the client can group them back into
 // a single workout-history card.
-router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
+router.post("/workout-log/bulk", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, exercises, sessionTitle, profileId, sessionDurationMinutes } = req.body;
@@ -1277,7 +1444,7 @@ router.post("/workout-log/bulk", async (req: SessionRequest, res: Response) => {
 
 // ── POST /api/wellness/weight-log ────────────────────────────────────────────
 // Body: { date: "YYYY-MM-DD", weightKg: number }
-router.post("/weight-log", async (req: SessionRequest, res: Response) => {
+router.post("/weight-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { weightKg, date, profileId } = req.body;

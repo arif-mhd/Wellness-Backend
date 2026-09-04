@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
+import { requireFeature } from "../middleware/requireFeature";
 import { labTestsContainer, labBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
@@ -45,7 +46,7 @@ router.get("/tests/:testId", async (req: Request, res: Response) => {
 
 // ─── POST /api/lab/bookings ───────────────────────────────────────────────────
 // Patient creates a lab booking. Payment is mocked.
-router.post("/bookings", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const {
