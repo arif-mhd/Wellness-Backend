@@ -17,10 +17,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // Supports ?search=, ?category=, ?limit=, ?skip= query params.
 router.get("/catalogue", async (req: Request, res: Response) => {
   try {
-    const { search, category, limit = "50", skip = "0", external, clinicId } = req.query as Record<string, string>;
+    const { search, category, limit = "50", skip = "0", external, clinicId, pharmacyId } = req.query as Record<string, string>;
 
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
+
+    // Explicit pharmacy filter — used by the patient app's "browse by pharmacy"
+    // screen (tap a pharmacy card, list only its own products). Independent of
+    // the clinicId resolution below, which a doctor's own prescribing search uses.
+    if (pharmacyId) {
+      query += " AND c.pharmacyId = @pharmacyId";
+      params.push({ name: "@pharmacyId", value: pharmacyId });
+    }
 
     // A doctor only prescribes from their own clinic branch's affiliated
     // pharmacy — never the whole cross-pharmacy catalogue. Doctor.clinicId
@@ -88,6 +96,19 @@ router.get("/catalogue", async (req: Request, res: Response) => {
       return bDate - aDate;
     });
 
+    // Resolve each product's pharmacy name — products only store pharmacyId,
+    // the display name lives on the pharmacy doc itself, so this is a bulk
+    // lookup rather than something already denormalized onto the product.
+    const pharmacyIds = [...new Set(resources.map((p: any) => p.pharmacyId).filter(Boolean))];
+    const pharmacyNameMap: Record<string, string> = {};
+    if (pharmacyIds.length) {
+      const { resources: pharmacyDocs } = await pharmaciesContainer.items.query({
+        query: "SELECT c.id, c.pharmacyName FROM c WHERE ARRAY_CONTAINS(@ids, c.id)",
+        parameters: [{ name: "@ids", value: pharmacyIds }],
+      }).fetchAll();
+      pharmacyDocs.forEach((d: any) => { pharmacyNameMap[d.id] = d.pharmacyName; });
+    }
+
     // Adapt to the Medicine shape the patient app expects
     const medicines: any[] = resources
       .slice(parseInt(skip), parseInt(skip) + parseInt(limit))
@@ -98,7 +119,7 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         category:             p.category,
         form:                 p.category,
         strength:             p.strength ?? null,
-        manufacturer:         p.manufacturer ?? p.pharmacyName ?? null,
+        manufacturer:         p.manufacturer ?? pharmacyNameMap[p.pharmacyId] ?? null,
         description:          p.description ?? null,
         price:                p.price,
         in_stock:             p.inStock !== false,
@@ -112,6 +133,8 @@ router.get("/catalogue", async (req: Request, res: Response) => {
         sideEffects:          p.sideEffects ?? null,
         howToUse:             p.howToUse ?? null,
         pharmacyRating:       getAverage(p.pharmacyId),
+        pharmacyId:           p.pharmacyId ?? null,
+        pharmacyName:         pharmacyNameMap[p.pharmacyId] ?? null,
         source:               "pharmacy" as const,
       }));
 
@@ -174,10 +197,17 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
     }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Product not found" }); return; }
     const p = resources[0] as any;
+
+    let pharmacyName: string | null = null;
+    if (p.pharmacyId) {
+      const { resource: pharmacyDoc } = await pharmaciesContainer.item(p.pharmacyId, p.pharmacyId).read();
+      pharmacyName = pharmacyDoc?.pharmacyName ?? null;
+    }
+
     res.json({
       id: p.id, name: p.name, generic_name: p.description ?? null,
       category: p.category, form: p.category, strength: p.strength ?? null,
-      manufacturer: p.manufacturer ?? p.pharmacyName ?? null, description: p.description ?? null,
+      manufacturer: p.manufacturer ?? pharmacyName ?? null, description: p.description ?? null,
       price: p.price, in_stock: p.inStock !== false,
       requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
       image_url: p.imageUrl ?? null, is_active: p.inStock !== false,
@@ -187,9 +217,60 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
       benefits: p.benefits ?? null,
       sideEffects: p.sideEffects ?? null,
       howToUse: p.howToUse ?? null,
+      pharmacyId: p.pharmacyId ?? null,
+      pharmacyName,
     });
   } catch (err) {
     console.error("Catalogue single fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/pharmacy/pharmacies ────────────────────────────────────────────
+// Public — lists approved pharmacies that carry at least one orderable
+// product, for the patient app's "browse by pharmacy" screen (replaces the
+// old cross-pharmacy "Top Sellers" section on the medicine home screen).
+router.get("/pharmacies", async (req: Request, res: Response) => {
+  try {
+    const { resources: pharmacies } = await pharmaciesContainer.items.query(
+      "SELECT * FROM c WHERE c.status = 'approved'"
+    ).fetchAll();
+
+    const { resources: allFeedback } = await feedbackContainer.items.query(
+      "SELECT c.provider.id, c.rating FROM c WHERE c.folder = 'pharmacy'"
+    ).fetchAll();
+    const ratingsMap: Record<string, { sum: number; count: number }> = {};
+    allFeedback.forEach((fb: any) => {
+      if (!fb.id || !fb.rating) return;
+      if (!ratingsMap[fb.id]) ratingsMap[fb.id] = { sum: 0, count: 0 };
+      ratingsMap[fb.id].sum += fb.rating;
+      ratingsMap[fb.id].count += 1;
+    });
+
+    const { resources: approvedProducts } = await pharmacyProductsContainer.items.query(
+      "SELECT c.pharmacyId FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)"
+    ).fetchAll();
+    const productCountMap: Record<string, number> = {};
+    approvedProducts.forEach((p: any) => {
+      if (!p.pharmacyId) return;
+      productCountMap[p.pharmacyId] = (productCountMap[p.pharmacyId] ?? 0) + 1;
+    });
+
+    const list = pharmacies
+      .map((p: any) => ({
+        id:           p.id,
+        pharmacyName: p.pharmacyName,
+        location:     p.location ?? null,
+        imageUrl:     p.imageUrl ?? null,
+        rating:       ratingsMap[p.id] ? ratingsMap[p.id].sum / ratingsMap[p.id].count : 0,
+        productCount: productCountMap[p.id] ?? 0,
+      }))
+      .filter((p) => p.productCount > 0)
+      .sort((a, b) => b.rating - a.rating || b.productCount - a.productCount);
+
+    res.json(list);
+  } catch (err) {
+    console.error("Pharmacies list error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
