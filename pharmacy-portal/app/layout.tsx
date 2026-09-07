@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Marcellus, Outfit, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
+import { BrandingProvider } from "@/components/BrandingContext";
 
 const inter      = Inter({ subsets: ["latin"] });
 const marcellus  = Marcellus({ weight: "400", subsets: ["latin"], variable: "--font-marcellus" });
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${inter.className} ${marcellus.variable} ${outfit.variable} ${bricolage.variable}`}>
-        <SuperTokensProvider>{children}</SuperTokensProvider>
+        <SuperTokensProvider>
+          <BrandingProvider>{children}</BrandingProvider>
+        </SuperTokensProvider>
       </body>
     </html>
   );

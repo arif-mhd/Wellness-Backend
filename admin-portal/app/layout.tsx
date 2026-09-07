@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, Marcellus } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
+import { BrandingProvider } from "@/components/BrandingContext";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} ${marcellus.variable}`}>
       <body>
-        <SuperTokensProvider>{children}</SuperTokensProvider>
+        <SuperTokensProvider>
+          <BrandingProvider>{children}</BrandingProvider>
+        </SuperTokensProvider>
       </body>
     </html>
   );

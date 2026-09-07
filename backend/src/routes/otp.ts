@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { otpCodesContainer, patientsContainer, pharmaciesContainer, doctorsContainer, clinicsContainer } from "../config/cosmos";
 import { sendOtpEmail } from "../config/resend";
+import { resolveOrgIdByEmail, getOrgBrandName } from "../utils/orgScope";
 
 const router = Router();
 
@@ -177,8 +178,21 @@ router.post("/send", async (req: Request, res: Response) => {
       purpose === "sos_access"        ? "sos_access"        :
       "login";
 
+    // Brand the email with the account's real organization name wherever an
+    // account already exists to resolve one from (registration has no
+    // account yet, so there's nothing to look up).
+    let brandName: string | undefined;
+    if (purpose !== "registration") {
+      try {
+        const orgId = await resolveOrgIdByEmail(normalizedEmail);
+        brandName = await getOrgBrandName(orgId);
+      } catch (err) {
+        console.error("[otp/send] brand lookup failed, using platform default:", err);
+      }
+    }
+
     try {
-      await sendOtpEmail(normalizedEmail, code, emailPurpose);
+      await sendOtpEmail(normalizedEmail, code, emailPurpose, brandName);
     } catch (emailErr: any) {
       // In local/dev, Resend's sandbox sender (onboarding@resend.dev) only
       // delivers to the account owner's email, so log the OTP to let testing

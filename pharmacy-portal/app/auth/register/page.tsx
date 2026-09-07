@@ -57,7 +57,10 @@ export default function RegisterPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const res = await fetch(`${apiUrl}/api/pharmacy/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.NEXT_PUBLIC_ORG_SLUG ? { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } : {}),
+        },
         body: JSON.stringify({ email, password, ownerName, pharmacyName, licenseNumber, phone, location, emiratesId }),
       });
       const data = await res.json();

@@ -10,26 +10,33 @@ export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Wellness Central <on
 export async function sendOtpEmail(
   to: string,
   code: string,
-  purpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" | "sos_access" = "login"
+  purpose: "login" | "enable_2fa" | "registration" | "reset" | "clinic_fee_change" | "clinic_withdrawal" | "sos_access" = "login",
+  // Defaults to the platform's own name — callers for pre-account purposes
+  // (registration OTP: no account exists yet, so there's no org to resolve)
+  // never pass this and get exactly the previous, unbranded copy. Callers
+  // for an existing account (reset, 2FA, etc.) resolve the real org via
+  // resolveOrgIdByEmail + getOrgBrandName and pass its name through — see
+  // otp.ts.
+  brandName: string = "Wellness"
 ): Promise<void> {
   const subject =
     purpose === "enable_2fa"
-      ? "Your Wellness – Enable Two-Factor Authentication Code"
+      ? `Your ${brandName} – Enable Two-Factor Authentication Code`
       : purpose === "reset"
-      ? "Reset your Wellness password"
+      ? `Reset your ${brandName} password`
       : purpose === "registration"
-      ? "Your Wellness verification code"
+      ? `Your ${brandName} verification code`
       : purpose === "clinic_fee_change"
-      ? "Your Wellness – Confirm Consultation Fee Change"
+      ? `Your ${brandName} – Confirm Consultation Fee Change`
       : purpose === "clinic_withdrawal"
-      ? "Your Wellness – Confirm Withdrawal Request"
+      ? `Your ${brandName} – Confirm Withdrawal Request`
       : purpose === "sos_access"
-      ? "Your Wellness – SOS Record Access Code"
-      : "Your Wellness – Login Verification Code";
+      ? `Your ${brandName} – SOS Record Access Code`
+      : `Your ${brandName} – Login Verification Code`;
 
   const purposeLabel =
     purpose === "enable_2fa"
-      ? "set up Two-Factor Authentication on your Wellness account"
+      ? `set up Two-Factor Authentication on your ${brandName} account`
       : purpose === "reset"
       ? "reset your password"
       : purpose === "registration"
@@ -61,7 +68,7 @@ export async function sendOtpEmail(
         <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(84,118,252,0.08);">
           <tr>
             <td style="background:linear-gradient(135deg,#8AA0FF 0%,#5476FC 100%);padding:36px 40px 32px;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Wellness Central</h1>
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">${brandName}</h1>
             </td>
           </tr>
           <tr>
@@ -81,7 +88,7 @@ export async function sendOtpEmail(
           <tr>
             <td style="background:#F5F6FA;padding:20px 40px;border-top:1px solid #EBEEF5;">
               <p style="margin:0;color:#9EA5AD;font-size:11px;text-align:center;">
-                © ${new Date().getFullYear()} Wellness Central. All rights reserved.
+                © ${new Date().getFullYear()} ${brandName}. All rights reserved.
               </p>
             </td>
           </tr>

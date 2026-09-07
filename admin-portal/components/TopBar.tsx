@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useBranding } from "./BrandingContext";
 
 type NotificationType =
   | "doctor_approval"
@@ -399,6 +400,7 @@ import { useSidebar } from "./SidebarContext";
 export default function TopBar() {
   const router = useRouter();
   const { setIsMobileOpen } = useSidebar();
+  const branding = useBranding();
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"Unread" | "All">("Unread");
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -470,11 +472,15 @@ export default function TopBar() {
           </svg>
         </button>
         <div className="hidden md:flex items-center lg:w-[200px]">
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-            className="w-[100px] object-contain"
-            alt="Wellness Central"
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              className="w-[100px] object-contain"
+              alt={branding.name}
+            />
+          ) : (
+            <span className="text-[14px] font-semibold text-slate-800 whitespace-nowrap">{branding.name}</span>
+          )}
         </div>
       </div>
 

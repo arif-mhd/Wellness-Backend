@@ -40,8 +40,8 @@ router.get("/:id", async (req: SessionRequest, res: Response) => {
 });
 
 // ─── POST /api/admin/organizations ───────────────────────────────────────────
-// Creates a new tenant. New orgs start with every feature disabled — a
-// super-admin opts them in explicitly via the entitlements endpoints below,
+// Creates a new tenant. New orgs start with every feature disabled — the
+// admin opts them in explicitly via the entitlements endpoints below,
 // rather than inheriting whatever the default org happens to have enabled.
 router.post("/", async (req: SessionRequest, res: Response) => {
   const { slug, name, supportEmail, supportPhone, planTier } = req.body;

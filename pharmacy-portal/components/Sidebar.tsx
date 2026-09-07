@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
+import { useBranding } from "./BrandingContext";
 import Session, { signOut } from "supertokens-web-js/recipe/session";
 
 // ─── Icons (memoised, never recreated) ───────────────────────────────────────
@@ -88,6 +89,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const branding = useBranding();
   const [pharmacyName, setPharmacyName] = useState("Wellness Pharmacy");
   const [ownerName, setOwnerName] = useState("Admin");
 
@@ -141,12 +143,21 @@ export default function Sidebar() {
         {/* Header row: logo + toggle */}
         <div className="relative flex items-center h-[72px] px-5 w-full">
           {/* Logo — stays in DOM, fades out */}
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
-            alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
-              }`}
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.name}
+              className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
+                }`}
+            />
+          ) : (
+            <span
+              className={`font-semibold text-[15px] text-[#1e293b] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[140px]" : "opacity-0 max-w-0 pointer-events-none"
+                }`}
+            >
+              {branding.name}
+            </span>
+          )}
           {/* Toggle button — always visible */}
           <button
             onClick={toggle}

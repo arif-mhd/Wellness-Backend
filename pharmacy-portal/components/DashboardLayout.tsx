@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
+import { useBranding } from "@/components/BrandingContext";
 
 export default function SharedDashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default function SharedDashboardLayout({
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
+  const branding = useBranding();
   const [headerSearch, setHeaderSearch] = useState("");
 
   const runHeaderSearch = () => {
@@ -69,11 +71,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <header className={`h-[96px] flex items-center justify-between shrink-0 select-none transition-all duration-300 ${sidebarOpen ? "px-6 xl:px-[24px]" : "px-10 lg:px-[40px]"}`}>
           {/* Logo Frame */}
           <div className="flex items-center">
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain"
-              alt="Wellness Central"
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                className="w-[91px] h-[30px] object-contain"
+                alt={branding.name}
+              />
+            ) : (
+              <span className="text-[15px] font-semibold text-[#24292E] whitespace-nowrap">{branding.name}</span>
+            )}
           </div>
 
           {/* Search bar container */}

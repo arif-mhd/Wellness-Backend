@@ -8,6 +8,7 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
 import { resolveClinicName } from "./clinicInsurance";
+import { resolveOrgIdForRegistration } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -224,6 +225,11 @@ router.post("/register", async (req: Request, res: Response) => {
     await UserRoles.addRoleToUser("public", supertokensId, "pharmacy_pending");
 
     const now = new Date().toISOString();
+    // The pharmacy portal's signup form sends its deployment's org slug on
+    // this header (set via NEXT_PUBLIC_ORG_SLUG at build time) — resolves to
+    // the matching org, or the default org if absent/unknown.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const tenantId = await resolveOrgIdForRegistration(orgSlug);
     const pharmacyDoc = {
       id:             supertokensId,
       supertokens_id: supertokensId,
@@ -235,6 +241,7 @@ router.post("/register", async (req: Request, res: Response) => {
       location:       location  || null,
       emiratesId:     emiratesId || null,
       phone,
+      tenantId,
       registeredAt:   now,
       approvedAt:     null,
       approvedBy:     null,

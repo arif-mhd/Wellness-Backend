@@ -8,6 +8,7 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
+import { resolveOrgIdForRegistration } from "../utils/orgScope";
 import { getClinicAppointmentsData } from "./clinicAppointments";
 import { getClinicFeedbackData } from "./clinicFeedback";
 
@@ -176,6 +177,14 @@ router.post("/register", async (req: Request, res: Response) => {
     await UserRoles.addRoleToUser("public", supertokensId, "clinic_pending");
 
     // ── 3. Save registration details to Cosmos ────────────────────────────
+    // The doctor-portal's clinic signup form sends its deployment's org slug
+    // on this header (set via NEXT_PUBLIC_ORG_SLUG at build time) — resolves
+    // to the matching org, or the default org if absent/unknown. Not to be
+    // confused with `orgId` elsewhere in this file, which is the unrelated
+    // multi-branch concept (which parent clinic a branch belongs to).
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const tenantId = await resolveOrgIdForRegistration(orgSlug);
+
     const now = new Date().toISOString();
     const clinicDoc = {
       id: supertokensId,   // Cosmos id = ST userId
@@ -183,6 +192,7 @@ router.post("/register", async (req: Request, res: Response) => {
       status: "details_pending",
       email,
       clinicName,
+      tenantId,
       // The owner's own personal name — collected later in the complete-profile
       // wizard (Owner's Personal Information step), kept distinct from
       // clinicName so filling it in never overwrites the clinic's own identity.

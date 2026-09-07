@@ -6,6 +6,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
+import { resolveOrgIdForRegistration } from "../utils/orgScope";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -76,6 +77,12 @@ router.post("/register", async (req: Request, res: Response) => {
     // Assign "patient" role
     await UserRoles.addRoleToUser("public", supertokensId, "patient");
 
+    // Each brand build of the patient app sends its own org slug on this
+    // header (see brand.json's orgSlug + api client) — resolves to the
+    // matching org, or the default org if absent/unknown.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const tenantId = await resolveOrgIdForRegistration(orgSlug);
+
     // Persist to Cosmos  (patients collection, partition key = /id)
     const patientDoc = {
       id:             supertokensId,
@@ -87,6 +94,7 @@ router.post("/register", async (req: Request, res: Response) => {
       gender:         gender       ?? "",
       emiratesId:     emiratesId   ?? "",
       status:         "active",
+      tenantId,
       createdAt:      new Date().toISOString(),
       updatedAt:      new Date().toISOString(),
     };

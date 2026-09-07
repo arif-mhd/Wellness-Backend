@@ -214,7 +214,10 @@ export default function SignupPage() {
     try {
       const res = await fetch(`${API_URL}/api/clinics/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.NEXT_PUBLIC_ORG_SLUG ? { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } : {}),
+        },
         body: JSON.stringify({
           email:       registrationEmail,
           password,

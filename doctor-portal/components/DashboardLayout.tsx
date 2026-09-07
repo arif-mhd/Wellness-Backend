@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
+import { useBranding } from "@/components/BrandingContext";
 import { usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
@@ -294,6 +295,7 @@ function GlobalSearch() {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isOpen: sidebarOpen, setIsMobileOpen } = useSidebar();
+  const branding = useBranding();
   const pathname = usePathname();
   const isVideoCall = pathname === "/video-calls";
 
@@ -490,11 +492,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </svg>
               </button>
             )}
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain hidden sm:block"
-              alt="Wellness Central"
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                className="w-[91px] h-[30px] object-contain hidden sm:block"
+                alt={branding.name}
+              />
+            ) : (
+              <span className="hidden sm:block text-[15px] font-semibold text-[#24292E] whitespace-nowrap">
+                {branding.name}
+              </span>
+            )}
           </div>
 
           {/* ── Global Search Bar ── */}

@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
+import { resolveOrgId, getOrgBrandName } from "../utils/orgScope";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
@@ -485,8 +486,8 @@ const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
   .map((h) => `  - ${h.symptoms} → ${h.specialty}`)
   .join("\n");
 
-function buildWellnessSystemPrompt(): string {
-  return `You are a helpful wellness assistant for Wellness Central, a healthcare platform. Your name is Dr. Wellness.
+function buildWellnessSystemPrompt(brandName: string): string {
+  return `You are a helpful wellness assistant for ${brandName}, a healthcare platform. Your name is Dr. Wellness.
 
 You MUST respond with ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
 
@@ -582,7 +583,9 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
     return;
   }
 
-  const systemPrompt = buildWellnessSystemPrompt();
+  const orgId = await resolveOrgId(req);
+  const brandName = await getOrgBrandName(orgId);
+  const systemPrompt = buildWellnessSystemPrompt(brandName);
   const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
 
   try {
