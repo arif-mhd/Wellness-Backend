@@ -47,6 +47,15 @@ export async function deleteBlob(blobPath: string): Promise<void> {
 }
 
 /**
+ * Whether a blob exists in the wellness container. Used to reconcile Cosmos
+ * state against Azure directly (e.g. call recordings) when an upstream
+ * webhook can't be trusted to have fired reliably.
+ */
+export async function blobExists(blobPath: string): Promise<boolean> {
+  return containerClient.getBlockBlobClient(blobPath).exists();
+}
+
+/**
  * Get the raw (private) URL of a blob — not publicly accessible.
  */
 export function getBlobUrl(blobPath: string): string {

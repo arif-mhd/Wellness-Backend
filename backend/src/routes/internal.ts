@@ -9,6 +9,8 @@ import {
 import { sendPushToUser } from "../utils/pushNotifications";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { deepgramCodeForLanguage } from "../utils/languages";
+import { blobExists } from "../config/blob";
+import { updateAppointmentWithRetry } from "../utils/appointmentWrite";
 
 const router = Router();
 
@@ -233,6 +235,70 @@ router.post("/appointments/:id/transcript", async (req: Request, res: Response) 
   } catch (err) {
     console.error("[appointments/:id/transcript] failed:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/internal/appointments/reconcile-recordings
+// Recording completion is supposed to reach Cosmos via LiveKit's egress_ended
+// webhook (see routes/livekitWebhook.ts) — but webhook delivery is
+// best-effort and depends on the LiveKit Cloud project actually having that
+// webhook URL configured, which has proven unreliable in practice: LiveKit's
+// own dashboard has shown egresses completing successfully and landing in
+// Azure Blob while recordingBlobPath stayed null on the appointment forever.
+// Rather than trust the webhook (or LiveKit's listEgress history API, which
+// has also been seen to not find egresses its own dashboard lists as
+// COMPLETE), this checks the one thing we have full control over and trust
+// completely: whether the expected file actually exists in our own Azure
+// Blob container, at the deterministic path startCallRecording() uploads to
+// (see appointments.ts). Safe to run repeatedly — only touches appointments
+// still missing recordingBlobPath.
+router.post("/appointments/reconcile-recordings", async (req: Request, res: Response) => {
+  const secret = process.env.INTERNAL_CRON_SECRET;
+  if (!secret) {
+    res.status(500).json({ error: "INTERNAL_CRON_SECRET not configured" });
+    return;
+  }
+  if (req.headers["x-internal-secret"] !== secret) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  try {
+    // Deliberately NOT filtered on callStartedAt/status — the presence-based
+    // completed-vs-cancelled heuristic in PATCH /:id/call-presence has its
+    // own known bug where a genuinely-completed call can end up marked
+    // "cancelled" with callStartedAt never set, and a recording started
+    // (consent-gated, independent of that heuristic) can still have
+    // completed for such a call. Checking every livekitRoom appointment's
+    // blob path directly sidesteps needing that other bug fixed first.
+    const { resources: candidates } = await appointmentsContainer.items
+      .query({
+        query: `SELECT c.id FROM c
+                WHERE IS_DEFINED(c.livekitRoom) AND c.livekitRoom != null
+                AND (NOT IS_DEFINED(c.recordingBlobPath) OR c.recordingBlobPath = null)`,
+      })
+      .fetchAll();
+
+    let backfilled = 0;
+    for (const { id } of candidates as { id: string }[]) {
+      const blobPath = `recordings/${id}.ogg`;
+      try {
+        if (!(await blobExists(blobPath))) continue;
+        const updated = await updateAppointmentWithRetry(id, (apt) => ({
+          ...apt,
+          recordingBlobPath: blobPath,
+          recordingSavedAt: new Date().toISOString(),
+        }));
+        if (updated) backfilled++;
+      } catch (err) {
+        console.error(`[reconcile-recordings] Failed to check/backfill ${id}:`, err);
+      }
+    }
+
+    res.json({ status: "OK", checked: candidates.length, backfilled });
+  } catch (err) {
+    console.error("[appointments/reconcile-recordings] sweep failed:", err);
+    res.status(500).json({ error: "Sweep failed" });
   }
 });
 
