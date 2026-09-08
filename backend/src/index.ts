@@ -86,6 +86,11 @@ app.use(
       "authorization",
       "rid",
       "ngrok-skip-browser-warning",
+      // Sent by every white-label portal/app build on registration and
+      // sign-in (see NEXT_PUBLIC_ORG_SLUG) — without this, the browser's own
+      // CORS preflight silently blocks the real request before it's ever
+      // sent, surfacing to the user as a generic network failure.
+      "x-org-slug",
       ...SuperTokens.getAllCORSHeaders(),
     ],
     credentials: true,
