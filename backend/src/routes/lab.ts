@@ -1,20 +1,50 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
+import EmailPassword from "supertokens-node/recipe/emailpassword";
+import UserRoles from "supertokens-node/recipe/userroles";
+import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labTestsContainer, labBookingsContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
+import { resolveClinicName } from "./clinicInsurance";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ─── GET /api/lab/tests ───────────────────────────────────────────────────────
-// Public: returns all active lab tests
-router.get("/tests", async (_req: Request, res: Response) => {
+// Public: returns all approved, active lab tests. Supports ?category=, ?labId=
+// (browse-by-lab, mirrors pharmacy.ts's ?pharmacyId= catalogue filter) and
+// ?clinicId= (a clinic-affiliated doctor's own prescribing search, mirrors
+// pharmacy.ts's clinicId->pharmacyId resolution — a branch has at most one
+// affiliated lab, even though that lab may also serve other branches).
+router.get("/tests", async (req: Request, res: Response) => {
   try {
-    const { category } = _req.query as { category?: string };
-    let query = "SELECT * FROM c WHERE c.is_active = true";
+    const { category, labId, clinicId } = req.query as { category?: string; labId?: string; clinicId?: string };
+    // Legacy-safe: test docs created before the approval workflow existed have
+    // no `status` field at all — treat those as approved, same pattern used
+    // for pharmacyProducts.inStock everywhere else in this codebase.
+    let query = "SELECT * FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')";
     const parameters: any[] = [];
+
+    if (clinicId) {
+      const { resources: clinicLabs } = await labServicesContainer.items
+        .query({
+          query: "SELECT * FROM c WHERE ARRAY_CONTAINS(c.clinicIds, @clinicId) AND c.status = 'approved'",
+          parameters: [{ name: "@clinicId", value: clinicId }],
+        })
+        .fetchAll();
+      if (clinicLabs.length) {
+        query += " AND c.labId = @clinicLabId";
+        parameters.push({ name: "@clinicLabId", value: clinicLabs[0].id });
+      }
+    }
+
+    if (labId) {
+      query += " AND c.labId = @labId";
+      parameters.push({ name: "@labId", value: labId });
+    }
     if (category) {
       query += " AND LOWER(c.category) = LOWER(@cat)";
       parameters.push({ name: "@cat", value: category });
@@ -28,12 +58,408 @@ router.get("/tests", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/lab/labs ─────────────────────────────────────────────────────────
+// Public — lists approved labs that carry at least one orderable test, for the
+// patient app's "browse by lab" screen. Mirrors GET /api/pharmacy/pharmacies.
+router.get("/labs", async (_req: Request, res: Response) => {
+  try {
+    const { resources: labs } = await labServicesContainer.items.query(
+      "SELECT * FROM c WHERE c.status = 'approved'"
+    ).fetchAll();
+
+    const { resources: approvedTests } = await labTestsContainer.items.query(
+      "SELECT c.labId FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')"
+    ).fetchAll();
+    const testCountMap: Record<string, number> = {};
+    approvedTests.forEach((t: any) => {
+      if (!t.labId) return;
+      testCountMap[t.labId] = (testCountMap[t.labId] ?? 0) + 1;
+    });
+
+    const list = labs
+      .map((l: any) => ({
+        id:         l.id,
+        name:       l.name,
+        location:   l.location ?? null,
+        rating:     l.rating ?? 0,
+        testCount:  testCountMap[l.id] ?? 0,
+      }))
+      .filter((l) => l.testCount > 0)
+      .sort((a, b) => b.rating - a.rating || b.testCount - a.testCount);
+
+    res.json(list);
+  } catch (err) {
+    console.error("Labs list error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/register ───────────────────────────────────────────────────
+// Public — self-registration for an independent lab. Mirrors pharmacy.ts's
+// POST /register exactly (SuperTokens signup -> "lab_pending" role -> Cosmos
+// doc awaiting admin approval). Uses the same field names adminLab.ts's
+// admin-direct-create already writes, so every lab doc shares one schema
+// regardless of how it was created.
+router.post("/register", async (req: Request, res: Response) => {
+  const { password, director, name, labLicense, location, contactNumber } = req.body;
+  const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
+
+  if (!email || !password || !director || !name || !labLicense || !contactNumber) {
+    res.status(400).json({ error: "email, password, director, name, labLicense and contactNumber are required." });
+    return;
+  }
+
+  try {
+    const signUpResult = await EmailPassword.signUp("public", email, password);
+
+    if (signUpResult.status === "EMAIL_ALREADY_EXISTS_ERROR") {
+      res.status(409).json({ error: "An account with this email already exists." });
+      return;
+    }
+    if (signUpResult.status !== "OK") {
+      res.status(400).json({ error: "Registration failed. Please try again." });
+      return;
+    }
+
+    const supertokensId = signUpResult.user.id;
+
+    await UserRoles.addRoleToUser("public", supertokensId, "lab_pending");
+
+    const now = new Date().toISOString();
+    const labDoc = {
+      id:             supertokensId,
+      supertokens_id: supertokensId,
+      status:         "pending_approval" as const,
+      email,
+      director,
+      name,
+      labLicense,
+      location:       location || null,
+      contactNumber,
+      clinicIds:      [],
+      affiliation:    null,
+      linkRequests:   [],
+      registeredAt:   now,
+      approvedAt:     null,
+      approvedBy:     null,
+      rejectedAt:     null,
+      rejectedReason: null,
+      totalTests:     0,
+      rating:         0,
+    };
+
+    await labServicesContainer.items.upsert(labDoc);
+
+    res.status(201).json({ status: "OK", message: "Registration submitted. Awaiting admin approval." });
+  } catch (err) {
+    console.error("Lab register error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/me ───────────────────────────────────────────────────────────
+router.get("/me", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { resource } = await labServicesContainer.item(labId, labId).read();
+    if (!resource) { res.status(404).json({ error: "Lab not found" }); return; }
+    res.json({ lab: resource });
+  } catch (err) {
+    console.error("Lab me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PUT /api/lab/me ────────────────────────────────────────────────────────────
+router.put("/me", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { director, name, labLicense, contactNumber, location, manager, operatingHours } = req.body;
+    const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
+
+    const { resource: existing } = await labServicesContainer.item(labId, labId).read();
+    if (!existing) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    const updated = {
+      ...existing,
+      ...(director && { director }),
+      ...(name && { name }),
+      ...(labLicense && { labLicense }),
+      ...(email && { email }),
+      ...(contactNumber && { contactNumber }),
+      ...(location !== undefined && { location }),
+      ...(manager !== undefined && { manager }),
+      ...(operatingHours !== undefined && { operatingHours }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK", lab: updated });
+  } catch (err) {
+    console.error("Lab update me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/clinic-affiliations ────────────────────────────────────────
+router.get("/clinic-affiliations", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { resource } = await labServicesContainer.item(labId, labId).read();
+    if (!resource) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    const clinicIds: string[] = resource.clinicIds ?? [];
+    const affiliations = await Promise.all(
+      clinicIds.map(async (id) => ({ clinicId: id, clinicName: (await resolveClinicName(id)) ?? "Unknown clinic" }))
+    );
+
+    res.json({ affiliations, linkRequests: resource.linkRequests ?? [] });
+  } catch (err) {
+    console.error("Lab clinic-affiliations fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/clinic-link-requests/accept ───────────────────────────────
+router.post("/clinic-link-requests/accept", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { fromClinicId } = req.body;
+    if (!fromClinicId) { res.status(400).json({ error: "fromClinicId is required." }); return; }
+
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    const linkRequests: any[] = lab.linkRequests ?? [];
+    if (!linkRequests.some((r) => r.fromClinicId === fromClinicId)) {
+      res.status(400).json({ error: "No matching pending link request." });
+      return;
+    }
+
+    const updated = {
+      ...lab,
+      clinicIds: [...new Set([...(lab.clinicIds ?? []), fromClinicId])],
+      affiliation: lab.affiliation ?? ("linked" as const),
+      linkRequests: linkRequests.filter((r) => r.fromClinicId !== fromClinicId),
+    };
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK", lab: updated });
+  } catch (err) {
+    console.error("Lab clinic-link-requests accept error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/clinic-link-requests/reject ───────────────────────────────
+router.post("/clinic-link-requests/reject", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { fromClinicId } = req.body;
+    if (!fromClinicId) { res.status(400).json({ error: "fromClinicId is required." }); return; }
+
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    const updated = { ...lab, linkRequests: (lab.linkRequests ?? []).filter((r: any) => r.fromClinicId !== fromClinicId) };
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Lab clinic-link-requests reject error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/my-tests ────────────────────────────────────────────────────
+// Self-service test inventory for the authenticated lab. Named "my-tests"
+// rather than reusing "tests" — that's the public catalogue route (mirrors
+// pharmacy.ts's catalogue/products split).
+router.get("/my-tests", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { resources } = await labTestsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.labId = @lid ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@lid", value: labId }],
+    }, { partitionKey: labId }).fetchAll();
+    res.json({ tests: resources });
+  } catch (err) {
+    console.error("Lab my-tests error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/my-tests/:testId ────────────────────────────────────────────
+router.get("/my-tests/:testId", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { testId } = req.params;
+    const { resource } = await labTestsContainer.item(testId, labId).read();
+    if (!resource || resource.labId !== labId) { res.status(404).json({ error: "Test not found" }); return; }
+    res.json({ test: resource });
+  } catch (err) {
+    console.error("Lab my-test fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/my-tests ───────────────────────────────────────────────────
+// Approval-gated exactly like pharmacy.ts's POST /products: an already-
+// approved lab's new tests go straight live; a pending/rejected lab's tests
+// wait for admin review.
+router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const {
+      name, category, price, turnaround_hours, requires_fasting,
+      requires_doctor_approval, homeVisitAvailable, description, recommendedFor,
+      ageRange, targetGroups, normalValues, howItsDone, recommendedFrequency,
+      patientInstructions,
+    } = req.body;
+
+    if (!name || !category || price == null) {
+      res.status(400).json({ error: "name, category, and price are required" });
+      return;
+    }
+
+    const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
+    const isOnboarded = labDoc?.status === "approved";
+
+    const now = new Date().toISOString();
+    const testId = `${labId}_${Date.now()}`;
+    const test = {
+      id:                       testId,
+      labId,
+      labName:                  labDoc?.name ?? null,
+      name,
+      category,
+      price:                    parseFloat(price),
+      turnaround_hours:         turnaround_hours ?? null,
+      requires_fasting:         requires_fasting === "true" || requires_fasting === true,
+      requires_doctor_approval: requires_doctor_approval === "true" || requires_doctor_approval === true,
+      homeVisitAvailable:       homeVisitAvailable === "true" || homeVisitAvailable === true,
+      is_active:                true,
+      description:              description ?? null,
+      recommendedFor:           recommendedFor ?? null,
+      ageRange:                 ageRange ?? null,
+      targetGroups:             Array.isArray(targetGroups) ? targetGroups : [],
+      normalValues:             Array.isArray(normalValues) ? normalValues : [],
+      howItsDone:                howItsDone ?? null,
+      recommendedFrequency:     recommendedFrequency ?? null,
+      patientInstructions:      patientInstructions ?? null,
+      status:                   isOnboarded ? "approved" : "pending_approval",
+      flagged:                  false,
+      flaggedAt:                null,
+      flaggedBy:                null,
+      flagReason:               null,
+      createdAt:                now,
+      approvedAt:               isOnboarded ? now : null,
+      approvedBy:                null,
+      rejectedAt:                null,
+      rejectedReason:            null,
+    };
+
+    await labTestsContainer.items.upsert(test);
+
+    if (labDoc) {
+      await labServicesContainer.items.upsert({ ...labDoc, totalTests: (labDoc.totalTests ?? 0) + 1 });
+    }
+
+    res.status(201).json({ status: "OK", test });
+  } catch (err) {
+    console.error("Lab create test error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PUT /api/lab/my-tests/:testId ────────────────────────────────────────────
+router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { testId } = req.params;
+    const {
+      name, category, price, turnaround_hours, requires_fasting,
+      requires_doctor_approval, homeVisitAvailable, description, recommendedFor,
+      ageRange, targetGroups, normalValues, howItsDone, recommendedFrequency,
+      patientInstructions, is_active,
+    } = req.body;
+
+    const { resource: existing } = await labTestsContainer.item(testId, labId).read();
+    if (!existing || existing.labId !== labId) { res.status(404).json({ error: "Test not found" }); return; }
+
+    const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
+    const isOnboarded = labDoc?.status === "approved";
+
+    const updated = {
+      ...existing,
+      ...(name !== undefined && { name }),
+      ...(category !== undefined && { category }),
+      ...(price !== undefined && { price: parseFloat(price) }),
+      ...(turnaround_hours !== undefined && { turnaround_hours }),
+      ...(requires_fasting !== undefined && { requires_fasting: requires_fasting === "true" || requires_fasting === true }),
+      ...(requires_doctor_approval !== undefined && { requires_doctor_approval: requires_doctor_approval === "true" || requires_doctor_approval === true }),
+      ...(homeVisitAvailable !== undefined && { homeVisitAvailable: homeVisitAvailable === "true" || homeVisitAvailable === true }),
+      ...(description !== undefined && { description }),
+      ...(recommendedFor !== undefined && { recommendedFor }),
+      ...(ageRange !== undefined && { ageRange }),
+      ...(targetGroups !== undefined && { targetGroups: Array.isArray(targetGroups) ? targetGroups : existing.targetGroups }),
+      ...(normalValues !== undefined && { normalValues: Array.isArray(normalValues) ? normalValues : existing.normalValues }),
+      ...(howItsDone !== undefined && { howItsDone }),
+      ...(recommendedFrequency !== undefined && { recommendedFrequency }),
+      ...(patientInstructions !== undefined && { patientInstructions }),
+      ...(is_active !== undefined && { is_active: is_active === "true" || is_active === true }),
+      status: isOnboarded ? "approved" : "pending_approval",
+      rejectedAt: null,
+      rejectedReason: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await labTestsContainer.items.upsert(updated);
+    res.json({ status: "OK", test: updated });
+  } catch (err) {
+    console.error("Lab update test error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── DELETE /api/lab/my-tests/:testId ─────────────────────────────────────────
+router.delete("/my-tests/:testId", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { testId } = req.params;
+    await labTestsContainer.item(testId, labId).delete();
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Lab delete test error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/my-bookings ──────────────────────────────────────────────────
+// Returns all bookings that contain at least one item belonging to this lab.
+// labBookings is partitioned by /patientId so this must be cross-partition.
+router.get("/my-bookings", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { resources } = await labBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid) ORDER BY c.createdAt DESC",
+        parameters: [{ name: "@lid", value: labId }],
+      },
+      { maxItemCount: 100 }
+    ).fetchAll();
+
+    res.json({ bookings: resources });
+  } catch (err) {
+    console.error("Lab bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── GET /api/lab/tests/:testId ───────────────────────────────────────────────
 router.get("/tests/:testId", async (req: Request, res: Response) => {
   try {
     const { testId } = req.params;
     const { resources } = await labTestsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
+      query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
       parameters: [{ name: "@id", value: testId }],
     }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Test not found" }); return; }
@@ -70,7 +496,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
 
     for (const item of items) {
       const { resources } = await labTestsContainer.items.query({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
+        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
         parameters: [{ name: "@id", value: item.testId }],
       }).fetchAll();
 
@@ -196,9 +622,11 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
 });
 
 // ─── PATCH /api/lab/bookings/:bookingId/status ────────────────────────────────
-router.patch("/bookings/:bookingId/status", requireRole("patient"), async (req: SessionRequest, res: Response) => {
+// A lab (not the patient) moves a booking through its own fulfillment
+// stages — mirrors pharmacy.ts's PATCH /orders/:orderId/status.
+router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: SessionRequest, res: Response) => {
   try {
-    const patientId = req.session!.getUserId();
+    const labId = req.session!.getUserId();
     const { bookingId } = req.params;
     const { status } = req.body;
 
@@ -208,13 +636,16 @@ router.patch("/bookings/:bookingId/status", requireRole("patient"), async (req: 
       return;
     }
 
-    const { resources } = await labBookingsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @pid",
-      parameters: [{ name: "@id", value: bookingId }, { name: "@pid", value: patientId }],
-    }, { partitionKey: patientId }).fetchAll();
+    const { resources } = await labBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid)",
+        parameters: [{ name: "@id", value: bookingId }, { name: "@lid", value: labId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
 
     if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
-    
+
     const booking = resources[0];
     const updated = { ...booking, status, updatedAt: new Date().toISOString() };
     await labBookingsContainer.items.upsert(updated);

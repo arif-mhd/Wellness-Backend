@@ -5,14 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type Step = 1 | 2 | 3;
-
-const STEPS = ["Account", "Pharmacy", "Review"];
+type AccountType = "pharmacy" | "lab";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep]             = useState<Step>(1);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
+
+  // Account type — chosen at the top of Step 1, drives every step after it.
+  const [accountType, setAccountType] = useState<AccountType>("pharmacy");
+  const STEPS = ["Account", accountType === "lab" ? "Lab" : "Pharmacy", "Review"];
 
   // Step 1 — account credentials
   const [email, setEmail]           = useState("");
@@ -27,6 +30,13 @@ export default function RegisterPage() {
   const [location, setLocation]           = useState("");
   const [emiratesId, setEmiratesId]       = useState("");
 
+  // Step 2 — lab details
+  const [director, setDirector]           = useState("");
+  const [labName, setLabName]             = useState("");
+  const [labLicense, setLabLicense]       = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [labLocation, setLabLocation]     = useState("");
+
   function validateStep1() {
     if (!email || !password || !confirmPwd) return "All fields are required.";
     if (!/\S+@\S+\.\S+/.test(email)) return "Enter a valid email.";
@@ -36,6 +46,10 @@ export default function RegisterPage() {
   }
 
   function validateStep2() {
+    if (accountType === "lab") {
+      if (!director || !labName || !labLicense || !contactNumber) return "Director name, lab name, license number and phone are required.";
+      return null;
+    }
     if (!ownerName || !pharmacyName || !licenseNumber || !phone) return "Owner name, pharmacy name, license number and phone are required.";
     return null;
   }
@@ -55,13 +69,18 @@ export default function RegisterPage() {
     setLoading(true); setError("");
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const res = await fetch(`${apiUrl}/api/pharmacy/register`, {
+      const isLab = accountType === "lab";
+      const res = await fetch(`${apiUrl}/api/${isLab ? "lab" : "pharmacy"}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(process.env.NEXT_PUBLIC_ORG_SLUG ? { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } : {}),
         },
-        body: JSON.stringify({ email, password, ownerName, pharmacyName, licenseNumber, phone, location, emiratesId }),
+        body: JSON.stringify(
+          isLab
+            ? { email, password, director, name: labName, labLicense, location: labLocation, contactNumber }
+            : { email, password, ownerName, pharmacyName, licenseNumber, phone, location, emiratesId }
+        ),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Registration failed."); return; }
@@ -84,7 +103,7 @@ export default function RegisterPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 8.5l7 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-marcellus text-[#1a2332]">Pharmacy Central</h1>
+          <h1 className="text-2xl font-marcellus text-[#1a2332]">Wellness Central</h1>
         </div>
 
         {/* Step tabs */}
@@ -113,8 +132,30 @@ export default function RegisterPage() {
           {step === 1 && (
             <div className="space-y-4 animate-fade-in">
               <h2 className="text-lg font-bricolage font-bold text-[#1a2332] mb-4">Create your account</h2>
+
+              {/* Account type picker */}
+              <div>
+                <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">I am registering as a</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["pharmacy", "lab"] as AccountType[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setAccountType(t)}
+                      className={`h-12 rounded-xl text-sm font-outfit font-semibold border transition ${
+                        accountType === t
+                          ? "bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white border-transparent shadow-lg shadow-green-200/50"
+                          : "bg-[#f3f4fd] text-slate-500 border-transparent hover:bg-slate-100"
+                      }`}
+                    >
+                      {t === "pharmacy" ? "Pharmacy" : "Lab"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {[
-                { label: "Email address", value: email, set: setEmail, type: "email", ph: "pharmacy@example.com" },
+                { label: "Email address", value: email, set: setEmail, type: "email", ph: accountType === "lab" ? "lab@example.com" : "pharmacy@example.com" },
                 { label: "Password", value: password, set: setPassword, type: "password", ph: "Min. 8 characters" },
                 { label: "Confirm password", value: confirmPwd, set: setConfirmPwd, type: "password", ph: "Repeat password" },
               ].map(({ label, value, set, type, ph }) => (
@@ -128,7 +169,7 @@ export default function RegisterPage() {
           )}
 
           {/* Step 2 */}
-          {step === 2 && (
+          {step === 2 && accountType === "pharmacy" && (
             <div className="space-y-4 animate-fade-in">
               <h2 className="text-lg font-bricolage font-bold text-[#1a2332] mb-4">Pharmacy details</h2>
               {[
@@ -148,20 +189,49 @@ export default function RegisterPage() {
             </div>
           )}
 
+          {step === 2 && accountType === "lab" && (
+            <div className="space-y-4 animate-fade-in">
+              <h2 className="text-lg font-bricolage font-bold text-[#1a2332] mb-4">Lab details</h2>
+              {[
+                { label: "Director full name *", value: director, set: setDirector, ph: "e.g. Dr. Sara Al Falasi" },
+                { label: "Lab name *", value: labName, set: setLabName, ph: "e.g. Al Shifa Diagnostics" },
+                { label: "License number *", value: labLicense, set: setLabLicense, ph: "e.g. DHA-LAB-2024-XXXXX" },
+                { label: "Phone number *", value: contactNumber, set: setContactNumber, ph: "+971 50 000 0000" },
+                { label: "Location / Address", value: labLocation, set: setLabLocation, ph: "Dubai, UAE" },
+              ].map(({ label, value, set, ph }) => (
+                <div key={label}>
+                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
+                  <input type="text" value={value} onChange={e => set(e.target.value)} placeholder={ph}
+                    className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition" />
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Step 3 — Review */}
           {step === 3 && (
             <div className="animate-fade-in">
               <h2 className="text-lg font-bricolage font-bold text-[#1a2332] mb-5">Review & submit</h2>
               <div className="space-y-3 mb-6">
-                {[
-                  ["Email",          email],
-                  ["Owner",          ownerName],
-                  ["Pharmacy name",  pharmacyName],
-                  ["License",        licenseNumber],
-                  ["Phone",          phone],
-                  ["Location",       location || "—"],
-                  ["Emirates ID",    emiratesId || "—"],
-                ].map(([label, value]) => (
+                {(accountType === "lab"
+                  ? [
+                      ["Email",     email],
+                      ["Director",  director],
+                      ["Lab name",  labName],
+                      ["License",   labLicense],
+                      ["Phone",     contactNumber],
+                      ["Location",  labLocation || "—"],
+                    ]
+                  : [
+                      ["Email",          email],
+                      ["Owner",          ownerName],
+                      ["Pharmacy name",  pharmacyName],
+                      ["License",        licenseNumber],
+                      ["Phone",          phone],
+                      ["Location",       location || "—"],
+                      ["Emirates ID",    emiratesId || "—"],
+                    ]
+                ).map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center py-2 border-b border-slate-50">
                     <span className="text-xs font-outfit text-slate-400 font-semibold uppercase tracking-wide">{label}</span>
                     <span className="text-sm font-outfit text-[#1a2332] font-medium">{value}</span>

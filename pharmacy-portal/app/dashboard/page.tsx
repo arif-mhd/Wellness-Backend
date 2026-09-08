@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useAccountRole } from "@/hooks/useAccountRole";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -25,7 +26,7 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
 }
 
 interface Product {
-  id: string; name: string; category: string; price: number; stock: number;
+  id: string; name: string; category: string; price: number; stock?: number;
   status: "pending_approval" | "approved" | "rejected"; createdAt: string; imageUrl?: string;
 }
 interface Pharmacy {
@@ -39,8 +40,26 @@ interface Order {
   delivery_address: string; status: string; createdAt: string; total_amount: number;
 }
 
-/** Build a 6-month rolling chart dataset from real orders. */
-function buildChartData(orders: Order[]) {
+interface LabTest {
+  id: string; name: string; category: string; price: number;
+  status: "pending_approval" | "approved" | "rejected"; createdAt: string; imageUrl?: string;
+}
+interface Lab {
+  name: string; director: string; labLicense: string; location?: string; status: string;
+}
+interface LabBookingItem {
+  testId: string; testName: string; category: string; labId: string; labName: string;
+  price: number; forPatientId?: string; visitMode: "Laboratory" | "Home"; scheduledAt?: string;
+  requires_doctor_approval?: boolean;
+}
+interface LabBooking {
+  id: string; patientId: string; items: LabBookingItem[];
+  status: string; payment_status?: string; payment_amount?: number;
+  createdAt: string; updatedAt?: string;
+}
+
+/** Build a 6-month rolling chart dataset from real orders/bookings (any {createdAt, total_amount} shape). */
+function buildChartData(orders: { createdAt: string; total_amount: number }[]) {
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const now = new Date();
@@ -82,8 +101,16 @@ const ORDER_STATUS_CONFIG: Record<string, { bg: string; text: string; dot: strin
   cancelled:  { bg: "#FEE2E2", text: "#F25252", dot: "#F25252" },
 };
 
+const BOOKING_STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string }> = {
+  awaiting:   { bg: "#FFF4E5", text: "#D97706", dot: "#F59E0B" },
+  confirmed:  { bg: "#EEF2FF", text: "#4F46E5", dot: "#6366F1" },
+  analyzing:  { bg: "#E0F2FE", text: "#0369A1", dot: "#0EA5E9" },
+  results:    { bg: "#E2F8EB", text: "#179353", dot: "#179353" },
+  cancelled:  { bg: "#FEE2E2", text: "#F25252", dot: "#F25252" },
+};
+
 function StatusBadge({ status, config }: { status: string; config: Record<string, { bg: string; text: string; dot: string }> }) {
-  const c = config[status] ?? config["pending"];
+  const c = config[status] ?? config["pending"] ?? Object.values(config)[0];
   const label = status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
   return (
     <span
@@ -120,32 +147,54 @@ function CustomTooltip({ active, payload, label }: any) {
 /* ─── Main Page ──────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const router   = useRouter();
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+
   const [pharmacy,   setPharmacy]   = useState<Pharmacy | null>(null);
   const [products,   setProducts]   = useState<Product[]>([]);
   const [orders,     setOrders]     = useState<Order[]>([]);
+  const [lab,        setLab]        = useState<Lab | null>(null);
+  const [tests,      setTests]      = useState<LabTest[]>([]);
+  const [bookings,   setBookings]   = useState<LabBooking[]>([]);
   const [ratingStats, setRatingStats] = useState({ averageRating: 0, totalReviews: 0 });
+  const [ratingAvailable, setRatingAvailable] = useState(true);
   const [loading,    setLoading]    = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [pRes, prRes, orRes, rRes] = await Promise.all([
-        apiFetch("/api/pharmacy/me"),
-        apiFetch("/api/pharmacy/products"),
-        apiFetch("/api/pharmacy/orders"),
-        apiFetch("/api/feedback/pharmacy/stats"),
-      ]);
-      if (pRes.ok)  { const d = await pRes.json();  setPharmacy(d.pharmacy); }
-      if (prRes.ok) { const d = await prRes.json(); setProducts(d.products ?? []); }
-      if (orRes.ok) { const d = await orRes.json(); setOrders(d.orders   ?? []); }
-      if (rRes.ok)  { const d = await rRes.json();  setRatingStats(d); }
+      if (isLab) {
+        const [lRes, tRes, bRes, rRes] = await Promise.all([
+          apiFetch("/api/lab/me"),
+          apiFetch("/api/lab/my-tests"),
+          apiFetch("/api/lab/my-bookings"),
+          apiFetch("/api/feedback/lab/stats"),
+        ]);
+        if (lRes.ok) { const d = await lRes.json(); setLab(d.lab); }
+        if (tRes.ok) { const d = await tRes.json(); setTests(d.tests ?? []); }
+        if (bRes.ok) { const d = await bRes.json(); setBookings(d.bookings ?? []); }
+        if (rRes.ok) { const d = await rRes.json(); setRatingStats(d); setRatingAvailable(true); }
+        else { setRatingAvailable(false); }
+      } else {
+        const [pRes, prRes, orRes, rRes] = await Promise.all([
+          apiFetch("/api/pharmacy/me"),
+          apiFetch("/api/pharmacy/products"),
+          apiFetch("/api/pharmacy/orders"),
+          apiFetch("/api/feedback/pharmacy/stats"),
+        ]);
+        if (pRes.ok)  { const d = await pRes.json();  setPharmacy(d.pharmacy); }
+        if (prRes.ok) { const d = await prRes.json(); setProducts(d.products ?? []); }
+        if (orRes.ok) { const d = await orRes.json(); setOrders(d.orders   ?? []); }
+        if (rRes.ok)  { const d = await rRes.json();  setRatingStats(d); }
+      }
     } catch { /* silently */ } finally { setLoading(false); setDataLoaded(true); }
-  }, []);
+  }, [isLab]);
 
   useEffect(() => { load(); }, [load]);
 
-  const recentProducts = products.slice(0, 5);
+  const recentProducts = isLab ? tests.slice(0, 5) : products.slice(0, 5);
   const recentOrders   = orders.slice(0, 5);
+  const recentBookings = bookings.slice(0, 5);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -154,10 +203,19 @@ export default function DashboardPage() {
     return "Good Evening!";
   })();
 
-  /* pending product count */
-  const pendingCount = products.filter(p => p.status === "pending_approval").length;
-  /* total order value */
-  const totalRevenue  = orders.reduce((s, o) => s + (o.total_amount ?? 0), 0);
+  /* pending item count */
+  const pendingCount = isLab
+    ? tests.filter(t => t.status === "pending_approval").length
+    : products.filter(p => p.status === "pending_approval").length;
+
+  /* total order/booking value */
+  const totalRevenue = isLab
+    ? bookings.reduce((s, b) => s + (b.payment_amount ?? 0), 0)
+    : orders.reduce((s, o) => s + (o.total_amount ?? 0), 0);
+
+  const chartSource = isLab
+    ? bookings.map(b => ({ createdAt: b.createdAt, total_amount: b.payment_amount ?? 0 }))
+    : orders;
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center min-h-screen">
@@ -175,18 +233,20 @@ export default function DashboardPage() {
             {greeting}
           </span>
           <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
-            {pharmacy?.ownerName?.split(" ")[0] ?? (dataLoaded ? "Pharmacy Admin" : "—")}
+            {isLab
+              ? (lab?.director?.split(" ")[0] ?? (dataLoaded ? "Lab Admin" : "—"))
+              : (pharmacy?.ownerName?.split(" ")[0] ?? (dataLoaded ? "Pharmacy Admin" : "—"))}
           </h1>
         </div>
         <div className="flex flex-col gap-1 text-right">
           <span className="text-[#707070] text-xs font-semibold tracking-[-0.24px] font-sans">
-            Pharmacy Status
+            {isLab ? "Lab Status" : "Pharmacy Status"}
           </span>
           <span className="text-[#383F45] font-normal text-[20px] leading-none tracking-[-0.4px]">
-            {pharmacy?.pharmacyName ?? "—"}
+            {isLab ? (lab?.name ?? "—") : (pharmacy?.pharmacyName ?? "—")}
           </span>
           <span className="text-[#A0A8B0] text-sm font-normal">
-            {pharmacy?.licenseNumber ?? "—"}
+            {isLab ? (lab?.labLicense ?? "—") : (pharmacy?.licenseNumber ?? "—")}
           </span>
         </div>
       </div>
@@ -194,11 +254,11 @@ export default function DashboardPage() {
       {/* ── Stats Row ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
 
-        {/* Card: Total Products */}
+        {/* Card: Total Products / Total Tests */}
         <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
-              Total Products
+              {isLab ? "Total Tests" : "Total Products"}
             </span>
             <span className="w-8 h-8 rounded-lg bg-[#EEF2FF] flex items-center justify-center">
               <svg className="w-4 h-4 text-[#5476FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,18 +267,18 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
-            {dataLoaded ? products.length : "—"}
+            {dataLoaded ? (isLab ? tests.length : products.length) : "—"}
           </div>
           <div className="text-[#A0A8B0] text-[11px]">
             {pendingCount > 0 ? `${pendingCount} awaiting approval` : "All approved"}
           </div>
         </div>
 
-        {/* Card: Total Orders */}
+        {/* Card: Total Orders / Bookings */}
         <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
-              Total Orders
+              {isLab ? "Total Bookings" : "Total Orders"}
             </span>
             <span className="w-8 h-8 rounded-lg bg-[#E2F8EB] flex items-center justify-center">
               <svg className="w-4 h-4 text-[#179353]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,10 +287,12 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
-            {dataLoaded ? orders.length : "—"}
+            {dataLoaded ? (isLab ? bookings.length : orders.length) : "—"}
           </div>
           <div className="text-[#A0A8B0] text-[11px]">
-            {orders.filter(o => o.status === "pending").length} pending dispatch
+            {isLab
+              ? `${bookings.filter(b => b.status === "awaiting").length} awaiting`
+              : `${orders.filter(o => o.status === "pending").length} pending dispatch`}
           </div>
         </div>
 
@@ -253,7 +315,9 @@ export default function DashboardPage() {
             <svg className="w-3.5 h-3.5 text-[#179353]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
-            <span className="text-[11px] text-[#179353] font-medium">Live from orders</span>
+            <span className="text-[11px] text-[#179353] font-medium">
+              {isLab ? "Live from bookings" : "Live from orders"}
+            </span>
           </div>
         </div>
 
@@ -268,13 +332,13 @@ export default function DashboardPage() {
             href="/dashboard/add-product"
             className="w-full bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white py-2.5 rounded-lg text-[13px] font-medium text-center shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all"
           >
-            + Add Product
+            {isLab ? "+ Add Lab Test" : "+ Add Product"}
           </Link>
           <Link
             href="/dashboard/orders"
             className="w-full bg-[#F7F8FA] border border-slate-200 text-[#24292E] py-2.5 rounded-lg text-[13px] font-medium text-center hover:bg-slate-50 transition-all"
           >
-            View Orders
+            {isLab ? "View Bookings" : "View Orders"}
           </Link>
         </div>
       </div>
@@ -298,7 +362,7 @@ export default function DashboardPage() {
                 <span className="w-3 h-0.5 rounded-full bg-[#5476FC] inline-block" /> Revenue
               </span>
               <span className="flex items-center gap-1.5 text-[#676E76]">
-                <span className="w-3 h-0.5 rounded-full bg-[#179353] inline-block" /> Orders
+                <span className="w-3 h-0.5 rounded-full bg-[#179353] inline-block" /> {isLab ? "Bookings" : "Orders"}
               </span>
             </div>
           </div>
@@ -307,7 +371,7 @@ export default function DashboardPage() {
 
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={buildChartData(orders)} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+              <AreaChart data={buildChartData(chartSource)} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="gradSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#5476FC" stopOpacity={0.18} />
@@ -355,7 +419,7 @@ export default function DashboardPage() {
                   yAxisId="right"
                   type="monotone"
                   dataKey="orders"
-                  name="Orders"
+                  name={isLab ? "Bookings" : "Orders"}
                   stroke="#179353"
                   strokeWidth={2.5}
                   fill="url(#gradOrders)"
@@ -367,33 +431,35 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: Rating + Recent Products */}
+        {/* Right Column: Rating + Recent Products/Tests */}
         <div className="flex flex-col gap-6">
-          {/* Average Rating Card */}
-          <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
-                Average Rating
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-[#FEF3C7] flex items-center justify-center">
-                <svg className="w-4 h-4 text-[#D97706]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-              </span>
+          {/* Average Rating Card — hidden for lab accounts if no lab feedback-stats endpoint exists */}
+          {(!isLab || ratingAvailable) && (
+            <div className="bg-white rounded-xl p-6 flex flex-col gap-3 shadow-sm border border-[#EBEEF5] hover:border-gray-100 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]">
+                  Average Rating
+                </span>
+                <span className="w-8 h-8 rounded-lg bg-[#FEF3C7] flex items-center justify-center">
+                  <svg className="w-4 h-4 text-[#D97706]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </span>
+              </div>
+              <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
+                {dataLoaded ? ratingStats.averageRating.toFixed(1) : "—"}
+              </div>
+              <div className="text-[#A0A8B0] text-[11px]">
+                Based on {ratingStats.totalReviews} reviews
+              </div>
             </div>
-            <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
-              {dataLoaded ? ratingStats.averageRating.toFixed(1) : "—"}
-            </div>
-            <div className="text-[#A0A8B0] text-[11px]">
-              Based on {ratingStats.totalReviews} reviews
-            </div>
-          </div>
+          )}
 
-          {/* Recent Products */}
+          {/* Recent Products / Recent Tests */}
           <div className="bg-white rounded-xl p-6 border border-[#EBEEF5] shadow-sm hover:border-gray-100 transition-all flex flex-col gap-4 flex-1">
             <div className="flex justify-between items-center">
               <span className="text-[#24292E] text-[18px] font-semibold tracking-[-0.36px]">
-                Recent Products
+                {isLab ? "Recent Tests" : "Recent Products"}
               </span>
               <Link href="/dashboard/inventory" className="text-[#5476FC] text-xs font-medium hover:underline">
                 View All
@@ -404,11 +470,15 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-1.5">
             {recentProducts.length === 0 ? (
               <div className="py-10 flex flex-col items-center text-center">
-                <p className="font-medium text-[#24292E] mb-1 text-[15px]">No products yet</p>
-                <p className="text-xs text-[#676E76] mb-5">Add your first product to get started</p>
+                <p className="font-medium text-[#24292E] mb-1 text-[15px]">
+                  {isLab ? "No tests yet" : "No products yet"}
+                </p>
+                <p className="text-xs text-[#676E76] mb-5">
+                  {isLab ? "Add your first lab test to get started" : "Add your first product to get started"}
+                </p>
                 <Link href="/dashboard/add-product"
                   className="px-5 py-2.5 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white rounded-xl font-medium text-[13px] shadow-sm">
-                  Add Product
+                  {isLab ? "Add Lab Test" : "Add Product"}
                 </Link>
               </div>
             ) : (
@@ -434,74 +504,130 @@ export default function DashboardPage() {
       </div>
     </div>
 
-      {/* ── Recent Orders ─────────────────────────────────────────────── */}
+      {/* ── Recent Orders / Bookings ─────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden mb-6">
         <div className="flex justify-between items-center p-6 border-b border-[#EBEEF5]">
           <div>
             <h2 className="text-[#24292E] text-[20px] font-semibold tracking-[-0.4px]">
-              Recent Orders
+              {isLab ? "Recent Bookings" : "Recent Orders"}
             </h2>
             <p className="text-[#676E76] text-xs mt-0.5">
-              Latest incoming patient orders
+              {isLab ? "Latest incoming patient bookings" : "Latest incoming patient orders"}
             </p>
           </div>
           <Link href="/dashboard/orders" className="text-xs font-medium text-[#5476FC] hover:underline">
-            View All Orders
+            {isLab ? "View All Bookings" : "View All Orders"}
           </Link>
         </div>
 
-        {recentOrders.length === 0 ? (
-          <div className="py-12 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-3">
-              <svg className="w-6 h-6 text-[#C0C8D0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+        {isLab ? (
+          recentBookings.length === 0 ? (
+            <div className="py-12 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-[#C0C8D0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="font-semibold text-[#24292E] mb-1">No bookings yet</p>
+              <p className="text-xs text-[#676E76]">Patient bookings will appear here once placed</p>
             </div>
-            <p className="font-semibold text-[#24292E] mb-1">No orders yet</p>
-            <p className="text-xs text-[#676E76]">Patient orders will appear here once placed</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Order ID</th>
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Items</th>
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Delivery Address</th>
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Total</th>
-                  <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EBEEF5]">
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-[#F8FAFC] transition-colors duration-200 group">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-medium text-sm text-[#24292E]">#{order.id.slice(0, 8).toUpperCase()}</span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-[#383F45]">
-                      {order.items.length} item{order.items.length !== 1 ? "s" : ""}
-                      <span className="ml-1 text-[#676E76] text-xs">
-                        ({order.items.slice(0, 2).map(i => i.name).join(", ")}{order.items.length > 2 ? "…" : ""})
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-[#383F45] max-w-[200px] truncate">
-                      {order.delivery_address || "—"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-[#676E76]">
-                      {new Date(order.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#24292E]">
-                      AED {order.total_amount.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <StatusBadge status={order.status} config={ORDER_STATUS_CONFIG} />
-                    </td>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Booking ID</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Test(s)</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Visit Mode</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Total</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#EBEEF5]">
+                  {recentBookings.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-[#F8FAFC] transition-colors duration-200 group">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-medium text-sm text-[#24292E]">#{booking.id.slice(0, 8).toUpperCase()}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#383F45]">
+                        {booking.items.length} item{booking.items.length !== 1 ? "s" : ""}
+                        <span className="ml-1 text-[#676E76] text-xs">
+                          ({booking.items.slice(0, 2).map(i => i.testName).join(", ")}{booking.items.length > 2 ? "…" : ""})
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#383F45]">
+                        {booking.items[0]?.visitMode ?? "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-[#676E76]">
+                        {new Date(booking.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#24292E]">
+                        AED {(booking.payment_amount ?? 0).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <StatusBadge status={booking.status} config={BOOKING_STATUS_CONFIG} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          recentOrders.length === 0 ? (
+            <div className="py-12 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-[#C0C8D0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="font-semibold text-[#24292E] mb-1">No orders yet</p>
+              <p className="text-xs text-[#676E76]">Patient orders will appear here once placed</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Items</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Delivery Address</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Total</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EBEEF5]">
+                  {recentOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-[#F8FAFC] transition-colors duration-200 group">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-medium text-sm text-[#24292E]">#{order.id.slice(0, 8).toUpperCase()}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#383F45]">
+                        {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                        <span className="ml-1 text-[#676E76] text-xs">
+                          ({order.items.slice(0, 2).map(i => i.name).join(", ")}{order.items.length > 2 ? "…" : ""})
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#383F45] max-w-[200px] truncate">
+                        {order.delivery_address || "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-[#676E76]">
+                        {new Date(order.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#24292E]">
+                        AED {order.total_amount.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <StatusBadge status={order.status} config={ORDER_STATUS_CONFIG} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
 
