@@ -6,6 +6,7 @@ import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
 import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
+import { resolveOrgIdByEmail, resolveOrgIdForRegistration } from "../utils/orgScope";
 
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
@@ -138,6 +139,34 @@ export function initSuperTokens(): void {
 
               if (response.status === "OK") {
                 const userId = response.user.id;
+
+                // Reject sign-in when the account belongs to a different
+                // organization than the portal it's logging into. Each
+                // portal deployment sends its own org via X-Org-Slug (see
+                // NEXT_PUBLIC_ORG_SLUG + SuperTokensProvider's preAPIHook on
+                // the doctor/pharmacy portals); an account with no header
+                // sent (e.g. the patient app, which has no per-deployment
+                // portal to scope) or resolving to the default org is never
+                // blocked, since there's nothing more specific to enforce.
+                const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
+                if (orgSlugHeader) {
+                  const emailField = input.formFields.find((f) => f.id === "email");
+                  const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
+                  if (email) {
+                    const [portalOrgId, accountOrgId] = await Promise.all([
+                      resolveOrgIdForRegistration(orgSlugHeader),
+                      resolveOrgIdByEmail(email),
+                    ]);
+                    if (portalOrgId !== accountOrgId) {
+                      await Session.revokeAllSessionsForUser(userId);
+                      return {
+                        status: "GENERAL_ERROR",
+                        message: "This account belongs to a different organization.",
+                      } as any;
+                    }
+                  }
+                }
+
                 try {
                   const { resource: patient } = await patientsContainer.item(userId, userId).read();
                   if (patient && (patient.status === "deactivated" || patient.status === "deleted")) {
