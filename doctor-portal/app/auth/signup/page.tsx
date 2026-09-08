@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import STGeneralError from "supertokens-web-js/utils/error";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 // Import modular step components
 import Step1VerifyContact from "@/components/auth/Step1VerifyContact";
@@ -14,6 +16,7 @@ import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import Step5Success from "@/components/auth/Step5Success";
 
 export default function SignupPage() {
+  const branding = useBranding();
   const [step, setStep] = useState(1);
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [otp1, setOtp1] = useState("");
@@ -250,8 +253,17 @@ export default function SignupPage() {
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
+    } catch (err) {
+      // The account was just created, but the automatic sign-in right after
+      // can itself be rejected by the backend with a GENERAL_ERROR (e.g. a
+      // cross-organization login block) — that arrives here as a thrown
+      // STGeneralError carrying the real message, and must not be papered
+      // over with the network-failure text.
+      if (STGeneralError.isThisError(err)) {
+        setError(err.message);
+      } else {
+        setError("Cannot reach the server. Make sure the backend is running.");
+      }
     } finally {
       setLoading(false);
     }
@@ -275,14 +287,22 @@ export default function SignupPage() {
         
         {/* Wellness Logo at Top */}
         <div className="mb-12 flex items-center gap-3 select-none">
-          <Image
-            src={logoImg}
-            alt="Wellness Central Logo"
-            width={160}
-            height={50}
-            className="object-contain hover:opacity-90 transition-opacity"
-            priority
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.name}
+              className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+            />
+          ) : (
+            <Image
+              src={logoImg}
+              alt={branding.name}
+              width={160}
+              height={50}
+              className="object-contain hover:opacity-90 transition-opacity"
+              priority
+            />
+          )}
           <span className="text-[0.7rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
             Clinic
           </span>

@@ -4,7 +4,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { pool } from "../config/database";
-import { uploadBlob } from "../config/blob";
+import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { FEATURE_KEYS, DEFAULT_ORG_SLUG } from "../config/features";
 
@@ -149,7 +149,12 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
 
   try {
     const blobPath = `organizations/${id}/logo-${uuidv4()}.${req.file.mimetype.split("/")[1] || "png"}`;
-    const url = await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+    await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+    // The container isn't publicly readable, so a bare blob URL 403s in the
+    // browser — every other upload in this codebase (pharmacy product
+    // photos, etc.) signs a long-lived SAS URL before persisting/rendering
+    // it; this route was missing that step.
+    const url = generateSasUrl(blobPath, 365);
 
     const { rows } = await pool.query(
       `UPDATE organizations SET logo_url = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,

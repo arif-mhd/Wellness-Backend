@@ -8,6 +8,7 @@ import { signIn, signOut } from "supertokens-web-js/recipe/emailpassword";
 import STGeneralError from "supertokens-web-js/utils/error";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
+import { useBranding } from "@/components/BrandingContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -80,6 +81,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
+  const branding = useBranding();
 
   // Landing on this page (via Back/Forward, a stale tab, or a typed URL)
   // while a session is still valid server-side must never just silently
@@ -184,14 +186,22 @@ export default function LoginPage() {
 
             {/* Logo */}
             <div className="mb-8 select-none">
-              <Image
-                src={logoImg}
-                alt="Wellness Central Logo"
-                width={160}
-                height={50}
-                className="object-contain hover:opacity-90 transition-opacity"
-                priority
-              />
+              {branding.logoUrl ? (
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.name}
+                  className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+                />
+              ) : (
+                <Image
+                  src={logoImg}
+                  alt={branding.name}
+                  width={160}
+                  height={50}
+                  className="object-contain hover:opacity-90 transition-opacity"
+                  priority
+                />
+              )}
             </div>
 
             <h2 className="text-2xl md:text-[1.65rem] font-normal tracking-tight text-gray-800 font-marcellus mb-8">

@@ -96,24 +96,30 @@ export async function getOrgBrandName(orgId: string): Promise<string> {
 // fallback semantics as resolveOrgId, so callers never have to special-case
 // "no result".
 export async function resolveOrgIdByEmail(email: string): Promise<string> {
+  // Registration routes don't consistently lowercase the `email` field before
+  // storing it (a pre-existing inconsistency across patients.ts/clinics.ts/
+  // pharmacy.ts, not introduced here) — so this can't do an exact-match
+  // query against whatever casing happens to be stored. LOWER() on both
+  // sides makes the lookup resilient to that regardless of what's stored.
+  const normalizedEmail = email.trim().toLowerCase();
   try {
     const { resources: patients } = await patientsContainer.items
-      .query({ query: "SELECT c.tenantId FROM c WHERE c.email = @email", parameters: [{ name: "@email", value: email }] })
+      .query({ query: "SELECT c.tenantId FROM c WHERE LOWER(c.email) = @email", parameters: [{ name: "@email", value: normalizedEmail }] })
       .fetchAll();
     if (patients[0]?.tenantId) return patients[0].tenantId;
 
     const { resources: clinics } = await clinicsContainer.items
-      .query({ query: "SELECT c.tenantId FROM c WHERE c.email = @email", parameters: [{ name: "@email", value: email }] })
+      .query({ query: "SELECT c.tenantId FROM c WHERE LOWER(c.email) = @email", parameters: [{ name: "@email", value: normalizedEmail }] })
       .fetchAll();
     if (clinics[0]?.tenantId) return clinics[0].tenantId;
 
     const { resources: pharmacies } = await pharmaciesContainer.items
-      .query({ query: "SELECT c.tenantId FROM c WHERE c.email = @email", parameters: [{ name: "@email", value: email }] })
+      .query({ query: "SELECT c.tenantId FROM c WHERE LOWER(c.email) = @email", parameters: [{ name: "@email", value: normalizedEmail }] })
       .fetchAll();
     if (pharmacies[0]?.tenantId) return pharmacies[0].tenantId;
 
     const { resources: doctors } = await doctorsContainer.items
-      .query({ query: "SELECT c.clinicId FROM c WHERE c.email = @email", parameters: [{ name: "@email", value: email }] })
+      .query({ query: "SELECT c.clinicId FROM c WHERE LOWER(c.email) = @email", parameters: [{ name: "@email", value: normalizedEmail }] })
       .fetchAll();
     if (doctors[0]?.clinicId) {
       // Lazy import avoids a load-time circular dependency (clinicInsurance.ts

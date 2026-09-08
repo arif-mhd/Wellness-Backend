@@ -4,8 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import logoImg from "@/assets/images/wellness_logo.png";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useBranding } from "@/components/BrandingContext";
 
 export default function LandingContent() {
+  const branding = useBranding();
   return (
     <div className="w-full flex justify-center items-center">
       <div className="bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.06)] border border-indigo-50/50 p-8 md:p-12 w-full max-w-[760px] flex flex-col justify-between min-h-[550px] relative overflow-hidden backdrop-blur-sm">
@@ -16,14 +18,22 @@ export default function LandingContent() {
         <div>
           {/* Wellness Central Logo */}
           <div className="flex items-center mb-8 select-none">
-            <Image
-              src={logoImg}
-              alt="Wellness Central"
-              width={160}
-              height={50}
-              className="object-contain hover:opacity-90 transition-opacity"
-              priority
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.name}
+                className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+              />
+            ) : (
+              <Image
+                src={logoImg}
+                alt={branding.name}
+                width={160}
+                height={50}
+                className="object-contain hover:opacity-90 transition-opacity"
+                priority
+              />
+            )}
           </div>
 
           {/* Headline */}
