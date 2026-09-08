@@ -229,7 +229,9 @@ router.post("/register", async (req: Request, res: Response) => {
     res.status(201).json({ status: "OK", message: "Registration submitted successfully." });
   } catch (err) {
     console.error("Clinic registration error:", err);
-    res.status(500).json({ error: "Internal server error." });
+    // TEMP DEBUG: surfacing the real error message to diagnose a live
+    // registration failure — revert to a generic message once resolved.
+    res.status(500).json({ error: "Internal server error.", debugMessage: err instanceof Error ? err.message : String(err) });
   }
 });
 

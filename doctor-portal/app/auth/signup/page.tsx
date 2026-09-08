@@ -251,7 +251,7 @@ export default function SignupPage() {
       } else if (res.status === 409) {
         setError("An account with this email already exists.");
       } else {
-        setError(data.error || "Registration failed. Please try again.");
+        setError(data.debugMessage || data.error || "Registration failed. Please try again.");
       }
     } catch (err) {
       // The account was just created, but the automatic sign-in right after
