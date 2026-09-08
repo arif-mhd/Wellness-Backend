@@ -1396,7 +1396,7 @@ function ConsultRoom() {
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <AddMedicines medicines={medicines} onChange={setMedicines} clinicId={clinicId ?? undefined} />
-                      <AddLabs labs={labs} onChange={setLabs} />
+                      <AddLabs labs={labs} onChange={setLabs} clinicId={clinicId ?? undefined} />
                     </div>
                     <AddDietPlan
                       plan={dietPlan}

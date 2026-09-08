@@ -28,6 +28,7 @@ import clinicPermissionsRouter from "./routes/clinicPermissions";
 import clinicPaymentsRouter from "./routes/clinicPayments";
 import clinicSearchRouter from "./routes/clinicSearch";
 import clinicPharmacyRouter from "./routes/clinicPharmacy";
+import clinicLabRouter from "./routes/clinicLab";
 import adminFeeRequestsRouter from "./routes/adminFeeRequests";
 import patientsRouter from "./routes/patients";
 import adminPatientsRouter from "./routes/adminPatients";
@@ -147,6 +148,7 @@ app.use("/api/clinics/permissions", clinicPermissionsRouter);
 app.use("/api/clinics/payments", clinicPaymentsRouter);
 app.use("/api/clinics/search",   clinicSearchRouter);
 app.use("/api/clinics/pharmacies", clinicPharmacyRouter);
+app.use("/api/clinics/labs",      clinicLabRouter);
 
 // Clinic self-registration (public) + own profile
 app.use("/api/clinics", clinicsRouter);
@@ -262,6 +264,8 @@ async function main() {
     await UserRoles.createNewRoleOrAddPermissions("pharmacy",         []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy_pending", []);
     await UserRoles.createNewRoleOrAddPermissions("pharmacy_admin",   []);
+    await UserRoles.createNewRoleOrAddPermissions("lab",              []);
+    await UserRoles.createNewRoleOrAddPermissions("lab_pending",      []);
     await UserRoles.createNewRoleOrAddPermissions("clinic",           []);
     await UserRoles.createNewRoleOrAddPermissions("clinic_pending",   []);
     console.log("✅ SuperTokens roles ready");

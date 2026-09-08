@@ -1,9 +1,8 @@
-
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Session from "supertokens-web-js/recipe/session";
+import { useAccountRole } from "@/hooks/useAccountRole";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -33,24 +32,63 @@ interface Order {
   total_amount: number;
 }
 
+interface BookingItem {
+  testId: string;
+  testName: string;
+  category: string;
+  labId: string;
+  labName: string;
+  price: number;
+  forPatientId?: string;
+  visitMode: "Laboratory" | "Home";
+  scheduledAt?: string;
+  requires_doctor_approval?: boolean;
+}
+
+interface Booking {
+  id: string;
+  patientId: string;
+  items: BookingItem[];
+  consultationDate?: string;
+  consultationSlot?: string;
+  notes?: string;
+  status: string;
+  payment_status?: string;
+  payment_amount?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+const NEXT_BOOKING_STATUS: Record<string, { next: string; label: string } | undefined> = {
+  awaiting:  { next: "confirmed", label: "Confirm Booking" },
+  confirmed: { next: "analyzing", label: "Start Analyzing" },
+  analyzing: { next: "results",   label: "Mark Results Ready" },
+};
+
 export default function OrdersPage() {
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+
   const [orders, setOrders] = useState<Order[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/pharmacy/orders");
-      if (res.ok) {
-        const d = await res.json();
-        setOrders(d.orders);
+      if (isLab) {
+        const res = await apiFetch("/api/lab/my-bookings");
+        if (res.ok) { const d = await res.json(); setBookings(d.bookings ?? []); }
+      } else {
+        const res = await apiFetch("/api/pharmacy/orders");
+        if (res.ok) { const d = await res.json(); setOrders(d.orders); }
       }
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLab]);
 
   useEffect(() => {
     load();
@@ -74,10 +112,137 @@ export default function OrdersPage() {
     }
   };
 
+  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
+    setUpdating(bookingId);
+    try {
+      const res = await apiFetch(`/api/lab/bookings/${bookingId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        await load();
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#5476FC]" />
+      </div>
+    );
+  }
+
+  if (isLab) {
+    return (
+      <div className="px-8 pb-12 font-outfit select-none animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]">
+              {bookings.length} booking{bookings.length !== 1 ? "s" : ""} found
+            </span>
+            <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
+              Bookings
+            </h1>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden">
+          {bookings.length === 0 ? (
+            <div className="py-20 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-[#C0C8D0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="font-semibold text-[#24292E] mb-1 text-base">No bookings yet</p>
+              <p className="text-sm text-[#676E76]">Incoming patient bookings will appear here</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Booking Details</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Test(s)</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Visit Mode / Scheduled</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Total</th>
+                    <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EBEEF5]">
+                  {bookings.map((booking) => {
+                    const action = NEXT_BOOKING_STATUS[booking.status];
+                    return (
+                      <tr key={booking.id} className="group hover:bg-[#F8FAFC] transition-colors duration-200">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm text-[#24292E]">Booking #{booking.id.slice(0, 8)}</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-50 text-blue-700 border-blue-100">
+                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-[#676E76]">Placed on {new Date(booking.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#383F45]">
+                          <ul className="flex flex-col gap-1">
+                            {booking.items.map((item, idx) => (
+                              <li key={idx} className="flex flex-col gap-0.5">
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs">{item.testName}</span>
+                                  <span className="text-[11px] text-[#676E76]">AED {item.price.toFixed(2)}</span>
+                                </div>
+                                {item.forPatientId && (
+                                  <span className="text-[10px] text-[#A0A8B0]">For patient: {item.forPatientId.slice(0, 8)}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#383F45] max-w-[220px]">
+                          <ul className="flex flex-col gap-1">
+                            {booking.items.map((item, idx) => (
+                              <li key={idx} className="flex flex-col">
+                                <span className="text-xs font-medium">{item.visitMode}</span>
+                                {item.scheduledAt && (
+                                  <span className="text-[11px] text-[#676E76]">
+                                    {new Date(item.scheduledAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#5476FC]">
+                          AED {(booking.payment_amount ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {action && (
+                            <button
+                              onClick={() => updateBookingStatus(booking.id, action.next)}
+                              disabled={updating === booking.id}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            >
+                              {updating === booking.id ? "Updating..." : action.label}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

@@ -86,6 +86,13 @@ const PharmacyIcon = ({ active }: { active: boolean }) => (
     <path d="M14.5 3.5 20.5 9.5" />
   </svg>
 );
+const LabIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "white" : "#3D4B5A"} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2h6" />
+    <path d="M10 2v6.34a2 2 0 0 1-.5 1.32L4.24 16.5A2 2 0 0 0 5.76 20h12.48a2 2 0 0 0 1.52-3.5l-5.26-6.84a2 2 0 0 1-.5-1.32V2" />
+    <path d="M8.5 14h7" />
+  </svg>
+);
 const SettingsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3D4B5A" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -136,6 +143,7 @@ const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: Permissio
   // this belongs in BASE so a branch-staff account sees it too, not just the
   // org owner.
   { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon },
+  { href: "/clinic/lab", label: "Lab", Icon: LabIcon },
 ];
 const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
 const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
