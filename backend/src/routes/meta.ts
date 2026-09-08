@@ -15,11 +15,12 @@ router.get("/languages", (_req: Request, res: Response) => {
 });
 
 // GET /api/meta/branding?org=acme
-// Public — every frontend (admin/doctor/pharmacy portals, patient app) calls
-// this on boot to pick up this org's colors/logo and enabled feature list.
-// Falls back to DEFAULT_ORG_SLUG since no caller can pass ?org= yet (no
-// subdomain/build-time org resolution wired up on any frontend so far) —
-// once that lands, this stays the single place branding is resolved from.
+// Public — the doctor-portal and pharmacy-portal call this on boot (passing
+// their own NEXT_PUBLIC_ORG_SLUG build-time env var as ?org=) to pick up
+// their org's colors/logo and enabled feature list. The admin-portal
+// deliberately does not call this with a slug — it stays platform-neutral
+// since it manages every org from one shared control panel. Falls back to
+// DEFAULT_ORG_SLUG whenever no ?org= is passed or it names an unknown slug.
 router.get("/branding", async (req: Request, res: Response) => {
   const slug = typeof req.query.org === "string" ? req.query.org : DEFAULT_ORG_SLUG;
 

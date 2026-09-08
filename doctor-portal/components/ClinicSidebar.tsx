@@ -269,7 +269,7 @@ export default function ClinicSidebar() {
                     "px-4",
                     open ? "md:px-4" : "md:px-3 md:justify-center",
                     active
-                      ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
+                      ? "bg-gradient-to-r from-[var(--brand-secondary,#869DFE)] to-[var(--brand-primary,#5879FC)] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                       : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
                   ].join(" ")}
                 >
@@ -313,7 +313,7 @@ export default function ClinicSidebar() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={clinicAvatar} alt="Clinic logo" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
+                  <div className="w-full h-full bg-gradient-to-br from-[var(--brand-secondary,#8AA0FF)] to-[var(--brand-primary,#5476FC)] flex items-center justify-center text-white text-sm font-semibold">
                     {clinicName?.[0]?.toUpperCase() ?? clinicEmail?.[0]?.toUpperCase() ?? "C"}
                   </div>
                 )}

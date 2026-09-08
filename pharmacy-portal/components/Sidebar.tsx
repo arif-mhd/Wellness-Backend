@@ -181,7 +181,7 @@ export default function Sidebar() {
                   "flex items-center py-3 transition-[background,box-shadow,padding] duration-150 rounded-[92px] overflow-hidden",
                   open ? "px-4" : "px-3 justify-center",
                   active
-                    ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
+                    ? "bg-gradient-to-r from-[var(--brand-secondary,#869DFE)] to-[var(--brand-primary,#5879FC)] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                     : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
                 ].join(" ")}
               >
@@ -230,7 +230,7 @@ export default function Sidebar() {
         {/* Profile row */}
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
           {/* Avatar */}
-          <Link href="/dashboard/settings" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[#5476FC] bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-bold text-sm">
+          <Link href="/dashboard/settings" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[var(--brand-primary,#5476FC)] bg-gradient-to-r from-[var(--brand-secondary,#8AA0FF)] to-[var(--brand-primary,#5476FC)] flex items-center justify-center text-white font-bold text-sm">
             Rx
           </Link>
 
