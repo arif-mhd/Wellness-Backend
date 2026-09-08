@@ -139,6 +139,35 @@ router.get("/", async (_req: SessionRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/admin/lab/pending ───────────────────────────────────────────────
+// Must be registered before GET /:labId — otherwise Express matches the
+// param route first and treats "pending" as a labId, returning 404 instead
+// of ever reaching this handler.
+router.get("/pending", async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await labServicesContainer.items.query(
+      { query: "SELECT * FROM c WHERE c.status = 'pending_approval' ORDER BY c.registeredAt DESC" }
+    ).fetchAll();
+    res.json({ labs: resources });
+  } catch (err) {
+    console.error("Admin lab pending error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/admin/lab/approved ─────────────────────────────────────────────
+router.get("/approved", async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await labServicesContainer.items.query(
+      { query: "SELECT * FROM c WHERE c.status = 'approved' ORDER BY c.approvedAt DESC" }
+    ).fetchAll();
+    res.json({ labs: resources });
+  } catch (err) {
+    console.error("Admin lab approved error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── GET /api/admin/lab/:labId ────────────────────────────────────────────────
 router.get("/:labId", async (req: SessionRequest, res: Response) => {
   try {
@@ -185,32 +214,6 @@ router.patch("/tests/:testId/toggle", async (_req: SessionRequest, res: Response
     res.json({ status: "OK", test: updated });
   } catch (err) {
     console.error("Admin toggle lab test error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ─── GET /api/admin/lab/pending ───────────────────────────────────────────────
-router.get("/pending", async (_req: SessionRequest, res: Response) => {
-  try {
-    const { resources } = await labServicesContainer.items.query(
-      { query: "SELECT * FROM c WHERE c.status = 'pending_approval' ORDER BY c.registeredAt DESC" }
-    ).fetchAll();
-    res.json({ labs: resources });
-  } catch (err) {
-    console.error("Admin lab pending error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ─── GET /api/admin/lab/approved ─────────────────────────────────────────────
-router.get("/approved", async (_req: SessionRequest, res: Response) => {
-  try {
-    const { resources } = await labServicesContainer.items.query(
-      { query: "SELECT * FROM c WHERE c.status = 'approved' ORDER BY c.approvedAt DESC" }
-    ).fetchAll();
-    res.json({ labs: resources });
-  } catch (err) {
-    console.error("Admin lab approved error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
