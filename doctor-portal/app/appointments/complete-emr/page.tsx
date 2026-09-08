@@ -204,7 +204,7 @@ function CompleteEmrForm() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />
-                <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} />
+                <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />
               </div>
             </div>
           )}

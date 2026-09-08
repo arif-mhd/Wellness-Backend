@@ -1,8 +1,10 @@
 import { Router, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
+import UserRoles from "supertokens-node/recipe/userroles";
 import { requireRole } from "../middleware/requireRole";
 import { labServicesContainer, labTestsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -36,6 +38,10 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       description:             description ?? null,
       specializations:         Array.isArray(specializations) ? specializations : [],
       status:                  "approved",
+      supertokens_id:          null,   // no ST account — admin-created
+      clinicIds:               [],
+      affiliation:             null,
+      linkRequests:            [],
       createdAt:               now,
       approvedAt:              now,
       approvedBy:              adminId,
@@ -58,7 +64,7 @@ router.post("/:labId/tests", async (req: SessionRequest, res: Response) => {
     const { labId } = req.params;
     const {
       name, category, price, turnaround_hours, requires_fasting,
-      requires_doctor_approval, description, recommendedFor, ageRange,
+      requires_doctor_approval, homeVisitAvailable, description, recommendedFor, ageRange,
       targetGroups, normalValues, howItsDone, recommendedFrequency,
       patientInstructions,
     } = req.body;
@@ -92,7 +98,9 @@ router.post("/:labId/tests", async (req: SessionRequest, res: Response) => {
       turnaround_hours:         turnaround_hours ?? null,
       requires_fasting:         Boolean(requires_fasting),
       requires_doctor_approval: Boolean(requires_doctor_approval),
+      homeVisitAvailable:       Boolean(homeVisitAvailable),
       is_active:                true,
+      status:                   "approved",
       description:              description ?? null,
       recommendedFor:           recommendedFor ?? null,
       ageRange:                 ageRange ?? null,
@@ -177,6 +185,92 @@ router.patch("/tests/:testId/toggle", async (_req: SessionRequest, res: Response
     res.json({ status: "OK", test: updated });
   } catch (err) {
     console.error("Admin toggle lab test error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/admin/lab/pending ───────────────────────────────────────────────
+router.get("/pending", async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await labServicesContainer.items.query(
+      { query: "SELECT * FROM c WHERE c.status = 'pending_approval' ORDER BY c.registeredAt DESC" }
+    ).fetchAll();
+    res.json({ labs: resources });
+  } catch (err) {
+    console.error("Admin lab pending error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/admin/lab/approved ─────────────────────────────────────────────
+router.get("/approved", async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await labServicesContainer.items.query(
+      { query: "SELECT * FROM c WHERE c.status = 'approved' ORDER BY c.approvedAt DESC" }
+    ).fetchAll();
+    res.json({ labs: resources });
+  } catch (err) {
+    console.error("Admin lab approved error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/admin/lab/:labId/approve ──────────────────────────────────────
+router.post("/:labId/approve", async (req: SessionRequest, res: Response) => {
+  try {
+    const adminId = req.session!.getUserId();
+    const { labId } = req.params;
+
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    await UserRoles.removeUserRole("public", labId, "lab_pending");
+    await UserRoles.addRoleToUser("public", labId, "lab");
+
+    const updated = {
+      ...lab,
+      status:     "approved",
+      approvedAt: new Date().toISOString(),
+      approvedBy: adminId,
+    };
+    await labServicesContainer.items.upsert(updated);
+
+    logActivity({
+      source: "admin",
+      action: "Lab Approved",
+      details: `${lab.name ?? labId} approved`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "lab",
+      entityId: labId,
+    });
+
+    res.json({ status: "OK", lab: updated });
+  } catch (err) {
+    console.error("Lab approve error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/admin/lab/:labId/reject ───────────────────────────────────────
+router.post("/:labId/reject", async (req: SessionRequest, res: Response) => {
+  try {
+    const { labId } = req.params;
+    const { reason } = req.body;
+
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found" }); return; }
+
+    const updated = {
+      ...lab,
+      status:         "rejected",
+      rejectedAt:     new Date().toISOString(),
+      rejectedReason: reason || null,
+    };
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK", lab: updated });
+  } catch (err) {
+    console.error("Lab reject error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

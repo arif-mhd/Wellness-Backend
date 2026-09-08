@@ -29,32 +29,42 @@ interface AddLabsProps {
   onChange: (labs: LabRecommendation[]) => void;
   /** The identity of the currently authenticated doctor — used to restrict delete to own entries */
   currentDoctorId?: string;
+  /** The doctor's own clinicId — scopes the catalogue search to that clinic's affiliated lab, if any */
+  clinicId?: string;
 }
 
-let cachedTests: CatalogueTest[] | null = null;
+const cachedTests: Record<string, CatalogueTest[]> = {};
 
-export default function AddLabs({ labs, onChange, currentDoctorId }: AddLabsProps) {
+export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: AddLabsProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [labName, setLabName] = useState("");
   const [selectedTest, setSelectedTest] = useState<CatalogueTest | null>(null);
   const [customMode, setCustomMode] = useState(false);
   const [notes, setNotes] = useState("");
 
-  const [allTests, setAllTests] = useState<CatalogueTest[]>(cachedTests ?? []);
-  const [loadingTests, setLoadingTests] = useState(!cachedTests);
+  const cacheKey = clinicId ?? "global";
+  const [allTests, setAllTests] = useState<CatalogueTest[]>(cachedTests[cacheKey] ?? []);
+  const [loadingTests, setLoadingTests] = useState(!cachedTests[cacheKey]);
   const [showResults, setShowResults] = useState(false);
-  const fetchedRef = useRef(false);
+  const fetchedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (cachedTests || fetchedRef.current) return;
-    fetchedRef.current = true;
+    if (cachedTests[cacheKey]) {
+      setAllTests(cachedTests[cacheKey]);
+      setLoadingTests(false);
+      return;
+    }
+    if (fetchedRef.current === cacheKey) return;
+    fetchedRef.current = cacheKey;
+    setLoadingTests(true);
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/lab/tests`);
+        const clinicParam = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : "";
+        const res = await fetch(`${API_URL}/api/lab/tests${clinicParam}`);
         if (res.ok) {
           const data = await res.json();
           const tests = data.map((t: any) => ({ id: t.id, name: t.name, category: t.category, labName: t.labName }));
-          cachedTests = tests;
+          cachedTests[cacheKey] = tests;
           setAllTests(tests);
         }
       } catch {
@@ -63,7 +73,7 @@ export default function AddLabs({ labs, onChange, currentDoctorId }: AddLabsProp
         setLoadingTests(false);
       }
     })();
-  }, []);
+  }, [clinicId]);
 
   const filteredTests = labName.trim()
     ? allTests.filter((t) => t.name.toLowerCase().includes(labName.trim().toLowerCase())).slice(0, 8)
@@ -142,6 +152,11 @@ export default function AddLabs({ labs, onChange, currentDoctorId }: AddLabsProp
             />
             {selectedTest?.labName && (
               <p className="text-[10px] text-[#5476FC] font-semibold">{selectedTest.labName}</p>
+            )}
+            {!customMode && clinicId && !selectedTest && (
+              <p className="text-[10px] text-[#838B95] font-medium italic">
+                Showing your clinic lab's tests
+              </p>
             )}
 
             {!customMode && showResults && labName.trim() && (

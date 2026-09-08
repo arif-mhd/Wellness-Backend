@@ -1,10 +1,13 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AccountRoleProvider } from "@/hooks/useAccountRole";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <ProtectedRoute>
-      <DashboardLayout>{children}</DashboardLayout>
-    </ProtectedRoute>
+    <AccountRoleProvider>
+      <ProtectedRoute>
+        <DashboardLayout>{children}</DashboardLayout>
+      </ProtectedRoute>
+    </AccountRoleProvider>
   );
 }

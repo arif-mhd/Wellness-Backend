@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
 import Session, { signOut } from "supertokens-web-js/recipe/session";
+import { useAccountRole } from "@/hooks/useAccountRole";
 
 // ─── Icons (memoised, never recreated) ───────────────────────────────────────
 const HomeIcon = ({ active }: { active: boolean }) => (
@@ -49,6 +50,12 @@ const SettingsIcon = () => (
     <path d="M12.934 10a1 1 0 0 0 .2 1.107l.04.04a1.414 1.414 0 1 1-2 2l-.04-.04A1 1 0 0 0 10 13.267v.066a1.333 1.333 0 0 1-2.667 0v-.04A1 1 0 0 0 6.12 12.48l-.04.04a1.414 1.414 0 1 1-2-2l.04-.04A1 1 0 0 0 2.733 9.333H2.667a1.333 1.333 0 0 1 0-2.666h.04A1 1 0 0 0 3.52 5.52l-.04-.04a1.414 1.414 0 1 1 2-2l.04.04A1 1 0 0 0 6.667 2.733V2.667a1.333 1.333 0 0 1 2.666 0v.04A1 1 0 0 0 10.48 3.52l.04-.04a1.414 1.414 0 1 1 2 2l-.04.04A1 1 0 0 0 13.267 6.667h.066a1.333 1.333 0 0 1 0 2.666h-.04A1 1 0 0 0 12.934 10Z" stroke="#3D4B5A" strokeWidth="1.5" />
   </svg>
 );
+const FlaskIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+    <path d="M6 1.333h4M6.667 1.333V6L2.94 12.19a1.2 1.2 0 0 0 1.026 1.81h8.068a1.2 1.2 0 0 0 1.026-1.81L9.333 6V1.333" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4.667 9.333h6.666" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const HelpIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="8" cy="8" r="6.667" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -74,11 +81,20 @@ const CollapseIcon = () => (
 );
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
+const NAV_ITEMS_PHARMACY = [
   { href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
   { href: "/dashboard/orders", label: "Orders", Icon: OrdersIcon },
   { href: "/dashboard/inventory", label: "Inventory", Icon: InventoryIcon },
   { href: "/dashboard/add-product", label: "Add Product", Icon: AddProductIcon },
+  { href: "/dashboard/feedback", label: "Feedback", Icon: FeedbackIcon },
+  { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
+];
+
+const NAV_ITEMS_LAB = [
+  { href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
+  { href: "/dashboard/orders", label: "Bookings", Icon: OrdersIcon },
+  { href: "/dashboard/inventory", label: "Inventory", Icon: InventoryIcon },
+  { href: "/dashboard/add-product", label: "Add Lab Test", Icon: AddProductIcon },
   { href: "/dashboard/feedback", label: "Feedback", Icon: FeedbackIcon },
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
 ];
@@ -88,8 +104,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
   const [pharmacyName, setPharmacyName] = useState("Wellness Pharmacy");
   const [ownerName, setOwnerName] = useState("Admin");
+
+  const NAV_ITEMS = isLab ? NAV_ITEMS_LAB : NAV_ITEMS_PHARMACY;
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);
@@ -99,21 +119,30 @@ export default function Sidebar() {
       try {
         const token = await Session.getAccessToken();
         if (!token) return;
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/pharmacy/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.pharmacy) {
-            setPharmacyName(data.pharmacy.pharmacyName ?? "Wellness Pharmacy");
-            setOwnerName(data.pharmacy.ownerName ?? "Admin");
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+        if (isLab) {
+          const res = await fetch(`${apiUrl}/api/lab/me`, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.lab) {
+              setPharmacyName(data.lab.name ?? "Wellness Lab");
+              setOwnerName(data.lab.director ?? "Admin");
+            }
+          }
+        } else {
+          const res = await fetch(`${apiUrl}/api/pharmacy/me`, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.pharmacy) {
+              setPharmacyName(data.pharmacy.pharmacyName ?? "Wellness Pharmacy");
+              setOwnerName(data.pharmacy.ownerName ?? "Admin");
+            }
           }
         }
       } catch { /* keep defaults */ }
     }
     loadProfile();
-  }, []);
+  }, [isLab]);
 
   async function handleSignOut() {
     try { await signOut(); } catch { /* ignore */ }
@@ -220,7 +249,7 @@ export default function Sidebar() {
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
           {/* Avatar */}
           <Link href="/dashboard/settings" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[#5476FC] bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-bold text-sm">
-            Rx
+            {isLab ? <FlaskIcon /> : "Rx"}
           </Link>
 
           {/* Name / email — stays in DOM */}

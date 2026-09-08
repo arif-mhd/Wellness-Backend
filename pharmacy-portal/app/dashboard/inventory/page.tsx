@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
+import { useAccountRole } from "@/hooks/useAccountRole";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -29,13 +30,24 @@ interface Product {
   flagReason?: string | null;
 }
 
+interface LabTest {
+  id: string; name: string; description?: string; category: string;
+  price: number; imageUrl?: string;
+  status: "pending_approval" | "approved" | "rejected";
+  createdAt: string; rejectedReason?: string;
+  turnaround_hours?: number;
+  requires_fasting?: boolean;
+  requires_doctor_approval?: boolean;
+  homeVisitAvailable?: boolean;
+  flagged?: boolean;
+  flagReason?: string | null;
+}
+
 const STATUS_CONFIG = {
   approved:         { label: "Approved",  bg: "bg-green-50",  text: "text-green-700",  border: "border-green-100", dot: "bg-green-500" },
   pending_approval: { label: "Pending",   bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-100", dot: "bg-amber-400" },
   rejected:         { label: "Rejected",  bg: "bg-red-50",    text: "text-red-700",    border: "border-red-100",   dot: "bg-red-500" },
 };
-
-const CATEGORIES = ["OTC", "Prescription", "Supplement", "Medical Device", "Personal Care", "Baby & Mother"];
 
 function StatusBadge({ status }: { status: keyof typeof STATUS_CONFIG }) {
   const c = STATUS_CONFIG[status];
@@ -49,7 +61,11 @@ function StatusBadge({ status }: { status: keyof typeof STATUS_CONFIG }) {
 export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+
   const [products, setProducts]     = useState<Product[]>([]);
+  const [tests, setTests]           = useState<LabTest[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState<"all" | "flagged" | Product["status"]>("all");
   // Seeded from ?search= so the header search bar can deep-link here.
@@ -59,10 +75,15 @@ export default function InventoryPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/pharmacy/products");
-      if (res.ok) { const d = await res.json(); setProducts(d.products); }
+      if (isLab) {
+        const res = await apiFetch("/api/lab/my-tests");
+        if (res.ok) { const d = await res.json(); setTests(d.tests ?? []); }
+      } else {
+        const res = await apiFetch("/api/pharmacy/products");
+        if (res.ok) { const d = await res.json(); setProducts(d.products); }
+      }
     } catch { /* silently */ } finally { setLoading(false); }
-  }, []);
+  }, [isLab]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -83,17 +104,39 @@ export default function InventoryPage() {
     }
   }
 
-  const filtered = products.filter(p => {
+  async function handleToggleHomeVisit(test: LabTest) {
+    setTogglingId(test.id);
+    const next = !test.homeVisitAvailable;
+    setTests(prev => prev.map(t => t.id === test.id ? { ...t, homeVisitAvailable: next } : t));
+    try {
+      const form = new FormData();
+      form.append("homeVisitAvailable", String(next));
+      const res = await apiFetch(`/api/lab/my-tests/${test.id}`, { method: "PUT", body: form });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTests(prev => prev.map(t => t.id === test.id ? { ...t, homeVisitAvailable: test.homeVisitAvailable } : t));
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  const items = isLab ? tests : products;
+
+  const filteredProducts = products.filter(p => {
     const matchStatus = filter === "all" || (filter === "flagged" && p.flagged);
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
-
+  const filteredTests = tests.filter(t => {
+    const matchStatus = filter === "all" || (filter === "flagged" && t.flagged);
+    const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase());
+    return matchStatus && matchSearch;
+  });
 
   const counts = {
-    all:     products.length,
-    flagged: products.filter(p => p.flagged).length,
+    all:     items.length,
+    flagged: isLab ? tests.filter(t => t.flagged).length : products.filter(p => p.flagged).length,
   };
 
   if (loading) return (
@@ -108,7 +151,7 @@ export default function InventoryPage() {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
         <div className="flex flex-col gap-1">
           <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]">
-            {products.length} product{products.length !== 1 ? "s" : ""} total
+            {items.length} {isLab ? "test" : "product"}{items.length !== 1 ? "s" : ""} total
           </span>
           <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
             Inventory
@@ -116,7 +159,7 @@ export default function InventoryPage() {
         </div>
         <Link href="/dashboard/add-product"
           className="px-5 py-2.5 bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white rounded-xl font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all flex items-center gap-2">
-          Add Product
+          {isLab ? "Add Lab Test" : "Add Product"}
         </Link>
       </div>
 
@@ -134,7 +177,7 @@ export default function InventoryPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products by name or category..."
+            placeholder={isLab ? "Search tests by name or category..." : "Search products by name or category..."}
             className="w-full bg-[#F5F7FB] text-[#24292E] placeholder-[#9EA5AD] text-sm rounded-lg pl-11 pr-4 py-2.5 outline-none border border-transparent focus:border-[#5476FC]/50 focus:bg-white transition-all"
           />
         </div>
@@ -147,25 +190,87 @@ export default function InventoryPage() {
               onChange={(e) => setFilter(e.target.value as any)}
               className="bg-[#F5F7FB] text-[#3D4B5A] text-xs font-medium rounded-lg px-3 py-2.5 outline-none border border-transparent focus:border-[#5476FC]/50 hover:bg-[#EBEEF5] transition-colors cursor-pointer"
             >
-              <option value="all">All Products ({counts.all})</option>
+              <option value="all">{isLab ? `All Tests (${counts.all})` : `All Products (${counts.all})`}</option>
               <option value="flagged">Flagged ({counts.flagged})</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Products grid */}
-      {filtered.length === 0 ? (
+      {/* Items grid */}
+      {(isLab ? filteredTests.length === 0 : filteredProducts.length === 0) ? (
         <div className="bg-white rounded-xl border border-[#EBEEF5] py-20 flex flex-col items-center text-center shadow-sm">
           <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-4">
             <svg className="w-6 h-6 text-[#C0C8D0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35" /></svg>
           </div>
-          <p className="font-semibold text-[#24292E] mb-1 text-base">No products found</p>
+          <p className="font-semibold text-[#24292E] mb-1 text-base">{isLab ? "No tests found" : "No products found"}</p>
           <p className="text-sm text-[#676E76]">Try adjusting your search or filter</p>
+        </div>
+      ) : isLab ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filteredTests.map(test => (
+            <div key={test.id} className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden hover:border-gray-300 hover:shadow-md transition-all group flex flex-col">
+              {/* Image */}
+              <div className="h-40 bg-[#F8FAFC] flex items-center justify-center relative border-b border-[#EBEEF5]">
+                {test.imageUrl ? (
+                  <img src={test.imageUrl} alt={test.name} className="h-full w-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" />
+                ) : (
+                  <svg className="w-12 h-12 text-[#C0C8D0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 3h6M10 3v6.5L4.5 19a1 1 0 0 0 .9 1.5h13.2a1 1 0 0 0 .9-1.5L14 9.5V3" />
+                  </svg>
+                )}
+                {test.flagged && (
+                  <div className="absolute top-2 left-2 bg-[#F25252] text-white px-2 py-1 rounded-md text-[10px] font-bold shadow-sm">
+                    Flagged
+                  </div>
+                )}
+                <div className="absolute top-2 right-2">
+                  <StatusBadge status={test.status} />
+                </div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-1">
+                <p className="font-medium text-[#24292E] truncate text-sm" title={test.name}>{test.name}</p>
+                <p className="text-[11px] text-[#676E76] mt-0.5 uppercase tracking-wider">{test.category}</p>
+
+                <div className="mt-3 mb-1">
+                  <span className="text-lg font-semibold text-[#5476FC]">AED {test.price.toFixed(2)}</span>
+                </div>
+
+                <button
+                  onClick={() => handleToggleHomeVisit(test)}
+                  disabled={togglingId === test.id}
+                  className="flex items-center justify-between gap-2 py-1.5 disabled:opacity-60"
+                >
+                  <span className={`text-xs font-medium ${test.homeVisitAvailable ? "text-green-700" : "text-gray-500"}`}>
+                    {test.homeVisitAvailable ? "Home Visit Available" : "Home Visit Unavailable"}
+                  </span>
+                  <span className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${test.homeVisitAvailable ? "bg-[#5476FC]" : "bg-[#D1D5DB]"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${test.homeVisitAvailable ? "translate-x-4" : ""}`} />
+                  </span>
+                </button>
+
+                {test.status === "rejected" && test.rejectedReason && (
+                  <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5 text-[11px] text-red-600 line-clamp-2">
+                    {test.rejectedReason}
+                  </div>
+                )}
+
+                <div className="mt-auto pt-4 flex gap-2">
+                  <button
+                    onClick={() => router.push(`/dashboard/inventory/${test.id}`)}
+                    className="w-full py-2 rounded-lg bg-[#F5F7FB] text-[#3D4B5A] text-xs font-medium hover:bg-[#EBEEF5] transition-colors border border-transparent"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filtered.map(product => (
+          {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden hover:border-gray-300 hover:shadow-md transition-all group flex flex-col">
               {/* Image */}
               <div className="h-40 bg-[#F8FAFC] flex items-center justify-center relative border-b border-[#EBEEF5]">
