@@ -83,6 +83,15 @@ export async function getOrgBrandName(orgId: string): Promise<string> {
   return rows[0]?.name ?? "Wellness";
 }
 
+// Resolves an organization's AI chat persona name (e.g. "Dr. Wellness") by
+// id — kept separate from getOrgBrandName since the persona name is a
+// distinct per-org field (organizations.persona_name), not derived from the
+// org's display name. Falls back the same way getOrgBrandName does.
+export async function getOrgPersonaName(orgId: string): Promise<string> {
+  const { rows } = await pool.query(`SELECT persona_name FROM organizations WHERE id = $1`, [orgId]);
+  return rows[0]?.persona_name ?? "Dr. Wellness";
+}
+
 // Resolves the org an EXISTING account belongs to, looked up by email
 // rather than session — for pre-auth flows like OTP send, where the caller
 // is identified by the email they typed, not a logged-in session. Covers

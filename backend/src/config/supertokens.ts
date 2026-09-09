@@ -23,9 +23,10 @@ const browserOrigins = [
   // LAN IP for Expo web served over the local network
   "http://192.168.29.127:8081",
   "http://192.168.29.127:8082",
-  // Allow SuperTokens dashboard (served from the backend itself)
-  "https://backend-741878858011.asia-south1.run.app",
-  process.env.API_DOMAIN || "",
+  // Allow SuperTokens dashboard (served from the backend itself) — this is
+  // just API_DOMAIN again, kept as a fallback for deployments that haven't
+  // set that env var yet.
+  process.env.API_DOMAIN || "https://backend-741878858011.asia-south1.run.app",
 ];
 
 /**
@@ -53,7 +54,10 @@ export function initSuperTokens(): void {
       connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || devFallbackOrThrow("SUPERTOKENS_CONNECTION_URI", "http://localhost:3567"),
     },
     appInfo: {
-      appName: "Wellness",
+      // Only affects the SuperTokens Dashboard UI title (internal staff
+      // tool) — this isn't per-org, since SuperTokens.init() runs once at
+      // boot for the whole platform, not per request/tenant.
+      appName: process.env.PLATFORM_NAME || "Wellness",
       // The URL of THIS backend
       apiDomain: process.env.API_DOMAIN || devFallbackOrThrow("API_DOMAIN", `http://localhost:${process.env.PORT || 3001}`),
       // Primary frontend (doctor portal). CORS handles the rest.

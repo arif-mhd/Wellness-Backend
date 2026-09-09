@@ -69,6 +69,7 @@ export async function initDb(): Promise<void> {
         secondary_color   TEXT,
         support_email     TEXT,
         support_phone     TEXT,
+        persona_name      TEXT NOT NULL DEFAULT 'Dr. Wellness',
         app_bundle_id     TEXT,
         play_store_url    TEXT,
         app_store_url     TEXT,
@@ -90,6 +91,14 @@ export async function initDb(): Promise<void> {
         updated_at  TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (org_id, feature_key)
       )
+    `);
+
+    // Add persona_name column if it doesn't exist yet (safe on existing DBs).
+    // Defaults to 'Dr. Wellness' so the already-seeded default org's AI chat
+    // persona keeps its current name without a manual backfill.
+    await client.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS persona_name TEXT NOT NULL DEFAULT 'Dr. Wellness'
     `);
 
     // Seed the default org once. Every feature defaults ON here so current

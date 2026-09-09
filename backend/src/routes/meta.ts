@@ -47,6 +47,7 @@ router.get("/branding", async (req: Request, res: Response) => {
         secondaryColor: org.secondary_color,
         supportEmail: org.support_email,
         supportPhone: org.support_phone,
+        personaName: org.persona_name,
       },
       enabledFeatures: featureRows.map((r) => r.feature_key),
     });

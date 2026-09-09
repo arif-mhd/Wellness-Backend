@@ -44,7 +44,7 @@ router.get("/:id", async (req: SessionRequest, res: Response) => {
 // admin opts them in explicitly via the entitlements endpoints below,
 // rather than inheriting whatever the default org happens to have enabled.
 router.post("/", async (req: SessionRequest, res: Response) => {
-  const { slug, name, supportEmail, supportPhone, planTier } = req.body;
+  const { slug, name, supportEmail, supportPhone, planTier, personaName } = req.body;
   if (!slug || !name) {
     res.status(400).json({ error: "slug and name are required." });
     return;
@@ -53,10 +53,10 @@ router.post("/", async (req: SessionRequest, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'))
+      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier, persona_name)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'), COALESCE($6, 'Dr. Wellness'))
        RETURNING *`,
-      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null]
+      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null, personaName ?? null]
     );
     const org = rows[0];
 
@@ -95,7 +95,7 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   const {
     name, primaryColor, secondaryColor, supportEmail, supportPhone,
-    appBundleId, playStoreUrl, appStoreUrl, planTier,
+    appBundleId, playStoreUrl, appStoreUrl, planTier, personaName,
   } = req.body;
   const adminId = req.session!.getUserId();
 
@@ -111,10 +111,11 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
          play_store_url  = COALESCE($8, play_store_url),
          app_store_url   = COALESCE($9, app_store_url),
          plan_tier       = COALESCE($10, plan_tier),
+         persona_name    = COALESCE($11, persona_name),
          updated_at      = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier]
+      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName]
     );
     if (!rows[0]) {
       res.status(404).json({ error: "Organization not found." });

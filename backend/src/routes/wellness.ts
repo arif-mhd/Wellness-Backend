@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { resolveOrgId, getOrgBrandName } from "../utils/orgScope";
+import { resolveOrgId, getOrgBrandName, getOrgPersonaName } from "../utils/orgScope";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
@@ -486,8 +486,8 @@ const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
   .map((h) => `  - ${h.symptoms} → ${h.specialty}`)
   .join("\n");
 
-function buildWellnessSystemPrompt(brandName: string): string {
-  return `You are a helpful wellness assistant for ${brandName}, a healthcare platform. Your name is Dr. Wellness.
+function buildWellnessSystemPrompt(brandName: string, personaName: string): string {
+  return `You are a helpful wellness assistant for ${brandName}, a healthcare platform. Your name is ${personaName}.
 
 You MUST respond with ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
 
@@ -584,8 +584,11 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
   }
 
   const orgId = await resolveOrgId(req);
-  const brandName = await getOrgBrandName(orgId);
-  const systemPrompt = buildWellnessSystemPrompt(brandName);
+  const [brandName, personaName] = await Promise.all([
+    getOrgBrandName(orgId),
+    getOrgPersonaName(orgId),
+  ]);
+  const systemPrompt = buildWellnessSystemPrompt(brandName, personaName);
   const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
 
   try {
@@ -722,8 +725,8 @@ const VISIT_SUMMARY_RESPONSE_SCHEMA = {
   required: ["summary"],
 };
 
-function buildVisitSummarySystemPrompt(): string {
-  return `You are writing a pre-visit clinical note for a doctor, based on a conversation between a patient and Dr. Wellness (a triage chatbot) plus the structured symptom details already extracted from that conversation.
+function buildVisitSummarySystemPrompt(personaName: string): string {
+  return `You are writing a pre-visit clinical note for a doctor, based on a conversation between a patient and ${personaName} (a triage chatbot) plus the structured symptom details already extracted from that conversation.
 
 You will be given the full conversation transcript and the structured intake object. Write ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
 
@@ -758,12 +761,15 @@ router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
     return;
   }
 
+  const orgId = await resolveOrgId(req);
+  const personaName = await getOrgPersonaName(orgId);
+
   const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
-  const systemPrompt = buildVisitSummarySystemPrompt();
+  const systemPrompt = buildVisitSummarySystemPrompt(personaName);
 
   const transcriptText = history
     .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
-    .map((h: any) => `${h.role === "user" ? "Patient" : "Dr. Wellness"}: ${h.text}`)
+    .map((h: any) => `${h.role === "user" ? "Patient" : personaName}: ${h.text}`)
     .join("\n");
 
   try {
