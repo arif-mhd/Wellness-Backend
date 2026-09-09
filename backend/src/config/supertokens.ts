@@ -152,23 +152,35 @@ export function initSuperTokens(): void {
                 // sent (e.g. the patient app, which has no per-deployment
                 // portal to scope) or resolving to the default org is never
                 // blocked, since there's nothing more specific to enforce.
-                const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
-                if (orgSlugHeader) {
-                  const emailField = input.formFields.find((f) => f.id === "email");
-                  const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
-                  if (email) {
-                    const [portalOrgId, accountOrgId] = await Promise.all([
-                      resolveOrgIdForRegistration(orgSlugHeader),
-                      resolveOrgIdByEmail(email),
-                    ]);
-                    if (portalOrgId !== accountOrgId) {
-                      await Session.revokeAllSessionsForUser(userId);
-                      return {
-                        status: "GENERAL_ERROR",
-                        message: "This account belongs to a different organization.",
-                      } as any;
+                try {
+                  const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
+                  if (orgSlugHeader) {
+                    const emailField = input.formFields.find((f) => f.id === "email");
+                    const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
+                    if (email) {
+                      const [portalOrgId, accountOrgId] = await Promise.all([
+                        resolveOrgIdForRegistration(orgSlugHeader),
+                        resolveOrgIdByEmail(email),
+                      ]);
+                      if (portalOrgId !== accountOrgId) {
+                        await Session.revokeAllSessionsForUser(userId);
+                        return {
+                          status: "GENERAL_ERROR",
+                          message: "This account belongs to a different organization.",
+                        } as any;
+                      }
                     }
                   }
+                } catch (err) {
+                  // A DB hiccup here must not turn into a hung/failed request
+                  // for the client — originalImplementation.signInPOST already
+                  // ran and set session cookies/headers on the response by
+                  // this point, so throwing here would leave the client with
+                  // an ambiguous half-succeeded request instead of a clean
+                  // OK or GENERAL_ERROR body. Fail open (same as "no header
+                  // sent"): a transient lookup failure shouldn't lock a
+                  // legitimate user out of their own account.
+                  console.error("[signInPOST] org-scope check failed, allowing sign-in:", err);
                 }
 
                 try {
