@@ -1,10 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "supertokens-web-js/recipe/session";
+import Session from "supertokens-web-js/recipe/session";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export default function PendingPage() {
   const router = useRouter();
+  const [isLab, setIsLab] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
+        const data = await res.json();
+        const roles: string[] = data.roles ?? [];
+        setIsLab(roles.includes("lab_pending"));
+      } catch { /* keep pharmacy copy as the default */ }
+    })();
+  }, []);
+
+  const businessLabel = isLab ? "lab" : "pharmacy";
+
   async function handleSignOut() {
     try { await signOut(); } catch { /* expired */ }
     router.replace("/auth/login");
@@ -25,7 +45,7 @@ export default function PendingPage() {
 
           <h2 className="text-2xl font-marcellus text-[#1a2332] mb-3">Application Under Review</h2>
           <p className="text-sm font-outfit text-slate-500 leading-relaxed mb-4">
-            Your pharmacy registration has been submitted successfully. Our admin team is reviewing your details and license information.
+            Your {businessLabel} registration has been submitted successfully. Our admin team is reviewing your details and license information.
           </p>
           <p className="text-sm font-outfit text-slate-500 leading-relaxed mb-8">
             You'll receive an update once your account is approved. This usually takes <span className="font-semibold text-[#16a34a]">1–2 business days</span>.
@@ -33,7 +53,7 @@ export default function PendingPage() {
 
           <div className="w-full bg-green-50 border border-green-100 rounded-xl px-5 py-4 mb-8 text-left">
             <p className="text-xs font-outfit font-bold text-green-700 uppercase tracking-wide mb-2">What happens next?</p>
-            {["Admin verifies your pharmacy license", "Account is approved and activated", "You can start adding products"].map((s, i) => (
+            {[`Admin verifies your ${businessLabel} license`, "Account is approved and activated", isLab ? "You can start adding lab tests" : "You can start adding products"].map((s, i) => (
               <div key={i} className="flex items-start gap-2 mt-2">
                 <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-[10px] font-bold text-green-700">{i + 1}</span>

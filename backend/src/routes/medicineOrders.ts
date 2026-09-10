@@ -7,7 +7,7 @@ import { medicineOrdersContainer, prescriptionsContainer } from "../config/cosmo
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
-import { validateOrderItems } from "../utils/pharmacyOrders";
+import { validateOrderItems, computeAggregateOrderStatus } from "../utils/pharmacyOrders";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -146,7 +146,13 @@ router.patch("/orders/:orderId/cancel", requireRole("patient"), async (req: Sess
       res.status(400).json({ error: "Only confirmed orders can be cancelled" });
       return;
     }
-    const updated = { ...order, status: "cancelled", updatedAt: new Date().toISOString() };
+    // Cancelling the whole order cancels every pharmacy's items in it —
+    // status lives per item now, so the top-level field has to be recomputed
+    // rather than just overwritten (it'll always resolve to "cancelled"
+    // here since every item agrees, but goes through the same helper every
+    // other write uses rather than assuming that outcome).
+    const cancelledItems = (order.items ?? []).map((i: any) => ({ ...i, status: "cancelled" }));
+    const updated = { ...order, items: cancelledItems, status: computeAggregateOrderStatus(cancelledItems), updatedAt: new Date().toISOString() };
     await medicineOrdersContainer.items.upsert(updated);
     res.json(updated);
   } catch (err) {

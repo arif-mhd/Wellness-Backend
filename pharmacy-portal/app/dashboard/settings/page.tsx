@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Session from "supertokens-web-js/recipe/session";
+import { useAccountRole } from "@/hooks/useAccountRole";
 
 async function pharmacyFetch(path: string, options: RequestInit = {}) {
   const token = await Session.getAccessToken();
@@ -67,12 +68,14 @@ const TABS = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
 
   return (
     <div className="px-8 pb-12 pt-6 max-w-6xl mx-auto w-full font-outfit animate-fade-in">
       <div className="mb-8 mt-2">
         <h1 className="text-[28px] text-[#383F45] font-normal tracking-[-0.56px] leading-none mb-2">Settings</h1>
-        <p className="text-sm text-[#676E76] tracking-[-0.28px]">Manage your pharmacy portal preferences and configuration.</p>
+        <p className="text-sm text-[#676E76] tracking-[-0.28px]">Manage your {isLab ? "lab" : "pharmacy"} portal preferences and configuration.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 bg-white p-6 rounded-2xl border border-[#EBEEF5] shadow-sm">
@@ -114,6 +117,10 @@ export default function SettingsPage() {
 }
 
 function GeneralSettings() {
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+  const basePath = isLab ? "/api/lab/me" : "/api/pharmacy/me";
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -132,30 +139,40 @@ function GeneralSettings() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const res = await pharmacyFetch("/api/pharmacy/me");
+        const res = await pharmacyFetch(basePath);
         if (res.ok) {
           const data = await res.json();
-          if (data.pharmacy) {
-            setFormData({
-              pharmacyName: data.pharmacy.pharmacyName ?? "",
-              ownerName: data.pharmacy.ownerName ?? "",
-              licenseNumber: data.pharmacy.licenseNumber ?? "",
-              emiratesId: data.pharmacy.emiratesId ?? "",
-              email: data.pharmacy.email ?? "",
-              phone: data.pharmacy.phone ?? "",
-              location: data.pharmacy.location ?? "",
-              manager: data.pharmacy.manager ?? ""
+          const account = isLab ? data.lab : data.pharmacy;
+          if (account) {
+            setFormData(isLab ? {
+              pharmacyName: account.name ?? "",
+              ownerName: account.director ?? "",
+              licenseNumber: account.labLicense ?? "",
+              emiratesId: "",
+              email: account.email ?? "",
+              phone: account.contactNumber ?? "",
+              location: account.location ?? "",
+              manager: account.manager ?? ""
+            } : {
+              pharmacyName: account.pharmacyName ?? "",
+              ownerName: account.ownerName ?? "",
+              licenseNumber: account.licenseNumber ?? "",
+              emiratesId: account.emiratesId ?? "",
+              email: account.email ?? "",
+              phone: account.phone ?? "",
+              location: account.location ?? "",
+              manager: account.manager ?? ""
             });
           }
         }
       } catch (err) {
-        console.error("Failed to load pharmacy profile", err);
+        console.error(`Failed to load ${isLab ? "lab" : "pharmacy"} profile`, err);
       } finally {
         setLoading(false);
       }
     }
     loadProfile();
-  }, []);
+  }, [basePath, isLab]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -165,12 +182,21 @@ function GeneralSettings() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/me", {
+      const body = isLab ? {
+        name: formData.pharmacyName,
+        director: formData.ownerName,
+        labLicense: formData.licenseNumber,
+        email: formData.email,
+        contactNumber: formData.phone,
+        location: formData.location,
+        manager: formData.manager,
+      } : formData;
+      const res = await pharmacyFetch(basePath, {
         method: "PUT",
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
-      setMessage({ type: 'success', text: 'Pharmacy information updated successfully!' });
+      setMessage({ type: 'success', text: `${isLab ? "Lab" : "Pharmacy"} information updated successfully!` });
       setIsEditing(false);
     } catch (err) {
       console.error(err);
@@ -214,24 +240,26 @@ function GeneralSettings() {
       <div className="space-y-5 max-w-2xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <label className={labelCls}>Pharmacy Name</label>
+            <label className={labelCls}>{isLab ? "Lab Name" : "Pharmacy Name"}</label>
             <input type="text" name="pharmacyName" value={formData.pharmacyName} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
           <div className="space-y-2">
-            <label className={labelCls}>Owner Name</label>
+            <label className={labelCls}>{isLab ? "Director Name" : "Owner Name"}</label>
             <input type="text" name="ownerName" value={formData.ownerName} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className={`grid grid-cols-1 ${isLab ? "" : "md:grid-cols-2"} gap-5`}>
           <div className="space-y-2">
-            <label className={labelCls}>License Number</label>
+            <label className={labelCls}>{isLab ? "Lab License" : "License Number"}</label>
             <input type="text" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
-          <div className="space-y-2">
-            <label className={labelCls}>Emirates ID</label>
-            <input type="text" name="emiratesId" value={formData.emiratesId} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
-          </div>
+          {!isLab && (
+            <div className="space-y-2">
+              <label className={labelCls}>Emirates ID</label>
+              <input type="text" name="emiratesId" value={formData.emiratesId} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -291,6 +319,9 @@ function defaultHours(): OperatingHours {
 }
 
 function OperatingHoursSettings() {
+  const { role } = useAccountRole();
+  const basePath = role === "lab" ? "/api/lab/me" : "/api/pharmacy/me";
+
   const [hours, setHours] = useState<OperatingHours>(defaultHours());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -299,11 +330,12 @@ function OperatingHoursSettings() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await pharmacyFetch("/api/pharmacy/me");
+        const res = await pharmacyFetch(basePath);
         if (res.ok) {
           const data = await res.json();
-          if (data.pharmacy?.operatingHours) {
-            setHours({ ...defaultHours(), ...data.pharmacy.operatingHours });
+          const account = data.lab ?? data.pharmacy;
+          if (account?.operatingHours) {
+            setHours({ ...defaultHours(), ...account.operatingHours });
           }
         }
       } catch (err) {
@@ -312,7 +344,7 @@ function OperatingHoursSettings() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [basePath]);
 
   const updateDay = (day: string, updates: Partial<DayHours>) => {
     setHours((prev) => ({ ...prev, [day]: { ...prev[day], ...updates } }));
@@ -322,7 +354,7 @@ function OperatingHoursSettings() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/me", {
+      const res = await pharmacyFetch(basePath, {
         method: "PUT",
         body: JSON.stringify({ operatingHours: hours }),
       });
@@ -390,6 +422,10 @@ interface ClinicAffiliation { clinicId: string; clinicName: string; }
 interface PendingClinicRequest { fromClinicId: string; fromClinicName: string; requestedAt: string; }
 
 function ClinicAffiliationSettings() {
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+  const base = isLab ? "/api/lab" : "/api/pharmacy";
+
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [affiliations, setAffiliations] = useState<ClinicAffiliation[]>([]);
@@ -398,7 +434,7 @@ function ClinicAffiliationSettings() {
 
   const load = () => {
     setLoading(true);
-    pharmacyFetch("/api/pharmacy/clinic-affiliations")
+    pharmacyFetch(`${base}/clinic-affiliations`)
       .then((r) => r.json())
       .then((data) => {
         setAffiliations(Array.isArray(data.affiliations) ? data.affiliations : []);
@@ -408,13 +444,13 @@ function ClinicAffiliationSettings() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [base]);
 
   const handleAccept = async (fromClinicId: string) => {
     setBusyId(fromClinicId);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/clinic-link-requests/accept", {
+      const res = await pharmacyFetch(`${base}/clinic-link-requests/accept`, {
         method: "POST",
         body: JSON.stringify({ fromClinicId }),
       });
@@ -432,7 +468,7 @@ function ClinicAffiliationSettings() {
     setBusyId(fromClinicId);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/clinic-link-requests/reject", {
+      const res = await pharmacyFetch(`${base}/clinic-link-requests/reject`, {
         method: "POST",
         body: JSON.stringify({ fromClinicId }),
       });
@@ -457,7 +493,7 @@ function ClinicAffiliationSettings() {
     <div className="animate-in fade-in duration-300">
       <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-6 border-b border-[#EBEEF5] pb-3">Clinic Affiliation</h2>
       <p className="text-[#676E76] text-[12px] mb-6 -mt-3">
-        Your pharmacy can serve more than one clinic or branch at a time — each accepted invitation adds another
+        Your {isLab ? "lab" : "pharmacy"} can serve more than one clinic or branch at a time — each accepted invitation adds another
         affiliation below.
       </p>
 
@@ -476,7 +512,9 @@ function ClinicAffiliationSettings() {
             <div>
               <p className="text-[#24292E] text-sm font-semibold">Affiliated with {a.clinicName}</p>
               <p className="text-[#676E76] text-[12px] mt-0.5">
-                Their doctors prescribe only from your own stock, and orders route here automatically.
+                {isLab
+                  ? "Their doctors refer patients only to your own lab, and bookings route here automatically."
+                  : "Their doctors prescribe only from your own stock, and orders route here automatically."}
               </p>
             </div>
           </div>
@@ -486,7 +524,10 @@ function ClinicAffiliationSettings() {
           <div key={r.fromClinicId} className="p-5 rounded-xl border border-[#EBEEF5] bg-white shadow-sm">
             <p className="text-[#24292E] text-sm font-semibold mb-1">Clinic affiliation request</p>
             <p className="text-[#676E76] text-[12px] mb-4">
-              <strong>{r.fromClinicName}</strong> would like to affiliate your pharmacy with their clinic. Their doctors would only prescribe from your stock, and their patients' orders would route to you.
+              <strong>{r.fromClinicName}</strong> would like to affiliate your {isLab ? "lab" : "pharmacy"} with their clinic.{" "}
+              {isLab
+                ? "Their doctors would only refer patients to your lab, and their patients' bookings would route to you."
+                : "Their doctors would only prescribe from your stock, and their patients' orders would route to you."}
             </p>
             <div className="flex items-center gap-3">
               <button onClick={() => handleAccept(r.fromClinicId)} disabled={busyId === r.fromClinicId} className="px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white font-medium text-[13px] shadow-[0_4px_10px_rgba(84,118,252,0.25)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.35)] transition-all disabled:opacity-60">
@@ -501,7 +542,7 @@ function ClinicAffiliationSettings() {
 
         {affiliations.length === 0 && linkRequests.length === 0 && (
           <p className="text-[#676E76] text-[13px]">
-            No clinic affiliations. Your pharmacy operates independently — a clinic can send you a link invitation
+            No clinic affiliations. Your {isLab ? "lab" : "pharmacy"} operates independently — a clinic can send you a link invitation
             from their own dashboard using this account's login email.
           </p>
         )}
@@ -563,6 +604,10 @@ function defaultNotifPreferences(): NotifPreferences {
 }
 
 function NotificationSettings() {
+  const { role } = useAccountRole();
+  const isLab = role === "lab";
+  const base = isLab ? "/api/lab" : "/api/pharmacy";
+
   const [prefs, setPrefs] = useState<NotifPreferences>(defaultNotifPreferences());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -571,11 +616,12 @@ function NotificationSettings() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await pharmacyFetch("/api/pharmacy/me");
+        const res = await pharmacyFetch(`${base}/me`);
         if (res.ok) {
           const data = await res.json();
-          if (data.pharmacy?.notificationPreferences) {
-            setPrefs({ ...defaultNotifPreferences(), ...data.pharmacy.notificationPreferences });
+          const account = data.lab ?? data.pharmacy;
+          if (account?.notificationPreferences) {
+            setPrefs({ ...defaultNotifPreferences(), ...account.notificationPreferences });
           }
         }
       } catch (err) {
@@ -584,7 +630,7 @@ function NotificationSettings() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [base]);
 
   const toggle = (key: string, channel: "email" | "sms") => {
     setPrefs((prev) => ({ ...prev, [key]: { ...prev[key], [channel]: !prev[key][channel] } }));
@@ -594,7 +640,7 @@ function NotificationSettings() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/notifications", {
+      const res = await pharmacyFetch(`${base}/notifications`, {
         method: "PATCH",
         body: JSON.stringify({ preferences: prefs }),
       });
@@ -672,6 +718,9 @@ function NotificationSettings() {
 }
 
 function SecuritySettings() {
+  const { role } = useAccountRole();
+  const base = role === "lab" ? "/api/lab" : "/api/pharmacy";
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -685,7 +734,7 @@ function SecuritySettings() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await pharmacyFetch("/api/pharmacy/2fa/status");
+        const res = await pharmacyFetch(`${base}/2fa/status`);
         if (res.ok) {
           const data = await res.json();
           setTwoFactorEnabled(!!data.twoFactorEnabled);
@@ -696,7 +745,7 @@ function SecuritySettings() {
         setLoading2fa(false);
       }
     })();
-  }, []);
+  }, [base]);
 
   const handleChangePassword = async () => {
     setPasswordMessage(null);
@@ -715,7 +764,7 @@ function SecuritySettings() {
 
     setChangingPassword(true);
     try {
-      const res = await pharmacyFetch("/api/pharmacy/change-password", {
+      const res = await pharmacyFetch(`${base}/change-password`, {
         method: "POST",
         body: JSON.stringify({ currentPassword, newPassword }),
       });
@@ -739,7 +788,7 @@ function SecuritySettings() {
     const next = !twoFactorEnabled;
     setToggling2fa(true);
     try {
-      const res = await pharmacyFetch(`/api/pharmacy/2fa/${next ? "enable" : "disable"}`, { method: "POST" });
+      const res = await pharmacyFetch(`${base}/2fa/${next ? "enable" : "disable"}`, { method: "POST" });
       if (res.ok) setTwoFactorEnabled(next);
     } catch (err) {
       console.error("Failed to toggle 2FA", err);
