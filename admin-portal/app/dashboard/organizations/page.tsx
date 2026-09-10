@@ -11,6 +11,7 @@ interface Organization {
   slug: string;
   name: string;
   logo_url: string | null;
+  logo_url_light: string | null;
   primary_color: string | null;
   secondary_color: string | null;
   support_email: string | null;
@@ -281,12 +282,13 @@ function OrganizationsPageInner() {
     }
   }
 
-  async function handleLogoUpload(file: File) {
+  async function handleLogoUpload(file: File, variant?: "light") {
     if (!selected) return;
     const formData = new FormData();
     formData.append("logo", file);
     try {
-      const res = await apiFetch(`/api/admin/organizations/${selected.id}/logo`, { method: "POST", body: formData });
+      const qs = variant ? `?variant=${variant}` : "";
+      const res = await apiFetch(`/api/admin/organizations/${selected.id}/logo${qs}`, { method: "POST", body: formData });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setOrgs(prev => prev.map(o => o.id === selected.id ? body.organization : o));
@@ -451,6 +453,36 @@ function OrganizationsPageInner() {
                     {orgSaveMsg}
                   </span>
                 )}
+              </div>
+
+              {/* Light/white logo variant — shown on dark or gradient screen
+                  backgrounds (e.g. the patient app's header) where the main
+                  logo above wouldn't be visible. Optional: falls back to the
+                  main logo (or the platform default) if never uploaded. */}
+              <div className="flex items-center gap-4 pb-5 border-b border-slate-50 mb-6 -mt-2">
+                <div
+                  className="w-16 h-16 rounded-2xl bg-[#1e293b] flex items-center justify-center shrink-0 overflow-hidden"
+                  title="Preview on a dark background"
+                >
+                  {draftOrg.logo_url_light ? (
+                    <img src={draftOrg.logo_url_light} alt={`${draftOrg.name} (light)`} className="max-w-[85%] max-h-[85%] object-contain" />
+                  ) : (
+                    <span className="text-white/40 text-[10px] text-center px-2">No light logo</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[13px] font-medium text-slate-800">Logo for dark backgrounds</p>
+                  <p className="text-[11px] text-slate-400 mb-1">Used where the main logo above wouldn't be visible (e.g. the patient app's home screen).</p>
+                  <label className="text-[11px] font-medium text-[#5476FC] hover:text-[#4466FC] cursor-pointer inline-block">
+                    {draftOrg.logo_url_light ? "Change light logo" : "Upload light logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, "light"); }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { apiFetch } from "@/lib/apiFetch";
 
 /**
  * Wrap any page that requires login with this component.
@@ -25,7 +24,15 @@ export default function ProtectedRoute({
 
   const checkSession = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+      // This app uses header-based session transfer (tokenTransferMethod:
+      // "header" — see SuperTokensProvider.tsx), so the token lives in
+      // browser storage, not a cookie. A plain fetch() with
+      // credentials:"include" (a cookie-mode idiom) never attaches it,
+      // which made this check 401 unconditionally regardless of whether a
+      // real session existed. apiFetch() attaches the real access token
+      // (and retries once after a refresh on a stale one), matching how
+      // every other authenticated call in this app already works.
+      const res = await apiFetch("/auth/me");
       if (res.ok) {
         setChecking(false);
       } else {

@@ -42,6 +42,7 @@ router.get("/branding", async (req: Request, res: Response) => {
         slug: org.slug,
         name: org.name,
         logoUrl: org.logo_url,
+        logoUrlLight: org.logo_url_light,
         faviconUrl: org.favicon_url,
         primaryColor: org.primary_color,
         secondaryColor: org.secondary_color,

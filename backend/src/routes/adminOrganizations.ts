@@ -140,6 +140,9 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
 });
 
 // ─── POST /api/admin/organizations/:id/logo ──────────────────────────────────
+// ?variant=light uploads the white/light-colored logo used on dark or
+// gradient backgrounds (see logo_url_light) instead of the main logo_url.
+// Any other/absent value updates the main logo.
 router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   if (!req.file) {
@@ -147,9 +150,11 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
     return;
   }
   const adminId = req.session!.getUserId();
+  const isLightVariant = req.query.variant === "light";
+  const column = isLightVariant ? "logo_url_light" : "logo_url";
 
   try {
-    const blobPath = `organizations/${id}/logo-${uuidv4()}.${req.file.mimetype.split("/")[1] || "png"}`;
+    const blobPath = `organizations/${id}/logo${isLightVariant ? "-light" : ""}-${uuidv4()}.${req.file.mimetype.split("/")[1] || "png"}`;
     await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
     // The container isn't publicly readable, so a bare blob URL 403s in the
     // browser — every other upload in this codebase (pharmacy product
@@ -158,7 +163,7 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
     const url = generateSasUrl(blobPath, 365);
 
     const { rows } = await pool.query(
-      `UPDATE organizations SET logo_url = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      `UPDATE organizations SET ${column} = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id, url]
     );
     if (!rows[0]) {
@@ -169,7 +174,7 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
     logActivity({
       source: "admin",
       action: "Organization Logo Updated",
-      details: `Logo updated for organization "${rows[0].name}"`,
+      details: `${isLightVariant ? "Light-variant logo" : "Logo"} updated for organization "${rows[0].name}"`,
       performedBy: "Admin",
       performedById: adminId,
       entityType: "organization",

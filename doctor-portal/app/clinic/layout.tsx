@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import ClinicSidebar from "@/components/ClinicSidebar";
 import { apiFetch } from "@/lib/apiFetch";
+import { useBranding } from "@/components/BrandingContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -323,6 +324,7 @@ function ClinicSearch() {
 
 function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const branding = useBranding();
   const { isOpen: sidebarOpen, setIsMobileOpen } = useSidebar();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
@@ -462,11 +464,15 @@ function ClinicLayoutContent({ children }: { children: React.ReactNode }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/8008cabf971217f2f64baa6799b253778c1ad571?width=182"
-              className="w-[91px] h-[30px] object-contain hidden sm:block"
-              alt="Wellness Central"
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                className="w-[91px] h-[30px] object-contain hidden sm:block"
+                alt={branding.name}
+              />
+            ) : (
+              <span className="hidden sm:block text-[15px] font-semibold text-[#1e293b]">{branding.name}</span>
+            )}
             <span className="hidden sm:inline-block text-[0.68rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
               Clinic
             </span>

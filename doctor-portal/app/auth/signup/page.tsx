@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import { signOut } from "supertokens-web-js/recipe/session";
 import STGeneralError from "supertokens-web-js/utils/error";
 import logoImg from "@/assets/images/wellness_logo.png";
 import { useBranding } from "@/components/BrandingContext";
@@ -232,6 +233,15 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // A stale session from a PREVIOUS account in this same browser
+        // (e.g. still logged in as another clinic from earlier testing)
+        // must never be left active while we sign in as the brand-new
+        // account below — otherwise a still-valid old session could end up
+        // being what the rest of the app reads, showing that old account's
+        // data instead of the one just registered. Best-effort: if there's
+        // no active session this simply no-ops.
+        try { await signOut(); } catch { /* no active session to clear */ }
+
         // Registration only creates the account — it doesn't log the user
         // in. Without this, the session is missing for the entire
         // complete-profile wizard that follows, and only surfaces as an
