@@ -232,7 +232,17 @@ app.use("/api/meta", metaRouter);
 app.use("/api/livekit", livekitWebhookRouter);
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    // Lets a deploy be verified from the outside (e.g. "does /health's
+    // buildMarker match the commit I just pushed?") without needing
+    // console/log access — added specifically because a recent deploy
+    // appeared to not include the latest commit despite the branch/commit
+    // being correct, and there was no independent way to confirm which
+    // build was actually serving traffic.
+    buildMarker: "multi-logo-2026-09-11",
+  });
 });
 
 // SuperTokens error handler (must be last)
