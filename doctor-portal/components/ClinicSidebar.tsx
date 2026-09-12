@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
-import { useBranding } from "./BrandingContext";
+import { useBranding, useFeatures, type FeatureKey } from "./BrandingContext";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions, type PermissionKey } from "@/lib/useClinicPermissions";
@@ -129,25 +129,29 @@ const CollapseIcon = () => (
 // a branch-staff account that's had that permission explicitly revoked — the
 // org owner and any account without that key set to `false` sees every item,
 // unchanged from before this feature existed.
-const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: PermissionKey }[] = [
+// `feature`, when set, hides the item entirely when the org hasn't enabled
+// that white-label feature flag (see FeatureKey/useFeatures) — independent
+// of `perm`, which is about per-account permissions, not per-org offerings.
+type NavItem = { href: string; label: string; Icon: any; perm?: PermissionKey; feature?: FeatureKey };
+const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/clinic", label: "Home", Icon: HomeIcon },
-  { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon },
+  { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon, feature: "appointments" },
   { href: "/clinic/doctors", label: "Doctors", Icon: DoctorsIcon },
   { href: "/clinic/patients", label: "Patients", Icon: PatientsIcon, perm: "manage_patients" },
   { href: "/clinic/analytics", label: "Analytics", Icon: AnalyticsIcon, perm: "view_analytics" },
-  { href: "/clinic/insurance", label: "Insurance", Icon: InsuranceIcon },
-  { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
+  { href: "/clinic/insurance", label: "Insurance", Icon: InsuranceIcon, feature: "insurance" },
+  { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon, feature: "appointments" },
   { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon, perm: "manage_payment" },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
   // Per-branch resource (each branch, including a branch-staff account's own
   // branch, affiliates its own pharmacy) — unlike Branches/User Roles below,
   // this belongs in BASE so a branch-staff account sees it too, not just the
   // org owner.
-  { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon },
-  { href: "/clinic/lab", label: "Lab", Icon: LabIcon },
+  { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon, feature: "pharmacy" },
+  { href: "/clinic/lab", label: "Lab", Icon: LabIcon, feature: "lab_booking" },
 ];
-const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
-const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
+const ACCOUNTS_NAV_ITEM: NavItem = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
+const BRANCHES_NAV_ITEM: NavItem = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
@@ -155,6 +159,7 @@ export default function ClinicSidebar() {
   const searchParams = useSearchParams();
   const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
   const branding = useBranding();
+  const { hasFeature } = useFeatures();
   const [clinicName, setClinicName] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAvatar, setClinicAvatar] = useState("");
@@ -204,7 +209,7 @@ export default function ClinicSidebar() {
     : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
 
   const NAV_ITEMS = (isBranchUser ? BASE_NAV_ITEMS : adminNav).filter(
-    (item) => !item.perm || can(item.perm)
+    (item) => (!item.perm || can(item.perm)) && (!item.feature || hasFeature(item.feature))
   );
 
   async function handleSignOut() {

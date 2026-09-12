@@ -72,6 +72,33 @@ export async function resolveOrgIdForRegistration(orgSlug?: string | null): Prom
   return getDefaultOrgId();
 }
 
+// Resolves which org a PUBLIC/unauthenticated read (e.g. GET /api/doctors,
+// GET /api/clinics) should be scoped to, from the same `X-Org-Slug` header
+// every brand build already sends on register — these endpoints have no
+// session to read a tenantId off of via resolveOrgId, so the header is the
+// only signal available. Same fallback semantics as resolveOrgIdForRegistration
+// (missing/unknown slug -> default org), so an un-rebranded client still
+// gets a working, if unscoped-to-its-own-org, response instead of an error.
+export async function resolveOrgIdFromHeader(orgSlug?: string | null): Promise<string> {
+  return resolveOrgIdForRegistration(orgSlug);
+}
+
+// Every clinicId a doctor or clinic-directory listing might carry for a given
+// org: the org's own clinic doc id (main branch) plus every nested
+// branches[].id (see loadOrgDocForClinicId's comment on why branches have no
+// standalone Cosmos document of their own). Used to scope GET /api/doctors
+// and GET /api/clinics to just one white-label org's roster.
+export async function getClinicIdsForOrg(orgId: string): Promise<string[]> {
+  const { resources } = await clinicsContainer.items
+    .query({
+      query: "SELECT c.id, c.branches FROM c WHERE c.tenantId = @orgId AND NOT IS_DEFINED(c.branchId)",
+      parameters: [{ name: "@orgId", value: orgId }],
+    })
+    .fetchAll();
+
+  return resources.flatMap((org: any) => [org.id, ...(org.branches ?? []).map((b: any) => b.id)]);
+}
+
 // Resolves an organization's branding (currently just its name) by id, for
 // callers that already know the org id and just need display info — e.g.
 // an OTP email that has to show which company's product this account

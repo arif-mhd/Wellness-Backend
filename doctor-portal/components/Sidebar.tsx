@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
-import { useBranding } from "./BrandingContext";
+import { useBranding, useFeatures, type FeatureKey } from "./BrandingContext";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
@@ -85,13 +85,13 @@ const CollapseIcon = () => (
 // `perm`, when set, gates the whole nav item for a doctor who's had that
 // permission explicitly revoked by their clinic org owner — a standalone
 // doctor (no clinic-set permissions) sees every item, unchanged.
-const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics" }[] = [
+const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics"; feature?: FeatureKey }[] = [
   { href: "/dashboard", label: "Home", Icon: HomeIcon },
-  { href: "/appointments", label: "Appointments", Icon: ApptIcon },
+  { href: "/appointments", label: "Appointments", Icon: ApptIcon, feature: "appointments" },
   { href: "/dashboard/patients", label: "Patients", Icon: PatientsIcon },
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon, perm: "view_analytics" },
-  { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon },
-  { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon },
+  { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon, feature: "prescriptions" },
+  { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon, feature: "appointments" },
   { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
   { href: "/dashboard/profile/payments", label: "Payment", Icon: PaymentIcon },
 ];
@@ -102,12 +102,13 @@ export default function Sidebar() {
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState } = useSidebar();
   const branding = useBranding();
+  const { hasFeature } = useFeatures();
   const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
   const [doctorAvatar, setDoctorAvatar] = useState("");
   const [scheduleSlots, setScheduleSlots] = useState<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>([]);
   const { can } = useDoctorPermissions();
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.perm || can(item.perm));
+  const visibleNavItems = NAV_ITEMS.filter((item) => (!item.perm || can(item.perm)) && (!item.feature || hasFeature(item.feature)));
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);

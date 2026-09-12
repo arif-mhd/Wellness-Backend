@@ -8,7 +8,7 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader } from "../utils/orgScope";
 import { getClinicAppointmentsData } from "./clinicAppointments";
 import { getClinicFeedbackData } from "./clinicFeedback";
 
@@ -734,20 +734,25 @@ function omitInternalFields<T extends { paymentSettings?: unknown; addressProofF
 }
 
 // ─── GET /api/clinics ─────────────────────────────────────────────────────────
-// Public directory — approved clinics only. Mirrors GET /api/doctors.
-// clinicsContainer also stores branch senior-staff login docs (they carry
-// their own personal fullName and a branchId), which are accounts, not
-// clinics — excluded here so they never appear in the patient-facing
-// directory (e.g. a branch's staff member showing up as if they were a
-// clinic of their own). Each org's active additional branches have their
-// own doctors too, so they're listed as their own entries alongside the
-// org's main-branch entry, not just folded into it.
-router.get("/", async (_req: Request, res: Response) => {
+// Public directory — approved clinics only, scoped to the calling brand's
+// own org (clinic doc's tenantId) via the `X-Org-Slug` header, same as
+// GET /api/doctors — see resolveOrgIdFromHeader. clinicsContainer also
+// stores branch senior-staff login docs (they carry their own personal
+// fullName and a branchId), which are accounts, not clinics — excluded here
+// so they never appear in the patient-facing directory (e.g. a branch's
+// staff member showing up as if they were a clinic of their own). Each
+// org's active additional branches have their own doctors too, so they're
+// listed as their own entries alongside the org's main-branch entry, not
+// just folded into it.
+router.get("/", async (req: Request, res: Response) => {
   try {
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+
     const { resources: orgs } = await clinicsContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.status = @status AND NOT IS_DEFINED(c.branchId) ORDER BY c.approvedAt DESC",
-        parameters: [{ name: "@status", value: "approved" }],
+        query: "SELECT * FROM c WHERE c.status = @status AND c.tenantId = @orgId AND NOT IS_DEFINED(c.branchId) ORDER BY c.approvedAt DESC",
+        parameters: [{ name: "@status", value: "approved" }, { name: "@orgId", value: orgId }],
       })
       .fetchAll();
 

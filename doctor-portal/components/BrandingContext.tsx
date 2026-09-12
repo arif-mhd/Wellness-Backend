@@ -4,14 +4,41 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+// Mirrors the backend's FEATURE_DEFS keys (see backend/src/config/features.ts).
+export type FeatureKey =
+  | "appointments"
+  | "prescriptions"
+  | "pharmacy"
+  | "lab_booking"
+  | "insurance"
+  | "vaccination"
+  | "fitness"
+  | "menstrual"
+  | "pregnancy"
+  | "nutrition_ai"
+  | "ai_chat"
+  | "articles"
+  | "sos";
+
 interface Branding {
   name: string;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  // Every feature enabled until the branding fetch resolves (or if it never
+  // does) — an org with nothing configured, or a fetch failure, must never
+  // hide sidebar items that were already visible before this existed. See
+  // hasFeature() below.
+  enabledFeatures: FeatureKey[];
 }
 
-const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null };
+const ALL_FEATURES: FeatureKey[] = [
+  "appointments", "prescriptions", "pharmacy", "lab_booking", "insurance",
+  "vaccination", "fitness", "menstrual", "pregnancy", "nutrition_ai",
+  "ai_chat", "articles", "sos",
+];
+
+const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, enabledFeatures: ALL_FEATURES };
 
 const BrandingContext = createContext<Branding>(DEFAULT_BRANDING);
 
@@ -51,6 +78,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
           logoUrl: b.logoUrl || null,
           primaryColor: b.primaryColor || null,
           secondaryColor: b.secondaryColor || null,
+          enabledFeatures: Array.isArray(data.enabledFeatures) ? data.enabledFeatures : ALL_FEATURES,
         };
         setBranding(resolved);
         if (b.name) document.title = `${b.name} – Clinic Portal`;
@@ -70,4 +98,11 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
 export function useBranding(): Branding {
   return useContext(BrandingContext);
+}
+
+// Convenience hook for sidebar/nav gating — e.g.
+// {hasFeature("lab_booking") && <NavItem .../>}
+export function useFeatures(): { enabledFeatures: FeatureKey[]; hasFeature: (key: FeatureKey) => boolean } {
+  const { enabledFeatures } = useContext(BrandingContext);
+  return { enabledFeatures, hasFeature: (key: FeatureKey) => enabledFeatures.includes(key) };
 }
