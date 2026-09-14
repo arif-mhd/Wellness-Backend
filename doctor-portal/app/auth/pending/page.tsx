@@ -5,9 +5,11 @@ import Link from "next/link";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { useRouter } from "next/navigation";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 export default function PendingApprovalPage() {
   const router = useRouter();
+  const branding = useBranding();
 
   async function handleSignOut() {
     if (!window.confirm("Are you sure you want to log out?")) return;
@@ -26,7 +28,11 @@ export default function PendingApprovalPage() {
 
         {/* Logo */}
         <div className="mb-12 select-none">
-          <Image src={logoImg} alt="Wellness Central" width={160} height={50} className="object-contain" priority />
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain" />
+          ) : (
+            <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain" priority />
+          )}
         </div>
 
         {/* Card */}

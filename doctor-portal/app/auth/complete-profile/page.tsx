@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { apiFetch } from "@/lib/apiFetch";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 import ProfileCompletionSidebar from "@/components/profile/ProfileCompletionSidebar";
 import OwnersPersonalInfoForm from "@/components/profile/OwnersPersonalInfoForm";
 import InsurancesForm from "@/components/profile/InsurancesForm";
@@ -89,6 +90,7 @@ type Phase = "owner" | "insurances" | "branchCount" | "companyInfo" | "availabil
 function CompleteProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const branding = useBranding();
 
   const [phase, setPhase] = useState<Phase>("owner");
   const [submitting, setSubmitting] = useState(false);
@@ -351,7 +353,11 @@ function CompleteProfileContent() {
 
       <div className="relative z-10 w-full max-w-[1300px] mx-auto flex flex-col items-center flex-1 justify-start pt-4">
         <div className="mb-10 flex items-center gap-3 select-none">
-          <Image src={logoImg} alt="Wellness Central Logo" width={160} height={50} className="object-contain hover:opacity-90 transition-opacity" priority />
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain hover:opacity-90 transition-opacity" />
+          ) : (
+            <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain hover:opacity-90 transition-opacity" priority />
+          )}
           <span className="text-[0.7rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
             Clinic
           </span>

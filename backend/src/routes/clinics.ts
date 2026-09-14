@@ -8,6 +8,7 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader } from "../utils/orgScope";
 import { getClinicAppointmentsData } from "./clinicAppointments";
 import { getClinicFeedbackData } from "./clinicFeedback";
 
@@ -176,6 +177,14 @@ router.post("/register", async (req: Request, res: Response) => {
     await UserRoles.addRoleToUser("public", supertokensId, "clinic_pending");
 
     // ── 3. Save registration details to Cosmos ────────────────────────────
+    // The doctor-portal's clinic signup form sends its deployment's org slug
+    // on this header (set via NEXT_PUBLIC_ORG_SLUG at build time) — resolves
+    // to the matching org, or the default org if absent/unknown. Not to be
+    // confused with `orgId` elsewhere in this file, which is the unrelated
+    // multi-branch concept (which parent clinic a branch belongs to).
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const tenantId = await resolveOrgIdForRegistration(orgSlug);
+
     const now = new Date().toISOString();
     const clinicDoc = {
       id: supertokensId,   // Cosmos id = ST userId
@@ -183,6 +192,7 @@ router.post("/register", async (req: Request, res: Response) => {
       status: "details_pending",
       email,
       clinicName,
+      tenantId,
       // The owner's own personal name — collected later in the complete-profile
       // wizard (Owner's Personal Information step), kept distinct from
       // clinicName so filling it in never overwrites the clinic's own identity.
@@ -724,20 +734,25 @@ function omitInternalFields<T extends { paymentSettings?: unknown; addressProofF
 }
 
 // ─── GET /api/clinics ─────────────────────────────────────────────────────────
-// Public directory — approved clinics only. Mirrors GET /api/doctors.
-// clinicsContainer also stores branch senior-staff login docs (they carry
-// their own personal fullName and a branchId), which are accounts, not
-// clinics — excluded here so they never appear in the patient-facing
-// directory (e.g. a branch's staff member showing up as if they were a
-// clinic of their own). Each org's active additional branches have their
-// own doctors too, so they're listed as their own entries alongside the
-// org's main-branch entry, not just folded into it.
-router.get("/", async (_req: Request, res: Response) => {
+// Public directory — approved clinics only, scoped to the calling brand's
+// own org (clinic doc's tenantId) via the `X-Org-Slug` header, same as
+// GET /api/doctors — see resolveOrgIdFromHeader. clinicsContainer also
+// stores branch senior-staff login docs (they carry their own personal
+// fullName and a branchId), which are accounts, not clinics — excluded here
+// so they never appear in the patient-facing directory (e.g. a branch's
+// staff member showing up as if they were a clinic of their own). Each
+// org's active additional branches have their own doctors too, so they're
+// listed as their own entries alongside the org's main-branch entry, not
+// just folded into it.
+router.get("/", async (req: Request, res: Response) => {
   try {
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+
     const { resources: orgs } = await clinicsContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.status = @status AND NOT IS_DEFINED(c.branchId) ORDER BY c.approvedAt DESC",
-        parameters: [{ name: "@status", value: "approved" }],
+        query: "SELECT * FROM c WHERE c.status = @status AND c.tenantId = @orgId AND NOT IS_DEFINED(c.branchId) ORDER BY c.approvedAt DESC",
+        parameters: [{ name: "@status", value: "approved" }, { name: "@orgId", value: orgId }],
       })
       .fetchAll();
 

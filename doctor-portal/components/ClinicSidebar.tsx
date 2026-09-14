@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
+import { useBranding, useFeatures, type FeatureKey } from "./BrandingContext";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions, type PermissionKey } from "@/lib/useClinicPermissions";
@@ -128,31 +129,37 @@ const CollapseIcon = () => (
 // a branch-staff account that's had that permission explicitly revoked — the
 // org owner and any account without that key set to `false` sees every item,
 // unchanged from before this feature existed.
-const BASE_NAV_ITEMS: { href: string; label: string; Icon: any; perm?: PermissionKey }[] = [
+// `feature`, when set, hides the item entirely when the org hasn't enabled
+// that white-label feature flag (see FeatureKey/useFeatures) — independent
+// of `perm`, which is about per-account permissions, not per-org offerings.
+type NavItem = { href: string; label: string; Icon: any; perm?: PermissionKey; feature?: FeatureKey };
+const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/clinic", label: "Home", Icon: HomeIcon },
-  { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon },
+  { href: "/clinic/appointments", label: "Appointments", Icon: ApptIcon, feature: "appointments" },
   { href: "/clinic/doctors", label: "Doctors", Icon: DoctorsIcon },
   { href: "/clinic/patients", label: "Patients", Icon: PatientsIcon, perm: "manage_patients" },
   { href: "/clinic/analytics", label: "Analytics", Icon: AnalyticsIcon, perm: "view_analytics" },
-  { href: "/clinic/insurance", label: "Insurance", Icon: InsuranceIcon },
-  { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon },
+  { href: "/clinic/insurance", label: "Insurance", Icon: InsuranceIcon, feature: "insurance" },
+  { href: "/clinic/schedules", label: "Schedules", Icon: ScheduleIcon, feature: "appointments" },
   { href: "/clinic/payment", label: "Payment", Icon: PaymentIcon, perm: "manage_payment" },
   { href: "/clinic/feedback", label: "Feedbacks and Rating", Icon: FeedbackIcon },
   // Per-branch resource (each branch, including a branch-staff account's own
   // branch, affiliates its own pharmacy) — unlike Branches/User Roles below,
   // this belongs in BASE so a branch-staff account sees it too, not just the
   // org owner.
-  { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon },
-  { href: "/clinic/lab", label: "Lab", Icon: LabIcon },
+  { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon, feature: "pharmacy" },
+  { href: "/clinic/lab", label: "Lab", Icon: LabIcon, feature: "lab_booking" },
 ];
-const ACCOUNTS_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
-const BRANCHES_NAV_ITEM: { href: string; label: string; Icon: any; perm?: PermissionKey } = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
+const ACCOUNTS_NAV_ITEM: NavItem = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
+const BRANCHES_NAV_ITEM: NavItem = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };
 
 export default function ClinicSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
+  const branding = useBranding();
+  const { hasFeature } = useFeatures();
   const [clinicName, setClinicName] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAvatar, setClinicAvatar] = useState("");
@@ -202,7 +209,7 @@ export default function ClinicSidebar() {
     : [...BASE_NAV_ITEMS, BRANCHES_NAV_ITEM];
 
   const NAV_ITEMS = (isBranchUser ? BASE_NAV_ITEMS : adminNav).filter(
-    (item) => !item.perm || can(item.perm)
+    (item) => (!item.perm || can(item.perm)) && (!item.feature || hasFeature(item.feature))
   );
 
   async function handleSignOut() {
@@ -240,11 +247,19 @@ export default function ClinicSidebar() {
       >
         <div className="flex flex-col flex-1 min-h-0 w-full">
           <div className="relative flex items-center h-[72px] px-5 w-full shrink-0">
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
-              alt="Wellness Central"
-              className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[100px] ${open ? "md:opacity-100 md:max-w-[100px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"}`}
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.name}
+                className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[100px] ${open ? "md:opacity-100 md:max-w-[100px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"}`}
+              />
+            ) : (
+              <span
+                className={`font-semibold text-[15px] text-[#1e293b] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[140px] ${open ? "md:opacity-100 md:max-w-[140px]" : "md:opacity-0 md:max-w-0 md:pointer-events-none"}`}
+              >
+                {branding.name}
+              </span>
+            )}
             <button
               onClick={() => {
                 if (window.innerWidth < 768) setIsMobileOpen(false);
@@ -277,7 +292,7 @@ export default function ClinicSidebar() {
                     "px-4",
                     open ? "md:px-4" : "md:px-3 md:justify-center",
                     active
-                      ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
+                      ? "bg-gradient-to-r from-[var(--brand-secondary,#869DFE)] to-[var(--brand-primary,#5879FC)] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                       : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
                   ].join(" ")}
                 >
@@ -321,7 +336,7 @@ export default function ClinicSidebar() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={clinicAvatar} alt="Clinic logo" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white text-sm font-semibold">
+                  <div className="w-full h-full bg-gradient-to-br from-[var(--brand-secondary,#8AA0FF)] to-[var(--brand-primary,#5476FC)] flex items-center justify-center text-white text-sm font-semibold">
                     {clinicName?.[0]?.toUpperCase() ?? clinicEmail?.[0]?.toUpperCase() ?? "C"}
                   </div>
                 )}

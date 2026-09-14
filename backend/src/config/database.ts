@@ -64,11 +64,13 @@ export async function initDb(): Promise<void> {
         slug              TEXT UNIQUE NOT NULL,
         name              TEXT NOT NULL,
         logo_url          TEXT,
+        logo_url_light    TEXT,
         favicon_url       TEXT,
         primary_color     TEXT,
         secondary_color   TEXT,
         support_email     TEXT,
         support_phone     TEXT,
+        persona_name      TEXT NOT NULL DEFAULT 'Dr. Wellness',
         app_bundle_id     TEXT,
         play_store_url    TEXT,
         app_store_url     TEXT,
@@ -90,6 +92,26 @@ export async function initDb(): Promise<void> {
         updated_at  TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (org_id, feature_key)
       )
+    `);
+
+    // Add persona_name column if it doesn't exist yet (safe on existing DBs).
+    // Defaults to 'Dr. Wellness' so the already-seeded default org's AI chat
+    // persona keeps its current name without a manual backfill.
+    await client.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS persona_name TEXT NOT NULL DEFAULT 'Dr. Wellness'
+    `);
+
+    // Add logo_url_light if it doesn't exist yet (safe on existing DBs) — a
+    // second, white/light-colored logo variant for dark or gradient
+    // backgrounds (e.g. the patient app's MainHeader, which swaps between a
+    // colored and white bundled logo depending on the screen behind it).
+    // NULL until an org explicitly uploads one; callers fall back to
+    // logo_url (or the bundled default) when it's unset — see
+    // GET /api/meta/branding and MainHeader.tsx.
+    await client.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS logo_url_light TEXT
     `);
 
     // Seed the default org once. Every feature defaults ON here so current

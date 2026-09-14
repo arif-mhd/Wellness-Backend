@@ -4,6 +4,20 @@ import SuperTokens from "supertokens-web-js";
 import Session from "supertokens-web-js/recipe/session";
 import EmailPassword from "supertokens-web-js/recipe/emailpassword";
 
+// Sent on every EmailPassword SDK call (sign-in included) so the backend's
+// signInPOST override can reject an account that belongs to a different
+// organization than this portal deployment — see NEXT_PUBLIC_ORG_SLUG.
+async function addOrgSlugHeader(context: { url: string; requestInit: RequestInit }) {
+  const orgSlug = process.env.NEXT_PUBLIC_ORG_SLUG;
+  if (orgSlug) {
+    context.requestInit.headers = {
+      ...context.requestInit.headers,
+      "X-Org-Slug": orgSlug,
+    };
+  }
+  return context;
+}
+
 if (typeof window !== "undefined") {
   SuperTokens.init({
     appInfo: {
@@ -13,7 +27,7 @@ if (typeof window !== "undefined") {
     },
     recipeList: [
       Session.init({ tokenTransferMethod: "header" }),
-      EmailPassword.init(),
+      EmailPassword.init({ preAPIHook: addOrgSlugHeader }),
     ],
   });
 }

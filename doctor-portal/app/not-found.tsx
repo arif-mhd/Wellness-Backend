@@ -1,8 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 export default function NotFound() {
+  const branding = useBranding();
   return (
     <div className="relative min-h-screen bg-gradient-to-tr from-slate-50 via-white to-indigo-50/30 flex flex-col items-center justify-center py-12 px-4 overflow-hidden font-outfit">
 
@@ -14,7 +18,11 @@ export default function NotFound() {
 
         {/* Logo */}
         <div className="mb-12 select-none">
-          <Image src={logoImg} alt="Wellness Central" width={160} height={50} className="object-contain" priority />
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain" />
+          ) : (
+            <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain" priority />
+          )}
         </div>
 
         {/* Card */}

@@ -4,7 +4,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { pool } from "../config/database";
-import { uploadBlob } from "../config/blob";
+import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { FEATURE_KEYS, DEFAULT_ORG_SLUG } from "../config/features";
 
@@ -40,11 +40,11 @@ router.get("/:id", async (req: SessionRequest, res: Response) => {
 });
 
 // ─── POST /api/admin/organizations ───────────────────────────────────────────
-// Creates a new tenant. New orgs start with every feature disabled — a
-// super-admin opts them in explicitly via the entitlements endpoints below,
+// Creates a new tenant. New orgs start with every feature disabled — the
+// admin opts them in explicitly via the entitlements endpoints below,
 // rather than inheriting whatever the default org happens to have enabled.
 router.post("/", async (req: SessionRequest, res: Response) => {
-  const { slug, name, supportEmail, supportPhone, planTier } = req.body;
+  const { slug, name, supportEmail, supportPhone, planTier, personaName } = req.body;
   if (!slug || !name) {
     res.status(400).json({ error: "slug and name are required." });
     return;
@@ -53,10 +53,10 @@ router.post("/", async (req: SessionRequest, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'))
+      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier, persona_name)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'), COALESCE($6, 'Dr. Wellness'))
        RETURNING *`,
-      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null]
+      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null, personaName ?? null]
     );
     const org = rows[0];
 
@@ -95,7 +95,7 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   const {
     name, primaryColor, secondaryColor, supportEmail, supportPhone,
-    appBundleId, playStoreUrl, appStoreUrl, planTier,
+    appBundleId, playStoreUrl, appStoreUrl, planTier, personaName,
   } = req.body;
   const adminId = req.session!.getUserId();
 
@@ -111,10 +111,11 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
          play_store_url  = COALESCE($8, play_store_url),
          app_store_url   = COALESCE($9, app_store_url),
          plan_tier       = COALESCE($10, plan_tier),
+         persona_name    = COALESCE($11, persona_name),
          updated_at      = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier]
+      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName]
     );
     if (!rows[0]) {
       res.status(404).json({ error: "Organization not found." });
@@ -139,6 +140,9 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
 });
 
 // ─── POST /api/admin/organizations/:id/logo ──────────────────────────────────
+// ?variant=light uploads the white/light-colored logo used on dark or
+// gradient backgrounds (see logo_url_light) instead of the main logo_url.
+// Any other/absent value updates the main logo.
 router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res: Response) => {
   const { id } = req.params;
   if (!req.file) {
@@ -146,13 +150,20 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
     return;
   }
   const adminId = req.session!.getUserId();
+  const isLightVariant = req.query.variant === "light";
+  const column = isLightVariant ? "logo_url_light" : "logo_url";
 
   try {
-    const blobPath = `organizations/${id}/logo-${uuidv4()}.${req.file.mimetype.split("/")[1] || "png"}`;
-    const url = await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+    const blobPath = `organizations/${id}/logo${isLightVariant ? "-light" : ""}-${uuidv4()}.${req.file.mimetype.split("/")[1] || "png"}`;
+    await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+    // The container isn't publicly readable, so a bare blob URL 403s in the
+    // browser — every other upload in this codebase (pharmacy product
+    // photos, etc.) signs a long-lived SAS URL before persisting/rendering
+    // it; this route was missing that step.
+    const url = generateSasUrl(blobPath, 365);
 
     const { rows } = await pool.query(
-      `UPDATE organizations SET logo_url = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      `UPDATE organizations SET ${column} = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id, url]
     );
     if (!rows[0]) {
@@ -163,7 +174,7 @@ router.post("/:id/logo", upload.single("logo"), async (req: SessionRequest, res:
     logActivity({
       source: "admin",
       action: "Organization Logo Updated",
-      details: `Logo updated for organization "${rows[0].name}"`,
+      details: `${isLightVariant ? "Light-variant logo" : "Logo"} updated for organization "${rows[0].name}"`,
       performedBy: "Admin",
       performedById: adminId,
       entityType: "organization",

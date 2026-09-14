@@ -6,6 +6,7 @@ import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
 import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
+import { resolveOrgIdByEmail, resolveOrgIdForRegistration } from "../utils/orgScope";
 
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
@@ -22,9 +23,10 @@ const browserOrigins = [
   // LAN IP for Expo web served over the local network
   "http://192.168.29.127:8081",
   "http://192.168.29.127:8082",
-  // Allow SuperTokens dashboard (served from the backend itself)
-  "https://backend-741878858011.asia-south1.run.app",
-  process.env.API_DOMAIN || "",
+  // Allow SuperTokens dashboard (served from the backend itself) — this is
+  // just API_DOMAIN again, kept as a fallback for deployments that haven't
+  // set that env var yet.
+  process.env.API_DOMAIN || "https://backend-741878858011.asia-south1.run.app",
 ];
 
 /**
@@ -52,7 +54,10 @@ export function initSuperTokens(): void {
       connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || devFallbackOrThrow("SUPERTOKENS_CONNECTION_URI", "http://localhost:3567"),
     },
     appInfo: {
-      appName: "Wellness",
+      // Only affects the SuperTokens Dashboard UI title (internal staff
+      // tool) — this isn't per-org, since SuperTokens.init() runs once at
+      // boot for the whole platform, not per request/tenant.
+      appName: process.env.PLATFORM_NAME || "Wellness",
       // The URL of THIS backend
       apiDomain: process.env.API_DOMAIN || devFallbackOrThrow("API_DOMAIN", `http://localhost:${process.env.PORT || 3001}`),
       // Primary frontend (doctor portal). CORS handles the rest.
@@ -138,6 +143,46 @@ export function initSuperTokens(): void {
 
               if (response.status === "OK") {
                 const userId = response.user.id;
+
+                // Reject sign-in when the account belongs to a different
+                // organization than the portal it's logging into. Each
+                // portal deployment sends its own org via X-Org-Slug (see
+                // NEXT_PUBLIC_ORG_SLUG + SuperTokensProvider's preAPIHook on
+                // the doctor/pharmacy portals); an account with no header
+                // sent (e.g. the patient app, which has no per-deployment
+                // portal to scope) or resolving to the default org is never
+                // blocked, since there's nothing more specific to enforce.
+                try {
+                  const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
+                  if (orgSlugHeader) {
+                    const emailField = input.formFields.find((f) => f.id === "email");
+                    const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
+                    if (email) {
+                      const [portalOrgId, accountOrgId] = await Promise.all([
+                        resolveOrgIdForRegistration(orgSlugHeader),
+                        resolveOrgIdByEmail(email),
+                      ]);
+                      if (portalOrgId !== accountOrgId) {
+                        await Session.revokeAllSessionsForUser(userId);
+                        return {
+                          status: "GENERAL_ERROR",
+                          message: "This account belongs to a different organization.",
+                        } as any;
+                      }
+                    }
+                  }
+                } catch (err) {
+                  // A DB hiccup here must not turn into a hung/failed request
+                  // for the client — originalImplementation.signInPOST already
+                  // ran and set session cookies/headers on the response by
+                  // this point, so throwing here would leave the client with
+                  // an ambiguous half-succeeded request instead of a clean
+                  // OK or GENERAL_ERROR body. Fail open (same as "no header
+                  // sent"): a transient lookup failure shouldn't lock a
+                  // legitimate user out of their own account.
+                  console.error("[signInPOST] org-scope check failed, allowing sign-in:", err);
+                }
+
                 try {
                   const { resource: patient } = await patientsContainer.item(userId, userId).read();
                   if (patient && (patient.status === "deactivated" || patient.status === "deleted")) {

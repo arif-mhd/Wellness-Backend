@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const OTP_LENGTH = 6;
@@ -13,6 +14,7 @@ const COUNTDOWN_SECONDS = 600;
 function ResetOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const branding = useBranding();
   const email = searchParams.get("email") ?? "";
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(""));
@@ -147,14 +149,22 @@ function ResetOtpContent() {
         {/* Logo */}
         <div className="mb-12 select-none">
           <Link href="/">
-            <Image
-              src={logoImg}
-              alt="Wellness Central Logo"
-              width={160}
-              height={50}
-              className="object-contain hover:opacity-90 transition-opacity"
-              priority
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.name}
+                className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+              />
+            ) : (
+              <Image
+                src={logoImg}
+                alt={branding.name}
+                width={160}
+                height={50}
+                className="object-contain hover:opacity-90 transition-opacity"
+                priority
+              />
+            )}
           </Link>
         </div>
 

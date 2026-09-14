@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import { signOut } from "supertokens-web-js/recipe/session";
+import STGeneralError from "supertokens-web-js/utils/error";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 // Import modular step components
 import Step1VerifyContact from "@/components/auth/Step1VerifyContact";
@@ -14,6 +17,7 @@ import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import Step5Success from "@/components/auth/Step5Success";
 
 export default function SignupPage() {
+  const branding = useBranding();
   const [step, setStep] = useState(1);
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [otp1, setOtp1] = useState("");
@@ -214,7 +218,10 @@ export default function SignupPage() {
     try {
       const res = await fetch(`${API_URL}/api/clinics/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.NEXT_PUBLIC_ORG_SLUG ? { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } : {}),
+        },
         body: JSON.stringify({
           email:       registrationEmail,
           password,
@@ -226,6 +233,15 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // A stale session from a PREVIOUS account in this same browser
+        // (e.g. still logged in as another clinic from earlier testing)
+        // must never be left active while we sign in as the brand-new
+        // account below — otherwise a still-valid old session could end up
+        // being what the rest of the app reads, showing that old account's
+        // data instead of the one just registered. Best-effort: if there's
+        // no active session this simply no-ops.
+        try { await signOut(); } catch { /* no active session to clear */ }
+
         // Registration only creates the account — it doesn't log the user
         // in. Without this, the session is missing for the entire
         // complete-profile wizard that follows, and only surfaces as an
@@ -247,8 +263,17 @@ export default function SignupPage() {
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
-    } catch {
-      setError("Cannot reach the server. Make sure the backend is running.");
+    } catch (err) {
+      // The account was just created, but the automatic sign-in right after
+      // can itself be rejected by the backend with a GENERAL_ERROR (e.g. a
+      // cross-organization login block) — that arrives here as a thrown
+      // STGeneralError carrying the real message, and must not be papered
+      // over with the network-failure text.
+      if (STGeneralError.isThisError(err)) {
+        setError(err.message);
+      } else {
+        setError("Cannot reach the server. Make sure the backend is running.");
+      }
     } finally {
       setLoading(false);
     }
@@ -272,14 +297,22 @@ export default function SignupPage() {
         
         {/* Wellness Logo at Top */}
         <div className="mb-12 flex items-center gap-3 select-none">
-          <Image
-            src={logoImg}
-            alt="Wellness Central Logo"
-            width={160}
-            height={50}
-            className="object-contain hover:opacity-90 transition-opacity"
-            priority
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.name}
+              className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+            />
+          ) : (
+            <Image
+              src={logoImg}
+              alt={branding.name}
+              width={160}
+              height={50}
+              className="object-contain hover:opacity-90 transition-opacity"
+              priority
+            />
+          )}
           <span className="text-[0.7rem] font-semibold tracking-[0.15em] text-[#5476FC] uppercase pl-3 border-l border-indigo-100">
             Clinic
           </span>

@@ -11,6 +11,7 @@ interface Organization {
   slug: string;
   name: string;
   logo_url: string | null;
+  logo_url_light: string | null;
   primary_color: string | null;
   secondary_color: string | null;
   support_email: string | null;
@@ -281,12 +282,13 @@ function OrganizationsPageInner() {
     }
   }
 
-  async function handleLogoUpload(file: File) {
+  async function handleLogoUpload(file: File, variant?: "light") {
     if (!selected) return;
     const formData = new FormData();
     formData.append("logo", file);
     try {
-      const res = await apiFetch(`/api/admin/organizations/${selected.id}/logo`, { method: "POST", body: formData });
+      const qs = variant ? `?variant=${variant}` : "";
+      const res = await apiFetch(`/api/admin/organizations/${selected.id}/logo${qs}`, { method: "POST", body: formData });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setOrgs(prev => prev.map(o => o.id === selected.id ? body.organization : o));
@@ -416,8 +418,11 @@ function OrganizationsPageInner() {
                 <div className="flex items-center gap-4">
                   <div className="relative group shrink-0">
                     <OrgAvatar org={draftOrg} size="lg" />
-                    <label className="absolute inset-0 rounded-full bg-slate-900/0 group-hover:bg-slate-900/40 flex items-center justify-center cursor-pointer transition-colors">
-                      <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <label
+                      title="Upload logo"
+                      className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5476FC] hover:bg-[#4466FC] border-2 border-white flex items-center justify-center cursor-pointer transition-colors shadow-sm"
+                    >
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -432,6 +437,15 @@ function OrganizationsPageInner() {
                   <div>
                     <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">{selected.name}</h2>
                     <p className="text-[12px] text-slate-400 font-mono">{selected.slug}</p>
+                    <label className="text-[11px] font-medium text-[#5476FC] hover:text-[#4466FC] cursor-pointer mt-0.5 inline-block">
+                      {draftOrg.logo_url ? "Change logo" : "Upload logo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); }}
+                      />
+                    </label>
                   </div>
                 </div>
                 {orgSaveMsg && (
@@ -439,6 +453,36 @@ function OrganizationsPageInner() {
                     {orgSaveMsg}
                   </span>
                 )}
+              </div>
+
+              {/* Light/white logo variant — shown on dark or gradient screen
+                  backgrounds (e.g. the patient app's header) where the main
+                  logo above wouldn't be visible. Optional: falls back to the
+                  main logo (or the platform default) if never uploaded. */}
+              <div className="flex items-center gap-4 pb-5 border-b border-slate-50 mb-6 -mt-2">
+                <div
+                  className="w-16 h-16 rounded-2xl bg-[#1e293b] flex items-center justify-center shrink-0 overflow-hidden"
+                  title="Preview on a dark background"
+                >
+                  {draftOrg.logo_url_light ? (
+                    <img src={draftOrg.logo_url_light} alt={`${draftOrg.name} (light)`} className="max-w-[85%] max-h-[85%] object-contain" />
+                  ) : (
+                    <span className="text-white/40 text-[10px] text-center px-2">No light logo</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[13px] font-medium text-slate-800">Logo for dark backgrounds</p>
+                  <p className="text-[11px] text-slate-400 mb-1">Used where the main logo above wouldn't be visible (e.g. the patient app's home screen).</p>
+                  <label className="text-[11px] font-medium text-[#5476FC] hover:text-[#4466FC] cursor-pointer inline-block">
+                    {draftOrg.logo_url_light ? "Change light logo" : "Upload light logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, "light"); }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -9,6 +9,8 @@ import { logActivity } from "../utils/activityLogger";
 import { hasDoctorPermission } from "../utils/doctorPermissions";
 import { notifyClinic } from "./clinicPayments";
 import { loadOrgDocForClinicId } from "./clinicInsurance";
+import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
+import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -790,10 +792,16 @@ function specialtyMatches(doctorSpecialty: string, wanted: string): boolean {
 }
 
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
-// Public or Patient endpoint to list all approved doctors.
-// Optional ?clinicId= filters to just that clinic's roster (used by the
-// Clinic Profile screen's "Doctors Available" section) — additive, existing
-// callers that don't pass it are unaffected.
+// Public or Patient endpoint to list all approved doctors, scoped to the
+// calling brand's own org — every doctor belongs to exactly one clinic,
+// which belongs to exactly one white-label org (clinic doc's tenantId), so
+// this always restricts the roster to that org's clinics via the
+// `X-Org-Slug` header (same header every brand build already sends — see
+// resolveOrgIdFromHeader). An un-rebranded/misconfigured caller falls back
+// to the default org's roster rather than erroring.
+// Optional ?clinicId= further narrows to just that one clinic's roster
+// (used by the Clinic Profile screen's "Doctors Available" section) — it's
+// intersected with the org scope, not a replacement for it.
 // Optional ?specialization= (alias ?specialty=) filters by specialty — used
 // by the Dr. Wellness chatbot's doctor recommendations. See specialtyMatches
 // above for why this isn't a plain equality check.
@@ -805,12 +813,25 @@ router.get("/", async (req: Request, res: Response) => {
       ? req.query.specialty
       : null;
   try {
-    const query = clinicId
-      ? "SELECT * FROM c WHERE c.status = @status AND c.clinicId = @clinicId ORDER BY c.approvedAt DESC"
-      : "SELECT * FROM c WHERE c.status = @status ORDER BY c.approvedAt DESC";
-    const parameters = clinicId
-      ? [{ name: "@status", value: "approved" }, { name: "@clinicId", value: clinicId }]
-      : [{ name: "@status", value: "approved" }];
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgClinicIds = await getClinicIdsForOrg(orgId);
+
+    // clinicId (if given) must itself belong to this org — an org's
+    // Clinic Profile screen should never be able to leak another org's
+    // roster by passing an arbitrary clinicId.
+    const scopedClinicIds = clinicId
+      ? (orgClinicIds.includes(clinicId) ? [clinicId] : [])
+      : orgClinicIds;
+
+    if (scopedClinicIds.length === 0) {
+      res.json({ doctors: [] });
+      return;
+    }
+
+    const { clause, parameters: inParams } = buildInClause("c.clinicId", scopedClinicIds);
+    const query = `SELECT * FROM c WHERE c.status = @status AND ${clause} ORDER BY c.approvedAt DESC`;
+    const parameters = [{ name: "@status", value: "approved" }, ...inParams];
 
     const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import logoImg from "@/assets/images/wellness_logo.png";
+import { useBranding } from "@/components/BrandingContext";
 
 interface TwoFactorAuthProps {
   phoneNumber?: string;
@@ -15,6 +16,7 @@ export default function TwoFactorAuth({
   onVerify,
   onGoBack,
 }: TwoFactorAuthProps) {
+  const branding = useBranding();
   const [otp1, setOtp1] = useState("");
   const [otp2, setOtp2] = useState("");
   const [otp3, setOtp3] = useState("");
@@ -94,14 +96,22 @@ export default function TwoFactorAuth({
         
         {/* Wellness Logo at Top */}
         <div className="mb-12 select-none">
-          <Image
-            src={logoImg}
-            alt="Wellness Central Logo"
-            width={160}
-            height={50}
-            className="object-contain hover:opacity-90 transition-opacity"
-            priority
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.name}
+              className="h-[50px] object-contain hover:opacity-90 transition-opacity"
+            />
+          ) : (
+            <Image
+              src={logoImg}
+              alt={branding.name}
+              width={160}
+              height={50}
+              className="object-contain hover:opacity-90 transition-opacity"
+              priority
+            />
+          )}
         </div>
 
         {/* Title above Card */}

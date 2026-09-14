@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
+import { useBranding } from "./BrandingContext";
 import Session, { signOut } from "supertokens-web-js/recipe/session";
 import { useAccountRole } from "@/hooks/useAccountRole";
 
@@ -104,6 +105,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen } = useSidebar();
+  const branding = useBranding();
   const { role } = useAccountRole();
   const isLab = role === "lab";
   const [pharmacyName, setPharmacyName] = useState("Wellness Pharmacy");
@@ -170,12 +172,21 @@ export default function Sidebar() {
         {/* Header row: logo + toggle */}
         <div className="relative flex items-center h-[72px] px-5 w-full">
           {/* Logo — stays in DOM, fades out */}
-          <img
-            src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
-            alt="Wellness Central"
-            className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
-              }`}
-          />
+          {branding.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.name}
+              className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[100px]" : "opacity-0 max-w-0 pointer-events-none"
+                }`}
+            />
+          ) : (
+            <span
+              className={`font-semibold text-[15px] text-[#1e293b] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out ${open ? "opacity-100 max-w-[140px]" : "opacity-0 max-w-0 pointer-events-none"
+                }`}
+            >
+              {branding.name}
+            </span>
+          )}
           {/* Toggle button — always visible */}
           <button
             onClick={toggle}
@@ -199,7 +210,7 @@ export default function Sidebar() {
                   "flex items-center py-3 transition-[background,box-shadow,padding] duration-150 rounded-[92px] overflow-hidden",
                   open ? "px-4" : "px-3 justify-center",
                   active
-                    ? "bg-gradient-to-r from-[#869DFE] to-[#5879FC] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
+                    ? "bg-gradient-to-r from-[var(--brand-secondary,#869DFE)] to-[var(--brand-primary,#5879FC)] text-white shadow-[0_4px_12px_rgba(88,121,252,0.25)]"
                     : "text-[#3D4B5A] hover:bg-[#ECEFFE]",
                 ].join(" ")}
               >
@@ -248,7 +259,7 @@ export default function Sidebar() {
         {/* Profile row */}
         <div className={`flex items-center border-t border-[#EBEEF5] pt-4 gap-3 ${open ? "flex-row" : "flex-col"}`}>
           {/* Avatar */}
-          <Link href="/dashboard/settings" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[#5476FC] bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] flex items-center justify-center text-white font-bold text-sm">
+          <Link href="/dashboard/settings" title="View Profile" className="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-[0_0_0_3px_rgba(84,118,252,0.15)] hover:ring-2 hover:ring-[var(--brand-primary,#5476FC)] bg-gradient-to-r from-[var(--brand-secondary,#8AA0FF)] to-[var(--brand-primary,#5476FC)] flex items-center justify-center text-white font-bold text-sm">
             {isLab ? <FlaskIcon /> : "Rx"}
           </Link>
 

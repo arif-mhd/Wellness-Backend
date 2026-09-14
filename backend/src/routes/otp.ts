@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { otpCodesContainer, patientsContainer, pharmaciesContainer, doctorsContainer, clinicsContainer } from "../config/cosmos";
 import { sendOtpEmail } from "../config/resend";
+import { resolveOrgIdByEmail, getOrgBrandName, resolveOrgIdForRegistration } from "../utils/orgScope";
 
 const router = Router();
 
@@ -177,8 +178,29 @@ router.post("/send", async (req: Request, res: Response) => {
       purpose === "sos_access"        ? "sos_access"        :
       "login";
 
+    // Brand the email with the account's real organization name wherever an
+    // account already exists to resolve one from. Registration has no
+    // account yet to look up by email, so it instead resolves from the
+    // X-Org-Slug header the same way registration itself does (see
+    // resolveOrgIdForRegistration's other callers in patients.ts/clinics.ts/
+    // pharmacy.ts) — falls back to the platform default org if the header is
+    // absent or unrecognized, same as those callers.
+    let brandName: string | undefined;
     try {
-      await sendOtpEmail(normalizedEmail, code, emailPurpose);
+      if (purpose === "registration") {
+        const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+        const orgId = await resolveOrgIdForRegistration(orgSlug);
+        brandName = await getOrgBrandName(orgId);
+      } else {
+        const orgId = await resolveOrgIdByEmail(normalizedEmail);
+        brandName = await getOrgBrandName(orgId);
+      }
+    } catch (err) {
+      console.error("[otp/send] brand lookup failed, using platform default:", err);
+    }
+
+    try {
+      await sendOtpEmail(normalizedEmail, code, emailPurpose, brandName);
     } catch (emailErr: any) {
       // In local/dev, Resend's sandbox sender (onboarding@resend.dev) only
       // delivers to the account owner's email, so log the OTP to let testing

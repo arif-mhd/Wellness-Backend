@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Marcellus, Outfit, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
+import { BrandingProvider } from "@/components/BrandingContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,7 +40,9 @@ export default function RootLayout({
           It initialises the SuperTokens SDK in the browser.
           All child pages can now use supertokens-web-js functions.
         */}
-        <SuperTokensProvider>{children}</SuperTokensProvider>
+        <SuperTokensProvider>
+          <BrandingProvider>{children}</BrandingProvider>
+        </SuperTokensProvider>
       </body>
     </html>
   );

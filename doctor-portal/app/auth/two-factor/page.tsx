@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import logoImg from "@/assets/images/wellness_logo.png";
 import doctorPortalImg from "@/assets/images/doctorportal.jpg";
+import { useBranding } from "@/components/BrandingContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const OTP_LENGTH        = 6;
@@ -16,6 +17,7 @@ const RESEND_COOLDOWN   = 60;  // 1 minute before resend is allowed
 function TwoFactorInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
+  const branding     = useBranding();
   const email        = searchParams.get("email") ?? "";
 
   const [otp, setOtp]         = useState<string[]>(Array(OTP_LENGTH).fill(""));
@@ -181,7 +183,11 @@ function TwoFactorInner() {
 
             {/* Logo */}
             <div className="mb-8 select-none">
-              <Image src={logoImg} alt="Wellness Central" width={160} height={50} className="object-contain" priority />
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain" />
+              ) : (
+                <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain" priority />
+              )}
             </div>
 
             {/* Shield icon */}

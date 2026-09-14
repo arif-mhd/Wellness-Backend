@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "supertokens-web-js/recipe/session";
 import { useSidebar } from "./SidebarContext";
-import WellnessCentralLogo from "./WellnessCentralLogo";
+import { useBranding } from "./BrandingContext";
 import { useAdminProfile } from "@/context/AdminProfileContext";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -267,6 +267,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen } = useSidebar();
+  const branding = useBranding();
 
   const { profile } = useAdminProfile();
   const adminName = profile.name;
@@ -318,13 +319,23 @@ export default function Sidebar() {
           {/* Header: logo + toggle */}
           <div className="relative shrink-0 flex items-center h-[72px] px-5 w-full border-b border-slate-50">
             {/* Logo — fades in/out with sidebar */}
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/b5efd6d155e1cbbdc3835258b3a2f9b4c50ee598?width=158"
-              alt="Wellness Central"
-              className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[150px] ${
-                open ? "lg:opacity-100 lg:max-w-[150px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
-              }`}
-            />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.name}
+                className={`object-contain h-[27px] transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[150px] ${
+                  open ? "lg:opacity-100 lg:max-w-[150px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
+                }`}
+              />
+            ) : (
+              <span
+                className={`font-semibold text-[15px] text-slate-800 whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out opacity-100 max-w-[150px] ${
+                  open ? "lg:opacity-100 lg:max-w-[150px]" : "lg:opacity-0 lg:max-w-0 lg:pointer-events-none"
+                }`}
+              >
+                {branding.name}
+              </span>
+            )}
             {/* Toggle button — always visible */}
             <button
               onClick={() => {

@@ -72,7 +72,10 @@ export default function RegisterPage() {
       const isLab = accountType === "lab";
       const res = await fetch(`${apiUrl}/api/${isLab ? "lab" : "pharmacy"}/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.NEXT_PUBLIC_ORG_SLUG ? { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } : {}),
+        },
         body: JSON.stringify(
           isLab
             ? { email, password, director, name: labName, labLicense, location: labLocation, contactNumber }
