@@ -9,7 +9,8 @@ import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
 import { resolveClinicName } from "./clinicInsurance";
 import { computeAggregateOrderStatus } from "../utils/pharmacyOrders";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForOrg } from "../utils/orgScope";
+import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -24,10 +25,33 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
 
+    // Scope to this brand's own pharmacies — mirrors GET /api/doctors. An org
+    // with no approved pharmacy of its own gets an empty catalogue rather than
+    // the whole platform's, which is the point of white-labelling: a brand
+    // must never sell another brand's stock.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgPharmacyIds = await getPharmacyIdsForOrg(orgId);
+
+    if (orgPharmacyIds.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const { clause: orgClause, parameters: orgParams } = buildInClause("c.pharmacyId", orgPharmacyIds);
+    query += ` AND ${orgClause}`;
+    params.push(...orgParams);
+
     // Explicit pharmacy filter — used by the patient app's "browse by pharmacy"
     // screen (tap a pharmacy card, list only its own products). Independent of
     // the clinicId resolution below, which a doctor's own prescribing search uses.
+    // Intersected with the org scope above, so passing another brand's
+    // pharmacyId yields nothing rather than leaking their stock.
     if (pharmacyId) {
+      if (!orgPharmacyIds.includes(pharmacyId)) {
+        res.json([]);
+        return;
+      }
       query += " AND c.pharmacyId = @pharmacyId";
       params.push({ name: "@pharmacyId", value: pharmacyId });
     }
@@ -234,9 +258,16 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
 // old cross-pharmacy "Top Sellers" section on the medicine home screen).
 router.get("/pharmacies", async (req: Request, res: Response) => {
   try {
-    const { resources: pharmacies } = await pharmaciesContainer.items.query(
-      "SELECT * FROM c WHERE c.status = 'approved'"
-    ).fetchAll();
+    // Scoped to the calling brand's own pharmacies, same as the catalogue
+    // above — the two screens must agree, or a patient could tap a pharmacy
+    // card and land on an empty product list.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+
+    const { resources: pharmacies } = await pharmaciesContainer.items.query({
+      query: "SELECT * FROM c WHERE c.status = 'approved' AND c.tenantId = @orgId",
+      parameters: [{ name: "@orgId", value: orgId }],
+    }).fetchAll();
 
     const { resources: allFeedback } = await feedbackContainer.items.query(
       "SELECT c.provider.id, c.rating FROM c WHERE c.folder = 'pharmacy'"
