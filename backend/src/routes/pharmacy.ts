@@ -25,22 +25,26 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
 
-    // Scope to this brand's own pharmacies — mirrors GET /api/doctors. An org
-    // with no approved pharmacy of its own gets an empty catalogue rather than
-    // the whole platform's, which is the point of white-labelling: a brand
-    // must never sell another brand's stock.
+    // Scope to this brand's own pharmacies — mirrors GET /api/doctors. A brand
+    // must never sell another brand's stock, so an org with no approved
+    // pharmacy of its own sees no stock at all.
+    //
+    // Deliberately NOT an early return: the external drug-dictionary lookup
+    // further down is a public reference (RxNorm), not anyone's inventory, so
+    // a doctor at a brand with no pharmacy yet must still be able to search
+    // real drug names when writing a prescription. Only the stock query is
+    // suppressed.
     const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
     const orgId = await resolveOrgIdFromHeader(orgSlug);
     const orgPharmacyIds = await getPharmacyIdsForOrg(orgId);
 
-    if (orgPharmacyIds.length === 0) {
-      res.json([]);
-      return;
-    }
+    let hasOrgStock = orgPharmacyIds.length > 0;
 
-    const { clause: orgClause, parameters: orgParams } = buildInClause("c.pharmacyId", orgPharmacyIds);
-    query += ` AND ${orgClause}`;
-    params.push(...orgParams);
+    if (hasOrgStock) {
+      const { clause: orgClause, parameters: orgParams } = buildInClause("c.pharmacyId", orgPharmacyIds);
+      query += ` AND ${orgClause}`;
+      params.push(...orgParams);
+    }
 
     // Explicit pharmacy filter — used by the patient app's "browse by pharmacy"
     // screen (tap a pharmacy card, list only its own products). Independent of
@@ -49,11 +53,11 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     // pharmacyId yields nothing rather than leaking their stock.
     if (pharmacyId) {
       if (!orgPharmacyIds.includes(pharmacyId)) {
-        res.json([]);
-        return;
+        hasOrgStock = false;
+      } else {
+        query += " AND c.pharmacyId = @pharmacyId";
+        params.push({ name: "@pharmacyId", value: pharmacyId });
       }
-      query += " AND c.pharmacyId = @pharmacyId";
-      params.push({ name: "@pharmacyId", value: pharmacyId });
     }
 
     // A doctor only prescribes from their own clinic branch's affiliated
@@ -90,9 +94,9 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     }
     query += " ORDER BY c.approvedAt DESC";
 
-    const { resources } = await pharmacyProductsContainer.items.query(
-      { query, parameters: params } as any
-    ).fetchAll();
+    const { resources } = hasOrgStock
+      ? await pharmacyProductsContainer.items.query({ query, parameters: params } as any).fetchAll()
+      : { resources: [] as any[] };
 
     // Fetch all pharmacy feedback to compute ratings
     const { resources: allFeedback } = await feedbackContainer.items.query(
