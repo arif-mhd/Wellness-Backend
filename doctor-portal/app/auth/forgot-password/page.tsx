@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
         {/* Wellness Logo at Top */}
         <div className="mb-12 select-none">
           <Link href="/">
-            {branding.logoUrl ? (
+            {!branding.loaded ? null : branding.logoUrl ? (
               <img
                 src={branding.logoUrl}
                 alt={branding.name}

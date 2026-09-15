@@ -16,9 +16,12 @@ export default function LandingContent() {
         <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-200/20 blur-2xl rounded-full" />
         
         <div>
-          {/* Wellness Central Logo */}
-          <div className="flex items-center mb-8 select-none">
-            {branding.logoUrl ? (
+          {/* Brand logo. Height is reserved before branding resolves so the
+              layout doesn't shift, and the bundled platform logo is only used
+              once we know this org genuinely has none — otherwise a
+              white-label portal flashes our logo before showing the client's. */}
+          <div className="flex items-center mb-8 select-none h-[50px]">
+            {!branding.loaded ? null : branding.logoUrl ? (
               <img
                 src={branding.logoUrl}
                 alt={branding.name}

@@ -30,6 +30,11 @@ interface Branding {
   // hide sidebar items that were already visible before this existed. See
   // hasFeature() below.
   enabledFeatures: FeatureKey[];
+  // False until the branding fetch settles. Anything showing a logo should
+  // render a placeholder while this is false rather than the bundled default,
+  // otherwise a white-label portal flashes the platform's own logo before
+  // swapping to the client's — which looks like the wrong site loaded.
+  loaded: boolean;
 }
 
 const ALL_FEATURES: FeatureKey[] = [
@@ -38,7 +43,7 @@ const ALL_FEATURES: FeatureKey[] = [
   "ai_chat", "articles", "sos",
 ];
 
-const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, enabledFeatures: ALL_FEATURES };
+const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, enabledFeatures: ALL_FEATURES, loaded: false };
 
 const BrandingContext = createContext<Branding>(DEFAULT_BRANDING);
 
@@ -79,6 +84,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
           primaryColor: b.primaryColor || null,
           secondaryColor: b.secondaryColor || null,
           enabledFeatures: Array.isArray(data.enabledFeatures) ? data.enabledFeatures : ALL_FEATURES,
+          loaded: true,
         };
         setBranding(resolved);
         if (b.name) document.title = `${b.name} – Clinic Portal`;
@@ -87,6 +93,8 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         // Keep the default — a branding fetch failure shouldn't break the app.
+        // Still mark it loaded, or a logo placeholder would hang forever.
+        if (!cancelled) setBranding((b) => ({ ...b, loaded: true }));
         document.documentElement.style.setProperty("--brand-primary", FALLBACK_PRIMARY);
         document.documentElement.style.setProperty("--brand-secondary", FALLBACK_SECONDARY);
       });
