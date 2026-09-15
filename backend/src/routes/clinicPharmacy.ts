@@ -5,6 +5,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { pharmaciesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { resolveClinicScope } from "../utils/clinicScope";
+import { resolveOrgId } from "../utils/orgScope";
 import { resolveClinicName } from "./clinicInsurance";
 import { logActivity } from "../utils/activityLogger";
 
@@ -112,11 +113,19 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
 
     const clinicName = await resolveClinicName(clinicId);
 
+    // Inherit the creating clinic's white-label org. A pharmacy registering
+    // itself picks this up from the portal's X-Org-Slug header, but a clinic
+    // creating one on its own behalf has no such header — and without a
+    // tenantId the pharmacy's stock is invisible to the very brand whose
+    // clinic just created it, since the catalogue scopes on pharmacy.tenantId.
+    const tenantId = await resolveOrgId(req);
+
     const now = new Date().toISOString();
     const pharmacyDoc = {
       id:             supertokensId,
       supertokens_id: supertokensId,
       status:         "pending_approval" as const,
+      tenantId,
       email,
       ownerName,
       pharmacyName,

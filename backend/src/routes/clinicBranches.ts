@@ -270,6 +270,12 @@ router.post("/:branchId/users", requireRole("clinic"), async (req: SessionReques
       id: supertokensId,
       supertokens_id: supertokensId,
       status: "approved",
+      // Inherit the white-label org from the clinic this branch belongs to.
+      // Without it resolveOrgId falls back to the platform default for this
+      // account, so anything a branch user creates — a pharmacy, say — gets
+      // tagged to the wrong brand. Note `orgId` further down is the
+      // multi-branch parent, which is an unrelated concept.
+      tenantId: org.tenantId,
       email,
       fullName,
       phone,
