@@ -8,12 +8,19 @@ import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos"
 import { devFallbackOrThrow } from "../utils/env";
 import { resolveOrgIdByEmail, resolveOrgIdForRegistration } from "../utils/orgScope";
 
+// Each portal env var accepts a comma-separated list, because white-labelling
+// means one portal per brand: the org slug is compiled into the build, so
+// every client needs their own deployment on their own domain, and each of
+// those is a separate CORS origin. A single value still works unchanged.
+const originsFrom = (value: string | undefined, fallback: string): string[] =>
+  (value ?? fallback).split(",").map((o) => o.trim()).filter(Boolean);
+
 // Browser-based portals that are allowed to make CORS requests.
 const browserOrigins = [
-  process.env.DOCTOR_PORTAL_URL   || "http://localhost:3002",
-  process.env.ADMIN_PORTAL_URL    || "http://localhost:3003",
-  process.env.PHARMACY_PORTAL_URL || "http://localhost:3004",
-  process.env.PATIENT_APP_URL     || "http://localhost:8081",
+  ...originsFrom(process.env.DOCTOR_PORTAL_URL,   "http://localhost:3002"),
+  ...originsFrom(process.env.ADMIN_PORTAL_URL,    "http://localhost:3003"),
+  ...originsFrom(process.env.PHARMACY_PORTAL_URL, "http://localhost:3004"),
+  ...originsFrom(process.env.PATIENT_APP_URL,     "http://localhost:8081"),
   // Always allow standard localhost dev ports
   "http://localhost:3002",
   "http://localhost:3003",
