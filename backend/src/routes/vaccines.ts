@@ -34,8 +34,9 @@ router.get("/", async (req: Request, res: Response) => {
 router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const { items } = req.body as {
+    const { items, profileId } = req.body as {
       items: { vaccineId: string; forPatientId?: string; visitMode?: "Laboratory" | "Home"; scheduledAt?: string | null }[];
+      profileId?: string; // fallback owner when an item doesn't set its own forPatientId
     };
 
     if (!items?.length) {
@@ -68,7 +69,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
         vaccineName: vaccine.name,
         manufacturer: vaccine.manufacturer ?? null,
         price: vaccine.price,
-        forPatientId: item.forPatientId ?? patientId,
+        forPatientId: item.forPatientId ?? profileId ?? patientId,
         visitMode: item.visitMode ?? "Laboratory",
         scheduledAt: item.scheduledAt ?? null,
       });

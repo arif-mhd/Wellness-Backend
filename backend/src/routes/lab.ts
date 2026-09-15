@@ -480,6 +480,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       consultationDate,   // optional — only when requires_doctor_approval tests in cart
       consultationSlot,
       notes,
+      profileId,          // fallback owner when an item doesn't set its own forPatientId
     } = req.body;
 
     if (!items?.length) {
@@ -513,7 +514,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
         labId:         test.labId,
         labName:       test.labName,
         price:         test.price,
-        forPatientId:  item.forPatientId ?? patientId,
+        forPatientId:  item.forPatientId ?? profileId ?? patientId,
         visitMode:     item.visitMode ?? "Laboratory",
         scheduledAt:   item.scheduledAt ?? null,
         requires_doctor_approval: test.requires_doctor_approval,
