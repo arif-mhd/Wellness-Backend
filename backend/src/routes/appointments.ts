@@ -1798,7 +1798,12 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
       id:               uuidv4(),
       patientId,
       patient_id:       patientId,
-      profileId:        patientId,
+      // The consult (and its prescription) may have been for a family member,
+      // not the account holder — attribute the resulting order to whoever it
+      // was actually for, same as the appointment itself already does via
+      // familyMemberId, so it shows up under the right profile's Recent
+      // Services instead of always landing on the main account.
+      profileId:        apt.familyMemberId ?? patientId,
       items:            validatedItems,
       delivery_address,
       prescription_id:  null,

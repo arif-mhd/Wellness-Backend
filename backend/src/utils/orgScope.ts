@@ -99,6 +99,23 @@ export async function getClinicIdsForOrg(orgId: string): Promise<string[]> {
   return resources.flatMap((org: any) => [org.id, ...(org.branches ?? []).map((b: any) => b.id)]);
 }
 
+// The pharmacy equivalent of getClinicIdsForOrg, for scoping the medicine
+// catalogue. A product has no tenantId of its own — it belongs to a pharmacy,
+// and the pharmacy carries the tenantId (stamped at registration from the
+// X-Org-Slug header), so the catalogue is scoped product -> pharmacyId ->
+// pharmacy.tenantId. Only approved pharmacies count: a pending or rejected
+// one's products must not surface in any brand's app.
+export async function getPharmacyIdsForOrg(orgId: string): Promise<string[]> {
+  const { resources } = await pharmaciesContainer.items
+    .query({
+      query: "SELECT c.id FROM c WHERE c.tenantId = @orgId AND c.status = 'approved'",
+      parameters: [{ name: "@orgId", value: orgId }],
+    })
+    .fetchAll();
+
+  return resources.map((p: any) => p.id);
+}
+
 // Resolves an organization's branding (currently just its name) by id, for
 // callers that already know the org id and just need display info — e.g.
 // an OTP email that has to show which company's product this account

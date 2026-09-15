@@ -7,6 +7,7 @@ import { requireRole } from "../middleware/requireRole";
 import { clinicsContainer } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
+import { resolveOrgIdForRegistration } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -282,12 +283,20 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
     licenseNumber, dohLicense, address, addressProofFileUrl,
     consultationRates, paymentSettings, bio, clinicImageUrl,
     slots,
+    orgSlug,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
     res.status(400).json({ error: "email, password, fullName and phone are required." });
     return;
   }
+
+  // Which white-label org this clinic belongs to. Self-registration reads this
+  // from the X-Org-Slug header the branded portal sends, but an admin creating
+  // a clinic by hand is not on any brand's portal — so it comes from the form
+  // instead. Omitted means the platform default, which keeps every existing
+  // admin-create caller working unchanged.
+  const tenantId = await resolveOrgIdForRegistration(typeof orgSlug === "string" ? orgSlug : undefined);
 
   try {
     const signUpResult = await EmailPassword.signUp("public", email, password);
@@ -312,6 +321,7 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
       id:                    supertokensId,
       supertokens_id:        supertokensId,
       status:                "approved",
+      tenantId,
       email,
       fullName,
       phone,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
@@ -99,6 +99,22 @@ export default function AddClinicPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Which white-label org this clinic belongs to. Self-registration infers it
+  // from the branded portal the clinic signed up on; an admin creating one by
+  // hand isn't on any brand's portal, so it has to be picked explicitly.
+  const [orgs, setOrgs] = useState<{ slug: string; name: string }[]>([]);
+  const [orgSlug, setOrgSlug] = useState("wellness");
+
+  useEffect(() => {
+    apiFetch("/api/admin/organizations")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.organizations;
+        if (Array.isArray(list) && list.length) setOrgs(list.map((o: any) => ({ slug: o.slug, name: o.name })));
+      })
+      .catch(() => { /* leave the default org selected — creation still works */ });
+  }, []);
+
   const handleStep1Submit = (formData: any) => { setOwnerInfo(formData); setStep(2); };
   const handleStep2Submit = (formData: any) => { setInsuranceInfo(formData); setStep(3); };
   const handleStep3Submit = (formData: any) => { setCompanyInfo(formData); setStep(4); };
@@ -135,6 +151,7 @@ export default function AddClinicPage() {
       }));
 
       const payload = {
+        orgSlug,
         email:                 ownerInfo?.email,
         password,
         fullName:              ownerInfo?.fullName,
@@ -257,6 +274,25 @@ export default function AddClinicPage() {
           )}
           {step === 5 && (
             <div className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(79,70,229,0.04)] border border-indigo-50/40 p-8 md:p-10 font-outfit max-w-xl mx-auto">
+              <div className="mb-8">
+                <label htmlFor="clinic-org" className="block text-sm font-medium text-gray-700 mb-2">
+                  Organization
+                </label>
+                <select
+                  id="clinic-org"
+                  value={orgSlug}
+                  onChange={(e) => setOrgSlug(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  {orgs.map((o) => (
+                    <option key={o.slug} value={o.slug}>{o.name}</option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-gray-500">
+                  Which white-label brand this clinic belongs to. Its doctors will
+                  only appear in that brand&apos;s app. This cannot be changed later.
+                </p>
+              </div>
               <Step4CreatePassword
                 password={password}
                 setPassword={setPassword}

@@ -1,9 +1,14 @@
-import { pharmacyProductsContainer } from "../config/cosmos";
+import { pharmacyProductsContainer, pharmaciesContainer } from "../config/cosmos";
 
 export interface OrderItemInput {
   medicine_id: string;
   quantity: number;
 }
+
+// A shared order can span several pharmacies at once — each line item is
+// fulfilled (and its progress tracked) independently by whichever pharmacy
+// owns it, so status lives per item rather than once on the whole order.
+export type OrderItemStatus = "confirmed" | "shipped" | "delivered" | "cancelled";
 
 export interface ValidatedOrderItem {
   medicine_id: string;
@@ -11,8 +16,10 @@ export interface ValidatedOrderItem {
   quantity: number;
   unit_price: number;
   pharmacyId: string;
+  pharmacyName: string | null;
   image_url: string | null;
   numberOfTablets: string | null;
+  status: OrderItemStatus;
 }
 
 export type ValidateItemsResult =
@@ -32,6 +39,7 @@ export type ValidateItemsResult =
 export async function validateOrderItems(items: OrderItemInput[]): Promise<ValidateItemsResult> {
   let total_amount = 0;
   const validatedItems: ValidatedOrderItem[] = [];
+  const pharmacyNameCache: Record<string, string | null> = {};
 
   for (const item of items) {
     const { resources } = await pharmacyProductsContainer.items.query({
@@ -48,19 +56,39 @@ export async function validateOrderItems(items: OrderItemInput[]): Promise<Valid
       return { ok: false, error: `${product.name} is currently out of stock` };
     }
 
+    if (!(product.pharmacyId in pharmacyNameCache)) {
+      const { resource: pharmacyDoc } = await pharmaciesContainer.item(product.pharmacyId, product.pharmacyId).read();
+      pharmacyNameCache[product.pharmacyId] = pharmacyDoc?.pharmacyName ?? null;
+    }
+
     validatedItems.push({
       medicine_id:  product.id,
       name:         product.name,
       quantity:     item.quantity,
       unit_price:   product.price,
       pharmacyId:   product.pharmacyId,
+      pharmacyName: pharmacyNameCache[product.pharmacyId],
       image_url:    product.imageUrl ?? null,
       numberOfTablets: product.numberOfTablets ?? null,
+      status:       "confirmed",
     });
     total_amount += product.price * item.quantity;
   }
 
   return { ok: true, items: validatedItems, total_amount };
+}
+
+// A shared order's own top-level `status` becomes a derived summary once
+// items can be fulfilled independently — "confirmed"/"shipped"/"delivered"
+// when every item agrees, "partial" the moment they diverge (e.g. one
+// pharmacy ships while another hasn't). Cancelled items don't count toward
+// that agreement unless every item is cancelled — a lone cancellation
+// shouldn't mask the real progress of everything else in the order.
+export function computeAggregateOrderStatus(items: { status?: string }[]): string {
+  const live = items.filter(i => i.status !== "cancelled");
+  const pool = live.length ? live : items;
+  const distinct = new Set(pool.map(i => i.status ?? "confirmed"));
+  return distinct.size === 1 ? [...distinct][0] : "partial";
 }
 
 // Converts a prescribed total unit count (e.g. "10 tablets" — frequency x

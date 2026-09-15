@@ -656,4 +656,109 @@ router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: Sess
   }
 });
 
+// ─── PATCH /api/lab/notifications ────────────────────────────────────────────
+// Persists the lab's notification preferences — mirrors pharmacy.ts's
+// PATCH /notifications.
+router.patch("/notifications", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  const labId = req.session!.getUserId();
+  const { preferences } = req.body;
+
+  try {
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found." }); return; }
+
+    const updated = {
+      ...lab,
+      notificationPreferences: {
+        ...(lab.notificationPreferences ?? {}),
+        ...(preferences ?? {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK", notificationPreferences: updated.notificationPreferences });
+  } catch (err) {
+    console.error("Lab notifications update error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/change-password ───────────────────────────────────────────
+router.post("/change-password", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  const labId = req.session!.getUserId();
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+    return;
+  }
+
+  try {
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "USER_NOT_FOUND" }); return; }
+
+    const signInResult = await EmailPassword.signIn("public", lab.email, currentPassword);
+    if (signInResult.status !== "OK") {
+      res.status(403).json({ error: "WRONG_PASSWORD" });
+      return;
+    }
+
+    const tokenResult = await EmailPassword.createResetPasswordToken("public", labId, lab.email);
+    if (tokenResult.status !== "OK") { res.status(500).json({ error: "RESET_TOKEN_FAILED" }); return; }
+
+    const resetResult = await EmailPassword.resetPasswordUsingToken("public", tokenResult.token, newPassword);
+    if (resetResult.status !== "OK") { res.status(500).json({ error: "RESET_FAILED" }); return; }
+
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Lab change-password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/2fa/status ──────────────────────────────────────────────────
+router.get("/2fa/status", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  const labId = req.session!.getUserId();
+  try {
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    res.json({ twoFactorEnabled: lab?.twoFactorEnabled === true });
+  } catch (err) {
+    console.error("Lab 2FA status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/lab/2fa/enable ──────────────────────────────────────────────────
+router.post("/2fa/enable", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  const labId = req.session!.getUserId();
+  try {
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found." }); return; }
+    await labServicesContainer.items.upsert({ ...lab, twoFactorEnabled: true, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: true });
+  } catch (err) {
+    console.error("Lab 2FA enable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /api/lab/2fa/disable ─────────────────────────────────────────────────
+router.post("/2fa/disable", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  const labId = req.session!.getUserId();
+  try {
+    const { resource: lab } = await labServicesContainer.item(labId, labId).read();
+    if (!lab) { res.status(404).json({ error: "Lab not found." }); return; }
+    await labServicesContainer.items.upsert({ ...lab, twoFactorEnabled: false, updatedAt: new Date().toISOString() });
+    res.json({ status: "OK", twoFactorEnabled: false });
+  } catch (err) {
+    console.error("Lab 2FA disable error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;

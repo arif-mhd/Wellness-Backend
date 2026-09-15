@@ -30,9 +30,9 @@ export default function LoginPage() {
         const res = await fetch(`${apiUrl}/auth/me`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
         const data = await res.json();
         const roles: string[] = data.roles ?? [];
-        if (roles.includes("pharmacy")) router.replace("/dashboard");
-        else if (roles.includes("pharmacy_pending")) router.replace("/auth/pending");
-        else setError("This account is not a pharmacy account. Please use the correct portal.");
+        if (roles.includes("pharmacy") || roles.includes("lab")) router.replace("/dashboard");
+        else if (roles.includes("pharmacy_pending") || roles.includes("lab_pending")) router.replace("/auth/pending");
+        else setError("This account is not a pharmacy or lab account. Please use the correct portal.");
       } else if (result.status === "WRONG_CREDENTIALS_ERROR") {
         setError("Invalid email or password.");
       } else {

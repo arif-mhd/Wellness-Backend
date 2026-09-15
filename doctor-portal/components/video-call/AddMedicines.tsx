@@ -89,7 +89,14 @@ export default function AddMedicines({ medicines, onChange, currentDoctorId, cli
       setSearching(true);
       try {
         const clinicParam = clinicId ? `&clinicId=${encodeURIComponent(clinicId)}` : "";
-        const res = await fetch(`${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8&external=true${clinicParam}`);
+        // Without this header the catalogue falls back to the platform default
+        // org, so a white-label doctor would search another brand's stock.
+        const res = await fetch(
+          `${API_URL}/api/pharmacy/catalogue?search=${encodeURIComponent(medName.trim())}&limit=8&external=true${clinicParam}`,
+          process.env.NEXT_PUBLIC_ORG_SLUG
+            ? { headers: { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } }
+            : undefined
+        );
         if (res.ok) {
           const data = await res.json();
           setSearchResults(

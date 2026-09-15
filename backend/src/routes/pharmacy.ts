@@ -1,14 +1,16 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer, feedbackContainer, otpCodesContainer } from "../config/cosmos";
+import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer, feedbackContainer, otpCodesContainer, labServicesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
 import { resolveClinicName } from "./clinicInsurance";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { computeAggregateOrderStatus } from "../utils/pharmacyOrders";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForOrg } from "../utils/orgScope";
+import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -23,12 +25,39 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     let query = "SELECT * FROM c WHERE c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)";
     const params: { name: string; value: string | number | boolean | null }[] = [];
 
+    // Scope to this brand's own pharmacies — mirrors GET /api/doctors. A brand
+    // must never sell another brand's stock, so an org with no approved
+    // pharmacy of its own sees no stock at all.
+    //
+    // Deliberately NOT an early return: the external drug-dictionary lookup
+    // further down is a public reference (RxNorm), not anyone's inventory, so
+    // a doctor at a brand with no pharmacy yet must still be able to search
+    // real drug names when writing a prescription. Only the stock query is
+    // suppressed.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgPharmacyIds = await getPharmacyIdsForOrg(orgId);
+
+    let hasOrgStock = orgPharmacyIds.length > 0;
+
+    if (hasOrgStock) {
+      const { clause: orgClause, parameters: orgParams } = buildInClause("c.pharmacyId", orgPharmacyIds);
+      query += ` AND ${orgClause}`;
+      params.push(...orgParams);
+    }
+
     // Explicit pharmacy filter — used by the patient app's "browse by pharmacy"
     // screen (tap a pharmacy card, list only its own products). Independent of
     // the clinicId resolution below, which a doctor's own prescribing search uses.
+    // Intersected with the org scope above, so passing another brand's
+    // pharmacyId yields nothing rather than leaking their stock.
     if (pharmacyId) {
-      query += " AND c.pharmacyId = @pharmacyId";
-      params.push({ name: "@pharmacyId", value: pharmacyId });
+      if (!orgPharmacyIds.includes(pharmacyId)) {
+        hasOrgStock = false;
+      } else {
+        query += " AND c.pharmacyId = @pharmacyId";
+        params.push({ name: "@pharmacyId", value: pharmacyId });
+      }
     }
 
     // A doctor only prescribes from their own clinic branch's affiliated
@@ -65,9 +94,9 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     }
     query += " ORDER BY c.approvedAt DESC";
 
-    const { resources } = await pharmacyProductsContainer.items.query(
-      { query, parameters: params } as any
-    ).fetchAll();
+    const { resources } = hasOrgStock
+      ? await pharmacyProductsContainer.items.query({ query, parameters: params } as any).fetchAll()
+      : { resources: [] as any[] };
 
     // Fetch all pharmacy feedback to compute ratings
     const { resources: allFeedback } = await feedbackContainer.items.query(
@@ -233,9 +262,16 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
 // old cross-pharmacy "Top Sellers" section on the medicine home screen).
 router.get("/pharmacies", async (req: Request, res: Response) => {
   try {
-    const { resources: pharmacies } = await pharmaciesContainer.items.query(
-      "SELECT * FROM c WHERE c.status = 'approved'"
-    ).fetchAll();
+    // Scoped to the calling brand's own pharmacies, same as the catalogue
+    // above — the two screens must agree, or a patient could tap a pharmacy
+    // card and land on an empty product list.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+
+    const { resources: pharmacies } = await pharmaciesContainer.items.query({
+      query: "SELECT * FROM c WHERE c.status = 'approved' AND c.tenantId = @orgId",
+      parameters: [{ name: "@orgId", value: orgId }],
+    }).fetchAll();
 
     const { resources: allFeedback } = await feedbackContainer.items.query(
       "SELECT c.provider.id, c.rating FROM c WHERE c.folder = 'pharmacy'"
@@ -670,7 +706,11 @@ router.delete("/products/:productId", requireRole("pharmacy"), async (req: Sessi
 });
 
 // ─── GET /api/pharmacy/orders ─────────────────────────────────────────────────
-// Returns all orders that contain at least one item belonging to this pharmacy.
+// Returns all orders that contain at least one item belonging to this
+// pharmacy — but with `items` filtered down to just this pharmacy's own
+// items, and `total_amount`/`status` recomputed from that subset. A shared
+// order can span several pharmacies at once; each should only ever see and
+// act on their own slice of it, never a co-seller's items.
 // medicineOrders is partitioned by /patientId so we must enable cross-partition.
 router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
@@ -683,7 +723,17 @@ router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: 
       { maxItemCount: 100 }   // cross-partition query — no partitionKey hint
     ).fetchAll();
 
-    res.json({ orders: resources });
+    const scoped = resources.map((order: any) => {
+      const myItems = (order.items ?? []).filter((i: any) => i.pharmacyId === pharmacyId);
+      return {
+        ...order,
+        items: myItems,
+        total_amount: myItems.reduce((sum: number, i: any) => sum + i.unit_price * i.quantity, 0),
+        status: computeAggregateOrderStatus(myItems),
+      };
+    });
+
+    res.json({ orders: scoped });
   } catch (err) {
     console.error("Pharmacy orders error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -691,6 +741,10 @@ router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: 
 });
 
 // ─── PATCH /api/pharmacy/orders/:orderId/status ───────────────────────────────
+// Updates status on only this pharmacy's own items within the order — a
+// co-seller's items in the same shared order are untouched. The order's own
+// top-level status is then recomputed from ALL items (not just this
+// pharmacy's), so it reflects "partial" the moment sellers diverge.
 router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
@@ -726,7 +780,15 @@ router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: Ses
       return;
     }
 
-    const updated = { ...order, status, updatedAt: new Date().toISOString() };
+    const updatedItems = (order.items ?? []).map((i: any) =>
+      i.pharmacyId === pharmacyId ? { ...i, status } : i
+    );
+    const updated = {
+      ...order,
+      items: updatedItems,
+      status: computeAggregateOrderStatus(updatedItems),
+      updatedAt: new Date().toISOString(),
+    };
     await medicineOrdersContainer.items.upsert(updated);
 
     // Create notification for the patient
@@ -747,7 +809,12 @@ router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: Ses
       console.warn("Failed to create notification for order status update:", notifErr);
     }
 
-    res.json({ status: "OK", order: updated });
+    // Echo back only this pharmacy's own items, same shape GET /orders uses.
+    const myItems = updatedItems.filter((i: any) => i.pharmacyId === pharmacyId);
+    res.json({
+      status: "OK",
+      order: { ...updated, items: myItems, total_amount: myItems.reduce((sum: number, i: any) => sum + i.unit_price * i.quantity, 0), status: computeAggregateOrderStatus(myItems) },
+    });
   } catch (err) {
     console.error("Update pharmacy order status error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -786,7 +853,9 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       return;
     }
 
-    // Look up the pharmacy's SuperTokens ID from Cosmos (id = supertokensId)
+    // This portal now serves both pharmacy and lab accounts under one login,
+    // so look up the SuperTokens ID in whichever container actually owns
+    // this email (id = supertokensId in both).
     const { resources: pharmacyDocs } = await pharmaciesContainer.items
       .query({
         query: "SELECT c.id FROM c WHERE c.email = @email",
@@ -794,12 +863,21 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       })
       .fetchAll();
 
-    if (!pharmacyDocs.length) {
+    let supertokensId = pharmacyDocs[0]?.id;
+    if (!supertokensId) {
+      const { resources: labDocs } = await labServicesContainer.items
+        .query({
+          query: "SELECT c.id FROM c WHERE c.email = @email",
+          parameters: [{ name: "@email", value: normalizedEmail }],
+        })
+        .fetchAll();
+      supertokensId = labDocs[0]?.id;
+    }
+
+    if (!supertokensId) {
       res.status(404).json({ error: "USER_NOT_FOUND" });
       return;
     }
-
-    const supertokensId = pharmacyDocs[0].id;
 
     const tokenResult = await EmailPassword.createResetPasswordToken(
       "public",
