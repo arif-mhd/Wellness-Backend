@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -86,7 +86,24 @@ export default function AddLabServicePage() {
     director: "", manager: "", labLicense: "", healthAuthorityLicense: "",
     accreditationNumber: "", operatingHours: "", website: "",
     description: "", specializations: "",
+    // Which white-label org owns this lab. A lab registering itself infers
+    // this from the portal it signed up on; an admin creating one by hand is
+    // on no brand's portal, so it has to be chosen. Sent through the ...form
+    // spread in the submit payload.
+    orgSlug: "wellness",
   });
+
+  const [orgs, setOrgs] = useState<{ slug: string; name: string }[]>([]);
+
+  useEffect(() => {
+    adminFetch("/api/admin/organizations")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.organizations;
+        if (Array.isArray(list) && list.length) setOrgs(list.map((o: any) => ({ slug: o.slug, name: o.name })));
+      })
+      .catch(() => { /* leave the default selected — creation still works */ });
+  }, []);
 
   const [tests, setTests] = useState<LabTestForm[]>([emptyTest()]);
 
@@ -229,6 +246,18 @@ export default function AddLabServicePage() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Lab Name" required><input className={inputCls} name="name" value={form.name} onChange={handleChange} required placeholder="e.g. LifeCare Diagnostics" /></Field>
+                  <Field label="Organization" required>
+                    <select
+                      className={inputCls}
+                      name="orgSlug"
+                      value={form.orgSlug}
+                      onChange={(e) => setForm({ ...form, orgSlug: e.target.value })}
+                    >
+                      {orgs.map((o) => (
+                        <option key={o.slug} value={o.slug}>{o.name}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Email Address" required><input className={inputCls} type="email" name="email" value={form.email} onChange={handleChange} required placeholder="lab@example.com" /></Field>
                   <Field label="Contact Number" required>
                     <div className="flex flex-col gap-1">
