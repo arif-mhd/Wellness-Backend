@@ -7,9 +7,11 @@ import Image from "next/image";
 import logoImg from "@/assets/images/wellness_logo.png";
 import pharmacyPortalImg from "@/assets/images/pharmacy_portal.png";
 import { signIn } from "supertokens-web-js/recipe/emailpassword";
+import { useBranding } from "@/components/BrandingContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const branding = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -71,14 +73,18 @@ export default function LoginPage() {
 
             {/* Logo */}
             <div className="mb-8 select-none">
-              <Image
-                src={logoImg}
-                alt="Wellness Central Logo"
-                width={160}
-                height={50}
-                className="object-contain hover:opacity-90 transition-opacity"
-                priority
-              />
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain hover:opacity-90 transition-opacity" />
+              ) : (
+                <Image
+                  src={logoImg}
+                  alt={branding.name}
+                  width={160}
+                  height={50}
+                  className="object-contain hover:opacity-90 transition-opacity"
+                  priority
+                />
+              )}
             </div>
 
             <h2 className="text-2xl md:text-[1.65rem] font-normal tracking-tight text-gray-800 font-marcellus mb-8">

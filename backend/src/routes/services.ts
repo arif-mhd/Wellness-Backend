@@ -48,8 +48,11 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             .query(
               {
                 query:
-                  "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-                parameters: [{ name: "@pid", value: patientId }],
+                  "SELECT TOP @limit * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
+                parameters: [
+                  { name: "@pid", value: patientId },
+                  { name: "@limit", value: limit },
+                ],
               },
               { partitionKey: patientId }
             )
@@ -63,8 +66,11 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             .query(
               {
                 query:
-                  "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-                parameters: [{ name: "@pid", value: patientId }],
+                  "SELECT TOP @limit * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
+                parameters: [
+                  { name: "@pid", value: patientId },
+                  { name: "@limit", value: limit },
+                ],
               },
               { partitionKey: patientId }
             )
@@ -78,8 +84,11 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             .query(
               {
                 query:
-                  "SELECT * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
-                parameters: [{ name: "@pid", value: patientId }],
+                  "SELECT TOP @limit * FROM c WHERE c.patientId = @pid ORDER BY c.createdAt DESC",
+                parameters: [
+                  { name: "@pid", value: patientId },
+                  { name: "@limit", value: limit },
+                ],
               },
               { partitionKey: patientId }
             )
@@ -92,8 +101,11 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
         ? appointmentsContainer.items
             .query({
               query:
-                "SELECT * FROM c WHERE c.patientId = @pid AND (c.status = 'completed' OR c.status = 'cancelled') ORDER BY c.scheduledAt DESC",
-              parameters: [{ name: "@pid", value: patientId }],
+                "SELECT TOP @limit * FROM c WHERE c.patientId = @pid AND (c.status = 'completed' OR c.status = 'cancelled') ORDER BY c.scheduledAt DESC",
+              parameters: [
+                { name: "@pid", value: patientId },
+                { name: "@limit", value: limit },
+              ],
             })
             .fetchAll()
             .then((r) => r.resources)

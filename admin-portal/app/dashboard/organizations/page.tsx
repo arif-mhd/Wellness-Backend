@@ -397,7 +397,6 @@ function OrganizationsPageInner() {
                       <OrgAvatar org={org} size="md" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-medium text-slate-800 truncate">{org.name}</p>
-                        <p className="text-[11px] text-slate-400 font-mono truncate">{org.slug}</p>
                       </div>
                       <PlanBadge tier={org.plan_tier} />
                     </div>
@@ -436,7 +435,6 @@ function OrganizationsPageInner() {
                   </div>
                   <div>
                     <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">{selected.name}</h2>
-                    <p className="text-[12px] text-slate-400 font-mono">{selected.slug}</p>
                     <label className="text-[11px] font-medium text-[#5476FC] hover:text-[#4466FC] cursor-pointer mt-0.5 inline-block">
                       {draftOrg.logo_url ? "Change logo" : "Upload logo"}
                       <input
@@ -622,7 +620,6 @@ function OrganizationsPageInner() {
                             >
                               <div className="min-w-0">
                                 <p className="text-[13px] font-medium text-slate-800">{f.label}</p>
-                                <p className="text-[11px] text-slate-400 font-mono">{f.key}</p>
                               </div>
                               <ToggleSwitch
                                 checked={f.enabled}
