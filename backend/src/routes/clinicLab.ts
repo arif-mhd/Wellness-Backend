@@ -6,6 +6,7 @@ import { labServicesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { resolveClinicScope } from "../utils/clinicScope";
 import { resolveClinicName } from "./clinicInsurance";
+import { resolveOrgId } from "../utils/orgScope";
 import { logActivity } from "../utils/activityLogger";
 
 const router = Router();
@@ -96,11 +97,17 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
 
     const clinicName = await resolveClinicName(clinicId);
 
+    // Inherit the creating clinic's white-label org. Without it the lab's
+    // tests are invisible to the very brand whose clinic just created it,
+    // since the test catalogue scopes on lab.tenantId.
+    const tenantId = await resolveOrgId(req);
+
     const now = new Date().toISOString();
     const labDoc = {
       id:             supertokensId,
       supertokens_id: supertokensId,
       status:         "pending_approval" as const,
+      tenantId,
       email,
       director,
       name,
