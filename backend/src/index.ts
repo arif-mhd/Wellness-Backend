@@ -10,6 +10,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import { initSuperTokens, allowedOrigins } from "./config/supertokens";
 import { initDb } from "./config/database";
 import { initCosmosContainers } from "./config/cosmos";
+import { backfillAppointmentSlotLocks } from "./utils/appointmentSweep";
 import authRouter from "./routes/auth";
 import doctorsRouter from "./routes/doctors";
 import adminDoctorsRouter from "./routes/adminDoctors";
@@ -254,6 +255,15 @@ async function main() {
     await initCosmosContainers();
   } catch (err) {
     console.warn("⚠️  Cosmos init failed:", err);
+  }
+
+  // Backfill slot-lock docs for appointments booked before this mechanism
+  // existed, so they're protected against a double-booking too (non-fatal —
+  // the double-booking guard on new bookings works regardless).
+  try {
+    await backfillAppointmentSlotLocks();
+  } catch (err) {
+    console.warn("⚠️  Appointment slot-lock backfill failed:", err);
   }
 
   // Create SuperTokens roles (non-fatal)

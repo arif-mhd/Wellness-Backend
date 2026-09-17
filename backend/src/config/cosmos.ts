@@ -24,6 +24,19 @@ export const adminsContainer: Container = db.container("admins");
 /** Appointments collection — partition key: /id */
 export const appointmentsContainer: Container = db.container("appointments");
 
+/** Appointment slot locks — partition key: /doctorId. One doc per booked
+ *  (doctorId, scheduledAt) pair, with a deterministic id of
+ *  `${doctorId}__${scheduledAt}`. This is the actual concurrency guard
+ *  against double-booking: `appointments` is partitioned by /id, so nothing
+ *  there can enforce "only one appointment per doctor+slot" atomically —
+ *  Cosmos DB does, however, reject a `.create()` with a duplicate id inside
+ *  the same partition (409 Conflict), and since every lock for one doctor
+ *  shares that doctor's partition, attempting to create a lock IS the
+ *  atomic "is this slot still free" check with no read-then-write gap. See
+ *  routes/appointments.ts POST / (create), PATCH /:id/cancel (release),
+ *  and PATCH /:id/reschedule (release old, create new). */
+export const appointmentSlotsContainer: Container = db.container("appointmentSlots");
+
 /** Food logs — partition key: /patientId  (one doc per logged food entry) */
 export const foodLogsContainer: Container = db.container("foodLogs");
 
@@ -147,6 +160,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "doctors",      partitionKey: { paths: ["/id"] } },
     { id: "admins",       partitionKey: { paths: ["/id"] } },
     { id: "appointments", partitionKey: { paths: ["/id"] } },
+    { id: "appointmentSlots", partitionKey: { paths: ["/doctorId"] } },
     { id: "foodLogs",     partitionKey: { paths: ["/patientId"] } },
     { id: "workoutLogs",  partitionKey: { paths: ["/patientId"] } },
     { id: "weightLogs",   partitionKey: { paths: ["/patientId"] } },
