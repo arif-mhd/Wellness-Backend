@@ -8,6 +8,7 @@ import { randomBytes } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
   appointmentsContainer,
+  appointmentSlotsContainer,
   patientsContainer,
   doctorsContainer,
   queryDocuments,
@@ -156,6 +157,13 @@ function generateAppointmentId(doctorName: string, scheduledAt: string): string 
   return `APT-${datePart}-${namePart}-${randomPart}`;
 }
 
+// Deterministic id for a (doctorId, scheduledAt) slot-lock document — see
+// appointmentSlotsContainer in config/cosmos.ts for why this is the actual
+// double-booking guard, not just a cache key.
+function slotLockId(doctorId: string, scheduledAt: string): string {
+  return `${doctorId}__${scheduledAt}`;
+}
+
 // ─── POST /api/appointments ──────────────────────────────────────────────────
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), requireFeature("appointments"), async (req: SessionRequest, res: Response) => {
@@ -220,6 +228,29 @@ router.post("/", requireRole("patient"), requireFeature("appointments"), async (
       };
     }
 
+    // Atomic double-booking guard: attempt to create a slot-lock document
+    // whose id is deterministic per (doctorId, scheduledAt). Cosmos DB
+    // rejects a create() with a duplicate id inside the same partition (409
+    // Conflict) — that rejection IS the "is this slot still free" check,
+    // with no read-then-write gap for two concurrent requests to both slip
+    // through, unlike the old approach of trusting a separate, earlier
+    // GET /available-slots call that neither request re-validated here.
+    const lockId = slotLockId(doctorId, scheduledAt);
+    try {
+      await appointmentSlotsContainer.items.create({
+        id: lockId,
+        doctorId,
+        scheduledAt,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      if (err?.code === 409) {
+        res.status(409).json({ error: "This time slot was just booked by someone else. Please choose another slot." });
+        return;
+      }
+      throw err;
+    }
+
     const id = generateAppointmentId(doctor.fullName ?? "DOC", scheduledAt);
     const now = new Date().toISOString();
 
@@ -256,7 +287,14 @@ router.post("/", requireRole("patient"), requireFeature("appointments"), async (
       consultationLanguage: typeof consultationLanguage === "string" && consultationLanguage.trim() ? consultationLanguage.trim() : null,
     };
 
-    await appointmentsContainer.items.create(appointment);
+    try {
+      await appointmentsContainer.items.create(appointment);
+    } catch (err) {
+      // The slot lock secured the slot but the actual appointment failed to
+      // write — release it so this slot doesn't stay permanently unbookable.
+      await appointmentSlotsContainer.item(lockId, doctorId).delete().catch(() => {});
+      throw err;
+    }
 
     // Log activity (best-effort)
     let displayName = patientDoc?.fullName ?? patientId;
@@ -635,7 +673,14 @@ router.get("/my-invite", requireRole("doctor"), async (req: SessionRequest, res:
 });
 
 // ─── GET /api/appointments/:id/available-doctors ─────────────────────────────
-// Doctor fetches available (not in an active call) approved doctors to add as specialist.
+// Doctor fetches available (not in an active call) approved doctors to add as
+// specialist. Scoped so a doctor never sees another clinic/org's doctors:
+// - Clinic-affiliated doctor: same branch only, unless the clinic admin has
+//   turned on canConnectOtherBranchSpecialists for them, in which case any
+//   branch of the same org.
+// - Independent doctor (no clinicId): only other independent doctors who have
+//   also opted in to openToNetworking — and only if THEY themselves have
+//   opted in too (mutual consent, not one-sided visibility).
 router.get("/:id/available-doctors", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const callingDoctorId = req.session!.getUserId();
   const { id } = req.params;
@@ -643,6 +688,9 @@ router.get("/:id/available-doctors", requireRole("doctor"), async (req: SessionR
     const { resource: apt } = await appointmentsContainer.item(id, id).read();
     if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
     if (apt.doctorId !== callingDoctorId) { res.status(403).json({ error: "Not authorized." }); return; }
+
+    const { resource: callingDoctor } = await doctorsContainer.item(callingDoctorId, callingDoctorId).read().catch(() => ({ resource: undefined as any }));
+    if (!callingDoctor) { res.status(404).json({ error: "Doctor not found." }); return; }
 
     // Fetch all approved doctors
     const { resources: allDoctors } = await doctorsContainer.items
@@ -659,7 +707,21 @@ router.get("/:id/available-doctors", requireRole("doctor"), async (req: SessionR
     });
     const busyIds = new Set(busyResults.map((r: any) => r.doctorId));
 
-    const available = allDoctors
+    let scopedDoctors: any[];
+    if (callingDoctor.clinicId) {
+      let allowedClinicIds = [callingDoctor.clinicId];
+      if (callingDoctor.canConnectOtherBranchSpecialists === true) {
+        const org = await loadOrgDocForClinicId(callingDoctor.clinicId);
+        if (org) allowedClinicIds = [org.id, ...(org.branches ?? []).map((b: any) => b.id)];
+      }
+      scopedDoctors = allDoctors.filter((d: any) => d.clinicId && allowedClinicIds.includes(d.clinicId));
+    } else if (callingDoctor.openToNetworking === true) {
+      scopedDoctors = allDoctors.filter((d: any) => !d.clinicId && d.openToNetworking === true);
+    } else {
+      scopedDoctors = [];
+    }
+
+    const available = scopedDoctors
       .filter((d: any) => d.id !== callingDoctorId && !busyIds.has(d.id))
       .map((d: any) => ({
         id:        d.id,
@@ -889,6 +951,9 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     const patientCancelReason = isPatient && typeof reason === "string" && reason.trim() ? reason.trim() : apt.patientCancelReason;
     const updated = { ...apt, status: "cancelled", cancelledReason, patientCancelReason, updatedAt: new Date().toISOString() };
     await appointmentsContainer.items.upsert(updated);
+    // Free the slot lock so this (doctorId, scheduledAt) can be booked again
+    // — best-effort, a missing/already-gone lock shouldn't fail the cancel.
+    await appointmentSlotsContainer.item(slotLockId(apt.doctorId, apt.scheduledAt), apt.doctorId).delete().catch(() => {});
 
     const now = new Date().toISOString();
 
@@ -1103,6 +1168,32 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     }
 
     const oldScheduledAt = apt.scheduledAt;
+    const slotIsChanging = scheduledAt !== oldScheduledAt;
+
+    // The `booked` query above (and every other slot-availability check in
+    // this codebase) is a plain SELECT with no locking — two concurrent
+    // reschedules (or a reschedule racing a fresh booking) into the same
+    // slot could both pass it. Creating the slot lock is the atomic,
+    // database-enforced guard: Cosmos rejects a duplicate id within the
+    // same (doctorId) partition with 409, which two racing requests can't
+    // both get past.
+    if (slotIsChanging) {
+      try {
+        await appointmentSlotsContainer.items.create({
+          id: slotLockId(apt.doctorId, scheduledAt),
+          doctorId: apt.doctorId,
+          scheduledAt,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (err: any) {
+        if (err?.code === 409) {
+          res.status(409).json({ error: "This time slot was just booked by someone else. Please choose another slot." });
+          return;
+        }
+        throw err;
+      }
+    }
+
     const updated = {
       ...apt,
       scheduledAt,
@@ -1110,7 +1201,18 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       status: "scheduled",
       updatedAt: new Date().toISOString()
     };
-    await appointmentsContainer.items.upsert(updated);
+    try {
+      await appointmentsContainer.items.upsert(updated);
+    } catch (err) {
+      if (slotIsChanging) {
+        await appointmentSlotsContainer.item(slotLockId(apt.doctorId, scheduledAt), apt.doctorId).delete().catch(() => {});
+      }
+      throw err;
+    }
+    if (slotIsChanging) {
+      // Old slot is free now that the appointment has moved off of it.
+      await appointmentSlotsContainer.item(slotLockId(apt.doctorId, oldScheduledAt), apt.doctorId).delete().catch(() => {});
+    }
 
     const now = new Date().toISOString();
 
@@ -2421,6 +2523,26 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
         doctorName = doc?.fullName ?? doctorName;
       } catch { /* use default */ }
 
+      // Same atomic double-booking guard as a fresh booking (POST /) — the
+      // proposed slot could have been taken by something else in the time
+      // between the doctor proposing it and the patient accepting.
+      const followUpScheduledAt = apt.pendingFollowUp.followUpScheduledAt ?? apt.pendingFollowUp.followUpDate ?? now;
+      const followUpLockId = slotLockId(apt.doctorId, followUpScheduledAt);
+      try {
+        await appointmentSlotsContainer.items.create({
+          id: followUpLockId,
+          doctorId: apt.doctorId,
+          scheduledAt: followUpScheduledAt,
+          createdAt: now,
+        });
+      } catch (err: any) {
+        if (err?.code === 409) {
+          res.status(409).json({ error: "That follow-up time is no longer available. Please ask your doctor to propose a new time." });
+          return;
+        }
+        throw err;
+      }
+
       // Create the follow-up appointment with a readable, searchable ID
       newAppointmentId = generateAppointmentId(doctorName, apt.pendingFollowUp.followUpScheduledAt ?? apt.pendingFollowUp.followUpDate ?? now);
       const followUpApt = {
@@ -2441,7 +2563,12 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
         createdAt: now,
         updatedAt: now,
       };
-      await appointmentsContainer.items.create(followUpApt);
+      try {
+        await appointmentsContainer.items.create(followUpApt);
+      } catch (err) {
+        await appointmentSlotsContainer.item(followUpLockId, apt.doctorId).delete().catch(() => {});
+        throw err;
+      }
 
       const followUpDate = apt.pendingFollowUp.followUpDate;
       const followUpTime = apt.pendingFollowUp.followUpTime;
