@@ -77,8 +77,15 @@ async function resolveDoctorClinicDisplay(clinicId: string | null | undefined): 
   }
 }
 
+// Used exclusively for the invited SPECIALIST's own connection (invite-specialist
+// / specialist-join) — a specialist is a separate doctor joining an already
+// in-progress call, so like a patient (see /:id/livekit-token below) they're
+// assumed to be on their own separate device, never the same machine as the
+// primary doctor or the LiveKit media server. Must use the LAN/remote-reachable
+// PATIENT url, not the DOCTOR (same-machine-as-server) one, or their browser
+// tries to reach a LiveKit server on its own machine and never connects.
 function makeLivekitToken(userId: string, room: string, name?: string): { token: Promise<string>; wsUrl: string } {
-  const wsUrl = process.env.LIVEKIT_WS_URL_DOCTOR || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_DOCTOR", "ws://localhost:7880");
+  const wsUrl = process.env.LIVEKIT_WS_URL_PATIENT || process.env.LIVEKIT_WS_URL || devFallbackOrThrow("LIVEKIT_WS_URL_PATIENT", "ws://localhost:7880");
   const at = new AccessToken(livekitApiKey, livekitApiSecret, { identity: userId, name, ttl: 2 * 60 * 60 });
   at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
   return { token: at.toJwt(), wsUrl };
@@ -625,9 +632,14 @@ router.get("/doctor/tasks", requireRole("doctor"), async (req: SessionRequest, r
 router.get("/my-invite", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const specialistId = req.session!.getUserId();
   try {
-    // Find appointments where this doctor is invited, patient accepted, and specialist hasn't joined yet
+    // Find appointments where this doctor is invited, patient accepted, and specialist hasn't joined yet.
+    // Guarded on c.status = 'in_progress' so a stale invite left over on an
+    // appointment that has since ended (call-presence/status already cleared
+    // specialistInvite in the normal case, but this is a belt-and-braces
+    // guard against any invite that predates that cleanup) never keeps
+    // re-notifying the specialist after the call is long over.
     const results = await queryDocuments<any>(appointmentsContainer, {
-      query: `SELECT * FROM c WHERE c.specialistInvite.doctorId = @sid AND c.specialistInvite.status = 'pending' AND c.specialistInvite.patientDecision = 'accepted'`,
+      query: `SELECT * FROM c WHERE c.specialistInvite.doctorId = @sid AND c.specialistInvite.status = 'pending' AND c.specialistInvite.patientDecision = 'accepted' AND c.status = 'in_progress'`,
       parameters: [{ name: "@sid", value: specialistId }],
     });
     if (results.length === 0) {
@@ -762,7 +774,7 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
       res.status(404).json({ error: "Specialist not found or not approved." }); return;
     }
 
-    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom);
+    const { token, wsUrl } = makeLivekitToken(specialistDoctorId, apt.livekitRoom, specialist.fullName);
     const resolvedToken = await token;
 
     // Store the invite on the appointment document
@@ -818,8 +830,9 @@ router.get("/:id/specialist-join", requireRole("doctor"), async (req: SessionReq
       updatedAt: new Date().toISOString(),
     };
     await appointmentsContainer.items.upsert(updated);
-    // Generate a fresh token using the same wsUrl the primary doctor uses
-    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom);
+    // Fresh token/wsUrl for the specialist's own device (see makeLivekitToken).
+    const { resource: specialistDoc } = await doctorsContainer.item(specialistId, specialistId).read().catch(() => ({ resource: undefined as any }));
+    const { token, wsUrl } = makeLivekitToken(specialistId, apt.livekitRoom, specialistDoc?.fullName);
     res.json({ token: await token, wsUrl, room: apt.livekitRoom });
   } catch (err) {
     console.error("specialist-join error:", err);
@@ -1301,6 +1314,10 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
     }
 
     const updated = { ...apt, status, updatedAt: new Date().toISOString() };
+    // Same reasoning as call-presence's completion branch — a completed
+    // appointment must not leave a dangling specialistInvite behind for
+    // GET /my-invite to keep matching.
+    if (status === "completed" && updated.specialistInvite) updated.specialistInvite = null;
     await appointmentsContainer.items.upsert(updated);
 
     if (status === "completed") {
@@ -1444,6 +1461,9 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
           updated.cancelledReason = "no_show";
           completionAction = "cancelled";
         }
+        // The call is genuinely over — an unresolved specialistInvite must
+        // not linger and keep matching GET /my-invite's poll indefinitely.
+        if (updated.specialistInvite) updated.specialistInvite = null;
       }
 
       try {
