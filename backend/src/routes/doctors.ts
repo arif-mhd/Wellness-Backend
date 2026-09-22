@@ -486,9 +486,29 @@ router.get("/:id/slots", async (req: Request, res: Response) => {
   }
 });
 
+// Doctor slot times (e.g. "09:00") are wall-clock hours in the clinic's own
+// business timezone — Gulf Standard Time, UTC+4, which the UAE does not
+// observe DST for — not true UTC. Elsewhere in this codebase (see
+// parseLocalTime in appointments.ts / internal.ts) that's handled by simply
+// stripping a stray "Z" before parsing, which only works when the Node
+// process itself runs in that same timezone. This route can't rely on the
+// server's OS timezone being configured correctly, so instead it builds the
+// slot's true UTC instant explicitly by subtracting the fixed GST offset —
+// correct no matter what timezone the server process runs in.
+const BUSINESS_UTC_OFFSET_MINUTES = 4 * 60; // Gulf Standard Time (UTC+4)
+
+function businessTimeToInstant(date: string, hhmm: string): Date {
+  const [h, m] = hhmm.split(":").map(Number);
+  // Construct as if the digits were UTC, then shift back by the business
+  // offset to land on the real instant they actually represent.
+  const asIfUtc = new Date(`${date}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`);
+  return new Date(asIfUtc.getTime() - BUSINESS_UTC_OFFSET_MINUTES * 60 * 1000);
+}
+
 // ─── GET /api/doctors/:id/available-slots?date=YYYY-MM-DD ───────────────────
 // Returns the list of available time strings (HH:MM) for a specific date,
-// excluding slots already booked for that doctor.
+// excluding slots already booked for that doctor and any that have already
+// passed (relative to the clinic's own business timezone, not the server's).
 router.get("/:id/available-slots", async (req: Request, res: Response) => {
   const { id } = req.params;
   const { date } = req.query;
@@ -529,8 +549,10 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
 
-        // Check if slot falls in any scheduled absences
-        const slotStart = new Date(`${date}T${h}:${m}:00.000Z`);
+        // Check if slot falls in any scheduled absences. slotStart/slotEnd
+        // are real UTC instants (see businessTimeToInstant above), matching
+        // abs.startDate/abs.endDate which are already true UTC ISO strings.
+        const slotStart = businessTimeToInstant(date, `${h}:${m}`);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
         const absences = doctor.absences ?? [];
         const isAbsent = absences.some((abs: any) => {
