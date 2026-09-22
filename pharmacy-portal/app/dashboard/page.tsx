@@ -9,6 +9,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -125,6 +127,7 @@ function StatusBadge({ status, config }: { status: string; config: Record<string
 
 /* ─── Custom Tooltip ─────────────────────────────────────────────────────── */
 function CustomTooltip({ active, payload, label }: any) {
+  const { currency } = useCountryConfig();
   if (!active || !payload?.length) return null;
   return (
     <div
@@ -136,7 +139,7 @@ function CustomTooltip({ active, payload, label }: any) {
         <div key={entry.dataKey} className="flex justify-between gap-6 mb-1">
           <span style={{ color: entry.color }}>{entry.name}</span>
           <span className="font-medium text-[#383F45]">
-            {entry.dataKey === "sales" ? `AED ${entry.value.toLocaleString()}` : entry.value}
+            {entry.dataKey === "sales" ? formatCurrency(entry.value, currency) : entry.value}
           </span>
         </div>
       ))}
@@ -148,6 +151,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export default function DashboardPage() {
   const router   = useRouter();
   const { role } = useAccountRole();
+  const { currency } = useCountryConfig();
   const isLab = role === "lab";
 
   const [pharmacy,   setPharmacy]   = useState<Pharmacy | null>(null);
@@ -309,7 +313,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="text-[#24292E] text-[28px] font-semibold tracking-[-0.56px]">
-            {dataLoaded ? `AED ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—"}
+            {dataLoaded ? `${currency.symbol} ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—"}
           </div>
           <div className="flex items-center gap-1">
             <svg className="w-3.5 h-3.5 text-[#179353]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,7 +412,7 @@ export default function DashboardPage() {
                   yAxisId="left"
                   type="monotone"
                   dataKey="sales"
-                  name="Revenue (AED)"
+                  name={`Revenue (${currency.code})`}
                   stroke="#5476FC"
                   strokeWidth={2.5}
                   fill="url(#gradSales)"
@@ -492,7 +496,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <p className="text-[13px] font-medium text-[#24292E] leading-tight">{p.name}</p>
-                      <p className="text-[11px] text-[#676E76]">{p.category} · AED {p.price.toFixed(2)}</p>
+                      <p className="text-[11px] text-[#676E76]">{p.category} · {formatCurrency(p.price.toFixed(2), currency)}</p>
                     </div>
                   </div>
                   <StatusBadge status={p.status} config={PRODUCT_STATUS_CONFIG} />
@@ -563,7 +567,7 @@ export default function DashboardPage() {
                         {new Date(booking.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#24292E]">
-                        AED {(booking.payment_amount ?? 0).toFixed(2)}
+                        {formatCurrency((booking.payment_amount ?? 0).toFixed(2), currency)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <StatusBadge status={booking.status} config={BOOKING_STATUS_CONFIG} />
@@ -617,7 +621,7 @@ export default function DashboardPage() {
                         {new Date(order.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#24292E]">
-                        AED {order.total_amount.toFixed(2)}
+                        {formatCurrency(order.total_amount.toFixed(2), currency)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <StatusBadge status={order.status} config={ORDER_STATUS_CONFIG} />

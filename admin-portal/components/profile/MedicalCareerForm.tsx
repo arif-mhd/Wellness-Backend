@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface LicenseRow {
   id: string;
@@ -45,6 +47,7 @@ export default function MedicalCareerForm({
   onSubmit,
   onGoBack,
 }: MedicalCareerFormProps) {
+  const { defaultCurrency } = useOrgCurrency();
   // License state
   const [licenses, setLicenses] = useState<LicenseRow[]>([
     { id: "1", authority: "Dubai Health Authority (DHA)", number: "DHA-12345678", verified: true },
@@ -361,10 +364,10 @@ export default function MedicalCareerForm({
                     {em.label}
                   </span>
                   
-                  {/* Input container with fixed AED prefix */}
+                  {/* Input container with the org's currency prefix */}
                   <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-4 py-3.5 border border-transparent">
                     <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2 font-outfit">
-                      AED
+                      {defaultCurrency.code}
                     </span>
                     <input
                       type="text"

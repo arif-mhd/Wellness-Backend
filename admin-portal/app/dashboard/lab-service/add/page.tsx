@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -75,6 +77,7 @@ function SectionIcon({ children }: { children: React.ReactNode }) {
 }
 
 export default function AddLabServicePage() {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -348,7 +351,7 @@ export default function AddLabServicePage() {
                     <Field label="Category" required>
                       <input className={inputCls} value={currentTest.category} onChange={e => updateTest(activeTestTab, "category", e.target.value)} placeholder="e.g. Thyroid, Vitamin, Package" />
                     </Field>
-                    <Field label="Price (AED)" required>
+                    <Field label={`Price (${defaultCurrency.code})`} required>
                       <input className={inputCls} type="number" min="0" step="0.01" value={currentTest.price} onChange={e => updateTest(activeTestTab, "price", e.target.value)} placeholder="350" />
                     </Field>
                     <Field label="Turnaround (hours)">

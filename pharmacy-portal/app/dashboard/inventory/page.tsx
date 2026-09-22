@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -62,6 +64,7 @@ export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { role } = useAccountRole();
+  const { currency } = useCountryConfig();
   const isLab = role === "lab";
 
   const [products, setProducts]     = useState<Product[]>([]);
@@ -234,7 +237,7 @@ export default function InventoryPage() {
                 <p className="text-[11px] text-[#676E76] mt-0.5 uppercase tracking-wider">{test.category}</p>
 
                 <div className="mt-3 mb-1">
-                  <span className="text-lg font-semibold text-[#5476FC]">AED {test.price.toFixed(2)}</span>
+                  <span className="text-lg font-semibold text-[#5476FC]">{formatCurrency(test.price.toFixed(2), currency)}</span>
                 </div>
 
                 <button
@@ -296,7 +299,7 @@ export default function InventoryPage() {
                 <p className="text-[11px] text-[#676E76] mt-0.5 uppercase tracking-wider">{product.category}</p>
 
                 <div className="mt-3 mb-1">
-                  <span className="text-lg font-semibold text-[#5476FC]">AED {product.price.toFixed(2)}</span>
+                  <span className="text-lg font-semibold text-[#5476FC]">{formatCurrency(product.price.toFixed(2), currency)}</span>
                 </div>
 
                 <button

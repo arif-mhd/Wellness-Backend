@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -92,6 +94,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const { id } = use(params);
   const { role } = useAccountRole();
+  const { currency } = useCountryConfig();
   const isLab = role === "lab";
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -365,7 +368,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-4 transition-all hover:border-gray-300">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#676E76] uppercase tracking-wider">Price</span>
-              <span className="text-[22px] font-semibold text-[#5476FC] tracking-[-0.44px]">AED {item.price.toFixed(2)}</span>
+              <span className="text-[22px] font-semibold text-[#5476FC] tracking-[-0.44px]">{formatCurrency(item.price.toFixed(2), currency)}</span>
             </div>
             {isLab ? (
               <div className="flex items-center justify-between">
@@ -632,7 +635,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price (AED) *</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price ({currency.code}) *</label>
                 <input type="number" min="0" step="0.01" value={editing.price}
                   onChange={e => setEditing(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : prev)}
                   className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
@@ -784,7 +787,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price (AED) *</label>
+                <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Price ({currency.code}) *</label>
                 <input type="number" min="0" step="0.01" value={editingTest.price}
                   onChange={e => setEditingTest(prev => prev ? { ...prev, price: parseFloat(e.target.value) } : prev)}
                   className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />

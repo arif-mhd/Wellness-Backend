@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -67,6 +69,7 @@ const NEXT_BOOKING_STATUS: Record<string, { next: string; label: string } | unde
 
 export default function OrdersPage() {
   const { role } = useAccountRole();
+  const { currency } = useCountryConfig();
   const isLab = role === "lab";
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -198,7 +201,7 @@ export default function OrdersPage() {
                               <li key={idx} className="flex flex-col gap-0.5">
                                 <div className="flex items-center justify-between gap-4">
                                   <span className="text-xs">{item.testName}</span>
-                                  <span className="text-[11px] text-[#676E76]">AED {item.price.toFixed(2)}</span>
+                                  <span className="text-[11px] text-[#676E76]">{formatCurrency(item.price.toFixed(2), currency)}</span>
                                 </div>
                                 {item.forPatientId && (
                                   <span className="text-[10px] text-[#A0A8B0]">For patient: {item.forPatientId.slice(0, 8)}</span>
@@ -222,7 +225,7 @@ export default function OrdersPage() {
                           </ul>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#5476FC]">
-                          AED {(booking.payment_amount ?? 0).toFixed(2)}
+                          {formatCurrency((booking.payment_amount ?? 0).toFixed(2), currency)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           {action && (
@@ -303,7 +306,7 @@ export default function OrdersPage() {
                         {order.items.map((item, idx) => (
                           <li key={idx} className="flex items-center justify-between gap-4">
                             <span className="text-xs">{item.quantity}x {item.name}</span>
-                            <span className="text-[11px] text-[#676E76]">AED {(item.quantity * item.unit_price).toFixed(2)}</span>
+                            <span className="text-[11px] text-[#676E76]">{formatCurrency((item.quantity * item.unit_price).toFixed(2), currency)}</span>
                           </li>
                         ))}
                       </ul>
@@ -312,7 +315,7 @@ export default function OrdersPage() {
                       {order.delivery_address}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#5476FC]">
-                      AED {order.total_amount.toFixed(2)}
+                      {formatCurrency(order.total_amount.toFixed(2), currency)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       {order.status === "confirmed" && (

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
 
 async function pharmacyFetch(path: string, options: RequestInit = {}) {
   const token = await Session.getAccessToken();
@@ -120,6 +121,10 @@ function GeneralSettings() {
   const { role } = useAccountRole();
   const isLab = role === "lab";
   const basePath = isLab ? "/api/lab/me" : "/api/pharmacy/me";
+  const { countryConfig } = useCountryConfig();
+  // Only pharmacies (not labs) have an identity-doc requirement today — same
+  // as the register page, rendered generically off the org's country config.
+  const pharmacyIdentityFields = isLab ? [] : countryConfig.identityFields.filter((f) => f.appliesTo === "pharmacy");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -129,12 +134,12 @@ function GeneralSettings() {
     pharmacyName: "",
     ownerName: "",
     licenseNumber: "",
-    emiratesId: "",
     email: "",
     phone: "",
     location: "",
     manager: ""
   });
+  const [identityValues, setIdentityValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function loadProfile() {
@@ -148,7 +153,6 @@ function GeneralSettings() {
               pharmacyName: account.name ?? "",
               ownerName: account.director ?? "",
               licenseNumber: account.labLicense ?? "",
-              emiratesId: "",
               email: account.email ?? "",
               phone: account.contactNumber ?? "",
               location: account.location ?? "",
@@ -157,12 +161,16 @@ function GeneralSettings() {
               pharmacyName: account.pharmacyName ?? "",
               ownerName: account.ownerName ?? "",
               licenseNumber: account.licenseNumber ?? "",
-              emiratesId: account.emiratesId ?? "",
               email: account.email ?? "",
               phone: account.phone ?? "",
               location: account.location ?? "",
               manager: account.manager ?? ""
             });
+            setIdentityValues(
+              Object.fromEntries(
+                pharmacyIdentityFields.map((f) => [f.key, (f.storage === "legacy" ? account[f.key] : account.identityDocuments?.[f.key]) ?? ""])
+              )
+            );
           }
         }
       } catch (err) {
@@ -172,6 +180,7 @@ function GeneralSettings() {
       }
     }
     loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath, isLab]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -190,7 +199,15 @@ function GeneralSettings() {
         contactNumber: formData.phone,
         location: formData.location,
         manager: formData.manager,
-      } : formData;
+      } : {
+        ...formData,
+        ...Object.fromEntries(
+          pharmacyIdentityFields.filter((f) => f.storage === "legacy").map((f) => [f.key, identityValues[f.key] || undefined])
+        ),
+        identityDocuments: Object.fromEntries(
+          pharmacyIdentityFields.filter((f) => f.storage === "generic" && identityValues[f.key]).map((f) => [f.key, identityValues[f.key]])
+        ),
+      };
       const res = await pharmacyFetch(basePath, {
         method: "PUT",
         body: JSON.stringify(body),
@@ -254,12 +271,18 @@ function GeneralSettings() {
             <label className={labelCls}>{isLab ? "Lab License" : "License Number"}</label>
             <input type="text" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
           </div>
-          {!isLab && (
-            <div className="space-y-2">
-              <label className={labelCls}>Emirates ID</label>
-              <input type="text" name="emiratesId" value={formData.emiratesId} onChange={handleChange} disabled={!isEditing} className={activeInputCls} />
+          {pharmacyIdentityFields.map((field) => (
+            <div key={field.key} className="space-y-2">
+              <label className={labelCls}>{field.label}</label>
+              <input
+                type="text"
+                value={identityValues[field.key] || ""}
+                onChange={(e) => setIdentityValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                disabled={!isEditing}
+                className={activeInputCls}
+              />
             </div>
-          )}
+          ))}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -559,22 +582,22 @@ function PayoutSettings() {
       <div className="space-y-5 max-w-2xl">
         <div className="space-y-2">
           <label className={labelCls}>Bank Name</label>
-          <input type="text" placeholder="e.g. Emirates NBD" className={inputCls} />
+          <input type="text" placeholder="e.g. your bank's name" className={inputCls} />
         </div>
-        
+
         <div className="space-y-2">
           <label className={labelCls}>Account Holder Name</label>
           <input type="text" placeholder="e.g. Al Shifa Pharmacy LLC" className={inputCls} />
         </div>
-        
+
         <div className="space-y-2">
           <label className={labelCls}>IBAN / Account Number</label>
-          <input type="text" placeholder="AE00000000000000000000" className={inputCls} />
+          <input type="text" placeholder="Bank account or IBAN number" className={inputCls} />
         </div>
-        
+
         <div className="space-y-2">
           <label className={labelCls}>SWIFT / BIC Code</label>
-          <input type="text" placeholder="EBIZAEAD" className={inputCls} />
+          <input type="text" placeholder="e.g. EBIZAEAD" className={inputCls} />
         </div>
 
         <div className="pt-4 flex justify-end">

@@ -6,6 +6,8 @@ import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -22,6 +24,9 @@ async function adminFetch(path: string, options: RequestInit = {}) {
 }
 
 interface LabService {
+  // Which white-label organization this record belongs to. The admin API
+  // already returns it (SELECT *); it drives which currency prices render in.
+  tenantId?: string | null;
   id: string;
   supertokens_id?: string | null;
   name: string;
@@ -113,6 +118,7 @@ const DoubleCaret = () => (
 );
 
 export default function LabProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState<"about" | "tests">("about");
@@ -621,8 +627,8 @@ export default function LabProfilePage({ params }: { params: Promise<{ id: strin
                                   {test.category}
                                 </td>
                                 <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:px-0 px-2">
-                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Price (AED)</div>
-                                  AED {test.price.toFixed(2)}
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Price ({currencyForOrg(lab?.tenantId).code})</div>
+                                  {formatCurrency(test.price.toFixed(2), currencyForOrg(lab?.tenantId))}
                                 </td>
                                 <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-semibold lg:px-0 px-2">
                                   <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Status</div>
@@ -718,7 +724,7 @@ export default function LabProfilePage({ params }: { params: Promise<{ id: strin
               {/* Price + Turnaround */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price ({currencyForOrg(lab?.tenantId).code}) *</label>
                   <input
                     type="number" min="0" step="0.01"
                     value={testForm.price}

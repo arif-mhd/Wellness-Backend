@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -49,6 +51,7 @@ const DoubleCaret = () => (
 );
 
 export default function ManageVaccinationPage() {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const [vaccines, setVaccines] = useState<Vaccine[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -194,7 +197,7 @@ export default function ManageVaccinationPage() {
                               {vaccine.doses_required ?? 1}
                             </td>
                             <td className="py-4 text-[13px] font-semibold text-slate-700 text-center">
-                              AED {vaccine.price.toFixed(2)}
+                              {formatCurrency(vaccine.price.toFixed(2), defaultCurrency)}
                             </td>
                             <td className="py-4 text-center">
                               <button
@@ -252,7 +255,7 @@ export default function ManageVaccinationPage() {
                           </div>
                           <div className="flex flex-col items-end text-right">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider">Price</span>
-                            <span className="text-[13px] text-slate-500 font-medium">AED {vaccine.price.toFixed(2)}</span>
+                            <span className="text-[13px] text-slate-500 font-medium">{formatCurrency(vaccine.price.toFixed(2), defaultCurrency)}</span>
                           </div>
                           <div className="flex flex-row items-center justify-between col-span-2">
                             <div className="flex flex-col">
@@ -354,8 +357,8 @@ export default function ManageVaccinationPage() {
                   { label: "Category", value: selected.category ?? "—" },
                   { label: "Age Range", value: selected.ageRange ?? "—" },
                   { label: "Doses Required", value: String(selected.doses_required ?? 1) },
-                  { label: "Price", value: `AED ${selected.price.toFixed(2)}` },
-                  { label: "Original Price", value: selected.originalPrice ? `AED ${selected.originalPrice.toFixed(2)}` : "—" },
+                  { label: "Price", value: formatCurrency(selected.price.toFixed(2), defaultCurrency) },
+                  { label: "Original Price", value: selected.originalPrice ? formatCurrency(selected.originalPrice.toFixed(2), defaultCurrency) : "—" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex flex-col sm:flex-row sm:items-start justify-between gap-1">
                     <span className="text-[11px] text-slate-400 font-semibold">{label}</span>

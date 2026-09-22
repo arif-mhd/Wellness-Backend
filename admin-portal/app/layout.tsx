@@ -3,6 +3,7 @@ import { Outfit, Marcellus } from "next/font/google";
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
 import { BrandingProvider } from "@/components/BrandingContext";
+import { OrgCurrencyProvider } from "@/components/OrgCurrencyContext";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -29,7 +30,9 @@ export default function RootLayout({
     <html lang="en" className={`${outfit.variable} ${marcellus.variable}`}>
       <body>
         <SuperTokensProvider>
-          <BrandingProvider>{children}</BrandingProvider>
+          <BrandingProvider>
+            <OrgCurrencyProvider>{children}</OrgCurrencyProvider>
+          </BrandingProvider>
         </SuperTokensProvider>
       </body>
     </html>

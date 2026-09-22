@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -56,6 +58,7 @@ const VACCINE_TYPES = ["Routine", "Travel", "Adult", "Core", "COVID-19", "Pediat
 const CATEGORIES = ["Preventive", "Booster", "Emergency", "Lifestyle", "Other"];
 
 export default function AddVaccinePage() {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const [form, setForm] = useState<VaccineForm>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
@@ -188,10 +191,10 @@ export default function AddVaccinePage() {
               {/* Pricing */}
               <Section title="Pricing">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Price (AED) *">
+                  <Field label={`Price (${defaultCurrency.code}) *`}>
                     <input required type="number" step="0.01" min="0" value={form.price} onChange={e => setField("price", e.target.value)} placeholder="350.00" className={inputCls} />
                   </Field>
-                  <Field label="Original Price (AED)">
+                  <Field label={`Original Price (${defaultCurrency.code})`}>
                     <input type="number" step="0.01" min="0" value={form.originalPrice} onChange={e => setField("originalPrice", e.target.value)} placeholder="420.00" className={inputCls} />
                   </Field>
                 </div>
@@ -250,10 +253,10 @@ export default function AddVaccinePage() {
 
                 <div className="flex items-baseline gap-2 mb-5">
                   <span className="text-[20px] font-semibold text-slate-800">
-                    {form.price ? `AED ${parseFloat(form.price).toFixed(2)}` : "AED —"}
+                    {form.price ? formatCurrency(parseFloat(form.price).toFixed(2), defaultCurrency) : `${defaultCurrency.symbol} —`}
                   </span>
                   {form.originalPrice && (
-                    <span className="text-[13px] text-slate-400 line-through">AED {parseFloat(form.originalPrice).toFixed(2)}</span>
+                    <span className="text-[13px] text-slate-400 line-through">{formatCurrency(parseFloat(form.originalPrice).toFixed(2), defaultCurrency)}</span>
                   )}
                 </div>
 

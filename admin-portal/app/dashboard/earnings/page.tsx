@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import Pagination from "@/components/Pagination";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency, CurrencyConfig } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Real, backend-driven clinic-wise and doctor-wise consultation earnings
@@ -31,8 +33,8 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-function fmtMoney(n: number): string {
-  return `AED ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtMoney(n: number, currency: CurrencyConfig): string {
+  return formatCurrency(n.toFixed(2), currency);
 }
 
 function Avatar({ name, url }: { name: string; url?: string | null }) {
@@ -66,6 +68,7 @@ function ComingSoon({ label }: { label: string }) {
 }
 
 export default function EarningsPage() {
+  const { defaultCurrency } = useOrgCurrency();
   const [activeTab, setActiveTab] = useState<TabKey>("consultations");
 
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -145,9 +148,9 @@ export default function EarningsPage() {
           <>
             {/* Summary cards */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <StatCard label="Total Earnings" amount={summary ? fmtMoney(summary.totalEarnings) : "—"} />
-              <StatCard label="Cash Earnings" amount={summary ? fmtMoney(summary.cashEarnings) : "—"} />
-              <StatCard label="Insurance Earnings" amount={summary ? fmtMoney(summary.insuranceEarnings) : "—"} />
+              <StatCard label="Total Earnings" amount={summary ? fmtMoney(summary.totalEarnings, defaultCurrency) : "—"} />
+              <StatCard label="Cash Earnings" amount={summary ? fmtMoney(summary.cashEarnings, defaultCurrency) : "—"} />
+              <StatCard label="Insurance Earnings" amount={summary ? fmtMoney(summary.insuranceEarnings, defaultCurrency) : "—"} />
             </div>
 
             {selectedClinic ? (
@@ -191,9 +194,9 @@ export default function EarningsPage() {
                                 </div>
                               </td>
                               <td className="py-2 text-[12.5px] text-slate-500">{d.specialty ?? "—"}</td>
-                              <td className="py-2 text-[13px] font-semibold text-slate-800 text-right">{fmtMoney(d.totalEarnings)}</td>
-                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(d.cashEarnings)}</td>
-                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(d.insuranceEarnings)}</td>
+                              <td className="py-2 text-[13px] font-semibold text-slate-800 text-right">{fmtMoney(d.totalEarnings, defaultCurrency)}</td>
+                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(d.cashEarnings, defaultCurrency)}</td>
+                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(d.insuranceEarnings, defaultCurrency)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -213,15 +216,15 @@ export default function EarningsPage() {
                           <div className="pt-3 border-t border-slate-50 flex flex-col gap-2">
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Total Earnings</span>
-                              <span className="text-[13px] font-semibold text-slate-800">{fmtMoney(d.totalEarnings)}</span>
+                              <span className="text-[13px] font-semibold text-slate-800">{fmtMoney(d.totalEarnings, defaultCurrency)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Cash</span>
-                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(d.cashEarnings)}</span>
+                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(d.cashEarnings, defaultCurrency)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Insurance</span>
-                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(d.insuranceEarnings)}</span>
+                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(d.insuranceEarnings, defaultCurrency)}</span>
                             </div>
                           </div>
                         </div>
@@ -282,9 +285,9 @@ export default function EarningsPage() {
                               </td>
                               <td className="py-2 text-[12.5px] text-slate-500">{c.branchCount}</td>
                               <td className="py-2 text-[12.5px] text-slate-500">{c.doctorCount}</td>
-                              <td className="py-2 text-[13px] font-semibold text-slate-800 text-right">{fmtMoney(c.totalEarnings)}</td>
-                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(c.cashEarnings)}</td>
-                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(c.insuranceEarnings)}</td>
+                              <td className="py-2 text-[13px] font-semibold text-slate-800 text-right">{fmtMoney(c.totalEarnings, defaultCurrency)}</td>
+                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(c.cashEarnings, defaultCurrency)}</td>
+                              <td className="py-2 text-[12.5px] text-slate-500 text-right">{fmtMoney(c.insuranceEarnings, defaultCurrency)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -305,15 +308,15 @@ export default function EarningsPage() {
                           <div className="pt-3 border-t border-slate-50 flex flex-col gap-2">
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Total Earnings</span>
-                              <span className="text-[13px] font-semibold text-slate-800">{fmtMoney(c.totalEarnings)}</span>
+                              <span className="text-[13px] font-semibold text-slate-800">{fmtMoney(c.totalEarnings, defaultCurrency)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Cash</span>
-                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(c.cashEarnings)}</span>
+                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(c.cashEarnings, defaultCurrency)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] text-slate-400">Insurance</span>
-                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(c.insuranceEarnings)}</span>
+                              <span className="text-[12px] font-medium text-slate-600">{fmtMoney(c.insuranceEarnings, defaultCurrency)}</span>
                             </div>
                           </div>
                         </div>

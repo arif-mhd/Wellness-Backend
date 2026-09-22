@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { apiFetch } from "@/lib/apiFetch";
 import Pagination from "@/components/Pagination";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface OrderItem {
   medicine_id: string;
@@ -79,6 +81,7 @@ const AvatarCircle = ({ name }: { name: string }) => (
 const PAGE_SIZE = 12;
 
 export default function OrdersPage() {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -267,7 +270,7 @@ export default function OrdersPage() {
                             {o.payment_method === "mock" ? "Mock" : o.payment_method}
                           </td>
                           <td className="py-2 text-[12px] text-slate-600 font-medium">
-                            AED {o.total_amount.toFixed(2)}
+                            {formatCurrency(o.total_amount.toFixed(2), currencyForOrg((o as any).tenantId))}
                           </td>
                           <td className="py-2 pr-2 relative">
                             <div className="flex items-center justify-between min-w-[130px] pr-2">
@@ -334,7 +337,7 @@ export default function OrdersPage() {
                       </div>
                       <div className="mt-2 pt-2 border-t border-slate-50/50 flex flex-col">
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider">Amount</span>
-                        <span className="text-[13px] text-slate-800 font-semibold">AED {o.total_amount.toFixed(2)}</span>
+                        <span className="text-[13px] text-slate-800 font-semibold">{formatCurrency(o.total_amount.toFixed(2), currencyForOrg((o as any).tenantId))}</span>
                       </div>
 
                       <div className="mt-3 w-full">
@@ -425,7 +428,7 @@ export default function OrdersPage() {
                     {selected.items.map((item, i) => (
                       <div key={i} className="flex items-center justify-between text-[12px]">
                         <span className="font-medium text-slate-700 truncate max-w-[60%]">{item.name} × {item.quantity}</span>
-                        <span className="font-medium text-slate-600">AED {(item.unit_price * item.quantity).toFixed(2)}</span>
+                        <span className="font-medium text-slate-600">{formatCurrency((item.unit_price * item.quantity).toFixed(2), currencyForOrg((selected as any)?.tenantId))}</span>
                       </div>
                     ))}
                   </div>
@@ -434,7 +437,7 @@ export default function OrdersPage() {
                 <div>
                   <p className="text-[11px] font-medium text-slate-500 mb-1.5">Payment</p>
                   <p className="text-[12px] font-medium text-slate-600">
-                    AED {selected.total_amount.toFixed(2)}
+                    {formatCurrency(selected.total_amount.toFixed(2), currencyForOrg((selected as any)?.tenantId))}
                     <span className="text-[#6A8BFF] ml-2">
                       {selected.payment_status === "paid" ? "Paid" : selected.payment_status}
                     </span>

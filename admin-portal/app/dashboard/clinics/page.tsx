@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface RateRow {
   category: string;
@@ -105,6 +107,7 @@ function ClinicAvatar({ clinic, size = "md" }: { clinic: Clinic; size?: "sm" | "
 }
 
 function ManageClinicsPageInner() {
+  const { currencyForOrg } = useOrgCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetId = searchParams.get("id");
@@ -619,7 +622,7 @@ function ManageClinicsPageInner() {
                           {b.consultationRates.map((r, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 pl-2">
                               <span className="text-[11px] text-slate-500">{r.category}</span>
-                              <span className="text-[11px] text-slate-800 font-medium">AED {r.price}</span>
+                              <span className="text-[11px] text-slate-800 font-medium">{formatCurrency(r.price, currencyForOrg((b as any)?.tenantId))}</span>
                             </div>
                           ))}
                         </div>

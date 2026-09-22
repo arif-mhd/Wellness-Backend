@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface RateRow {
   id: string;
@@ -54,6 +56,7 @@ function VerifyField({
 }
 
 export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicCompanyInfoFormProps) {
+  const { defaultCurrency } = useOrgCurrency();
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [dohLicense, setDohLicense] = useState("");
@@ -207,7 +210,7 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
                 <input type="text" placeholder="Category" value={row.category} onChange={(e) => updateRateRow(row.id, "category", e.target.value)} className={inputCls} />
                 <div className="flex items-center gap-2">
                   <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-4 py-3.5 border border-transparent">
-                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">AED</span>
+                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">{defaultCurrency.code}</span>
                     <input type="text" placeholder="Add Price" value={row.price} onChange={(e) => updateRateRow(row.id, "price", e.target.value)} className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit" />
                   </div>
                   {rates.length > 1 && (
