@@ -1482,47 +1482,53 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
   const { id } = req.params;
 
   try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) {
-      res.status(404).json({ error: "Appointment not found." });
-      return;
-    }
-    if (apt.patientId !== patientId) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-
     const {
       primaryReason, symptoms, severity, duration, onset, location,
       conditions, medications, allergies, additionalNotes, source, visitSummary,
     } = req.body;
 
-    const updated = {
-      ...apt,
-      preVisitData: {
-        primaryReason:    primaryReason    ?? null,
-        symptoms:         Array.isArray(symptoms) ? symptoms : [],
-        onset:            onset            ?? "",
-        location:         location         ?? "",
-        severity:         severity         ?? "",
-        duration:         duration         ?? "",
-        conditions:       conditions       ?? "",
-        medications:      medications      ?? "",
-        allergies:        allergies        ?? "",
-        additionalNotes:  additionalNotes  ?? "",
-        // AI-generated narrative pre-visit note (see /api/wellness/visit-summary)
-        // — a separate written recap alongside the structured fields above,
-        // not a replacement for them. Empty for manual (non-chat) bookings.
-        visitSummary:     typeof visitSummary === "string" ? visitSummary : "",
-        source:           source === "ai_chat" ? "ai_chat" : "manual",
-        submittedAt:      new Date().toISOString(),
-      },
-      updatedAt: new Date().toISOString(),
-    };
-    await appointmentsContainer.items.upsert(updated);
+    // Only preVisitData/updatedAt are ours to set — everything else on the
+    // document (status, schedule, payment, presence, recording consent) is
+    // carried over from a FRESH read on each attempt, so a doctor cancelling
+    // or rescheduling mid-submit isn't reverted by this write.
+    const updated = await updateAppointmentWithRetry(id, (apt) => {
+      if (apt.patientId !== patientId) throw new AppointmentWriteNotAuthorizedError();
+
+      return {
+        ...apt,
+        preVisitData: {
+          primaryReason:    primaryReason    ?? null,
+          symptoms:         Array.isArray(symptoms) ? symptoms : [],
+          onset:            onset            ?? "",
+          location:         location         ?? "",
+          severity:         severity         ?? "",
+          duration:         duration         ?? "",
+          conditions:       conditions       ?? "",
+          medications:      medications      ?? "",
+          allergies:        allergies        ?? "",
+          additionalNotes:  additionalNotes  ?? "",
+          // AI-generated narrative pre-visit note (see /api/wellness/visit-summary)
+          // — a separate written recap alongside the structured fields above,
+          // not a replacement for them. Empty for manual (non-chat) bookings.
+          visitSummary:     typeof visitSummary === "string" ? visitSummary : "",
+          source:           source === "ai_chat" ? "ai_chat" : "manual",
+          submittedAt:      new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: "Appointment not found." });
+      return;
+    }
 
     res.json({ status: "OK", preVisitData: updated.preVisitData });
-  } catch (err) {
+  } catch (err: any) {
+    if (err instanceof AppointmentWriteNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
+    // Retries exhausted — the document is under sustained concurrent write.
+    // Tell the client to retry rather than silently dropping either update.
+    if (err?.code === 412) { res.status(409).json({ error: "Appointment was updated concurrently. Please try again." }); return; }
     console.error("Save pre-visit data error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
