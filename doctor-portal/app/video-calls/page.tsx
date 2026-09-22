@@ -20,6 +20,24 @@ function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function mediaErrorMessage(e: any, device: "camera" | "microphone"): string {
+  const label = device === "camera" ? "Camera" : "Microphone";
+  switch (e?.name) {
+    case "NotReadableError":
+      return `${label} is being used by another app — close it and retry`;
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return `${label} permission denied — check your browser/OS settings`;
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return `No ${device} detected`;
+    case "OverconstrainedError":
+      return `${label} doesn't support the required settings`;
+    default:
+      return `Could not start ${device}${e?.message ? `: ${e.message}` : ""}`;
+  }
+}
+
 interface ChatMsg { id: string; sender: "you" | "other"; name: string; text: string; time: string; }
 
 interface RemoteVideoTile {
@@ -64,6 +82,7 @@ function VideoCallInner() {
   const [error,      setError]      = useState<string | null>(null);
   const [micOn,      setMicOn]      = useState(true);
   const [camOn,      setCamOn]      = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [timer,      setTimer]      = useState(0);
 
   const [messages,   setMessages]   = useState<ChatMsg[]>([]);
@@ -272,8 +291,27 @@ function VideoCallInner() {
           });
         });
 
-        await room.localParticipant.setCameraEnabled(true);
-        await room.localParticipant.setMicrophoneEnabled(true);
+        // Camera/mic are handled in their own try/catch, independently of each
+        // other and of the room connection above. A denied or busy camera must
+        // not stop the microphone from being requested — an audio-only call is
+        // still a usable consultation — and must not surface as a room
+        // "Connection error".
+        try {
+          await room.localParticipant.setCameraEnabled(true);
+        } catch (camErr: any) {
+          if (!cancelled) {
+            setCamOn(false);
+            setMediaError(mediaErrorMessage(camErr, "camera"));
+          }
+        }
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+        } catch (micErr: any) {
+          if (!cancelled) {
+            setMicOn(false);
+            setMediaError(prev => prev ?? mediaErrorMessage(micErr, "microphone"));
+          }
+        }
 
         if (!isSpecialist) {
           apiFetch(`/api/appointments/${appointmentId}/call-presence`, {
@@ -524,6 +562,34 @@ function VideoCallInner() {
 
   const toggleMic = async () => { await roomRef.current?.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); };
   const toggleCam = async () => { await roomRef.current?.localParticipant.setCameraEnabled(!camOn);   setCamOn(v => !v); };
+
+  // Retries only whichever device actually failed to start — no room
+  // reconnect, no page reload. Safe to call repeatedly (e.g. right after
+  // granting the permission that was denied).
+  const retryMedia = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    setMediaError(null);
+    let camErrMsg: string | null = null;
+    let micErrMsg: string | null = null;
+    if (!camOn) {
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+        setCamOn(true);
+      } catch (e: any) {
+        camErrMsg = mediaErrorMessage(e, "camera");
+      }
+    }
+    if (!micOn) {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        setMicOn(true);
+      } catch (e: any) {
+        micErrMsg = mediaErrorMessage(e, "microphone");
+      }
+    }
+    if (camErrMsg || micErrMsg) setMediaError(camErrMsg ?? micErrMsg);
+  }, [camOn, micOn]);
 
   const fetchAvailableDoctors = useCallback(async () => {
     if (!appointmentId || isSpecialist) return;
@@ -807,6 +873,13 @@ function VideoCallInner() {
                 ? "bg-green-50 border-green-100 text-green-700"
                 : "bg-red-50 border-red-100 text-red-600"
             }`}>{followUpToast}</div>
+          )}
+          {mediaError && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full text-amber-700 text-[10px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              {mediaError}
+              <button onClick={retryMedia} className="underline font-bold hover:text-amber-900">Retry</button>
+            </div>
           )}
           <button onClick={openEhrPanel} className="h-8 px-3 rounded-lg border border-gray-200 text-gray-600 text-[10px] font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
             EHR

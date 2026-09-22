@@ -17,6 +17,20 @@ const TIMEZONES = [
   "(UTC+08:00) China Standard Time",
 ];
 
+function Toggle({ on, onChange, disabled }: { on: boolean; onChange: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative w-[36px] h-[20px] rounded-full shrink-0 transition-all duration-200 outline-none disabled:opacity-50 ${on ? "bg-[#1FAF65]" : "bg-[#D1D5EB]"}`}
+    >
+      <span
+        className={`absolute top-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm transition-all duration-200 ${on ? "left-[18px]" : "left-[2px]"}`}
+      />
+    </button>
+  );
+}
+
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl p-6 flex flex-col gap-5">
@@ -42,6 +56,12 @@ export default function AccountSettingsPage() {
   const [savingTz, setSavingTz] = useState(false);
   const [tzSaved, setTzSaved] = useState(false);
 
+  // Specialist networking (independent doctors only — clinic-affiliated
+  // doctors' cross-branch access is controlled by their clinic admin instead)
+  const [isIndependent, setIsIndependent] = useState(false);
+  const [openToNetworking, setOpenToNetworking] = useState(false);
+  const [savingNetworking, setSavingNetworking] = useState(false);
+
   const { can } = useDoctorPermissions();
 
   useEffect(() => {
@@ -50,9 +70,29 @@ export default function AccountSettingsPage() {
       .then(data => {
         const doc = data.doctor;
         if (doc?.timezone) setTimezone(doc.timezone);
+        setIsIndependent(!doc?.clinicId);
+        setOpenToNetworking(!!doc?.openToNetworking);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleToggleNetworking = async () => {
+    const next = !openToNetworking;
+    setSavingNetworking(true);
+    setOpenToNetworking(next);
+    try {
+      const res = await apiFetch("/api/doctors/networking-status", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openToNetworking: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      alert("Failed to update specialist networking setting.");
+      setOpenToNetworking(!next);
+    } finally {
+      setSavingNetworking(false);
+    }
+  };
 
   const handleSaveTimezone = async () => {
     setSavingTz(true); setTzSaved(false);
@@ -114,6 +154,21 @@ export default function AccountSettingsPage() {
           )}
         </div>
       </SectionCard>
+
+      {/* ── Specialist Networking (independent doctors only) ─── */}
+      {isIndependent && (
+        <SectionCard
+          title="Specialist Networking"
+          description="Open this to be discoverable by other independent doctors, and to add them as a specialist during a video call yourself. Both doctors must have this on for either to see the other — it won't work one-sided."
+        >
+          <div className="flex items-center gap-3">
+            <Toggle on={openToNetworking} onChange={handleToggleNetworking} disabled={savingNetworking} />
+            <span className="text-[#383F45] text-sm font-medium">
+              {openToNetworking ? "Open to connecting with other independent doctors" : "Not open to connecting with other independent doctors"}
+            </span>
+          </div>
+        </SectionCard>
+      )}
 
       {/* ── Credentials & account deletion ───────────────────── */}
       <SectionCard title="Credentials & Account">

@@ -494,7 +494,8 @@ router.get("/:id/slots", async (req: Request, res: Response) => {
 
 // ─── GET /api/doctors/:id/available-slots?date=YYYY-MM-DD ───────────────────
 // Returns the list of available time strings (HH:MM) for a specific date,
-// excluding slots already booked for that doctor.
+// excluding slots already booked for that doctor and any that have already
+// passed (relative to the clinic's own business timezone, not the server's).
 router.get("/:id/available-slots", async (req: Request, res: Response) => {
   const { id } = req.params;
   const { date } = req.query;
@@ -540,7 +541,9 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
 
-        // Check if slot falls in any scheduled absences
+        // Check if slot falls in any scheduled absences. slotStart is a real
+        // UTC instant, matching abs.startDate/abs.endDate which are already
+        // true UTC ISO strings.
         const slotStart = zonedTimeToUtc(date, `${h}:${m}`, timezone);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
         const absences = doctor.absences ?? [];
@@ -732,6 +735,36 @@ router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest
     res.json({ status: "OK", isOnline });
   } catch (err) {
     console.error("Update online status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/doctors/networking-status ───────────────────────────────────
+// Self-service opt-in for INDEPENDENT doctors only (no clinicId) — whether
+// this doctor is open to connecting with other independent doctors as
+// specialists during a video call. Two independent doctors only see each
+// other in "Add Specialist" if both have opted in (see
+// GET /api/appointments/:id/available-doctors). No-op for clinic-affiliated
+// doctors, whose cross-branch access is controlled by their clinic admin
+// instead (see PATCH /api/clinics/doctors/:id/branch-access).
+router.patch("/networking-status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { openToNetworking } = req.body;
+  if (typeof openToNetworking !== "boolean") {
+    res.status(400).json({ error: "openToNetworking must be a boolean." });
+    return;
+  }
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      openToNetworking,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ status: "OK", openToNetworking });
+  } catch (err) {
+    console.error("Update networking status error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

@@ -418,6 +418,37 @@ router.patch("/:id/online-status", requireRole("clinic"), async (req: SessionReq
   }
 });
 
+// ─── PATCH /api/clinics/doctors/:id/branch-access ────────────────────────────
+// Controls whether this doctor can see/add specialists from OTHER branches of
+// the same org during a video call's "Add Specialist" flow, or only their own
+// branch (the default — see GET /api/appointments/:id/available-doctors).
+router.patch("/:id/branch-access", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const actorId = req.session!.getUserId();
+  const actorPerms = await getActorPermissionState(actorId);
+  if (!hasPermission(actorPerms, "manage_doctors")) {
+    res.status(403).json({ error: "You don't have permission to manage doctors." });
+    return;
+  }
+  const { canConnectOtherBranchSpecialists } = req.body;
+  if (typeof canConnectOtherBranchSpecialists !== "boolean") {
+    res.status(400).json({ error: "canConnectOtherBranchSpecialists must be a boolean." });
+    return;
+  }
+  try {
+    const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
+    if (!doctor) return;
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      canConnectOtherBranchSpecialists,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ status: "OK", canConnectOtherBranchSpecialists });
+  } catch (err) {
+    console.error("Update doctor branch access error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /api/clinics/doctors/:id/reset-password ────────────────────────────
 // Clinic sets a brand-new password for the doctor directly. The password is
 // only ever known to whoever typed it into this request — nothing is stored

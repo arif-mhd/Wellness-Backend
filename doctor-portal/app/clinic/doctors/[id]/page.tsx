@@ -41,6 +41,7 @@ interface Doctor {
   fees?: number | null;
   isOnline?: boolean;
   twoFactorEnabled?: boolean;
+  canConnectOtherBranchSpecialists?: boolean;
   avatarUrl?: string | null;
   slots?: Slot[];
   slotsPending?: boolean;
@@ -188,6 +189,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const [loadError, setLoadError] = useState("");
   const [togglingOnline, setTogglingOnline] = useState(false);
   const [togglingTwoFA, setTogglingTwoFA] = useState(false);
+  const [togglingBranchAccess, setTogglingBranchAccess] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [savingDoc, setSavingDoc] = useState(false);
@@ -371,6 +373,26 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
       setDoctor((prev) => (prev ? { ...prev, twoFactorEnabled: !next } : prev));
     } finally {
       setTogglingTwoFA(false);
+    }
+  };
+
+  const handleToggleBranchAccess = async () => {
+    if (!doctor) return;
+    const next = !doctor.canConnectOtherBranchSpecialists;
+    setTogglingBranchAccess(true);
+    setDoctor((prev) => (prev ? { ...prev, canConnectOtherBranchSpecialists: next } : prev));
+    try {
+      const res = await apiFetch(`/api/clinics/doctors/${id}/branch-access${qs}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canConnectOtherBranchSpecialists: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      window.alert("Failed to update branch access.");
+      setDoctor((prev) => (prev ? { ...prev, canConnectOtherBranchSpecialists: !next } : prev));
+    } finally {
+      setTogglingBranchAccess(false);
     }
   };
 
@@ -605,6 +627,19 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                   className={`font-bold hover:underline disabled:opacity-50 ${doctor.twoFactorEnabled ? "text-[#E84949]" : "text-[#5476FC]"}`}
                 >
                   {togglingTwoFA ? "Updating…" : doctor.twoFactorEnabled ? "Disable" : "Enable"}
+                </button>
+              </div>
+            )}
+            {can("manage_doctors") && (
+              <div className="flex justify-between items-center text-[12px]">
+                <span className="text-[#676E76]">Cross-Branch Specialists</span>
+                <button
+                  onClick={handleToggleBranchAccess}
+                  disabled={togglingBranchAccess}
+                  title="When enabled, this doctor can add specialists from any branch of your clinic during a video call. When disabled, only specialists from their own branch."
+                  className={`font-bold hover:underline disabled:opacity-50 ${doctor.canConnectOtherBranchSpecialists ? "text-[#E84949]" : "text-[#5476FC]"}`}
+                >
+                  {togglingBranchAccess ? "Updating…" : doctor.canConnectOtherBranchSpecialists ? "Disable" : "Enable"}
                 </button>
               </div>
             )}
