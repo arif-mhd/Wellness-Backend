@@ -2,7 +2,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
-import { patientsContainer, clinicsContainer, doctorsContainer, pharmaciesContainer } from "../config/cosmos";
+import { patientsContainer, clinicsContainer, doctorsContainer, pharmaciesContainer, labServicesContainer } from "../config/cosmos";
 
 let defaultOrgIdCache: string | null = null;
 
@@ -114,6 +114,21 @@ export async function getPharmacyIdsForOrg(orgId: string): Promise<string[]> {
     .fetchAll();
 
   return resources.map((p: any) => p.id);
+}
+
+// Same shape again for labs. A lab test has no tenantId of its own — it
+// belongs to a lab (labTests.labId), and the lab carries the tenantId, so the
+// test catalogue is scoped test -> labId -> lab.tenantId. Only approved labs
+// count, matching how GET /api/lab/labs already filters.
+export async function getLabIdsForOrg(orgId: string): Promise<string[]> {
+  const { resources } = await labServicesContainer.items
+    .query({
+      query: "SELECT c.id FROM c WHERE c.tenantId = @orgId AND c.status = 'approved'",
+      parameters: [{ name: "@orgId", value: orgId }],
+    })
+    .fetchAll();
+
+  return resources.map((l: any) => l.id);
 }
 
 // Resolves an organization's branding (currently just its name) by id, for

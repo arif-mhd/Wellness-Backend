@@ -5,6 +5,7 @@ import { requireRole } from "../middleware/requireRole";
 import { labServicesContainer, labTestsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
+import { resolveOrgIdForRegistration } from "../utils/orgScope";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -17,6 +18,7 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       name, email, contactNumber, location, director, manager,
       labLicense, healthAuthorityLicense, accreditationNumber,
       operatingHours, website, description, specializations,
+      orgSlug,
     } = req.body;
 
     if (!name || !email || !contactNumber || !location) {
@@ -24,11 +26,18 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       return;
     }
 
+    // Which white-label org this lab belongs to. A lab registering itself
+    // takes this from the portal's X-Org-Slug header; an admin creating one
+    // by hand is on no brand's portal, so it comes from the form instead.
+    // Omitted means the platform default, so existing callers are unaffected.
+    const tenantId = await resolveOrgIdForRegistration(typeof orgSlug === "string" ? orgSlug : undefined);
+
     const now = new Date().toISOString();
     const labId = uuidv4();
 
     const lab = {
       id: labId,
+      tenantId,
       name, email, contactNumber, location, director, manager,
       labLicense:              labLicense ?? null,
       healthAuthorityLicense:  healthAuthorityLicense ?? null,

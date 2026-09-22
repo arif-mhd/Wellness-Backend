@@ -9,6 +9,8 @@ import { labServicesContainer, labTestsContainer, labBookingsContainer } from ".
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicName } from "./clinicInsurance";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
+import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -28,6 +30,23 @@ router.get("/tests", async (req: Request, res: Response) => {
     let query = "SELECT * FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')";
     const parameters: any[] = [];
 
+    // Scope to this brand's own labs, mirroring the medicine catalogue. A
+    // brand with no approved lab of its own sees no tests rather than the
+    // whole platform's. The clinicId and labId filters below then narrow
+    // within that set — they never widen past it.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+
+    if (orgLabIds.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const { clause: orgClause, parameters: orgParams } = buildInClause("c.labId", orgLabIds);
+    query += ` AND ${orgClause}`;
+    parameters.push(...orgParams);
+
     if (clinicId) {
       const { resources: clinicLabs } = await labServicesContainer.items
         .query({
@@ -41,7 +60,13 @@ router.get("/tests", async (req: Request, res: Response) => {
       }
     }
 
+    // Intersected with the org scope above, so another brand's labId yields
+    // nothing rather than leaking their tests.
     if (labId) {
+      if (!orgLabIds.includes(labId)) {
+        res.json([]);
+        return;
+      }
       query += " AND c.labId = @labId";
       parameters.push({ name: "@labId", value: labId });
     }
@@ -61,11 +86,17 @@ router.get("/tests", async (req: Request, res: Response) => {
 // ─── GET /api/lab/labs ─────────────────────────────────────────────────────────
 // Public — lists approved labs that carry at least one orderable test, for the
 // patient app's "browse by lab" screen. Mirrors GET /api/pharmacy/pharmacies.
-router.get("/labs", async (_req: Request, res: Response) => {
+router.get("/labs", async (req: Request, res: Response) => {
   try {
-    const { resources: labs } = await labServicesContainer.items.query(
-      "SELECT * FROM c WHERE c.status = 'approved'"
-    ).fetchAll();
+    // Scoped the same way as GET /tests above — the two screens have to agree,
+    // or a patient taps a lab card and lands on an empty test list.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+
+    const { resources: labs } = await labServicesContainer.items.query({
+      query: "SELECT * FROM c WHERE c.status = 'approved' AND c.tenantId = @orgId",
+      parameters: [{ name: "@orgId", value: orgId }],
+    }).fetchAll();
 
     const { resources: approvedTests } = await labTestsContainer.items.query(
       "SELECT c.labId FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')"
@@ -126,10 +157,17 @@ router.post("/register", async (req: Request, res: Response) => {
     await UserRoles.addRoleToUser("public", supertokensId, "lab_pending");
 
     const now = new Date().toISOString();
+    // Which white-label org this lab belongs to — the portal it registered
+    // through sends its slug on this header, exactly as pharmacy.ts does.
+    // Absent or unknown resolves to the platform default.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const tenantId = await resolveOrgIdForRegistration(orgSlug);
+
     const labDoc = {
       id:             supertokensId,
       supertokens_id: supertokensId,
       status:         "pending_approval" as const,
+      tenantId,
       email,
       director,
       name,
@@ -480,6 +518,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       consultationDate,   // optional — only when requires_doctor_approval tests in cart
       consultationSlot,
       notes,
+      profileId,          // fallback owner when an item doesn't set its own forPatientId
     } = req.body;
 
     if (!items?.length) {
@@ -513,7 +552,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
         labId:         test.labId,
         labName:       test.labName,
         price:         test.price,
-        forPatientId:  item.forPatientId ?? patientId,
+        forPatientId:  item.forPatientId ?? profileId ?? patientId,
         visitMode:     item.visitMode ?? "Laboratory",
         scheduledAt:   item.scheduledAt ?? null,
         requires_doctor_approval: test.requires_doctor_approval,

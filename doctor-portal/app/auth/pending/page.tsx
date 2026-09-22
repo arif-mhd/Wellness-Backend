@@ -27,8 +27,8 @@ export default function PendingApprovalPage() {
       <div className="relative z-10 w-full max-w-[480px] flex flex-col items-center">
 
         {/* Logo */}
-        <div className="mb-12 select-none">
-          {branding.logoUrl ? (
+        <div className="mb-12 select-none h-[50px]">
+          {!branding.loaded ? null : branding.logoUrl ? (
             <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain" />
           ) : (
             <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain" priority />

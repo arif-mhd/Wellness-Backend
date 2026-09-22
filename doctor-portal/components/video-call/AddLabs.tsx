@@ -60,7 +60,14 @@ export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: A
     (async () => {
       try {
         const clinicParam = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : "";
-        const res = await fetch(`${API_URL}/api/lab/tests${clinicParam}`);
+        // Without this header the test list falls back to the platform default
+        // org, so a white-label doctor would see another brand's labs.
+        const res = await fetch(
+          `${API_URL}/api/lab/tests${clinicParam}`,
+          process.env.NEXT_PUBLIC_ORG_SLUG
+            ? { headers: { "X-Org-Slug": process.env.NEXT_PUBLIC_ORG_SLUG } }
+            : undefined
+        );
         if (res.ok) {
           const data = await res.json();
           const tests = data.map((t: any) => ({ id: t.id, name: t.name, category: t.category, labName: t.labName }));

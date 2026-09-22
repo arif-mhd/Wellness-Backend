@@ -723,6 +723,36 @@ router.patch("/online-status", requireRole("doctor"), async (req: SessionRequest
   }
 });
 
+// ─── PATCH /api/doctors/networking-status ───────────────────────────────────
+// Self-service opt-in for INDEPENDENT doctors only (no clinicId) — whether
+// this doctor is open to connecting with other independent doctors as
+// specialists during a video call. Two independent doctors only see each
+// other in "Add Specialist" if both have opted in (see
+// GET /api/appointments/:id/available-doctors). No-op for clinic-affiliated
+// doctors, whose cross-branch access is controlled by their clinic admin
+// instead (see PATCH /api/clinics/doctors/:id/branch-access).
+router.patch("/networking-status", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  const doctorId = req.session!.getUserId();
+  const { openToNetworking } = req.body;
+  if (typeof openToNetworking !== "boolean") {
+    res.status(400).json({ error: "openToNetworking must be a boolean." });
+    return;
+  }
+  try {
+    const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
+    if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
+    await doctorsContainer.items.upsert({
+      ...doctor,
+      openToNetworking,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ status: "OK", openToNetworking });
+  } catch (err) {
+    console.error("Update networking status error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 
 
 // Shapes a doctor document down to the fields the public/patient-facing

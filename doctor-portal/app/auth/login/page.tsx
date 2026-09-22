@@ -186,7 +186,7 @@ export default function LoginPage() {
 
             {/* Logo */}
             <div className="mb-8 select-none">
-              {branding.logoUrl ? (
+              {!branding.loaded ? null : branding.logoUrl ? (
                 <img
                   src={branding.logoUrl}
                   alt={branding.name}

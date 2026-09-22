@@ -352,8 +352,8 @@ function CompleteProfileContent() {
       <div className="absolute -top-24 -right-24 w-[350px] h-[350px] bg-blue-200/20 rounded-full blur-[100px] pointer-events-none select-none" />
 
       <div className="relative z-10 w-full max-w-[1300px] mx-auto flex flex-col items-center flex-1 justify-start pt-4">
-        <div className="mb-10 flex items-center gap-3 select-none">
-          {branding.logoUrl ? (
+        <div className="mb-10 flex items-center gap-3 select-none h-[50px]">
+          {!branding.loaded ? null : branding.logoUrl ? (
             <img src={branding.logoUrl} alt={branding.name} className="h-[50px] object-contain hover:opacity-90 transition-opacity" />
           ) : (
             <Image src={logoImg} alt={branding.name} width={160} height={50} className="object-contain hover:opacity-90 transition-opacity" priority />

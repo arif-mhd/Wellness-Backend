@@ -616,6 +616,7 @@ router.get("/family", requireRole("patient"), async (req: SessionRequest, res: R
 router.post("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
+    const { idempotencyKey, ...memberFields } = req.body ?? {};
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -624,6 +625,20 @@ router.post("/family", requireRole("patient"), async (req: SessionRequest, res: 
     } catch { /* ignore */ }
 
     const currentMembers = (existing.familyMembers as any[]) ?? [];
+
+    // A resubmit of the same add-member attempt — e.g. the client's first
+    // request actually succeeded but it never saw the response (dropped
+    // connection, backgrounded mid photo-upload) and the user retried —
+    // must hand back the member that's already there instead of creating a
+    // second, duplicate one.
+    if (idempotencyKey) {
+      const already = currentMembers.find((m: any) => m.idempotencyKey === idempotencyKey);
+      if (already) {
+        res.json({ member: already });
+        return;
+      }
+    }
+
     if (currentMembers.length >= MAX_ADDITIONAL_FAMILY_MEMBERS) {
       res.status(400).json({
         error: `You can add up to ${MAX_ADDITIONAL_FAMILY_MEMBERS} family members (5 profiles total including yourself).`,
@@ -634,7 +649,7 @@ router.post("/family", requireRole("patient"), async (req: SessionRequest, res: 
     // uuidv4 rather than a timestamp — Date.now() has only millisecond
     // resolution, so a burst of near-simultaneous requests (e.g. a
     // double-tapped submit button) could otherwise collide on the same id.
-    const member = { ...req.body, id: uuidv4() };
+    const member = { ...memberFields, id: uuidv4(), ...(idempotencyKey ? { idempotencyKey } : {}) };
     const familyMembers = [...currentMembers, member];
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
     res.json({ member });

@@ -23,7 +23,7 @@
 import "dotenv/config";
 import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
-import { clinicsContainer, patientsContainer, pharmaciesContainer } from "../config/cosmos";
+import { clinicsContainer, patientsContainer, pharmaciesContainer, labServicesContainer } from "../config/cosmos";
 
 const APPLY = process.argv.includes("--apply");
 
@@ -58,6 +58,7 @@ async function main() {
   await backfillContainer("clinic", clinicsContainer, defaultOrgId);
   await backfillContainer("patient", patientsContainer, defaultOrgId);
   await backfillContainer("pharmacy", pharmaciesContainer, defaultOrgId);
+  await backfillContainer("lab", labServicesContainer, defaultOrgId);
 
   if (!APPLY) {
     console.log(`Re-run with --apply to write these changes.`);
