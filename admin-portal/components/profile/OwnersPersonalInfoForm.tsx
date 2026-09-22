@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 interface OtherInfoRow {
   id: string;
@@ -37,6 +38,8 @@ export default function OwnersPersonalInfoForm({
   initialEmiratesIdOrPassport = "",
   onSubmit,
 }: OwnersPersonalInfoFormProps) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const ownerIdLabel = identityFieldsForOrg(null, "clinic")[0]?.label ?? "ID";
   const [fullName, setFullName] = useState(initialFullName);
   const [contactNumber, setContactNumber] = useState(initialPhone);
   const [phoneError, setPhoneError] = useState("");
@@ -64,7 +67,7 @@ export default function OwnersPersonalInfoForm({
 
   const handleVerifyOwnerId = () => {
     if (!ownerId.trim()) {
-      setFormError("Enter the Owner/Staff Emirates ID first.");
+      setFormError(`Enter the ${ownerIdLabel} first.`);
       return;
     }
     setFormError("");
@@ -105,7 +108,7 @@ export default function OwnersPersonalInfoForm({
     if (!fullName.trim()) { setFormError("Full name is required."); return; }
     const phoneErr = validatePhone(contactNumber);
     if (phoneErr) { setPhoneError(phoneErr); setFormError(phoneErr); return; }
-    if (!ownerId.trim()) { setFormError("Owner/Staff Emirates ID is required."); return; }
+    if (!ownerId.trim()) { setFormError(`${ownerIdLabel} is required.`); return; }
     if (!email.trim()) { setFormError("Email ID is required."); return; }
     if (!gender) { setFormError("Gender is required."); return; }
     if (!dob) { setFormError("Date of Birth is required."); return; }
@@ -171,7 +174,7 @@ export default function OwnersPersonalInfoForm({
           <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
             <input
               type="text"
-              placeholder="Owner / Staff Emirates ID*"
+              placeholder={`${ownerIdLabel}*`}
               value={ownerId}
               onChange={(e) => { setOwnerId(e.target.value); setOwnerIdVerified(false); }}
               className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit pr-20"

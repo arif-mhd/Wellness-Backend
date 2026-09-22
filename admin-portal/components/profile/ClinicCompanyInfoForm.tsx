@@ -56,6 +56,8 @@ function VerifyField({
 }
 
 export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicCompanyInfoFormProps) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const licenseLabel = identityFieldsForOrg(null, "clinic")[1]?.label ?? "ID";
   const { defaultCurrency } = useOrgCurrency();
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseVerified, setLicenseVerified] = useState(false);
@@ -117,7 +119,7 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
     e.preventDefault();
 
     if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
-    if (!dohLicense.trim()) { setFormError("DOH License is required."); return; }
+    if (!dohLicense.trim()) { setFormError(`${licenseLabel} is required.`); return; }
     if (!address.trim()) { setFormError("Address is required."); return; }
 
     setFormError("");
@@ -157,8 +159,8 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
             <VerifyField placeholder="License Number" value={licenseNumber} onChange={setLicenseNumber} verified={licenseVerified} onVerify={() => handleVerify(setLicenseVerified, licenseNumber, "License Number")} />
           </div>
           <div>
-            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">DOH Lic*</div>
-            <VerifyField placeholder="DOH License" value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
+            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">{licenseLabel}*</div>
+            <VerifyField placeholder={licenseLabel} value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 interface Doctor {
   id: string;
@@ -77,6 +78,7 @@ function DoctorAvatar({ doctor, size = "md" }: { doctor: Doctor; size?: "sm" | "
 }
 
 function ManageDoctorsPageInner() {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetId = searchParams.get("id");
@@ -534,7 +536,7 @@ function ManageDoctorsPageInner() {
               {/* Details */}
               <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-5 mb-6">
                 {[
-                  { label: "Emirates ID",               value: selectedDoctor.emiratesId },
+                  { label: identityFieldsForOrg((selectedDoctor as any)?.tenantId, "doctor")[0]?.label ?? "ID", value: selectedDoctor.emiratesId },
                   { label: "Gender",                    value: selectedDoctor.gender },
                   { label: "Date of Birth",             value: selectedDoctor.dateOfBirth },
                   { label: "Contact Number",            value: selectedDoctor.phone },

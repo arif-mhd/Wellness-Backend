@@ -120,6 +120,7 @@ const DoubleCaret = () => (
 );
 
 export default function PharmacyProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
@@ -372,7 +373,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                     <DetailRow label="Location" value={pharmacy.location || "—"} />
                     <DetailRow label="Contact Number" value={pharmacy.phone} />
                     {pharmacy.emiratesId && (
-                      <DetailRow label="Emirates ID" value={pharmacy.emiratesId} />
+                      <DetailRow label={identityFieldsForOrg((pharmacy as any)?.tenantId, "pharmacy")[0]?.label ?? "ID"} value={pharmacy.emiratesId} />
                     )}
                     <DetailRow
                       label="Email ID"

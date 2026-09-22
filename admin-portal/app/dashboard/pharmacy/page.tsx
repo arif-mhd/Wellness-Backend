@@ -5,6 +5,7 @@ import Pagination from "@/components/Pagination";
 import { useRouter, useSearchParams } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -103,6 +104,7 @@ const StarRating = ({ rating }: { rating: number }) => (
 type ActiveTab = "onboard" | "queue";
 
 function ManagePharmacyPageInner() {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetId = searchParams.get("id");
@@ -606,7 +608,7 @@ function ManagePharmacyPageInner() {
                     </div>
                     {selectedPharmacy.emiratesId && (
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-400 font-semibold">Emirates ID</span>
+                        <span className="text-[11px] text-slate-400 font-semibold">{identityFieldsForOrg((selectedPharmacy as any)?.tenantId, "pharmacy")[0]?.label ?? "ID"}</span>
                         <span className="text-[11px] text-slate-800 font-semibold text-right">{selectedPharmacy.emiratesId}</span>
                       </div>
                     )}

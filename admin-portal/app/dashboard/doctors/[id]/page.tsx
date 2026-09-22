@@ -128,6 +128,7 @@ interface ReviewEntry { id: string; rating: number; comment: string; reviewer: {
 const PALETTE = ["#8b5cf6", "#10b981", "#f59e0b", "#06b6d4", "#ef4444", "#3b82f6", "#ec4899", "#84cc16", "#f97316", "#0ea5e9"];
 
 export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
@@ -333,7 +334,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <div className="space-y-4">
                       {doctor.emiratesId && (
                         <DetailRow
-                          label="Emirates ID"
+                          label={identityFieldsForOrg((doctor as any)?.tenantId, "doctor")[0]?.label ?? "ID"}
                           value={
                             <div className="flex items-center gap-1.5">
                               {doctor.emiratesId}
