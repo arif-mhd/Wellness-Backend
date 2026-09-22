@@ -9,7 +9,8 @@ import { uploadBlob, generateSasUrl } from "../config/blob";
 import { searchRxnorm } from "../services/rxnormService";
 import { resolveClinicName } from "./clinicInsurance";
 import { computeAggregateOrderStatus } from "../utils/pharmacyOrders";
-import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForOrg } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForOrg, getCountryConfigForOrgId } from "../utils/orgScope";
+import { validateIdentityFieldPatterns } from "../config/countries";
 import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
@@ -316,11 +317,23 @@ router.get("/pharmacies", async (req: Request, res: Response) => {
 // Public — called by pharmacy portal signup.
 // Creates a SuperTokens account with "pharmacy_pending" role and saves profile to Cosmos.
 router.post("/register", async (req: Request, res: Response) => {
-  const { password, ownerName, pharmacyName, licenseNumber, location, emiratesId, phone } = req.body;
+  const { password, ownerName, pharmacyName, licenseNumber, location, emiratesId, phone, identityDocuments } = req.body;
   const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
 
   if (!email || !password || !ownerName || !pharmacyName || !licenseNumber || !phone) {
     res.status(400).json({ error: "email, password, ownerName, pharmacyName, licenseNumber and phone are required." });
+    return;
+  }
+
+  // Which org this pharmacy is registering under, resolved early since the
+  // format check below needs the org's country config — same header the
+  // rest of this handler already reads further down.
+  const orgSlugForValidation = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+  const tenantIdForValidation = await resolveOrgIdForRegistration(orgSlugForValidation);
+  const countryConfig = await getCountryConfigForOrgId(tenantIdForValidation);
+  const patternError = validateIdentityFieldPatterns(countryConfig, "pharmacy", { emiratesId }, identityDocuments);
+  if (patternError) {
+    res.status(400).json({ error: patternError });
     return;
   }
 
@@ -342,11 +355,6 @@ router.post("/register", async (req: Request, res: Response) => {
     await UserRoles.addRoleToUser("public", supertokensId, "pharmacy_pending");
 
     const now = new Date().toISOString();
-    // The pharmacy portal's signup form sends its deployment's org slug on
-    // this header (set via NEXT_PUBLIC_ORG_SLUG at build time) — resolves to
-    // the matching org, or the default org if absent/unknown.
-    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
-    const tenantId = await resolveOrgIdForRegistration(orgSlug);
     const pharmacyDoc = {
       id:             supertokensId,
       supertokens_id: supertokensId,
@@ -357,8 +365,9 @@ router.post("/register", async (req: Request, res: Response) => {
       licenseNumber,
       location:       location  || null,
       emiratesId:     emiratesId || null,
+      identityDocuments: identityDocuments ?? {},
       phone,
-      tenantId,
+      tenantId: tenantIdForValidation,
       registeredAt:   now,
       approvedAt:     null,
       approvedBy:     null,
@@ -469,13 +478,22 @@ router.post("/clinic-link-requests/reject", requireRole("pharmacy"), async (req:
 router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
   try {
     const pharmacyId = req.session!.getUserId();
-    const { ownerName, pharmacyName, licenseNumber, phone, location, manager, operatingHours } = req.body;
+    const { ownerName, pharmacyName, licenseNumber, phone, location, manager, operatingHours, emiratesId, identityDocuments } = req.body;
     const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : req.body.email;
 
     const { resource: existing } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read();
     if (!existing) {
       res.status(404).json({ error: "Pharmacy not found" });
       return;
+    }
+
+    if (identityDocuments) {
+      const countryConfig = await getCountryConfigForOrgId(existing.tenantId);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "pharmacy", { emiratesId }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
     }
 
     const updated = {
@@ -488,6 +506,8 @@ router.put("/me", requireRole("pharmacy"), async (req: SessionRequest, res: Resp
       ...(location !== undefined && { location }),
       ...(manager !== undefined && { manager }),
       ...(operatingHours !== undefined && { operatingHours }),
+      ...(emiratesId !== undefined && { emiratesId }),
+      ...(identityDocuments !== undefined && { identityDocuments: { ...existing.identityDocuments, ...identityDocuments } }),
       updatedAt: new Date().toISOString(),
     };
 

@@ -6,7 +6,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgId, getCountryConfigForOrgId } from "../utils/orgScope";
+import { validateIdentityFieldPatterns } from "../config/countries";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -202,7 +203,21 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
     const {
       fullName, name, phone, emiratesId, exrNumber, email, gender, bloodGroup,
       dob, maritalStatus, height, weight, location, language, displayLanguage,
+      // Country-specific identity fields with no dedicated column (Aadhaar,
+      // PAN, etc.) — keyed by the patient's org's country config
+      // identityFields[].key.
+      identityDocuments,
     } = req.body;
+
+    if (identityDocuments) {
+      const orgId = await resolveOrgId(req);
+      const countryConfig = await getCountryConfigForOrgId(orgId);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "patient", { emiratesId }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
+    }
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -218,6 +233,7 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
       ...(phone        !== undefined && { phone }),
       ...(emiratesId   !== undefined && { emiratesId }),
       ...(exrNumber    !== undefined && { exrNumber }),
+      ...(identityDocuments !== undefined && { identityDocuments: { ...(existing as any).identityDocuments, ...identityDocuments } }),
       ...(email        !== undefined && { email }),
       ...(gender       !== undefined && { gender }),
       ...(bloodGroup   !== undefined && { bloodGroup }),

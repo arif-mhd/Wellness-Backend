@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { SUPPORTED_LANGUAGES } from "../utils/languages";
 import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
+import { COUNTRY_CONFIGS } from "../config/countries";
+import { resolveCountryConfigForOrgRow } from "../utils/orgScope";
 
 const router = Router();
 
@@ -12,6 +14,16 @@ const router = Router();
 // fuzzy free-text.
 router.get("/languages", (_req: Request, res: Response) => {
   res.json({ languages: SUPPORTED_LANGUAGES.map((l) => l.name) });
+});
+
+// GET /api/meta/countries
+// Public — every supported country's field-set/currency config, keyed by
+// ISO code. Used by admin-portal's org country picker (an org's country is
+// set once, at org-creation/edit time, by the platform team). Static
+// registry data (src/config/countries.ts) — safe to cache aggressively.
+router.get("/countries", (_req: Request, res: Response) => {
+  res.set("Cache-Control", "public, max-age=3600");
+  res.json({ countries: COUNTRY_CONFIGS });
 });
 
 // GET /api/meta/branding?org=acme
@@ -37,6 +49,8 @@ router.get("/branding", async (req: Request, res: Response) => {
       [org.id]
     );
 
+    const { countryCode, currencyCode, countryConfig } = resolveCountryConfigForOrgRow(org);
+
     res.json({
       branding: {
         slug: org.slug,
@@ -49,8 +63,11 @@ router.get("/branding", async (req: Request, res: Response) => {
         supportEmail: org.support_email,
         supportPhone: org.support_phone,
         personaName: org.persona_name,
+        countryCode,
+        currencyCode,
       },
       enabledFeatures: featureRows.map((r) => r.feature_key),
+      countryConfig,
     });
   } catch (err) {
     console.error("Get branding error:", err);

@@ -2,6 +2,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
+import { CountryConfig, getCountryConfig } from "../config/countries";
 import { patientsContainer, clinicsContainer, doctorsContainer, pharmaciesContainer, labServicesContainer } from "../config/cosmos";
 
 let defaultOrgIdCache: string | null = null;
@@ -140,6 +141,33 @@ export async function getLabIdsForOrg(orgId: string): Promise<string[]> {
 export async function getOrgBrandName(orgId: string): Promise<string> {
   const { rows } = await pool.query(`SELECT name FROM organizations WHERE id = $1`, [orgId]);
   return rows[0]?.name ?? "Wellness";
+}
+
+// Resolves an org row's country config + effective currency, from a row
+// already fetched via `SELECT * FROM organizations` (needs country_code /
+// currency_code columns present, which every row has post-migration).
+// Shared by GET /api/meta/branding and the admin organizations routes so
+// both surface the exact same shape rather than two ad-hoc reimplementations.
+export function resolveCountryConfigForOrgRow(org: { country_code?: string | null; currency_code?: string | null }): {
+  countryCode: string;
+  currencyCode: string;
+  countryConfig: CountryConfig;
+} {
+  const countryConfig = getCountryConfig(org.country_code);
+  return {
+    countryCode: countryConfig.code,
+    currencyCode: org.currency_code || countryConfig.defaultCurrency.code,
+    countryConfig,
+  };
+}
+
+// Resolves just the CountryConfig for a known org id — for routes that
+// already have a tenantId in hand (clinic/patient/doctor docs) and need to
+// know which country's identity-field patterns to validate against, without
+// needing the rest of the org's branding fields.
+export async function getCountryConfigForOrgId(orgId: string): Promise<CountryConfig> {
+  const { rows } = await pool.query(`SELECT country_code FROM organizations WHERE id = $1`, [orgId]);
+  return getCountryConfig(rows[0]?.country_code);
 }
 
 // Resolves an organization's AI chat persona name (e.g. "Dr. Wellness") by

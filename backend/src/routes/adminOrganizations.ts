@@ -7,8 +7,17 @@ import { pool } from "../config/database";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { FEATURE_KEYS, DEFAULT_ORG_SLUG } from "../config/features";
+import { COUNTRY_CODES } from "../config/countries";
+import { resolveCountryConfigForOrgRow } from "../utils/orgScope";
 
 const router = Router();
+
+// Attaches the resolved countryConfig (and normalized countryCode/currencyCode)
+// onto a raw organizations row, for every admin-portal response that returns
+// one — so the portal never has to resolve country -> field-set itself.
+function withCountryConfig(org: any) {
+  return { ...org, ...resolveCountryConfigForOrgRow(org) };
+}
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(requireRole("admin"));
@@ -17,7 +26,7 @@ router.use(requireRole("admin"));
 router.get("/", async (_req: SessionRequest, res: Response) => {
   try {
     const { rows } = await pool.query(`SELECT * FROM organizations ORDER BY created_at ASC`);
-    res.json({ organizations: rows });
+    res.json({ organizations: rows.map(withCountryConfig) });
   } catch (err) {
     console.error("List organizations error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -32,7 +41,7 @@ router.get("/:id", async (req: SessionRequest, res: Response) => {
       res.status(404).json({ error: "Organization not found." });
       return;
     }
-    res.json({ organization: rows[0] });
+    res.json({ organization: withCountryConfig(rows[0]) });
   } catch (err) {
     console.error("Get organization error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -44,19 +53,23 @@ router.get("/:id", async (req: SessionRequest, res: Response) => {
 // admin opts them in explicitly via the entitlements endpoints below,
 // rather than inheriting whatever the default org happens to have enabled.
 router.post("/", async (req: SessionRequest, res: Response) => {
-  const { slug, name, supportEmail, supportPhone, planTier, personaName } = req.body;
+  const { slug, name, supportEmail, supportPhone, planTier, personaName, countryCode, currencyCode } = req.body;
   if (!slug || !name) {
     res.status(400).json({ error: "slug and name are required." });
+    return;
+  }
+  if (countryCode && !COUNTRY_CODES.includes(countryCode)) {
+    res.status(400).json({ error: `Unknown countryCode: ${countryCode}. Supported: ${COUNTRY_CODES.join(", ")}` });
     return;
   }
   const adminId = req.session!.getUserId();
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier, persona_name)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'), COALESCE($6, 'Dr. Wellness'))
+      `INSERT INTO organizations (slug, name, support_email, support_phone, plan_tier, persona_name, country_code, currency_code)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'starter'), COALESCE($6, 'Dr. Wellness'), COALESCE($7, 'AE'), $8)
        RETURNING *`,
-      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null, personaName ?? null]
+      [slug, name, supportEmail ?? null, supportPhone ?? null, planTier ?? null, personaName ?? null, countryCode ?? null, currencyCode ?? null]
     );
     const org = rows[0];
 
@@ -77,7 +90,7 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       entityId: org.id,
     });
 
-    res.status(201).json({ organization: org });
+    res.status(201).json({ organization: withCountryConfig(org) });
   } catch (err: any) {
     if (err.code === "23505") {
       res.status(409).json({ error: "An organization with this slug already exists." });
@@ -96,7 +109,12 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
   const {
     name, primaryColor, secondaryColor, supportEmail, supportPhone,
     appBundleId, playStoreUrl, appStoreUrl, planTier, personaName,
+    countryCode, currencyCode,
   } = req.body;
+  if (countryCode && !COUNTRY_CODES.includes(countryCode)) {
+    res.status(400).json({ error: `Unknown countryCode: ${countryCode}. Supported: ${COUNTRY_CODES.join(", ")}` });
+    return;
+  }
   const adminId = req.session!.getUserId();
 
   try {
@@ -112,10 +130,12 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
          app_store_url   = COALESCE($9, app_store_url),
          plan_tier       = COALESCE($10, plan_tier),
          persona_name    = COALESCE($11, persona_name),
+         country_code    = COALESCE($12, country_code),
+         currency_code   = COALESCE($13, currency_code),
          updated_at      = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName]
+      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName, countryCode ?? null, currencyCode ?? null]
     );
     if (!rows[0]) {
       res.status(404).json({ error: "Organization not found." });
@@ -132,7 +152,7 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
       entityId: id,
     });
 
-    res.json({ organization: rows[0] });
+    res.json({ organization: withCountryConfig(rows[0]) });
   } catch (err) {
     console.error("Update organization error:", err);
     res.status(500).json({ error: "Internal server error." });

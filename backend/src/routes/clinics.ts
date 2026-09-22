@@ -8,7 +8,8 @@ import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
-import { resolveOrgIdForRegistration, resolveOrgIdFromHeader } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getCountryConfigForOrgId } from "../utils/orgScope";
+import { validateIdentityFieldPatterns } from "../config/countries";
 import { getClinicAppointmentsData } from "./clinicAppointments";
 import { getClinicFeedbackData } from "./clinicFeedback";
 
@@ -132,6 +133,7 @@ router.post("/register", async (req: Request, res: Response) => {
     dateOfBirth,
     gender,
     emiratesIdOrPassport,
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !clinicName || !phone) {
@@ -185,6 +187,19 @@ router.post("/register", async (req: Request, res: Response) => {
     const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
     const tenantId = await resolveOrgIdForRegistration(orgSlug);
 
+    // Format-only check on whichever identity fields were actually supplied —
+    // fields stay optional (see validateIdentityFieldPatterns), this just
+    // catches an obviously malformed value (e.g. a PAN typed with the wrong
+    // number of digits) before it's stored.
+    const countryConfig = await getCountryConfigForOrgId(tenantId);
+    const patternError = validateIdentityFieldPatterns(
+      countryConfig, "clinic", { emiratesIdOrPassport }, identityDocuments
+    );
+    if (patternError) {
+      res.status(400).json({ error: patternError });
+      return;
+    }
+
     const now = new Date().toISOString();
     const clinicDoc = {
       id: supertokensId,   // Cosmos id = ST userId
@@ -201,6 +216,10 @@ router.post("/register", async (req: Request, res: Response) => {
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
       emiratesIdOrPassport: emiratesIdOrPassport || null,
+      // Country-specific fields with no dedicated column (PAN, GST, etc.) —
+      // keyed by the country config's identityFields[].key. Empty object by
+      // default, same "no value yet" convention as the fields around it.
+      identityDocuments: identityDocuments || {},
       // Fields filled in after onboarding
       positionInClinic: null,
       languages: null,
@@ -251,6 +270,9 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
     licenseNumber, dohLicense, address, addressProofFileUrl,
     description, city, postalCode, country, website, yearEstablished,
     consultationRates, paymentSettings, bio, clinicImageUrl,
+    // Country-specific business identity fields with no dedicated column
+    // (PAN, GST, etc.) — keyed by the org's country config identityFields[].key.
+    identityDocuments,
     // Timeslots
     slots,
     // Multi-branch (registration-time only — see clinicBranches.ts for
@@ -263,6 +285,17 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
     if (!clinic) {
       res.status(404).json({ error: "Clinic profile not found." });
       return;
+    }
+
+    if (identityDocuments) {
+      const countryConfig = await getCountryConfigForOrgId(clinic.tenantId);
+      const patternError = validateIdentityFieldPatterns(
+        countryConfig, "clinic", { emiratesIdOrPassport }, identityDocuments
+      );
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
     }
 
     // A branch user's personal fields (name, contact info...) live on their
@@ -294,7 +327,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       };
       await clinicsContainer.items.upsert(updatedUser);
 
-      const branchFieldsProvided = [licenseNumber, dohLicense, address, addressProofFileUrl, description, city, postalCode, country, website, yearEstablished, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
+      const branchFieldsProvided = [licenseNumber, dohLicense, identityDocuments, address, addressProofFileUrl, description, city, postalCode, country, website, yearEstablished, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
       const isMainBranchUser = clinic.branchId === clinic.orgId;
       let updatedBranch: any = isMainBranchUser
         ? mainBranchFrom(org)
@@ -307,6 +340,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
           ...org,
           licenseNumber:       licenseNumber       ?? org.licenseNumber,
           dohLicense:          dohLicense          ?? org.dohLicense,
+          identityDocuments:   identityDocuments ? { ...org.identityDocuments, ...identityDocuments } : org.identityDocuments,
           address:             address             ?? org.address,
           addressProofFileUrl: addressProofFileUrl ?? org.addressProofFileUrl,
           description:         description         ?? org.description,
@@ -331,6 +365,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
             ...b,
             licenseNumber:       licenseNumber       ?? b.licenseNumber,
             dohLicense:          dohLicense          ?? b.dohLicense,
+            identityDocuments:   identityDocuments ? { ...b.identityDocuments, ...identityDocuments } : b.identityDocuments,
             address:             address             ?? b.address,
             addressProofFileUrl: addressProofFileUrl ?? b.addressProofFileUrl,
             description:         description         ?? b.description,
@@ -406,6 +441,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       insurances:            insurances            ?? clinic.insurances,
       licenseNumber:         licenseNumber         ?? clinic.licenseNumber,
       dohLicense:            dohLicense            ?? clinic.dohLicense,
+      identityDocuments:     identityDocuments ? { ...clinic.identityDocuments, ...identityDocuments } : clinic.identityDocuments,
       address:               address               ?? clinic.address,
       addressProofFileUrl:   addressProofFileUrl   ?? clinic.addressProofFileUrl,
       description:           description           ?? clinic.description,

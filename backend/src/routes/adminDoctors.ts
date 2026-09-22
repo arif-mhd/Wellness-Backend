@@ -308,6 +308,9 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
     slots,
     degreeFileUrl, specFileUrl, otherFileUrl,
     bankDetails,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.).
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
@@ -357,6 +360,7 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
       emiratesIdFileUrl: emiratesIdFileUrl || null,
       specialty: specialty || null,
       license: license || null,
+      identityDocuments: identityDocuments ?? {},
       experience: experience || null,
       medicalSchool: medicalSchool || null,
       residency: residency || null,

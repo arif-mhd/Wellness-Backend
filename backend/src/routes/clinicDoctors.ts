@@ -169,6 +169,9 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
     specialty, license, qualification, specializations,
     fees, consultationRates, paymentSettings, resumeFileUrl,
     bio,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.).
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
@@ -212,6 +215,7 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       emiratesIdFileUrl: emiratesIdFileUrl || null,
       specialty: specialty || null,
       license: license || null,
+      identityDocuments: identityDocuments ?? {},
       qualification: qualification || null,
       specializations: specializations ?? [],
       fees: fees ?? null,
@@ -339,6 +343,7 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
     fullName, bio, eligibility, specialty, license, qualification, specializations,
     address, languages, fees, consultationRates, paymentSettings,
     avatarUrl, resumeFileUrl, phone, gender, dateOfBirth, bloodGroup, height, weight,
+    identityDocuments,
   } = req.body;
 
   try {
@@ -352,6 +357,7 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
       eligibility: eligibility ?? doctor.eligibility,
       specialty: specialty ?? doctor.specialty,
       license: license ?? doctor.license,
+      identityDocuments: identityDocuments ? { ...doctor.identityDocuments, ...identityDocuments } : doctor.identityDocuments,
       qualification: qualification ?? doctor.qualification,
       specializations: specializations ?? doctor.specializations,
       address: address ?? doctor.address,
