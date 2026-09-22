@@ -28,3 +28,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Cloud SQL Auth Proxy binary (downloaded locally, not source)
+cloud-sql-proxy
