@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDateTime } from "@/lib/appointmentTime";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -61,12 +63,6 @@ function fmt12(t: string) {
   return `${hr12}.${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-function parseLocalISO(iso: string): Date {
-  if (!iso) return new Date();
-  const clean = iso.endsWith("Z") ? iso.slice(0, -1) : iso;
-  return new Date(clean);
-}
-
 function pctChange(current: number, previous: number) {
   if (previous === 0) return current === 0 ? 0 : 100;
   return Math.round(((current - previous) / previous) * 100);
@@ -108,6 +104,7 @@ function Avatar({ name, size = "w-10 h-10" }: { name: string; size?: string }) {
 }
 
 function ClinicHomeContent() {
+  const clinicTz = useClinicTimezone();
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -406,7 +403,7 @@ function ClinicHomeContent() {
                     </div>
                     <div className="flex items-center justify-between gap-3 mt-1">
                       <span className="text-[#676E76] text-xs font-normal tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                        {parseLocalISO(a.scheduledAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}
+                        {formatClinicDateTime(a.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}
                       </span>
                       <button
                         onClick={() => router.push(`/clinic/patients/${a.patientId}`)}

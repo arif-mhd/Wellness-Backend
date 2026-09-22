@@ -4,6 +4,8 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDate, formatClinicTime, formatClinicDateTime, clinicParts, clinicDayKey } from "@/lib/appointmentTime";
 
 interface Appointment {
   id: string;
@@ -74,39 +76,37 @@ const STATUS_COLOR: Record<Appointment["status"], string> = {
 
 function statusLabel(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "Waiting";
-  if (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() < Date.now()) return "Done";
+  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) return "Done";
   if (apt.status === "completed" && !apt.emr) return "EMR Pending";
   return STATUS_LABEL[apt.status];
 }
 
 function statusColor(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "text-[#D92D20]";
-  if (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() < Date.now()) return "text-[#179353]";
+  if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) return "text-[#179353]";
   if (apt.status === "completed" && !apt.emr) return "text-[#F59E0B]";
   return STATUS_COLOR[apt.status];
 }
 
-// scheduledAt is stored as local-time ISO (no Z suffix). Stripping any
-// trailing Z before parsing prevents the browser from treating it as UTC,
-// which would cause a +5:30 offset error for IST users.
-function parseLocalISO(iso: string): Date {
-  if (!iso) return new Date();
-  const clean = iso.endsWith("Z") ? iso.slice(0, -1) : iso;
-  return new Date(clean);
-}
+// scheduledAt is a true UTC instant (see the backend's utils/timezone.ts).
+// Comparisons use it directly; anything DISPLAYED must be formatted in the
+// clinic's own zone via lib/appointmentTime.ts, never the browser's.
 
 function isActiveNow(apt: Appointment) {
-  return apt.status === "in_progress" || (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() >= Date.now());
+  return apt.status === "in_progress" || (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() >= Date.now());
 }
 
-function toLocalInputValue(iso: string) {
-  const clean = iso.endsWith("Z") ? iso.slice(0, -1) : iso;
-  return clean.slice(0, 16);
+function toLocalInputValue(iso: string, timezone: string) {
+  // datetime-local expects "YYYY-MM-DDTHH:mm" as clinic wall-clock time.
+  const p = clinicParts(iso, timezone);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${p.year}-${pad(p.month + 1)}-${pad(p.day)}T${pad(p.hours)}:${pad(p.minutes)}`;
 }
 
 interface BranchOption { id: string; name: string; status: string; }
 
 function ClinicAppointmentsContent() {
+  const clinicTz = useClinicTimezone();
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -166,10 +166,10 @@ function ClinicAppointmentsContent() {
     const now = Date.now();
     return appointments.filter((apt) => {
       if (activeTab === "Upcoming") {
-        const upcoming = apt.status === "in_progress" || (apt.status === "scheduled" && parseLocalISO(apt.scheduledAt).getTime() >= now);
+        const upcoming = apt.status === "in_progress" || (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() >= now);
         if (!upcoming) return false;
       } else if (activeTab === "Past") {
-        const past = apt.status === "completed" || apt.status === "cancelled" || parseLocalISO(apt.scheduledAt).getTime() < now;
+        const past = apt.status === "completed" || apt.status === "cancelled" || new Date(apt.scheduledAt).getTime() < now;
         if (!past) return false;
       }
 
@@ -177,10 +177,10 @@ function ClinicAppointmentsContent() {
       if (activeMode === "Online" && apt.visitType !== "online") return false;
 
       if (timeFilter !== "All") {
-        const d = parseLocalISO(apt.scheduledAt);
+        const d = new Date(apt.scheduledAt);
         const today = new Date();
         if (timeFilter === "Today") {
-          if (d.toDateString() !== today.toDateString()) return false;
+          if (clinicDayKey(d, clinicTz) !== clinicDayKey(today, clinicTz)) return false;
         } else if (timeFilter === "This Week") {
           const weekStart = new Date(today);
           weekStart.setDate(today.getDate() - today.getDay());
@@ -286,7 +286,7 @@ function ClinicAppointmentsContent() {
   // ── Row renderer ────────────────────────────────────────────
   function AppointmentRow({ appt }: { appt: Appointment }) {
     const isSelected = selectedId === appt.id;
-    const dateObj = parseLocalISO(appt.scheduledAt);
+    const scheduledIso = appt.scheduledAt;
     return (
       <div
         onClick={() => {
@@ -319,7 +319,7 @@ function ClinicAppointmentsContent() {
           <div className="flex flex-col text-left min-w-0 pr-2">
             <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
             <span className="text-[#676E76] text-[11px]">
-              {dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {dateObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              {formatClinicDate(scheduledIso, clinicTz, { month: "short", day: "numeric" })} · {formatClinicTime(scheduledIso, clinicTz, { hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
           {/* Status */}
@@ -359,7 +359,7 @@ function ClinicAppointmentsContent() {
               <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time/Diag</span>
               <div className="flex flex-col text-left">
                 <span className="text-[#24292E] text-[12px] font-medium truncate">{appt.primaryDiagnosis}</span>
-                <span className="text-[#676E76] text-[11px]">{dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                <span className="text-[#676E76] text-[11px]">{formatClinicDate(scheduledIso, clinicTz, { month: "short", day: "numeric" })}</span>
               </div>
             </div>
             <div className="flex flex-col min-w-0">
@@ -588,9 +588,9 @@ function ClinicAppointmentsContent() {
                   </div>
                 </div>
                 <p className="text-[#9EA5AD] text-[12px] font-medium">
-                  {parseLocalISO(selectedAppt.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {formatClinicDate(selectedAppt.scheduledAt, clinicTz, { month: "short", day: "numeric", year: "numeric" })}
                   {" · "}
-                  {parseLocalISO(selectedAppt.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                  {formatClinicTime(selectedAppt.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit" })}
                 </p>
                 <a href={`/clinic/patients/${selectedAppt.patientId}${qs}`} className="w-full flex justify-center items-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all">
                   View Profile
@@ -678,7 +678,7 @@ function ClinicAppointmentsContent() {
               {canManage && (
                 <div className="flex flex-col gap-3 xl:mt-1 mt-4">
                   <button
-                    onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt)); setShowRescheduleModal(true); setActionError(""); }}
+                    onClick={() => { setRescheduleValue(toLocalInputValue(selectedAppt.scheduledAt, clinicTz)); setShowRescheduleModal(true); setActionError(""); }}
                     disabled={selectedAppt.status === "cancelled" || selectedAppt.status === "completed"}
                     className="w-full border border-[#C8D0DA] text-[#676E76] text-[12px] font-medium py-2 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
