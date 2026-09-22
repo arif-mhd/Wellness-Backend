@@ -17,6 +17,15 @@ RUN npm run build
 
 FROM node:20-slim
 
+# The Rust engine inside @livekit/rtc-node reads the OS trust store directly
+# rather than Node's bundled CAs, and node:20-slim ships without one — so
+# every outbound TLS connection fails with "no native root CA certificates
+# found" and the agent dies the moment it's dispatched to a room. It works on
+# a dev machine only because the host already has a trust store.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package*.json ./

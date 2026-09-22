@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useBranding } from "@/components/BrandingContext";
 
 type Step = 1 | 2 | 3;
 type AccountType = "pharmacy" | "lab";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const branding = useBranding();
   const [step, setStep]             = useState<Step>(1);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
@@ -103,7 +105,7 @@ export default function RegisterPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 8.5l7 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-marcellus text-[#1a2332]">Wellness Central</h1>
+          <h1 className="text-2xl font-marcellus text-[#1a2332]">{branding.name}</h1>
         </div>
 
         {/* Step tabs */}

@@ -1,4 +1,4 @@
-import { appointmentsContainer } from "../config/cosmos";
+import { appointmentsContainer, appointmentSlotsContainer, queryDocuments } from "../config/cosmos";
 
 // An appointment whose calendar day has fully passed without ever being
 // completed is a missed/abandoned consultation — not a live "in progress"
@@ -43,4 +43,41 @@ export async function autoExpireStaleAppointments<T extends { id: string; status
   });
 
   return appointments;
+}
+
+// One-time-ish startup job: appointments created before the slot-lock
+// mechanism existed have no corresponding document in appointmentSlots, so
+// they aren't actually protected against a double-booking on their slot
+// until this backfills one for them. Safe to run on every boot — for
+// already-locked slots the create() below just 409s and is ignored; it only
+// ever writes for the (shrinking, eventually empty) set of pre-existing
+// appointments that predate this mechanism.
+export async function backfillAppointmentSlotLocks(): Promise<void> {
+  const active = await queryDocuments<{ id: string; doctorId: string; scheduledAt: string }>(
+    appointmentsContainer,
+    { query: "SELECT c.id, c.doctorId, c.scheduledAt FROM c WHERE c.status IN ('scheduled', 'in_progress')" }
+  );
+
+  let created = 0;
+  await Promise.all(
+    active.map(async (apt) => {
+      try {
+        await appointmentSlotsContainer.items.create({
+          id: `${apt.doctorId}__${apt.scheduledAt}`,
+          doctorId: apt.doctorId,
+          scheduledAt: apt.scheduledAt,
+          createdAt: new Date().toISOString(),
+        });
+        created++;
+      } catch (err: any) {
+        if (err?.code !== 409) {
+          console.error(`[backfillAppointmentSlotLocks] Failed for appointment ${apt.id}:`, err);
+        }
+      }
+    })
+  );
+
+  if (created > 0) {
+    console.log(`[backfillAppointmentSlotLocks] Created ${created} missing slot lock(s).`);
+  }
 }
