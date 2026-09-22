@@ -38,7 +38,7 @@ const router = Router();
 // and saves the core registration data to Cosmos DB.
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    const { email, password, fullName, phone, dateOfBirth, gender, emiratesId } =
+    const { email, password, fullName, phone, dateOfBirth, gender, emiratesId, exrNumber, identityDocuments } =
       req.body;
 
     if (!email || !password || !fullName) {
@@ -84,6 +84,18 @@ router.post("/register", async (req: Request, res: Response) => {
     const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
     const tenantId = await resolveOrgIdForRegistration(orgSlug);
 
+    // Country-specific identity documents (PAN/Aadhaar for IN, Emirates ID
+    // for AE) arrive in the generic bag — validate their format against this
+    // org's country before creating the account, same as PUT /profile does.
+    const registrationCountryConfig = await getCountryConfigForOrgId(tenantId);
+    const registrationPatternError = validateIdentityFieldPatterns(
+      registrationCountryConfig, "patient", { emiratesId, exrNumber }, identityDocuments
+    );
+    if (registrationPatternError) {
+      res.status(400).json({ error: registrationPatternError });
+      return;
+    }
+
     // Persist to Cosmos  (patients collection, partition key = /id)
     const patientDoc = {
       id:             supertokensId,
@@ -94,6 +106,8 @@ router.post("/register", async (req: Request, res: Response) => {
       dateOfBirth:    dateOfBirth  ?? "",
       gender:         gender       ?? "",
       emiratesId:     emiratesId   ?? "",
+      exrNumber:      exrNumber    ?? "",
+      identityDocuments: identityDocuments ?? {},
       status:         "active",
       tenantId,
       createdAt:      new Date().toISOString(),

@@ -18,6 +18,8 @@ import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds, hasPermission, getActorPermissionState } from "../utils/clinicScope";
 import { sendPushToUser } from "../utils/pushNotifications";
+import { validateIdentityFieldPatterns } from "../config/countries";
+import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -195,6 +197,17 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
     await UserRoles.addRoleToUser("public", supertokensId, "doctor");
 
     const now = new Date().toISOString();
+  // Country-specific identity documents — validated against the CLINIC's own
+  // country (the doctor doc doesn't exist yet to resolve from).
+  if (identityDocuments) {
+    const countryConfig = await resolveCountryConfigForDoctor({ clinicId });
+    const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+    if (patternError) {
+      res.status(400).json({ error: patternError });
+      return;
+    }
+  }
+
     const doctorDoc = {
       id: supertokensId,
       supertokens_id: supertokensId,
@@ -349,6 +362,18 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
   try {
     const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
+    // Country-specific identity documents (Medical Council Registration for
+    // IN, Emirates ID for AE) go in the generic bag — check their format
+    // against this doctor's own country, same as the clinic/patient routes.
+    if (identityDocuments) {
+      const countryConfig = await resolveCountryConfigForDoctor(doctor);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
+    }
+
 
     const updated = {
       ...doctor,

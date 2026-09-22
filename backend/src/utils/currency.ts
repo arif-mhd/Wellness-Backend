@@ -1,5 +1,5 @@
 import { CurrencyConfig } from "../config/countries";
-import { getCountryConfigForOrgId, getDefaultOrgIdForRegistration } from "./orgScope";
+import { getCountryConfigForOrgId, resolveCountryConfigForDoctor } from "./orgScope";
 import { doctorsContainer } from "../config/cosmos";
 
 // For call sites with an orgId already in hand (e.g. via resolveOrgId(req)
@@ -17,20 +17,7 @@ export async function resolveCurrencyForOrgId(orgId: string): Promise<CurrencyCo
 // an independent doctor with no clinicId. Mirrors resolveTimezoneForDoctor
 // in timezone.ts exactly — same chain, same reasoning.
 export async function resolveCurrencyForDoctor(doctor: { clinicId?: string | null }): Promise<CurrencyConfig> {
-  if (doctor.clinicId) {
-    // Lazy import — same defensive pattern timezone.ts/orgScope.ts already
-    // use for this exact function, keeping the clinicInsurance.ts ->
-    // clinicScope.ts coupling scoped to where it's actually used rather than
-    // a static module-level import.
-    const { loadOrgDocForClinicId } = await import("../routes/clinicInsurance");
-    const org = await loadOrgDocForClinicId(doctor.clinicId);
-    if (org?.tenantId) {
-      const countryConfig = await getCountryConfigForOrgId(org.tenantId);
-      return countryConfig.defaultCurrency;
-    }
-  }
-  const defaultOrgId = await getDefaultOrgIdForRegistration();
-  const countryConfig = await getCountryConfigForOrgId(defaultOrgId);
+  const countryConfig = await resolveCountryConfigForDoctor(doctor);
   return countryConfig.defaultCurrency;
 }
 

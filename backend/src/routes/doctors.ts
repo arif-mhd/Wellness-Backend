@@ -12,6 +12,8 @@ import { loadOrgDocForClinicId } from "./clinicInsurance";
 import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
 import { buildInClause } from "../utils/clinicScope";
 import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor } from "../utils/timezone";
+import { validateIdentityFieldPatterns } from "../config/countries";
+import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -110,6 +112,18 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
     if (!hasDoctorPermission(doctor, "manage_own_profile")) {
       res.status(403).json({ error: "You don't have permission to edit your profile." });
       return;
+    }
+
+    // Country-specific identity documents (Medical Council Registration for
+    // IN, Emirates ID for AE) go in the generic bag — check their format
+    // against this doctor's own country, same as the clinic/patient routes.
+    if (identityDocuments) {
+      const countryConfig = await resolveCountryConfigForDoctor(doctor);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
     }
 
     const updated = {

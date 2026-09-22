@@ -1,5 +1,5 @@
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { getCountryConfigForOrgId, getDefaultOrgIdForRegistration } from "./orgScope";
+import { resolveCountryConfigForDoctor } from "./orgScope";
 import { doctorsContainer } from "../config/cosmos";
 
 // The ONLY place in the codebase that should ever combine a bare
@@ -32,20 +32,7 @@ export function startOfClinicDayUtc(dateStr: string, timezone: string): Date {
 // request/session — a doctor's timezone is intrinsic to their own clinic,
 // not to whoever happens to be asking.
 export async function resolveTimezoneForDoctor(doctor: { clinicId?: string | null }): Promise<string> {
-  if (doctor.clinicId) {
-    // Lazy import — same defensive pattern orgScope.ts already uses for this
-    // exact function, keeping the clinicInsurance.ts -> clinicScope.ts
-    // coupling scoped to where it's actually used rather than a static
-    // module-level import.
-    const { loadOrgDocForClinicId } = await import("../routes/clinicInsurance");
-    const org = await loadOrgDocForClinicId(doctor.clinicId);
-    if (org?.tenantId) {
-      const countryConfig = await getCountryConfigForOrgId(org.tenantId);
-      return countryConfig.timezone;
-    }
-  }
-  const defaultOrgId = await getDefaultOrgIdForRegistration();
-  const countryConfig = await getCountryConfigForOrgId(defaultOrgId);
+  const countryConfig = await resolveCountryConfigForDoctor(doctor);
   return countryConfig.timezone;
 }
 

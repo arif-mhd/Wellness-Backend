@@ -170,6 +170,25 @@ export async function getCountryConfigForOrgId(orgId: string): Promise<CountryCo
   return getCountryConfig(rows[0]?.country_code);
 }
 
+// Resolves the CountryConfig a given doctor's records should be interpreted
+// under — via their clinic's org (the same tenantId chain used for billing and
+// insurance), falling back to the platform default org for an independent
+// doctor with no clinicId. Doesn't need a request/session: a doctor's country
+// is intrinsic to their own clinic, not to whoever happens to be asking.
+//
+// Shared by utils/timezone.ts and utils/currency.ts, and by the doctor routes
+// that validate country-specific identity documents, so the chain exists once.
+export async function resolveCountryConfigForDoctor(doctor: { clinicId?: string | null }): Promise<CountryConfig> {
+  if (doctor?.clinicId) {
+    // Lazy import — keeps the clinicInsurance.ts -> clinicScope.ts coupling
+    // scoped to where it's used, same as resolveOrgIdByEmail below.
+    const { loadOrgDocForClinicId } = await import("../routes/clinicInsurance");
+    const org = await loadOrgDocForClinicId(doctor.clinicId);
+    if (org?.tenantId) return getCountryConfigForOrgId(org.tenantId);
+  }
+  return getCountryConfigForOrgId(await getDefaultOrgIdForRegistration());
+}
+
 // Resolves an organization's AI chat persona name (e.g. "Dr. Wellness") by
 // id — kept separate from getOrgBrandName since the persona name is a
 // distinct per-org field (organizations.persona_name), not derived from the
