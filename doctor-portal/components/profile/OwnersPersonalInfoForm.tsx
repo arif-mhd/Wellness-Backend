@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useIdentityFields, useBranding } from "@/components/BrandingContext";
 
 interface OtherInfoRow {
   id: string;
@@ -54,6 +55,12 @@ export default function OwnersPersonalInfoForm({
   const [fullName, setFullName] = useState(initialFullName);
   const [contactNumber, setContactNumber] = useState(initialPhone);
   const [phoneError, setPhoneError] = useState("");
+  // The clinic owner's identity document is whatever this country calls it —
+  // Emirates ID / Passport in the UAE, PAN in India.
+  const { phone: phoneConfig } = useBranding();
+  const phoneExample = `${phoneConfig.callingCode}${"5".repeat(1)}${"0".repeat(Math.max(0, phoneConfig.digitLength - 1))}`;
+  const clinicIdentityFields = useIdentityFields("clinic");
+  const ownerIdLabel = clinicIdentityFields[0]?.label ?? "Owner / Staff ID";
   const [ownerId, setOwnerId] = useState(initialEmiratesIdOrPassport);
   const [ownerIdVerified, setOwnerIdVerified] = useState(false);
   const [email, setEmail] = useState(initialEmail);
@@ -142,7 +149,7 @@ export default function OwnersPersonalInfoForm({
     if (!fullName.trim()) { setFormError("Full name is required."); return; }
     const phoneErr = validatePhone(contactNumber);
     if (phoneErr) { setPhoneError(phoneErr); setFormError(phoneErr); return; }
-    if (!ownerId.trim()) { setFormError("Owner/Staff Emirates ID is required."); return; }
+    if (!ownerId.trim()) { setFormError(`${ownerIdLabel} is required.`); return; }
     if (!email.trim()) { setFormError("Email ID is required."); return; }
     if (!gender) { setFormError("Gender is required."); return; }
     const dobErr = validateDob(dob);
@@ -199,7 +206,7 @@ export default function OwnersPersonalInfoForm({
           <div className="flex flex-col gap-1">
             <input
               type="tel"
-              placeholder="Contact Number* (e.g. +971501234567)"
+              placeholder={`Contact Number* (e.g. ${phoneExample})`}
               value={contactNumber}
               onChange={handlePhoneChange}
               className={`${inputCls} ${phoneError ? "border border-red-300 bg-red-50" : ""}`}
@@ -211,7 +218,7 @@ export default function OwnersPersonalInfoForm({
           <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
             <input
               type="text"
-              placeholder="Owner / Staff Emirates ID*"
+              placeholder={`${ownerIdLabel}*`}
               value={ownerId}
               onChange={(e) => { setOwnerId(e.target.value); setOwnerIdVerified(false); }}
               className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit pr-20"

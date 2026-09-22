@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import { useBranding } from "@/components/BrandingContext";
 
 // ── Small helpers ──────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ function buildFormData(clinic: Clinic): FormData {
 }
 
 export default function ClinicSettingsPage() {
+  const { phone: phoneConfig } = useBranding();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -329,7 +331,7 @@ export default function ClinicSettingsPage() {
                 <div className="flex flex-col gap-4 flex-1">
                   <EditableFieldRow label="Registration Number" value={cli.registrationNumber || ""} onChange={() => {}} disabled />
                   <EditableFieldRow label="Primary Email ID" value={cli.email || ""} onChange={() => {}} disabled />
-                  <EditableFieldRow label="Contact Number" value={draftContact.phone} onChange={v => setDraftContact(p => ({ ...p, phone: v }))} placeholder="+971 50 123 4567" />
+                  <EditableFieldRow label="Contact Number" value={draftContact.phone} onChange={v => setDraftContact(p => ({ ...p, phone: v }))} placeholder={`${phoneConfig.callingCode} 50 123 4567`} />
                 </div>
                 <div className="mt-auto pt-2">
                   <InlineEditBtns

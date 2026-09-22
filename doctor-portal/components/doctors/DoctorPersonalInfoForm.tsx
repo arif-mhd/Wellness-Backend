@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import { useIdentityFields } from "@/components/BrandingContext";
+import { splitIdentityValues, missingRequiredIdentityField, invalidIdentityField } from "@/lib/identityFields";
 
 interface OtherInfoRow {
   id: string;
@@ -36,7 +38,7 @@ const inputCls =
   "w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] text-[#24292E] outline-none focus:border-[#5476FC] transition-colors bg-white placeholder-[#A7AAB4]";
 const errCls = "border-red-300 bg-red-50 focus:border-red-400";
 
-type FieldErrors = Partial<Record<"firstName" | "lastName" | "emiratesId" | "email" | "phone" | "gender" | "dob", string>>;
+type FieldErrors = Partial<Record<"firstName" | "lastName" | "email" | "phone" | "gender" | "dob", string>>;
 
 export default function DoctorPersonalInfoForm({
   onSubmit,
@@ -54,8 +56,8 @@ export default function DoctorPersonalInfoForm({
 }: DoctorPersonalInfoFormProps) {
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
-  const [emiratesId, setEmiratesId] = useState(initialEmiratesId);
-  const [emiratesIdScanned, setEmiratesIdScanned] = useState(false);
+  const identityFields = useIdentityFields("doctor");
+  const [identityValues, setIdentityValues] = useState<Record<string, string>>({ emiratesId: initialEmiratesId ?? "" });
   const [email, setEmail] = useState(initialEmail);
   const [phone, setPhone] = useState(initialPhone);
   const [gender, setGender] = useState(initialGender);
@@ -108,11 +110,10 @@ export default function DoctorPersonalInfoForm({
     return "";
   };
 
-  const validateField = (field: keyof FieldErrors, values = { firstName, lastName, emiratesId, email, phone, gender, dob }): string => {
+  const validateField = (field: keyof FieldErrors, values = { firstName, lastName, email, phone, gender, dob }): string => {
     switch (field) {
       case "firstName": return values.firstName.trim() ? "" : "First name is required.";
       case "lastName": return values.lastName.trim() ? "" : "Last name is required.";
-      case "emiratesId": return values.emiratesId.trim() ? "" : "Emirates ID is required.";
       case "email": return validateEmailFormat(values.email);
       case "phone": return values.phone.trim() ? "" : "Contact number is required.";
       case "gender": return values.gender ? "" : "Gender is required.";
@@ -152,23 +153,13 @@ export default function DoctorPersonalInfoForm({
   }, [email]);
 
   const isFormValid = useMemo(() => {
-    const values = { firstName, lastName, emiratesId, email, phone, gender, dob };
-    const hasErrors = (["firstName", "lastName", "emiratesId", "email", "phone", "gender", "dob"] as const)
+    const values = { firstName, lastName, email, phone, gender, dob };
+    const hasErrors = (["firstName", "lastName", "email", "phone", "gender", "dob"] as const)
       .some((f) => validateField(f, values));
-    return !hasErrors && emailCheckState !== "taken";
+    const identityError = missingRequiredIdentityField(identityFields, identityValues) || invalidIdentityField(identityFields, identityValues);
+    return !hasErrors && !identityError && emailCheckState !== "taken";
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstName, lastName, emiratesId, email, phone, gender, dob, emailCheckState]);
-
-  const handleScan = () => {
-    if (!emiratesId.trim()) {
-      setFormError("Enter the Emirates ID first.");
-      return;
-    }
-    // No OCR/ID-lookup service exists in this codebase — this just marks the
-    // field as reviewed, same shallow pattern as every other VERIFY button.
-    setFormError("");
-    setEmiratesIdScanned(true);
-  };
+  }, [firstName, lastName, identityValues, identityFields, email, phone, gender, dob, emailCheckState]);
 
   const addOtherInfoRow = () => setOtherInfo((rows) => [...rows, { id: Date.now().toString(), label: "", value: "" }]);
   const updateOtherInfoRow = (id: string, field: "label" | "value", val: string) =>
@@ -178,8 +169,8 @@ export default function DoctorPersonalInfoForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const values = { firstName, lastName, emiratesId, email, phone, gender, dob };
-    const fields = ["firstName", "lastName", "emiratesId", "email", "phone", "gender", "dob"] as const;
+    const values = { firstName, lastName, email, phone, gender, dob };
+    const fields = ["firstName", "lastName", "email", "phone", "gender", "dob"] as const;
     const errors: FieldErrors = {};
     fields.forEach((f) => { const err = validateField(f, values); if (err) errors[f] = err; });
     setFieldErrors(errors);
@@ -199,7 +190,8 @@ export default function DoctorPersonalInfoForm({
       firstName,
       lastName,
       fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
-      emiratesId,
+      ...splitIdentityValues(identityFields, identityValues).legacy,
+      identityDocuments: splitIdentityValues(identityFields, identityValues).identityDocuments,
       email,
       phone,
       gender,
@@ -247,26 +239,17 @@ export default function DoctorPersonalInfoForm({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[12px] font-semibold text-[#24292E]">Emirates ID</label>
-          <div className="flex gap-3">
+        {identityFields.map((field) => (
+          <div key={field.key} className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-semibold text-[#24292E]">{field.label}{field.required ? " *" : ""}</label>
             <input
               type="text"
-              value={emiratesId}
-              onChange={(e) => { setEmiratesId(e.target.value); setEmiratesIdScanned(false); }}
-              onBlur={() => markTouched("emiratesId")}
-              className={`${inputCls} ${touched.emiratesId && fieldErrors.emiratesId ? errCls : ""}`}
+              value={identityValues[field.key] ?? ""}
+              onChange={(e) => setIdentityValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+              className={inputCls}
             />
-            <button
-              type="button"
-              onClick={handleScan}
-              className="shrink-0 h-11 px-8 rounded-xl bg-[#24292E] text-white text-[12px] font-bold tracking-widest hover:bg-black transition-colors shadow-sm"
-            >
-              {emiratesIdScanned ? "SCANNED" : "SCAN"}
-            </button>
           </div>
-          {touched.emiratesId && fieldErrors.emiratesId && <span className="text-red-500 text-[11px] mt-0.5">{fieldErrors.emiratesId}</span>}
-        </div>
+        ))}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="flex flex-col gap-1.5">

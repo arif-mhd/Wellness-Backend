@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useBranding, useIdentityFields } from "@/components/BrandingContext";
 
 interface ClinicCompanyInfoFormProps {
   onSubmit: (data: any) => void;
@@ -69,6 +70,10 @@ export default function ClinicCompanyInfoForm({
 }: ClinicCompanyInfoFormProps) {
   const [licenseNumber, setLicenseNumber] = useState(initialLicenseNumber);
   const [licenseVerified, setLicenseVerified] = useState(false);
+  // "DOH License" is a UAE regulator; India's equivalent is the Clinical
+  // Establishment License. Both come from the country's clinic identity fields.
+  const clinicIdentityFields = useIdentityFields("clinic");
+  const licenseLabel = clinicIdentityFields.find((f) => /licen[cs]e/i.test(f.key))?.label ?? "DOH Lic";
   const [dohLicense, setDohLicense] = useState(initialDohLicense);
   const [dohVerified, setDohVerified] = useState(false);
 
@@ -115,7 +120,7 @@ export default function ClinicCompanyInfoForm({
 
     if (onBranchNameChange && !branchName?.trim()) { setFormError("Branch Name is required."); return; }
     if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
-    if (!dohLicense.trim()) { setFormError("DOH License is required."); return; }
+    if (!dohLicense.trim()) { setFormError(`${licenseLabel} is required.`); return; }
     if (!address.trim()) { setFormError("Address is required."); return; }
 
     setFormError("");
@@ -168,7 +173,7 @@ export default function ClinicCompanyInfoForm({
             <VerifyField placeholder="License Number" value={licenseNumber} onChange={setLicenseNumber} verified={licenseVerified} onVerify={() => handleVerify(setLicenseVerified, licenseNumber, "License Number")} />
           </div>
           <div>
-            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">DOH Lic*</div>
+            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">{licenseLabel}*</div>
             <VerifyField placeholder="DOH License" value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
           </div>
         </div>
