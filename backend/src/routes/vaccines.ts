@@ -5,6 +5,8 @@ import { requireFeature } from "../middleware/requireFeature";
 import { vaccinesContainer, vaccinationBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
+import { resolveOrgId } from "../utils/orgScope";
+import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
 
@@ -90,10 +92,11 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
     await vaccinationBookingsContainer.items.upsert(booking);
 
     const vaccineNames = validatedItems.map((i: any) => i.vaccineName).join(", ");
+    const vaccineCurrency = await resolveCurrencyForOrgId(await resolveOrgId(req));
     logActivity({
       source: "patient",
       action: "Vaccination Booked",
-      details: `Vaccination AED ${total_amount.toFixed(2)} — ${vaccineNames}`,
+      details: `Vaccination ${formatCurrencyText(total_amount, vaccineCurrency)} — ${vaccineNames}`,
       performedBy: "Patient",
       performedById: patientId,
       entityType: "vaccinationBooking",

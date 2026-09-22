@@ -11,6 +11,7 @@ import { notifyClinic } from "./clinicPayments";
 import { loadOrgDocForClinicId } from "./clinicInsurance";
 import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
 import { buildInClause } from "../utils/clinicScope";
+import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor } from "../utils/timezone";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -94,6 +95,10 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
     degreeFileUrl, specFileUrl, otherFileUrl,
     // Payment/bank details
     bankDetails,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.) — keyed by the
+    // doctor's org's country config identityFields[].key.
+    identityDocuments,
   } = req.body;
 
   try {
@@ -125,6 +130,7 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
       emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
       specialty: specialty ?? doctor.specialty,
       license: license ?? doctor.license,
+      identityDocuments: identityDocuments ? { ...doctor.identityDocuments, ...identityDocuments } : doctor.identityDocuments,
       experience: experience ?? doctor.experience,
       medicalSchool: medicalSchool ?? doctor.medicalSchool,
       residency: residency ?? doctor.residency,
@@ -505,8 +511,13 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       return;
     }
 
+    const timezone = await resolveTimezoneForDoctor(doctor);
     const slots: any[] = doctor.slots ?? [];
-    const dayOfWeek = new Date(date + "T12:00:00Z").getUTCDay();
+    // Noon anchor avoids DST-transition edge cases when computing which
+    // calendar day-of-week this date is, in the clinic's own timezone —
+    // not the server's (Cloud Run runs in UTC, which silently matched by
+    // coincidence for AE/IN before, since noon UTC is unambiguous).
+    const dayOfWeek = utcToZonedTime(zonedTimeToUtc(date, "12:00", timezone), timezone).getDay();
     const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
 
     if (activeDaySlots.length === 0) {
@@ -530,7 +541,7 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
         const m = (cursor % 60).toString().padStart(2, "0");
 
         // Check if slot falls in any scheduled absences
-        const slotStart = new Date(`${date}T${h}:${m}:00.000Z`);
+        const slotStart = zonedTimeToUtc(date, `${h}:${m}`, timezone);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
         const absences = doctor.absences ?? [];
         const isAbsent = absences.some((abs: any) => {
@@ -553,9 +564,11 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     const uniqueIntervals = Array.from(new Set(intervals)).sort();
 
-    // Find booked slots for this date
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
+    // Find booked slots for this date — bounds are the CLINIC's local day,
+    // converted to true UTC instants (not the calendar-UTC day, which would
+    // be wrong by the clinic's offset).
+    const dayStart = startOfClinicDayUtc(date, timezone).toISOString();
+    const dayEnd = new Date(zonedTimeToUtc(date, "23:59", timezone).getTime() + 59_999).toISOString();
 
     const booked = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT c.scheduledAt FROM c
@@ -572,8 +585,8 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     const bookedSet = new Set(
       booked.map((b: any) => {
-        const d = new Date(b.scheduledAt);
-        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+        const local = utcToZonedTime(new Date(b.scheduledAt), timezone);
+        return `${local.getHours().toString().padStart(2, "0")}:${local.getMinutes().toString().padStart(2, "0")}`;
       })
     );
 
