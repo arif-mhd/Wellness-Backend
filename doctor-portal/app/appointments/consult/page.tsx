@@ -39,6 +39,18 @@ function mediaErrorMessage(e: any, device: "camera" | "microphone"): string {
   }
 }
 
+// A device/permission failure can also surface from room.connect() itself,
+// which otherwise reports as a generic "Connection error". Detect it so the
+// doctor is told what to actually fix.
+function isMediaPermissionError(e: any): boolean {
+  const name = e?.name;
+  if (name === "NotAllowedError" || name === "PermissionDeniedError" ||
+      name === "NotReadableError" || name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return true;
+  }
+  return /permission|denied|camera|microphone|getusermedia/i.test(String(e?.message ?? ""));
+}
+
 interface ChatMsg { id: string; sender: "you" | "patient"; name: string; text: string; time: string; }
 
 interface RemoteVideoTile {
@@ -401,7 +413,14 @@ function ConsultRoom() {
           }
         }
       } catch (e: any) {
-        if (!cancelled) setError(`Connection error: ${e?.message}`);
+        if (cancelled) return;
+        if (isMediaPermissionError(e)) {
+          // Don't bury a permission problem under "Connection error" — the
+          // doctor can only act on it if we name the device.
+          setMediaError(mediaErrorMessage(e, /camera/i.test(String(e?.message ?? "")) ? "camera" : "microphone"));
+        } else {
+          setError(`Connection error: ${e?.message}`);
+        }
       }
     }
 
