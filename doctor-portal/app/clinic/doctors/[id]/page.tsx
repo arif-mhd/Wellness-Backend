@@ -8,6 +8,8 @@ import { useClinicPermissions } from "@/lib/useClinicPermissions";
 import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDate, formatClinicTime } from "@/lib/appointmentTime";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
@@ -174,6 +176,7 @@ function StarRating({ rating, size = 12 }: { rating: number; size?: number }) {
 const inputCls = "h-8 border border-[#D6D9E0] text-[11px] font-medium text-center text-[#24292E] outline-none focus:border-[#5476FC] rounded-sm px-2 bg-white";
 
 function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
+  const currency = useCurrency();
   const clinicTz = useClinicTimezone();
   const { id } = use(params);
   const searchParams = useSearchParams();
@@ -700,7 +703,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                 <div className="flex flex-col gap-2">
                   {[
                     { label: "Location", val: editing ? null : (doctor.address ?? "—"), edit: editing ? <input value={eAddress} onChange={(e) => setEAddress(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
-                    { label: "Consultation Fees", val: editing ? null : (doctor.fees != null ? `$${doctor.fees}` : "—"), edit: editing ? <input value={eFees} onChange={(e) => setEFees(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
+                    { label: "Consultation Fees", val: editing ? null : (doctor.fees != null ? formatCurrency(doctor.fees, currency) : "—"), edit: editing ? <input value={eFees} onChange={(e) => setEFees(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
                     { label: "Contact Number", val: editing ? null : (doctor.phone ?? "—"), edit: editing ? <input value={ePhone} onChange={(e) => setEPhone(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
                     { label: "Office Phone", val: "—" },
                     { label: "Languages", val: editing ? null : formatLanguages(doctor.languages), edit: editing ? <input value={eLanguages} onChange={(e) => setELanguages(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },

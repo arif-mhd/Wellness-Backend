@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface Slot {
   dayOfWeek: number;
@@ -132,6 +134,7 @@ const TIMING_DAYS = [
 ];
 
 function ManageDoctorsContent() {
+  const currency = useCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -493,7 +496,7 @@ function ManageDoctorsContent() {
                   { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
                   { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
                   { label: "Location", val: selectedDoctor.address ?? "—" },
-                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
+                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? formatCurrency(selectedDoctor.fees, currency) : "—" },
                   { label: "Email", val: selectedDoctor.email ?? "—" },
                   { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
                   { label: "Office Phone", val: "—" },

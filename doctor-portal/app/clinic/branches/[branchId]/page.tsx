@@ -7,6 +7,8 @@ import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDate } from "@/lib/appointmentTime";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface TrendPoint { label: string; count: number; }
 
@@ -163,6 +165,7 @@ const TABS = ["Users/Managers", "Doctors", "Appointments", "Licenses", "Timings"
 
 export default function BranchDetailPage({ params }: { params: Promise<{ branchId: string }> }) {
   const clinicTz = useClinicTimezone();
+  const currency = useCurrency();
   const { branchId } = use(params);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -885,7 +888,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                   { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
                   { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
                   { label: "Location", val: selectedDoctor.address ?? "—" },
-                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
+                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? formatCurrency(selectedDoctor.fees, currency) : "—" },
                   { label: "Email", val: selectedDoctor.email ?? "—" },
                   { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
                   { label: "Languages", val: formatLanguages(selectedDoctor.languages) },
