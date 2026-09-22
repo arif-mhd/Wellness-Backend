@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 const EMIRATES = [
   { key: "AUH", city: "Abu Dhabi" },
@@ -122,6 +124,7 @@ function buildFormData(doc: Doctor): FormData {
 }
 
 export default function ProfilePage() {
+  const currency = useCurrency();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -223,7 +226,7 @@ export default function ProfilePage() {
 
   const displayFee = (key: string) => {
     const v = fd.feesPerEmirate[key];
-    return v ? `AED ${v}.00` : "AED —";
+    return v ? formatCurrency(v, currency) : `${currency.symbol} —`;
   };
 
   return (
@@ -513,7 +516,7 @@ export default function ProfilePage() {
           {!editFees && <EditBtn onClick={() => { setDraftFees({ ...fd.feesPerEmirate }); setEditFees(true); }} />}
         </div>
         <div className="bg-white rounded-xl p-8 border border-white">
-          <span className="text-[#24292E] text-sm font-medium block mb-4">Consultation Fee (AED)</span>
+          <span className="text-[#24292E] text-sm font-medium block mb-4">Consultation Fee ({currency.code})</span>
           {editFees ? (
             <>
               <div className="flex flex-col gap-3 max-w-xs">

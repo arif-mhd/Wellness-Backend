@@ -7,17 +7,11 @@ import { apiFetch } from "@/lib/apiFetch";
 import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or display
-// formatting silently shifts by the browser's timezone offset.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDateTime } from "@/lib/appointmentTime";
 
 function CompleteEmrForm() {
+  const clinicTz = useClinicTimezone();
   const searchParams  = useSearchParams();
   const router        = useRouter();
   const appointmentId = searchParams.get("appointmentId") ?? "";
@@ -176,7 +170,7 @@ function CompleteEmrForm() {
           <p className="text-gray-400 text-[10px]">
             {mode === "live"
               ? (scheduledAt
-                  ? parseLocalTime(scheduledAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                  ? formatClinicDateTime(scheduledAt, clinicTz, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
                   : "Fill in the clinical record for this visit, then mark it complete.")
               : "This consultation has already ended. Fill in and save the clinical record below."}
           </p>

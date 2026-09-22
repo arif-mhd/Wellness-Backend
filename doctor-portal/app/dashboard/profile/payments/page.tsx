@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 const BANKS = [
   {
@@ -36,6 +38,7 @@ function RadioCircle({ selected }: { selected: boolean }) {
 }
 
 export default function PaymentsPage() {
+  const currency = useCurrency();
   const [primaryBank, setPrimaryBank] = useState("abc");
   const [banks, setBanks] = useState(BANKS);
 
@@ -93,14 +96,14 @@ export default function PaymentsPage() {
         {/* Stat cards */}
         <div className="flex flex-col sm:flex-row gap-6">
           {[
-            { label: "Earnings this month", value: "AED 6,000.00" },
-            { label: "Total Earnings",      value: "AED 60,000.00" },
-            { label: "Withdrawn",           value: "AED 60,000.00" },
-          ].map(({ label, value }) => (
+            { label: "Earnings this month", amount: 6000 },
+            { label: "Total Earnings",      amount: 60000 },
+            { label: "Withdrawn",           amount: 60000 },
+          ].map(({ label, amount }) => (
             <div key={label} className="bg-white border border-[#EBEEF5] rounded-[12px] p-6 flex flex-col gap-2 flex-1 shadow-sm">
               <span className="text-[#676E76] text-[13px] font-normal">{label}</span>
               <span className="text-[#24292E] text-[24px] font-medium tracking-tight mt-1 leading-none">
-                {value}
+                {formatCurrency(amount.toFixed(2), currency)}
               </span>
             </div>
           ))}

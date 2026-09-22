@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { clinicDayKey, formatClinicDate, formatClinicTime } from "@/lib/appointmentTime";
 
 interface Appointment {
   id: string;
@@ -13,15 +15,6 @@ interface Appointment {
   reason: string;
   scheduledAt: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
-}
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or hour/minute
-// reads and display formatting silently shift by the browser's timezone.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
 }
 
 function Avatar({ name }: { name: string }) {
@@ -36,6 +29,7 @@ function Avatar({ name }: { name: string }) {
 // own modal + PUT /api/appointments/:id/reschedule) — this tab deep-links
 // there with the appointment pre-selected instead of duplicating that flow.
 export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
+  const clinicTz = useClinicTimezone();
   const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,8 +55,8 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
     return appointments
       .filter((a) => a.status !== "cancelled")
       .filter((a) => {
-        const d = parseLocalTime(a.scheduledAt);
-        if (quickFilter === "today" && d.toDateString() !== now.toDateString()) return false;
+        const d = new Date(a.scheduledAt);
+        if (quickFilter === "today" && clinicDayKey(d, clinicTz) !== clinicDayKey(now, clinicTz)) return false;
         if (quickFilter === "week") {
           const weekStart = new Date(now);
           weekStart.setDate(now.getDate() - now.getDay());
@@ -173,7 +167,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
                     </span>
                     <span className="text-[12px] sm:text-[11px] text-gray-400 truncate">Reason: {a.reason || "—"}</span>
                     <span className="text-[12px] text-gray-500 sm:hidden mt-1 font-medium">
-                      {parseLocalTime(a.scheduledAt).toLocaleDateString("en-GB")}, {parseLocalTime(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                      {formatClinicDate(a.scheduledAt, clinicTz, { day: "2-digit", month: "2-digit", year: "numeric" })}, {formatClinicTime(a.scheduledAt, clinicTz, { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
                 </div>
@@ -181,7 +175,7 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
                 {/* Date/Time Column */}
                 <div className="hidden sm:flex justify-center flex-1 sm:basis-1/3 shrink-0">
                   <span className="text-[12px] text-gray-500 whitespace-nowrap">
-                    {parseLocalTime(a.scheduledAt).toLocaleDateString("en-GB")}, {parseLocalTime(a.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    {formatClinicDate(a.scheduledAt, clinicTz, { day: "2-digit", month: "2-digit", year: "numeric" })}, {formatClinicTime(a.scheduledAt, clinicTz, { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
 

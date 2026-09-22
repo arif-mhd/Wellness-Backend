@@ -20,16 +20,36 @@ export type FeatureKey =
   | "articles"
   | "sos";
 
+// Mirrors backend/src/config/countries.ts's CurrencyConfig shape — duplicated
+// here (no shared package between this portal and the backend) rather than
+// imported, same convention pharmacy-portal already uses for its own copy of
+// CountryConfig. Keep in sync by hand if the backend shape changes.
+export interface CurrencyConfig {
+  code: string;
+  symbol: string;
+  position: "prefix" | "suffix";
+}
+
 interface Branding {
   name: string;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
   // Every feature enabled until the branding fetch resolves (or if it never
   // does) — an org with nothing configured, or a fetch failure, must never
   // hide sidebar items that were already visible before this existed. See
   // hasFeature() below.
   enabledFeatures: FeatureKey[];
+  // Same UAE-shaped default the portal has always assumed — used until the
+  // branding fetch resolves or on failure, so a network blip degrades to
+  // "today's behavior" instead of showing an unlabeled/wrong currency.
+  currency: CurrencyConfig;
+  // IANA zone every appointment time in this portal is displayed in. The
+  // clinic's own zone is canonical — never the viewing browser's — so a
+  // doctor logging in from abroad still sees their clinic's schedule.
+  timezone: string;
   // False until the branding fetch settles. Anything showing a logo should
   // render a placeholder while this is false rather than the bundled default,
   // otherwise a white-label portal flashes the platform's own logo before
@@ -43,7 +63,10 @@ const ALL_FEATURES: FeatureKey[] = [
   "ai_chat", "articles", "sos",
 ];
 
-const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, enabledFeatures: ALL_FEATURES, loaded: false };
+const FALLBACK_CURRENCY: CurrencyConfig = { code: "AED", symbol: "AED", position: "prefix" };
+const FALLBACK_TIMEZONE = "Asia/Dubai";
+
+const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, supportEmail: null, supportPhone: null, enabledFeatures: ALL_FEATURES, currency: FALLBACK_CURRENCY, timezone: FALLBACK_TIMEZONE, loaded: false };
 
 const BrandingContext = createContext<Branding>(DEFAULT_BRANDING);
 
@@ -78,12 +101,19 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       .then((data) => {
         if (cancelled) return;
         const b = data.branding ?? {};
+        const defaultCurrency: CurrencyConfig | undefined = data.countryConfig?.defaultCurrency;
         const resolved: Branding = {
           name: b.name || DEFAULT_BRANDING.name,
           logoUrl: b.logoUrl || null,
           primaryColor: b.primaryColor || null,
           secondaryColor: b.secondaryColor || null,
+          supportEmail: b.supportEmail || null,
+          supportPhone: b.supportPhone || null,
           enabledFeatures: Array.isArray(data.enabledFeatures) ? data.enabledFeatures : ALL_FEATURES,
+          currency: defaultCurrency
+            ? { code: b.currencyCode || defaultCurrency.code, symbol: defaultCurrency.symbol, position: defaultCurrency.position }
+            : FALLBACK_CURRENCY,
+          timezone: data.countryConfig?.timezone || FALLBACK_TIMEZONE,
           loaded: true,
         };
         setBranding(resolved);
@@ -113,4 +143,16 @@ export function useBranding(): Branding {
 export function useFeatures(): { enabledFeatures: FeatureKey[]; hasFeature: (key: FeatureKey) => boolean } {
   const { enabledFeatures } = useContext(BrandingContext);
   return { enabledFeatures, hasFeature: (key: FeatureKey) => enabledFeatures.includes(key) };
+}
+
+// Convenience hook for anywhere an amount is displayed — see lib/currency.ts
+// for the formatCurrency() helper this is meant to be paired with.
+export function useCurrency(): CurrencyConfig {
+  return useContext(BrandingContext).currency;
+}
+
+// Convenience hook for anywhere an appointment time is displayed — see
+// lib/appointmentTime.ts for the formatters this is meant to be paired with.
+export function useClinicTimezone(): string {
+  return useContext(BrandingContext).timezone;
 }

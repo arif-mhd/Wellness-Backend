@@ -4,16 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import { apiFetch } from "@/lib/apiFetch";
 import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or display
-// formatting (and the reschedule date prefill below) silently shifts by the
-// browser's timezone offset.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { clinicDayKey, clinicParts } from "@/lib/appointmentTime";
 
 // "YYYY-MM-DD" built from local getters — NOT `.toISOString()`, which would
 // re-convert through UTC and risk shifting the calendar day again.
@@ -116,6 +108,7 @@ const getAge = (dobString: string | null) => {
 };
 
 export default function ScheduleAbsencesView() {
+  const clinicTz = useClinicTimezone();
   const [activeRange, setActiveRange] = useState<"Day" | "Week">("Week");
   const [activeDayOfWeek, setActiveDayOfWeek] = useState<number>(new Date().getDay());
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
@@ -390,7 +383,7 @@ export default function ScheduleAbsencesView() {
   // ── Reschedule a single conflicting appointment ──────────────────────────
   const openReschedule = (appt: any) => {
     setReschedulingAppt(appt);
-    setRescheduleDate(toLocalDateInputValue(parseLocalTime(appt.scheduledAt)));
+    setRescheduleDate(clinicDayKey(appt.scheduledAt, clinicTz));
     setRescheduleTime("");
     setRescheduleSlots([]);
   };
@@ -1014,7 +1007,7 @@ export default function ScheduleAbsencesView() {
                         className="text-[10px] font-semibold text-[#E05252]"
                         style={{ fontFamily: "Outfit, sans-serif" }}
                       >
-                        {formatPillDate(parseLocalTime(apt.scheduledAt))}
+                        {formatPillDate(new Date(apt.scheduledAt))}
                       </span>
                     </div>
                     <button
@@ -1127,7 +1120,7 @@ export default function ScheduleAbsencesView() {
             </div>
 
             <p className="text-[#9EA5AD] text-[11px] -mt-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Currently: {formatPillDate(parseLocalTime(reschedulingAppt.scheduledAt))}
+              Currently: {formatPillDate(new Date(reschedulingAppt.scheduledAt))}
             </p>
 
             <div className="flex flex-col gap-2">

@@ -6,16 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
 import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or display
-// formatting and the isActiveNow comparison against Date.now() silently
-// shift by the browser's timezone offset.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDate, formatClinicTime } from "@/lib/appointmentTime";
 
 interface Slot { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean; }
 
@@ -114,7 +106,7 @@ function statusColor(c: Consultation) {
   return "text-[#5476FC]";
 }
 function isActiveNow(c: Consultation) {
-  return c.status === "in_progress" || (c.status === "scheduled" && parseLocalTime(c.scheduledAt).getTime() >= Date.now());
+  return c.status === "in_progress" || (c.status === "scheduled" && new Date(c.scheduledAt).getTime() >= Date.now());
 }
 
 function fmt12(t: string) {
@@ -181,6 +173,7 @@ function StarRating({ rating, size = 12 }: { rating: number; size?: number }) {
 const inputCls = "h-8 border border-[#D6D9E0] text-[11px] font-medium text-center text-[#24292E] outline-none focus:border-[#5476FC] rounded-sm px-2 bg-white";
 
 function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
+  const clinicTz = useClinicTimezone();
   const { id } = use(params);
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -889,8 +882,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                         <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
                         <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                         <div className="flex flex-col gap-0.5 shrink-0">
-                          <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{parseLocalTime(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
-                          <span className="text-[11px] text-[#676E76]">{parseLocalTime(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                          <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{formatClinicTime(c.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit" })}</span></span>
+                          <span className="text-[11px] text-[#676E76]">{formatClinicDate(c.scheduledAt, clinicTz, { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
                         </div>
                         <span className={`text-[12px] font-medium shrink-0 ${statusColor(c)}`}>{statusLabel(c)}</span>
                         <div className="flex items-center gap-3 shrink-0">
@@ -919,8 +912,8 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                       <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
                       <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                       <div className="flex flex-col gap-0.5 shrink-0">
-                        <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{parseLocalTime(c.scheduledAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></span>
-                        <span className="text-[11px] text-[#676E76]">{parseLocalTime(c.scheduledAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
+                        <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{formatClinicTime(c.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit" })}</span></span>
+                        <span className="text-[11px] text-[#676E76]">{formatClinicDate(c.scheduledAt, clinicTz, { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
                       </div>
                       <span className={`text-[12px] font-medium shrink-0 ${statusColor(c)}`}>{statusLabel(c)}</span>
                       <button onClick={(e) => { e.stopPropagation(); setSelectedConsultId(c.id); }} className="flex items-center gap-1 text-[12px] font-medium text-[#24292E] hover:text-[#5476FC] transition-colors shrink-0">

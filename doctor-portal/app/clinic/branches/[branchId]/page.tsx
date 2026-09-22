@@ -5,15 +5,8 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or display
-// formatting silently shifts by the browser's timezone offset.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDate } from "@/lib/appointmentTime";
 
 interface TrendPoint { label: string; count: number; }
 
@@ -169,6 +162,7 @@ const DOC_COL = { name: "190px", cons1: "90px", cons2: "90px", avg: "90px", pres
 const TABS = ["Users/Managers", "Doctors", "Appointments", "Licenses", "Timings", "Insurances", "Payments", "Analytics", "Rating and Performance"];
 
 export default function BranchDetailPage({ params }: { params: Promise<{ branchId: string }> }) {
+  const clinicTz = useClinicTimezone();
   const { branchId } = use(params);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -952,7 +946,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     </div>
                   </div>
                   <span className="text-[12px] text-[#676E76]">
-                    {parseLocalTime(a.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {formatClinicDate(a.scheduledAt, clinicTz, { month: "short", day: "numeric" })}
                   </span>
                 </div>
               ))}

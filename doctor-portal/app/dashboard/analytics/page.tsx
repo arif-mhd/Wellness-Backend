@@ -7,20 +7,13 @@ import AllConsultations from "@/components/analytics/AllConsultations";
 import PatientsOutcome from "@/components/analytics/PatientsOutcome";
 import DiagnosticsStatus from "@/components/analytics/DiagnosticsStatus";
 import ScreeningRecommendations from "@/components/analytics/ScreeningRecommendations";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { clinicParts } from "@/lib/appointmentTime";
 
 interface TaskCounts {
   upcomingConsultations: number;
   pendingEmr: number;
   total: number;
-}
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or month/year
-// bucketing near a month boundary can silently misattribute revenue.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
 }
 
 function pctChange(today: number, yesterday: number): { value: number; direction: "up" | "down" | "none" } {
@@ -33,6 +26,7 @@ function pctChange(today: number, yesterday: number): { value: number; direction
 }
 
 export default function AnalyticsPage() {
+  const clinicTz = useClinicTimezone();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [feedback, setFeedback] = useState<any[]>([]);
   const [taskCounts, setTaskCounts] = useState<TaskCounts>({ upcomingConsultations: 0, pendingEmr: 0, total: 0 });
@@ -107,8 +101,8 @@ export default function AnalyticsPage() {
   const completedThisMonth = appointments.filter((a) => {
     if (a.status !== "completed" && a.status !== "Completed") return false;
     if (!a.scheduledAt) return false;
-    const d = parseLocalTime(a.scheduledAt);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    const d = clinicParts(a.scheduledAt, clinicTz);
+    return d.year === currentYear && d.month === currentMonth;
   });
   const revenueThisMonth = completedThisMonth.reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
 
@@ -119,8 +113,8 @@ export default function AnalyticsPage() {
   const completedPrevMonth = appointments.filter((a) => {
     if (a.status !== "completed" && a.status !== "Completed") return false;
     if (!a.scheduledAt) return false;
-    const d = parseLocalTime(a.scheduledAt);
-    return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
+    const d = clinicParts(a.scheduledAt, clinicTz);
+    return d.year === prevYear && d.month === prevMonth;
   });
   const revenuePrevMonth = completedPrevMonth.reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
 

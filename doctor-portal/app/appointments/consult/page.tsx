@@ -14,6 +14,8 @@ import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN } from "@/components/video-call/AddDietPlan";
 import EhrPanel from "@/components/video-call/EhrPanel";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -74,6 +76,7 @@ function StarRating({ rating }: { rating: number }) {
 function ConsultRoom() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const currency = useCurrency();
   const appointmentId = searchParams.get("appointmentId") ?? "";
   const patientName = searchParams.get("patientName") ?? "Patient";
 
@@ -919,7 +922,7 @@ function ConsultRoom() {
             <div className="divide-y divide-gray-100">
               <div className="flex justify-between py-2.5 text-xs">
                 <span className="text-gray-500">Consultation Fee</span>
-                <span className="text-[#24292e] font-semibold">{selectedSpecialist.fees ? `AED ${selectedSpecialist.fees}` : "AED 200.00"}</span>
+                <span className="text-[#24292e] font-semibold">{formatCurrency(selectedSpecialist.fees ?? 200, currency)}</span>
               </div>
               <div className="flex justify-between py-2.5 text-xs">
                 <span className="text-gray-500">Specialty</span>
@@ -1466,7 +1469,7 @@ function ConsultRoom() {
                         <p className="text-[#24292e] text-xs font-semibold truncate">{doc.fullName}</p>
                         <p className="text-gray-400 text-[10px] truncate">{doc.specialty}</p>
                         <StarRating rating={doc.rating} />
-                        {doc.fees && <p className="text-[10px] text-gray-400 mt-0.5">AED {doc.fees}</p>}
+                        {doc.fees && <p className="text-[10px] text-gray-400 mt-0.5">{formatCurrency(doc.fees, currency)}</p>}
                       </div>
                       <button onClick={() => handleSelectDoctor(doc)}
                         className="flex-shrink-0 h-7 px-4 rounded-full text-[10px] font-semibold border border-gray-200 text-gray-600 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">
