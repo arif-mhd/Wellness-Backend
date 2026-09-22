@@ -5,7 +5,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
-import { useClinicTimezone } from "@/components/BrandingContext";
+import { useClinicTimezone, useIdentityFields } from "@/components/BrandingContext";
 import { formatClinicDate } from "@/lib/appointmentTime";
 import { useCurrency } from "@/components/BrandingContext";
 import { formatCurrency } from "@/lib/currency";
@@ -165,6 +165,7 @@ const TABS = ["Users/Managers", "Doctors", "Appointments", "Licenses", "Timings"
 
 export default function BranchDetailPage({ params }: { params: Promise<{ branchId: string }> }) {
   const clinicTz = useClinicTimezone();
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
   const currency = useCurrency();
   const { branchId } = use(params);
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -667,7 +668,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-semibold text-[#24292E]">Emirates ID</label>
+                    <label className="text-[11px] font-semibold text-[#24292E]">{doctorIdLabel}</label>
                     <input value={editEmiratesId} onChange={(e) => setEditEmiratesId(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -705,7 +706,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     { label: "Name", val: selectedUser.fullName },
                     { label: "Phone", val: selectedUser.phone },
                     { label: "Mail Id", val: selectedUser.email },
-                    { label: "Emirates ID", val: selectedUser.emiratesId ?? "—" },
+                    { label: doctorIdLabel, val: selectedUser.emiratesId ?? "—" },
                     { label: "Address", val: selectedUser.address ?? "—" },
                     { label: "Gender", val: selectedUser.gender ?? "—" },
                     { label: "Date of Birth", val: selectedUser.dateOfBirth ?? "—" },
@@ -883,7 +884,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
 
               <div className="flex flex-col gap-3 mb-8">
                 {[
-                  { label: "Emirates ID", val: selectedDoctor.emiratesId ?? "—" },
+                  { label: doctorIdLabel, val: selectedDoctor.emiratesId ?? "—" },
                   { label: "Gender", val: selectedDoctor.gender?.toUpperCase() ?? "—" },
                   { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
                   { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
@@ -1136,7 +1137,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                       <input required value={addFullName} onChange={(e) => setAddFullName(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[12px] font-semibold text-[#24292E]">Emirates ID</label>
+                      <label className="text-[12px] font-semibold text-[#24292E]">{doctorIdLabel}</label>
                       <input value={addEmiratesId} onChange={(e) => setAddEmiratesId(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
                     </div>
                     <div className="flex flex-col gap-1.5">

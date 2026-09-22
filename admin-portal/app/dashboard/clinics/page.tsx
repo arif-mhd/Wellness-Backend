@@ -107,6 +107,7 @@ function ClinicAvatar({ clinic, size = "md" }: { clinic: Clinic; size?: "sm" | "
 }
 
 function ManageClinicsPageInner() {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const { currencyForOrg } = useOrgCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -544,7 +545,7 @@ function ManageClinicsPageInner() {
               <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-5 mb-6">
                 {[
                   { label: "Owner Name",              value: selectedClinic.fullName },
-                  { label: "Emirates ID / Passport", value: selectedClinic.emiratesIdOrPassport },
+                  { label: identityFieldsForOrg((selectedClinic as any)?.tenantId, "clinic")[0]?.label ?? "ID", value: selectedClinic.emiratesIdOrPassport },
                   { label: "Position",                value: selectedClinic.positionInClinic },
                   { label: "Gender",                  value: selectedClinic.gender },
                   { label: "Date of Birth",           value: selectedClinic.dateOfBirth },

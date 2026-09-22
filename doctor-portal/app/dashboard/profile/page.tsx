@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
 import { useCurrency } from "@/components/BrandingContext";
 import { formatCurrency } from "@/lib/currency";
+import { useIdentityFields } from "@/components/BrandingContext";
 
 const CONSULTATION_TIMES = [10, 15, 20, 30, 45, 60];
 
@@ -110,6 +111,7 @@ function buildFormData(doc: Doctor): FormData {
 }
 
 export default function ProfilePage() {
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
   const currency = useCurrency();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -397,7 +399,7 @@ export default function ProfilePage() {
                   <EditableFieldRow label="Gender" value={draftPersonal.gender} onChange={v => setDraftPersonal(p => ({ ...p, gender: v }))} />
                   <EditableFieldRow label="Marital Status" value={draftPersonal.maritalStatus} onChange={v => setDraftPersonal(p => ({ ...p, maritalStatus: v }))} />
                   <EditableFieldRow label="Email ID (read-only)" value={doc.email || ""} onChange={() => {}} disabled />
-                  <EditableFieldRow label="Emirates ID (read-only)" value={doc.emiratesId || ""} onChange={() => {}} disabled />
+                  <EditableFieldRow label={`${doctorIdLabel} (read-only)`} value={doc.emiratesId || ""} onChange={() => {}} disabled />
                 </div>
                 <InlineEditBtns
                   onCancel={() => setEditPersonal(false)}
@@ -406,7 +408,7 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                <FieldRow label="Emirates ID" value={doc.emiratesId || "—"} />
+                <FieldRow label={doctorIdLabel} value={doc.emiratesId || "—"} />
                 <FieldRow label="Contact Number" value={fd.phone || "—"} />
                 <FieldRow label="Email ID" value={doc.email || "—"} />
                 <FieldRow label="Gender" value={fd.gender || "—"} />

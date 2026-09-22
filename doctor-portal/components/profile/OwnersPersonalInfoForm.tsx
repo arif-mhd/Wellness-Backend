@@ -109,7 +109,7 @@ export default function OwnersPersonalInfoForm({
 
   const handleVerifyOwnerId = () => {
     if (!ownerId.trim()) {
-      setFormError("Enter the Owner/Staff Emirates ID first.");
+      setFormError(`Enter the ${ownerIdLabel} first.`);
       return;
     }
     setFormError("");

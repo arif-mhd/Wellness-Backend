@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import { useRouter } from "next/navigation";
 import { signOut } from "supertokens-web-js/recipe/session";
+import { useIdentityFields } from "@/components/BrandingContext";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -115,6 +116,7 @@ function Stars({ rating, size = 16 }: { rating: number; size?: number }) {
 }
 
 export default function ClinicProfilePage() {
+  const clinicIdLabel = useIdentityFields("clinic")[0]?.label ?? "ID";
   const router = useRouter();
   const [clinic, setClinic] = useState<any>({});
   const [doctors, setDoctors] = useState<ClinicDoctor[]>([]);
@@ -285,7 +287,7 @@ export default function ClinicProfilePage() {
               <Field label="Height" value={clinic.height} bold />
               <Field label="Weight" value={clinic.weight} bold />
 
-              <Field label="Emirates ID" value={clinic.emiratesIdOrPassport} bold />
+              <Field label={clinicIdLabel} value={clinic.emiratesIdOrPassport} bold />
               <Field label="Position in Clinic" value={clinic.positionInClinic} bold />
               <div className="hidden lg:block"></div>
 

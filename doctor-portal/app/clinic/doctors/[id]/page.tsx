@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
 import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
-import { useClinicTimezone } from "@/components/BrandingContext";
+import { useClinicTimezone, useIdentityFields } from "@/components/BrandingContext";
 import { formatClinicDate, formatClinicTime } from "@/lib/appointmentTime";
 import { useCurrency } from "@/components/BrandingContext";
 import { formatCurrency } from "@/lib/currency";
@@ -177,6 +177,7 @@ const inputCls = "h-8 border border-[#D6D9E0] text-[11px] font-medium text-cente
 
 function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
   const currency = useCurrency();
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
   const clinicTz = useClinicTimezone();
   const { id } = use(params);
   const searchParams = useSearchParams();
@@ -689,7 +690,7 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                   {[
                     { label: "Gender", val: doctor.gender ?? "—" },
                     { label: "License Number", val: editing ? null : (doctor.license ?? "—"), edit: editing ? <input value={eLicense} onChange={(e) => setELicense(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
-                    { label: "Emirates ID", val: doctor.emiratesId ?? "—" },
+                    { label: doctorIdLabel, val: doctor.emiratesId ?? "—" },
                     { label: "Specialization", val: editing ? null : (doctor.specialty ?? "—"), edit: editing ? <input value={eSpecialty} onChange={(e) => setESpecialty(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
                     { label: "Qualification", val: editing ? null : (doctor.qualification ?? "—"), edit: editing ? <input value={eQualification} onChange={(e) => setEQualification(e.target.value)} className={`${inputCls} w-[120px]`} /> : null },
                   ].map((f) => (
