@@ -534,11 +534,11 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[#676E76] text-[11px]">Revenue This Month</span>
-            <span className="text-[#24292E] text-[18px] font-medium">${branch.revenueThisMonth.toLocaleString()}</span>
+            <span className="text-[#24292E] text-[18px] font-medium">{formatCurrency(branch.revenueThisMonth, currency)}</span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[#676E76] text-[11px]">Revenue Last Month</span>
-            <span className="text-[#24292E] text-[18px] font-medium">${branch.revenueLastMonth.toLocaleString()}</span>
+            <span className="text-[#24292E] text-[18px] font-medium">{formatCurrency(branch.revenueLastMonth, currency)}</span>
           </div>
         </div>
 
@@ -1059,8 +1059,8 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
             <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
           ) : paymentSummary ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-              <StatBlock label="Total Earnings" value={`$${paymentSummary.totalEarnings.toLocaleString()}`} />
-              <StatBlock label="Available Balance" value={`$${paymentSummary.balance.toLocaleString()}`} />
+              <StatBlock label="Total Earnings" value={formatCurrency(paymentSummary.totalEarnings, currency)} />
+              <StatBlock label="Available Balance" value={formatCurrency(paymentSummary.balance, currency)} />
             </div>
           ) : (
             <div className="text-center text-sm text-[#A0A8B0] py-8">You don&apos;t have permission to view payments for this branch.</div>
@@ -1078,8 +1078,8 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatBlock label="Doctors" value={String(branch.doctorCount)} />
             <StatBlock label="Consultations Today" value={String(branch.consultationsToday)} />
-            <StatBlock label="Revenue This Month" value={`$${branch.revenueThisMonth.toLocaleString()}`} />
-            <StatBlock label="Revenue Last Month" value={`$${branch.revenueLastMonth.toLocaleString()}`} />
+            <StatBlock label="Revenue This Month" value={formatCurrency(branch.revenueThisMonth, currency)} />
+            <StatBlock label="Revenue Last Month" value={formatCurrency(branch.revenueLastMonth, currency)} />
           </div>
           <div className="mt-6 bg-[#F9FAFC] rounded-xl p-4 border border-[#E4E8F0]">
             <div className="flex items-center justify-between mb-1">

@@ -7,8 +7,9 @@ import AllConsultations from "@/components/analytics/AllConsultations";
 import PatientsOutcome from "@/components/analytics/PatientsOutcome";
 import DiagnosticsStatus from "@/components/analytics/DiagnosticsStatus";
 import ScreeningRecommendations from "@/components/analytics/ScreeningRecommendations";
-import { useClinicTimezone } from "@/components/BrandingContext";
+import { useClinicTimezone, useCurrency } from "@/components/BrandingContext";
 import { clinicParts } from "@/lib/appointmentTime";
+import { formatCurrency } from "@/lib/currency";
 
 interface TaskCounts {
   upcomingConsultations: number;
@@ -27,6 +28,7 @@ function pctChange(today: number, yesterday: number): { value: number; direction
 
 export default function AnalyticsPage() {
   const clinicTz = useClinicTimezone();
+  const currency = useCurrency();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [feedback, setFeedback] = useState<any[]>([]);
   const [taskCounts, setTaskCounts] = useState<TaskCounts>({ upcomingConsultations: 0, pendingEmr: 0, total: 0 });
@@ -120,11 +122,7 @@ export default function AnalyticsPage() {
 
   const revenueChange = pctChange(revenueThisMonth, revenuePrevMonth);
 
-  const formattedRevenue = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(revenueThisMonth);
+  const formattedRevenue = formatCurrency(Math.round(revenueThisMonth), currency);
 
   return (
       <div className="px-4 md:px-5 pb-12 select-none">

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/apiFetch";
 import { useSidebar } from "@/components/SidebarContext";
-import { useClinicTimezone } from "@/components/BrandingContext";
+import { useClinicTimezone, useCurrency } from "@/components/BrandingContext";
 import { clinicDayKey, clinicParts } from "@/lib/appointmentTime";
+import { formatCurrency } from "@/lib/currency";
 
 interface SlotDef {
   dayOfWeek: number;
@@ -84,6 +85,7 @@ function pctChange(today: number, yesterday: number): { value: number; direction
 
 export default function DashboardPage() {
   const clinicTz = useClinicTimezone();
+  const currency = useCurrency();
   const router = useRouter();
 
   const [doctorName, setDoctorName]     = useState<string | null>(null);
@@ -578,7 +580,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
               {dataLoaded
-                ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(revenueThisMonth)
+                ? formatCurrency(Math.round(revenueThisMonth), currency)
                 : "—"}
             </div>
             <div className="flex items-center gap-1">
