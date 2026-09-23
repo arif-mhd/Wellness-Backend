@@ -3,6 +3,8 @@
 import React, { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 import AllConsultations from "@/components/analytics/AllConsultations";
 import PatientsOutcome from "@/components/analytics/PatientsOutcome";
 import DiagnosticsStatus from "@/components/analytics/DiagnosticsStatus";
@@ -72,6 +74,7 @@ function StarRating({ value }: { value: number }) {
 
 function ClinicAnalyticsContent() {
   const router = useRouter();
+  const currency = useCurrency();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
   const qs = branchId ? `?branchId=${branchId}` : "";
@@ -234,7 +237,7 @@ function ClinicAnalyticsContent() {
                   <span className="text-[#707070] text-[11px] font-medium tracking-[-0.24px]">{monthLabel}</span>
                 </div>
                 <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]">
-                  ${Math.round(dashboard?.revenueThisMonth ?? 0).toLocaleString()}
+                  {formatCurrency(Math.round(dashboard?.revenueThisMonth ?? 0), currency)}
                 </div>
                 <TrendLine value={revenuePct} suffix="from last month" />
               </div>

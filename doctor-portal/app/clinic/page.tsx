@@ -4,8 +4,9 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
-import { useClinicTimezone } from "@/components/BrandingContext";
+import { useClinicTimezone, useCurrency } from "@/components/BrandingContext";
 import { formatClinicDateTime } from "@/lib/appointmentTime";
+import { formatCurrency } from "@/lib/currency";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -105,6 +106,7 @@ function Avatar({ name, size = "w-10 h-10" }: { name: string; size?: string }) {
 
 function ClinicHomeContent() {
   const clinicTz = useClinicTimezone();
+  const currency = useCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -335,7 +337,7 @@ function ClinicHomeContent() {
             </div>
           </div>
           <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-            ${Math.round(dashboard?.revenueThisMonth ?? 0).toLocaleString()}
+            {formatCurrency(Math.round(dashboard?.revenueThisMonth ?? 0), currency)}
           </div>
           <TrendLine value={revenuePct} suffix="from last month" />
         </div>
