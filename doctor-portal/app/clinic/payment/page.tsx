@@ -267,6 +267,7 @@ function EditFeeModal({
   onSubmit: (newValue: string) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }) {
+  const currency = useCurrency();
   const [step, setStep] = useState<FeeStep>("input");
   const [newValue, setNewValue] = useState("");
   const [otp, setOtp] = useState("");
@@ -303,7 +304,7 @@ function EditFeeModal({
         {step === "input" && (
           <>
             <h2 className="text-[18px] font-medium text-[#24292E] mb-6">Edit Consultation Fee</h2>
-            <p className="text-[13px] font-semibold text-[#24292E] mb-5">{label} — Current fee: {currentValue || "—"}</p>
+            <p className="text-[13px] font-semibold text-[#24292E] mb-5">{label} — Current fee: {currentValue ? fmtMoney(Number(currentValue), currency) : "—"}</p>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-medium text-[#3D4B5A] mb-2">New Fees</label>
@@ -804,7 +805,7 @@ function ClinicPaymentContent() {
           {selectedDoctor && (
             <div className="lg:col-span-8 flex flex-col gap-8">
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-5 flex items-center justify-between flex-wrap gap-4">
-                <span className="text-[14px] font-medium text-[#24292E]">General Consultation fee: {doctorSummary?.fees ?? "—"}</span>
+                <span className="text-[14px] font-medium text-[#24292E]">General Consultation fee: {doctorSummary?.fees != null && String(doctorSummary.fees) !== "" ? fmtMoney(Number(doctorSummary.fees), currency) : "—"}</span>
                 <button onClick={() => setEditingFee({ targetType: "doctor", label: `${selectedDoctor.fullName} — General Consultation fee`, currentValue: doctorSummary?.fees ?? "" })} className="px-5 py-2 bg-[#5476FC] text-white text-[12px] font-semibold rounded-xl shadow-sm hover:shadow-md transition-all">
                   Edit Fees
                 </button>
