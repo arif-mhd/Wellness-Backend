@@ -1,12 +1,34 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import logoImg from "@/assets/images/wellness_logo.png";
 import { useBranding } from "@/components/BrandingContext";
+import { apiFetch } from "@/lib/apiFetch";
 
 export default function NotFound() {
   const branding = useBranding();
+
+  // The dashboard route differs by role (clinic accounts live under
+  // /clinic, doctors under /dashboard) — same resolution the login page
+  // uses (see goToLanding in auth/login/page.tsx). Defaulting to
+  // /dashboard for a clinic session would land them on the doctor
+  // dashboard, which has no data for their account and looks static.
+  const [homeHref, setHomeHref] = useState("/dashboard");
+  useEffect(() => {
+    apiFetch("/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const roles: string[] = data?.roles ?? [];
+        if (roles.includes("clinic_pending")) setHomeHref("/auth/pending");
+        else if (roles.includes("clinic")) setHomeHref("/clinic");
+      })
+      .catch(() => {
+        // If we can't resolve roles, fall back to the doctor dashboard.
+      });
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-gradient-to-tr from-slate-50 via-white to-indigo-50/30 flex flex-col items-center justify-center py-12 px-4 overflow-hidden font-outfit">
 
@@ -44,7 +66,7 @@ export default function NotFound() {
           </p>
 
           <Link
-            href="/dashboard"
+            href={homeHref}
             className="w-full bg-gradient-to-r from-[#8AA0FF] to-[#5476FC] text-white py-3.5 rounded-xl font-medium font-outfit text-sm shadow-md shadow-blue-500/20 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
           >
             Return to Dashboard

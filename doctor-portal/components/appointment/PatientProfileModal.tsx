@@ -808,15 +808,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                     {/* Medicines */}
                     {selectedConsultation.emr.medicines && selectedConsultation.emr.medicines.length > 0 && (
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
-                          <button className="flex items-center gap-2 px-[13px] py-[6px] bg-[#E0E7FF] rounded-[12px] text-[#182A6F] text-[13px] font-medium leading-5">
-                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                              <path d="M9 11.8414L5.79806 8.63944L6.58856 7.82606L8.4375 9.675V3.375H9.5625V9.675L11.4114 7.82606L12.2019 8.63944L9 11.8414ZM4.73081 14.625C4.35194 14.625 4.03125 14.4938 3.76875 14.2313C3.50625 13.9688 3.375 13.6481 3.375 13.2692V11.2356H4.5V13.2692C4.5 13.3269 4.52406 13.3798 4.57219 13.4278C4.62019 13.4759 4.67306 13.5 4.73081 13.5H13.2692C13.3269 13.5 13.3798 13.4759 13.4278 13.4278C13.4759 13.3798 13.5 13.2692V11.2356H14.625V13.2692C14.625 13.6481 14.4938 13.9688 14.2313 14.2313C13.9688 14.4938 13.6481 14.625 13.2692 14.625H4.73081Z" fill="#182A6E"/>
-                            </svg>
-                            Download Prescription
-                          </button>
-                        </div>
+                        <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
                         <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
                           {selectedConsultation.emr.medicines.map((med: any, i: number) => (
                             <React.Fragment key={med.id ?? i}>
