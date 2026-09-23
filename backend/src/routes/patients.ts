@@ -573,12 +573,6 @@ router.post(
 
       const userId = req.session!.getUserId();
       const { memberId } = req.params;
-      const ext = req.file.mimetype.split("/")[1] ?? "jpg";
-      const blobPath = `patients/${userId}/family/${memberId}/avatar.${ext}`;
-
-      try { await deleteBlob(blobPath); } catch { /* ignore */ }
-      await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
-      const avatarUrl = generateSasUrl(blobPath, 365);
 
       let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
       try {
@@ -586,7 +580,23 @@ router.post(
         if (resource) existing = resource;
       } catch { /* ignore */ }
 
-      const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+      // Check the member actually exists BEFORE touching blob storage —
+      // otherwise a bad/stale memberId still burns an upload+delete against
+      // a blob path nothing will ever read back.
+      const currentMembers = (existing.familyMembers as any[]) ?? [];
+      if (!currentMembers.some((m: any) => m.id === memberId)) {
+        res.status(404).json({ error: "Family member not found." });
+        return;
+      }
+
+      const ext = req.file.mimetype.split("/")[1] ?? "jpg";
+      const blobPath = `patients/${userId}/family/${memberId}/avatar.${ext}`;
+
+      try { await deleteBlob(blobPath); } catch { /* ignore */ }
+      await uploadBlob(blobPath, req.file.buffer, req.file.mimetype);
+      const avatarUrl = generateSasUrl(blobPath, 365);
+
+      const familyMembers = currentMembers.map((m: any) =>
         m.id === memberId ? { ...m, avatarUrl } : m
       );
       await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
@@ -671,7 +681,13 @@ router.put("/family/:memberId", requireRole("patient"), async (req: SessionReque
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (!currentMembers.some((m: any) => m.id === memberId)) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    const familyMembers = currentMembers.map((m: any) =>
       m.id === memberId ? { ...m, ...req.body } : m
     );
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
@@ -694,7 +710,13 @@ router.delete("/family/:memberId", requireRole("patient"), async (req: SessionRe
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = ((existing.familyMembers as any[]) ?? []).filter((m: any) => m.id !== memberId);
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (!currentMembers.some((m: any) => m.id === memberId)) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    const familyMembers = currentMembers.filter((m: any) => m.id !== memberId);
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
     res.json({ status: "OK" });
   } catch (err) {
@@ -716,7 +738,13 @@ router.put("/family/:memberId/allergies", requireRole("patient"), async (req: Se
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (!currentMembers.some((m: any) => m.id === memberId)) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    const familyMembers = currentMembers.map((m: any) =>
       m.id === memberId ? { ...m, allergies } : m
     );
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
@@ -740,7 +768,13 @@ router.put("/family/:memberId/medications", requireRole("patient"), async (req: 
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (!currentMembers.some((m: any) => m.id === memberId)) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    const familyMembers = currentMembers.map((m: any) =>
       m.id === memberId ? { ...m, medications } : m
     );
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
@@ -764,7 +798,13 @@ router.put("/family/:memberId/chronic-diseases", requireRole("patient"), async (
       if (resource) existing = resource;
     } catch { /* ignore */ }
 
-    const familyMembers = ((existing.familyMembers as any[]) ?? []).map((m: any) =>
+    const currentMembers = (existing.familyMembers as any[]) ?? [];
+    if (!currentMembers.some((m: any) => m.id === memberId)) {
+      res.status(404).json({ error: "Family member not found." });
+      return;
+    }
+
+    const familyMembers = currentMembers.map((m: any) =>
       m.id === memberId ? { ...m, chronicDiseases } : m
     );
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
