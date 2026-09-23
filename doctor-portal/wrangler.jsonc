@@ -7,5 +7,23 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+
+  // One worker per white-label brand. The top-level name above is the
+  // platform's own (wellness); each client brand gets an entry here so a
+  // build can be pointed at its own worker with `-e <brand>` instead of
+  // hand-editing the name between deploys — which is how a client build ends
+  // up published over the platform's worker.
+  //
+  // `name` is set explicitly: without it Wrangler would derive
+  // "wellness-doctor-portal-anandalakshmi" rather than the existing worker.
+  //
+  // NOTE: this only selects the worker. NEXT_PUBLIC_ORG_SLUG is inlined at
+  // BUILD time from .env.local, so the matching .env.<brand>.local must be
+  // copied into place before building — see the cf:deploy:* package scripts.
+  "env": {
+    "anandalakshmi": {
+      "name": "anandalakshmi-doctor-portal"
+    }
   }
 }
