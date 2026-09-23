@@ -10,19 +10,14 @@ import TimeSlotView from "@/components/schedule/TimeSlotView";
 import ScheduleAbsencesView from "@/components/schedule/ScheduleAbsencesView";
 import RescheduleModal from "@/components/schedule/RescheduleModal";
 import DesktopOnlyWrapper from "@/components/DesktopOnlyWrapper";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDate, formatClinicTime, clinicParts, clinicDayKey } from "@/lib/appointmentTime";
 
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
-
-function formatScheduleDateTime(isoString: string): string {
+function formatScheduleDateTime(isoString: string, timezone: string): string {
   try {
-    const d = parseLocalTime(isoString);
-    if (isNaN(d.getTime())) return "N/A";
-    const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    if (isNaN(new Date(isoString).getTime())) return "N/A";
+    const datePart = formatClinicDate(isoString, timezone, { day: "numeric", month: "short", year: "numeric" });
+    const timePart = formatClinicTime(isoString, timezone, { hour: "numeric", minute: "2-digit" });
     return `${datePart}, ${timePart}`;
   } catch {
     return "N/A";
@@ -30,6 +25,7 @@ function formatScheduleDateTime(isoString: string): string {
 }
 
 export default function SchedulesDashboardPage() {
+  const clinicTz = useClinicTimezone();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Scheduled Appointments");
   const [activeView, setActiveView] = useState<"list" | "calendar">("list");
@@ -74,14 +70,10 @@ export default function SchedulesDashboardPage() {
       }
 
       // Check if the appointment is today (regardless of time)
-      const apptDate = parseLocalTime(apt.scheduledAt);
-      const today = new Date();
-      const isToday = apptDate.getFullYear() === today.getFullYear() &&
-                      apptDate.getMonth() === today.getMonth() &&
-                      apptDate.getDate() === today.getDate();
+      const isToday = clinicDayKey(apt.scheduledAt, clinicTz) === clinicDayKey(new Date(), clinicTz);
       
       const isCompleted = apt.status?.toLowerCase() === "completed";
-      const isFuture = apptDate.getTime() > Date.now();
+      const isFuture = new Date(apt.scheduledAt).getTime() > Date.now();
       const actionType: ScheduleItem["actionType"] =
         isToday && !isCompleted ? "Consult Now" :
         isFuture && !isCompleted ? "Reschedule" :
@@ -98,31 +90,28 @@ export default function SchedulesDashboardPage() {
         email: apt.patientEmail ?? "",
         symptomType: symptomType,
         symptomDetails: apt.reason ?? "General Consultation",
-        dateTime: formatScheduleDateTime(apt.scheduledAt),
-        scheduledAt: apptDate.toISOString(),
+        dateTime: formatScheduleDateTime(apt.scheduledAt, clinicTz),
+        scheduledAt: new Date(apt.scheduledAt).toISOString(),
         actionType,
         patientBio: apt.patientChronicIllnesses || "No conditions reported.",
       };
     });
-  }, [appointments]);
+  }, [appointments, clinicTz]);
 
   // Map backend appointments to CalendarAppointment structure for CalendarView
   const calendarAppointments: CalendarAppointment[] = useMemo(() => {
     const activeApts = appointments.filter(a => a.status !== "cancelled" && a.status !== "Cancelled");
 
     return activeApts.map((apt) => {
-      const d = parseLocalTime(apt.scheduledAt);
+      const d = clinicParts(apt.scheduledAt, clinicTz);
       const dayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-      const dayLabel = dayLabels[d.getDay()];
+      const dayLabel = dayLabels[d.weekday];
 
-      const h = d.getHours() % 12 || 12;
-      const ampm = d.getHours() >= 12 ? "PM" : "AM";
+      const h = d.hours % 12 || 12;
+      const ampm = d.hours >= 12 ? "PM" : "AM";
       const hourStr = `${h} ${ampm}`;
 
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = clinicDayKey(apt.scheduledAt, clinicTz);
 
       const dob = apt.patientDob || "";
       let age = 0;
@@ -145,7 +134,7 @@ export default function SchedulesDashboardPage() {
         dateStr,
       };
     });
-  }, [appointments]);
+  }, [appointments, clinicTz]);
 
   // Filtering based on search query
   const filteredListItems = useMemo(() => {

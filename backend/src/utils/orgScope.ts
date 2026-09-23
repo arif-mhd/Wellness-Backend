@@ -2,6 +2,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
+import { CountryConfig, getCountryConfig } from "../config/countries";
 import { patientsContainer, clinicsContainer, doctorsContainer, pharmaciesContainer, labServicesContainer } from "../config/cosmos";
 
 let defaultOrgIdCache: string | null = null;
@@ -140,6 +141,52 @@ export async function getLabIdsForOrg(orgId: string): Promise<string[]> {
 export async function getOrgBrandName(orgId: string): Promise<string> {
   const { rows } = await pool.query(`SELECT name FROM organizations WHERE id = $1`, [orgId]);
   return rows[0]?.name ?? "Wellness";
+}
+
+// Resolves an org row's country config + effective currency, from a row
+// already fetched via `SELECT * FROM organizations` (needs country_code /
+// currency_code columns present, which every row has post-migration).
+// Shared by GET /api/meta/branding and the admin organizations routes so
+// both surface the exact same shape rather than two ad-hoc reimplementations.
+export function resolveCountryConfigForOrgRow(org: { country_code?: string | null; currency_code?: string | null }): {
+  countryCode: string;
+  currencyCode: string;
+  countryConfig: CountryConfig;
+} {
+  const countryConfig = getCountryConfig(org.country_code);
+  return {
+    countryCode: countryConfig.code,
+    currencyCode: org.currency_code || countryConfig.defaultCurrency.code,
+    countryConfig,
+  };
+}
+
+// Resolves just the CountryConfig for a known org id — for routes that
+// already have a tenantId in hand (clinic/patient/doctor docs) and need to
+// know which country's identity-field patterns to validate against, without
+// needing the rest of the org's branding fields.
+export async function getCountryConfigForOrgId(orgId: string): Promise<CountryConfig> {
+  const { rows } = await pool.query(`SELECT country_code FROM organizations WHERE id = $1`, [orgId]);
+  return getCountryConfig(rows[0]?.country_code);
+}
+
+// Resolves the CountryConfig a given doctor's records should be interpreted
+// under — via their clinic's org (the same tenantId chain used for billing and
+// insurance), falling back to the platform default org for an independent
+// doctor with no clinicId. Doesn't need a request/session: a doctor's country
+// is intrinsic to their own clinic, not to whoever happens to be asking.
+//
+// Shared by utils/timezone.ts and utils/currency.ts, and by the doctor routes
+// that validate country-specific identity documents, so the chain exists once.
+export async function resolveCountryConfigForDoctor(doctor: { clinicId?: string | null }): Promise<CountryConfig> {
+  if (doctor?.clinicId) {
+    // Lazy import — keeps the clinicInsurance.ts -> clinicScope.ts coupling
+    // scoped to where it's used, same as resolveOrgIdByEmail below.
+    const { loadOrgDocForClinicId } = await import("../routes/clinicInsurance");
+    const org = await loadOrgDocForClinicId(doctor.clinicId);
+    if (org?.tenantId) return getCountryConfigForOrgId(org.tenantId);
+  }
+  return getCountryConfigForOrgId(await getDefaultOrgIdForRegistration());
 }
 
 // Resolves an organization's AI chat persona name (e.g. "Dr. Wellness") by

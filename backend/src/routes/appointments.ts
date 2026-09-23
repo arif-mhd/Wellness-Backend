@@ -34,12 +34,8 @@ import { validateOrderItems, resolvePackQuantity, OrderItemInput } from "../util
 import PDFDocument from "pdfkit";
 import { drawPrescriptionPdf } from "../utils/prescriptionPdf";
 import { updateAppointmentWithRetry, AppointmentWriteNotAuthorizedError } from "../utils/appointmentWrite";
-
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor, resolveTimezoneForDoctorId, formatClinicDateTimeText } from "../utils/timezone";
+import { resolveCurrencyForDoctorId, formatCurrencyText } from "../utils/currency";
 
 // True if this doctor is either the primary doctor on the appointment, or the
 // specialist who was invited — both are allowed to view the
@@ -175,10 +171,11 @@ function slotLockId(doctorId: string, scheduledAt: string): string {
 // Patient books an appointment. Payment is mocked — appointment is immediately scheduled.
 router.post("/", requireRole("patient"), requireFeature("appointments"), async (req: SessionRequest, res: Response) => {
   const patientId = req.session!.getUserId();
-  const { doctorId, scheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId, consultationLanguage } = req.body;
+  const { doctorId, date, time, scheduledAt: legacyScheduledAt, reason, shareMedicalHistory, familyMemberId, visitType, paymentMethod, insurancePolicyId, consultationLanguage } = req.body;
 
-  if (!doctorId || !scheduledAt || !reason) {
-    res.status(400).json({ error: "doctorId, scheduledAt, and reason are required." });
+  const hasDateTime = !!(date && time);
+  if (!doctorId || (!hasDateTime && !legacyScheduledAt) || !reason) {
+    res.status(400).json({ error: "doctorId, date, time, and reason are required." });
     return;
   }
 
@@ -193,6 +190,23 @@ router.post("/", requireRole("patient"), requireFeature("appointments"), async (
     if (!doctor || doctor.status !== "approved") {
       res.status(404).json({ error: "Doctor not found or not available." });
       return;
+    }
+
+    // The backend is the sole authoritative place that converts the
+    // clinic-local wall-clock date+time the patient picked into a true UTC
+    // instant — the client used to build this itself by appending a literal
+    // "Z" to local time with no real conversion, which is the exact bug this
+    // replaces. `legacyScheduledAt` stays accepted for one release cycle in
+    // case an older client build (or another portal) still sends it, but
+    // it's stored as-is (still buggy) — remove this branch once telemetry
+    // shows zero warnings for a full release cycle.
+    let scheduledAt: string;
+    if (hasDateTime) {
+      const timezone = await resolveTimezoneForDoctor(doctor);
+      scheduledAt = zonedTimeToUtc(date, time, timezone).toISOString();
+    } else {
+      console.warn("[legacy-scheduledAt] POST /api/appointments received scheduledAt instead of date/time", { doctorId });
+      scheduledAt = legacyScheduledAt;
     }
 
     // Fetched up front (rather than after creation, as before) because the
@@ -370,6 +384,16 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
       })
     );
 
+    // One resolution per unique doctor (not per appointment) — see
+    // src/utils/timezone.ts for why the frontend must never assume UTC or
+    // its own device zone when displaying scheduledAt.
+    const timezoneByDoctorId = new Map<string, string>();
+    await Promise.all(
+      Array.from(doctorsById.entries()).map(async ([docId, doc]) => {
+        timezoneByDoctorId.set(docId, await resolveTimezoneForDoctor(doc));
+      })
+    );
+
     const enriched = appointments.map((apt) => {
       const doctor = doctorsById.get(apt.doctorId);
       const clinicDisplay = doctor?.clinicId ? clinicDisplayById.get(doctor.clinicId) : undefined;
@@ -380,6 +404,7 @@ router.get("/", requireRole("patient"), async (req: SessionRequest, res: Respons
         doctorAvatarUrl: doctor?.avatarUrl ?? null,
         clinicName: clinicDisplay?.name ?? null,
         clinicAddress: clinicDisplay?.address ?? null,
+        timezone: timezoneByDoctorId.get(apt.doctorId) ?? null,
       };
     });
 
@@ -792,11 +817,12 @@ router.post("/:id/invite-specialist", requireRole("doctor"), async (req: Session
     await appointmentsContainer.items.upsert(updated);
 
     // Notify the patient inside the LiveKit room so the consent modal appears
+    const specialistInviteCurrency = await resolveCurrencyForDoctorId(apt.doctorId);
     await sendLivekitData(apt.livekitRoom, {
       type: "specialist_invite",
       specialistName: specialist.fullName,
       specialistAvatarUrl: specialist.avatarUrl ?? null,
-      fee: specialist.fees ? `AED ${specialist.fees}` : "AED 200",
+      fee: formatCurrencyText(specialist.fees ?? 200, specialistInviteCurrency),
     });
 
     res.json({
@@ -930,6 +956,9 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
         doctorAvatarUrl: doctor?.avatarUrl ?? apt.doctorAvatarUrl,
         clinicName,
         clinicAddress: clinicAddress ?? apt.clinicAddress ?? null,
+        // IANA zone `scheduledAt` should be displayed in — frontends must
+        // never assume UTC or the device's own zone. See src/utils/timezone.ts.
+        timezone: await resolveTimezoneForDoctor(doctor ?? {}),
       };
     } catch { /* fall back to the raw doc if doctor lookup fails */ }
 
@@ -970,15 +999,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
 
     const now = new Date().toISOString();
 
-    const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const timeText = parseLocalTime(apt.scheduledAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const { dateText, timeText } = formatClinicDateTimeText(apt.scheduledAt, await resolveTimezoneForDoctorId(apt.doctorId));
 
     if (isDoctor || isClinic) {
       // Notify patient
@@ -1072,10 +1093,11 @@ router.patch("/:id/mark-paid", verifySession(), async (req: SessionRequest, res:
 router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res: Response) => {
   const userId = req.session!.getUserId();
   const { id } = req.params;
-  const { scheduledAt, reason } = req.body;
+  const { date, time, scheduledAt: legacyScheduledAt, reason } = req.body;
 
-  if (!scheduledAt) {
-    res.status(400).json({ error: "scheduledAt is required." });
+  const hasDateTime = !!(date && time);
+  if (!hasDateTime && !legacyScheduledAt) {
+    res.status(400).json({ error: "date and time are required." });
     return;
   }
 
@@ -1089,25 +1111,36 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     if (!actor) return;
     const { isDoctor: callerIsDoctor, isClinic: callerIsClinic } = actor;
 
-    const newDate = new Date(scheduledAt);
-    if (isNaN(newDate.getTime())) {
-      res.status(400).json({ error: "Invalid scheduledAt format." });
-      return;
-    }
-
-    const dateStr = newDate.toISOString().split('T')[0]; // YYYY-MM-DD
-    const utcHours = newDate.getUTCHours().toString().padStart(2, "0");
-    const utcMinutes = newDate.getUTCMinutes().toString().padStart(2, "0");
-    const timeStr = `${utcHours}:${utcMinutes}`;
-
     const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
     if (!doctor || doctor.status !== "approved") {
       res.status(404).json({ error: "Doctor not found or not active." });
       return;
     }
+    const timezone = await resolveTimezoneForDoctor(doctor);
+
+    // Same backend-authoritative pattern as POST / — see the comment there.
+    // `legacyScheduledAt` stays accepted for one release cycle; its
+    // dateStr/timeStr are decoded straight from the (buggy) fake-UTC value's
+    // UTC-labeled digits, same as this endpoint already did before this fix,
+    // just no longer used to build the FINAL stored value directly.
+    let dateStr: string, timeStr: string;
+    if (hasDateTime) {
+      dateStr = date;
+      timeStr = time;
+    } else {
+      console.warn("[legacy-scheduledAt] PATCH /:id/reschedule received scheduledAt instead of date/time", { appointmentId: id });
+      const legacyDate = new Date(legacyScheduledAt);
+      if (isNaN(legacyDate.getTime())) {
+        res.status(400).json({ error: "Invalid scheduledAt format." });
+        return;
+      }
+      dateStr = legacyDate.toISOString().split('T')[0];
+      timeStr = `${legacyDate.getUTCHours().toString().padStart(2, "0")}:${legacyDate.getUTCMinutes().toString().padStart(2, "0")}`;
+    }
+    const scheduledAt = zonedTimeToUtc(dateStr, timeStr, timezone).toISOString();
 
     const slots: any[] = doctor.slots ?? [];
-    const dayOfWeek = new Date(dateStr + "T12:00:00Z").getUTCDay();
+    const dayOfWeek = utcToZonedTime(zonedTimeToUtc(dateStr, "12:00", timezone), timezone).getDay();
     const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
 
     if (activeDaySlots.length === 0) {
@@ -1129,8 +1162,8 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
       while (cursor + duration <= endMinutes) {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
-        
-        const slotStart = new Date(`${dateStr}T${h}:${m}:00.000Z`);
+
+        const slotStart = zonedTimeToUtc(dateStr, `${h}:${m}`, timezone);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
         const absences = doctor.absences ?? [];
         const isAbsent = absences.some((abs: any) => {
@@ -1148,8 +1181,8 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
 
     const uniqueIntervals = Array.from(new Set(intervals)).sort();
 
-    const dayStart = `${dateStr}T00:00:00.000Z`;
-    const dayEnd   = `${dateStr}T23:59:59.999Z`;
+    const dayStart = startOfClinicDayUtc(dateStr, timezone).toISOString();
+    const dayEnd   = new Date(zonedTimeToUtc(dateStr, "23:59", timezone).getTime() + 59_999).toISOString();
 
     const booked = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT c.scheduledAt FROM c
@@ -1168,8 +1201,8 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
 
     const bookedSet = new Set(
       booked.map((b: any) => {
-        const d = new Date(b.scheduledAt);
-        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+        const local = utcToZonedTime(new Date(b.scheduledAt), timezone);
+        return `${local.getHours().toString().padStart(2, "0")}:${local.getMinutes().toString().padStart(2, "0")}`;
       })
     );
 
@@ -1229,15 +1262,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
 
     const now = new Date().toISOString();
 
-    const dateText = parseLocalTime(scheduledAt).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const timeText = parseLocalTime(scheduledAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const { dateText, timeText } = formatClinicDateTimeText(scheduledAt, timezone);
 
     if (callerIsDoctor || callerIsClinic) {
       const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
@@ -1578,17 +1603,31 @@ router.patch("/:id/recording-consent", verifySession(), async (req: SessionReque
     // Start recording once — the moment both sides have acknowledged, not
     // eagerly when the room is created. Whichever party acks second is the
     // one whose request happens to trigger this.
-    if (updated.recordingConsent?.doctorAckAt && updated.recordingConsent?.patientAckAt && !updated.recordingEgressId) {
-      const egressId = await startCallRecording(id);
-      if (egressId) {
-        // ETag-protected — a blind upsert here raced the egress webhook's own
-        // write of recordingBlobPath moments later and could silently revert
-        // it, which is exactly how a completed recording used to disappear.
-        await updateAppointmentWithRetry(id, (latest) => ({ ...latest, recordingEgressId: egressId }));
+    // recordingStarted is reported back honestly: null while still waiting on
+    // the other party's ack, true once egress is confirmed running (including
+    // an earlier ack call that already started it), false if startCallRecording
+    // swallowed a failure — startCallRecording must never throw to avoid
+    // blocking the call, but that also means this is the only place left that
+    // can tell the caller recording didn't actually start.
+    let recordingStarted: boolean | null = null;
+    if (updated.recordingConsent?.doctorAckAt && updated.recordingConsent?.patientAckAt) {
+      if (updated.recordingEgressId) {
+        recordingStarted = true;
+      } else {
+        const egressId = await startCallRecording(id);
+        if (egressId) {
+          // ETag-protected — a blind upsert here raced the egress webhook's own
+          // write of recordingBlobPath moments later and could silently revert
+          // it, which is exactly how a completed recording used to disappear.
+          await updateAppointmentWithRetry(id, (latest) => ({ ...latest, recordingEgressId: egressId }));
+          recordingStarted = true;
+        } else {
+          recordingStarted = false;
+        }
       }
     }
 
-    res.json({ status: "OK", recordingConsent: updated.recordingConsent });
+    res.json({ status: "OK", recordingConsent: updated.recordingConsent, recordingStarted });
   } catch (err) {
     console.error("Recording consent ack error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -1676,15 +1715,7 @@ router.post("/:id/remind", verifySession(), async (req: SessionRequest, res: Res
     const docDoc = await doctorsContainer.item(apt.doctorId, apt.doctorId).read().then(r => r.resource).catch(() => null);
     const doctorName = docDoc?.fullName ?? "Doctor";
 
-    const dateText = parseLocalTime(apt.scheduledAt).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const timeText = parseLocalTime(apt.scheduledAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const { dateText, timeText } = formatClinicDateTimeText(apt.scheduledAt, await resolveTimezoneForDoctor(docDoc ?? {}));
 
     const body = isClinic
       ? `You have a reminder about your appointment with Dr. ${doctorName} on ${dateText} at ${timeText}.`
@@ -1950,10 +1981,11 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
     await medicineOrdersContainer.items.upsert(order);
 
     const itemNames = validatedItems.map((i) => i.name).join(", ");
+    const orderCurrency = await resolveCurrencyForDoctorId(apt.doctorId);
     logActivity({
       source: "patient",
       action: "Medicine Order Placed",
-      details: `Order AED ${total_amount.toFixed(2)} from consultation — ${itemNames}`,
+      details: `Order ${formatCurrencyText(total_amount, orderCurrency)} from consultation — ${itemNames}`,
       performedBy: "Patient",
       performedById: patientId,
       entityType: "medicineOrder",
@@ -2425,6 +2457,20 @@ router.get("/:id/livekit-token", verifySession(), async (req: SessionRequest, re
       return;
     }
 
+    // Recording consent is mandatory, not just a frontend gate: minting a token
+    // is how a party joins and publishes/subscribes in the room, so this is the
+    // one place that must refuse it server-side. Each party acks for themselves
+    // (see PATCH /recording-consent), so only that party's own ack is required
+    // here — not both, since the other party may not have reached the consent
+    // screen yet.
+    const hasAcked = isDoctor
+      ? Boolean(apt.recordingConsent?.doctorAckAt)
+      : Boolean(apt.recordingConsent?.patientAckAt);
+    if (!hasAcked) {
+      res.status(403).json({ error: "Recording consent required before joining the call." });
+      return;
+    }
+
     // Doctors connect from a browser on the same machine → use localhost (avoids Chrome
     // blocking WebRTC from HTTP pages to non-localhost IPs).
     // Patients connect from a physical device on the LAN → use LAN IP.
@@ -2484,7 +2530,8 @@ router.post("/:id/send-followup", requireRole("doctor"), async (req: SessionRequ
       doctorName = doc?.fullName ?? doctorName;
     } catch { /* use default */ }
 
-    const followUpScheduledAt = `${followUpDate}T${followUpTime}:00.000`;
+    const timezone = await resolveTimezoneForDoctorId(doctorId);
+    const followUpScheduledAt = zonedTimeToUtc(followUpDate, followUpTime, timezone).toISOString();
 
     // Store the pending follow-up on the appointment
     const updated = {
@@ -2598,14 +2645,7 @@ router.post("/:id/followup-respond", requireRole("patient"), async (req: Session
 
       const followUpDate = apt.pendingFollowUp.followUpDate;
       const followUpTime = apt.pendingFollowUp.followUpTime;
-      const dateText = new Date(`${followUpDate}T12:00:00Z`).toLocaleDateString("en-US", {
-        month: "short", day: "numeric", year: "numeric",
-      });
-      const [h, m] = followUpTime.split(":");
-      const hr = parseInt(h, 10);
-      const ampm = hr >= 12 ? "PM" : "AM";
-      const hr12 = hr % 12 || 12;
-      const timeText = `${hr12}:${m} ${ampm}`;
+      const { dateText, timeText } = formatClinicDateTimeText(followUpApt.scheduledAt, await resolveTimezoneForDoctorId(apt.doctorId));
 
       // Notify the patient
       const notifId = "notif_" + Date.now().toString(36) + "_" + randomBytes(3).toString("hex");

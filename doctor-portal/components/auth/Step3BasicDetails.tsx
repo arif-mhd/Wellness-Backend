@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useBranding } from "@/components/BrandingContext";
 
 interface Step3BasicDetailsProps {
   clinicName: string;
@@ -27,6 +28,7 @@ export default function Step3BasicDetails({
   onSubmit,
   onGoBack,
 }: Step3BasicDetailsProps) {
+  const { phone: phoneConfig } = useBranding();
   const [phoneError, setPhoneError] = useState("");
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,7 +89,7 @@ export default function Step3BasicDetails({
           <input
             type="tel"
             required
-            placeholder="Clinic Phone Number* (e.g. +971501234567)"
+            placeholder={`Clinic Phone Number* (e.g. ${phoneConfig.callingCode}501234567)`}
             value={phone}
             onChange={handlePhoneChange}
             className={`w-full bg-[#f3f4fd] border rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5476FC] transition text-gray-800 placeholder-gray-400 font-outfit ${

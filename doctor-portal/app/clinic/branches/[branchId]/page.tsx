@@ -5,15 +5,10 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 import Step4CreatePassword from "@/components/auth/Step4CreatePassword";
 import MiniTrendChart from "@/components/clinic/MiniTrendChart";
-
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or display
-// formatting silently shifts by the browser's timezone offset.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { useClinicTimezone, useIdentityFields } from "@/components/BrandingContext";
+import { formatClinicDate } from "@/lib/appointmentTime";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface TrendPoint { label: string; count: number; }
 
@@ -169,6 +164,9 @@ const DOC_COL = { name: "190px", cons1: "90px", cons2: "90px", avg: "90px", pres
 const TABS = ["Users/Managers", "Doctors", "Appointments", "Licenses", "Timings", "Insurances", "Payments", "Analytics", "Rating and Performance"];
 
 export default function BranchDetailPage({ params }: { params: Promise<{ branchId: string }> }) {
+  const clinicTz = useClinicTimezone();
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
+  const currency = useCurrency();
   const { branchId } = use(params);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -536,11 +534,11 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[#676E76] text-[11px]">Revenue This Month</span>
-            <span className="text-[#24292E] text-[18px] font-medium">${branch.revenueThisMonth.toLocaleString()}</span>
+            <span className="text-[#24292E] text-[18px] font-medium">{formatCurrency(branch.revenueThisMonth, currency)}</span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[#676E76] text-[11px]">Revenue Last Month</span>
-            <span className="text-[#24292E] text-[18px] font-medium">${branch.revenueLastMonth.toLocaleString()}</span>
+            <span className="text-[#24292E] text-[18px] font-medium">{formatCurrency(branch.revenueLastMonth, currency)}</span>
           </div>
         </div>
 
@@ -670,7 +668,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-semibold text-[#24292E]">Emirates ID</label>
+                    <label className="text-[11px] font-semibold text-[#24292E]">{doctorIdLabel}</label>
                     <input value={editEmiratesId} onChange={(e) => setEditEmiratesId(e.target.value)} className="h-9 border border-[#D6DEFF] rounded-lg px-3 text-[12px] outline-none focus:border-[#5476FC] bg-white" />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -708,7 +706,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     { label: "Name", val: selectedUser.fullName },
                     { label: "Phone", val: selectedUser.phone },
                     { label: "Mail Id", val: selectedUser.email },
-                    { label: "Emirates ID", val: selectedUser.emiratesId ?? "—" },
+                    { label: doctorIdLabel, val: selectedUser.emiratesId ?? "—" },
                     { label: "Address", val: selectedUser.address ?? "—" },
                     { label: "Gender", val: selectedUser.gender ?? "—" },
                     { label: "Date of Birth", val: selectedUser.dateOfBirth ?? "—" },
@@ -886,12 +884,12 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
 
               <div className="flex flex-col gap-3 mb-8">
                 {[
-                  { label: "Emirates ID", val: selectedDoctor.emiratesId ?? "—" },
+                  { label: doctorIdLabel, val: selectedDoctor.emiratesId ?? "—" },
                   { label: "Gender", val: selectedDoctor.gender?.toUpperCase() ?? "—" },
                   { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
                   { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
                   { label: "Location", val: selectedDoctor.address ?? "—" },
-                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
+                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? formatCurrency(selectedDoctor.fees, currency) : "—" },
                   { label: "Email", val: selectedDoctor.email ?? "—" },
                   { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
                   { label: "Languages", val: formatLanguages(selectedDoctor.languages) },
@@ -952,7 +950,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     </div>
                   </div>
                   <span className="text-[12px] text-[#676E76]">
-                    {parseLocalTime(a.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {formatClinicDate(a.scheduledAt, clinicTz, { month: "short", day: "numeric" })}
                   </span>
                 </div>
               ))}
@@ -1061,8 +1059,8 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
             <div className="text-center text-sm text-[#A0A8B0] py-8">Loading...</div>
           ) : paymentSummary ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-              <StatBlock label="Total Earnings" value={`$${paymentSummary.totalEarnings.toLocaleString()}`} />
-              <StatBlock label="Available Balance" value={`$${paymentSummary.balance.toLocaleString()}`} />
+              <StatBlock label="Total Earnings" value={formatCurrency(paymentSummary.totalEarnings, currency)} />
+              <StatBlock label="Available Balance" value={formatCurrency(paymentSummary.balance, currency)} />
             </div>
           ) : (
             <div className="text-center text-sm text-[#A0A8B0] py-8">You don&apos;t have permission to view payments for this branch.</div>
@@ -1080,8 +1078,8 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatBlock label="Doctors" value={String(branch.doctorCount)} />
             <StatBlock label="Consultations Today" value={String(branch.consultationsToday)} />
-            <StatBlock label="Revenue This Month" value={`$${branch.revenueThisMonth.toLocaleString()}`} />
-            <StatBlock label="Revenue Last Month" value={`$${branch.revenueLastMonth.toLocaleString()}`} />
+            <StatBlock label="Revenue This Month" value={formatCurrency(branch.revenueThisMonth, currency)} />
+            <StatBlock label="Revenue Last Month" value={formatCurrency(branch.revenueLastMonth, currency)} />
           </div>
           <div className="mt-6 bg-[#F9FAFC] rounded-xl p-4 border border-[#E4E8F0]">
             <div className="flex items-center justify-between mb-1">
@@ -1139,7 +1137,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                       <input required value={addFullName} onChange={(e) => setAddFullName(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[12px] font-semibold text-[#24292E]">Emirates ID</label>
+                      <label className="text-[12px] font-semibold text-[#24292E]">{doctorIdLabel}</label>
                       <input value={addEmiratesId} onChange={(e) => setAddEmiratesId(e.target.value)} className="w-full h-11 border border-[#D6DEFF] rounded-xl px-4 text-[13px] outline-none focus:border-[#5476FC]" />
                     </div>
                     <div className="flex flex-col gap-1.5">

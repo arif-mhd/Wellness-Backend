@@ -3,6 +3,7 @@ import { Inter, Marcellus, Outfit, Bricolage_Grotesque } from "next/font/google"
 import "./globals.css";
 import SuperTokensProvider from "@/components/SuperTokensProvider";
 import { BrandingProvider } from "@/components/BrandingContext";
+import { CountryConfigProvider } from "@/components/CountryConfigContext";
 
 const inter      = Inter({ subsets: ["latin"] });
 const marcellus  = Marcellus({ weight: "400", subsets: ["latin"], variable: "--font-marcellus" });
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${inter.className} ${marcellus.variable} ${outfit.variable} ${bricolage.variable}`}>
         <SuperTokensProvider>
-          <BrandingProvider>{children}</BrandingProvider>
+          <BrandingProvider>
+            <CountryConfigProvider>{children}</CountryConfigProvider>
+          </BrandingProvider>
         </SuperTokensProvider>
       </body>
     </html>

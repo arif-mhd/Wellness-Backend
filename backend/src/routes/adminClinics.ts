@@ -7,7 +7,8 @@ import { requireRole } from "../middleware/requireRole";
 import { clinicsContainer } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, getCountryConfigForOrgId } from "../utils/orgScope";
+import { validateIdentityFieldPatterns } from "../config/countries";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -284,6 +285,10 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
     consultationRates, paymentSettings, bio, clinicImageUrl,
     slots,
     orgSlug,
+    // Country-specific business identity fields with no dedicated column
+    // (PAN, GST, etc.) — keyed by the target org's country config
+    // identityFields[].key.
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
@@ -297,6 +302,15 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
   // instead. Omitted means the platform default, which keeps every existing
   // admin-create caller working unchanged.
   const tenantId = await resolveOrgIdForRegistration(typeof orgSlug === "string" ? orgSlug : undefined);
+
+  const countryConfig = await getCountryConfigForOrgId(tenantId);
+  const patternError = validateIdentityFieldPatterns(
+    countryConfig, "clinic", { emiratesIdOrPassport }, identityDocuments
+  );
+  if (patternError) {
+    res.status(400).json({ error: patternError });
+    return;
+  }
 
   try {
     const signUpResult = await EmailPassword.signUp("public", email, password);
@@ -340,6 +354,7 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
       licenseVerified:       false,
       dohLicense:            dohLicense            || null,
       dohLicenseVerified:    false,
+      identityDocuments:     identityDocuments     ?? {},
       address:               address               || null,
       addressProofFileUrl:   addressProofFileUrl   || null,
       addressProofVerified:  false,

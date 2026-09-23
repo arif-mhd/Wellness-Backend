@@ -4,6 +4,8 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -71,6 +73,7 @@ export default function AdminProductDetailPage({
 }: {
   params: Promise<{ id: string; productId: string }>;
 }) {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id: pharmacyId, productId } = use(params);
 
@@ -228,7 +231,7 @@ export default function AdminProductDetailPage({
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-semibold">Price</span>
-                <span className="text-[20px] font-medium text-[#6A8BFF]">AED {product.price.toFixed(2)}</span>
+                <span className="text-[20px] font-medium text-[#6A8BFF]">{formatCurrency(product.price.toFixed(2), currencyForOrg((product as any)?.tenantId))}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-semibold">Availability</span>

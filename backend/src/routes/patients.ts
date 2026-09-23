@@ -6,7 +6,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import Session from "supertokens-node/recipe/session";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { resolveOrgIdForRegistration } from "../utils/orgScope";
+import { resolveOrgIdForRegistration, resolveOrgId, getCountryConfigForOrgId } from "../utils/orgScope";
+import { validateIdentityFieldPatterns } from "../config/countries";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -37,7 +38,7 @@ const router = Router();
 // and saves the core registration data to Cosmos DB.
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    const { email, password, fullName, phone, dateOfBirth, gender, emiratesId } =
+    const { email, password, fullName, phone, dateOfBirth, gender, emiratesId, exrNumber, identityDocuments } =
       req.body;
 
     if (!email || !password || !fullName) {
@@ -83,6 +84,18 @@ router.post("/register", async (req: Request, res: Response) => {
     const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
     const tenantId = await resolveOrgIdForRegistration(orgSlug);
 
+    // Country-specific identity documents (PAN/Aadhaar for IN, Emirates ID
+    // for AE) arrive in the generic bag — validate their format against this
+    // org's country before creating the account, same as PUT /profile does.
+    const registrationCountryConfig = await getCountryConfigForOrgId(tenantId);
+    const registrationPatternError = validateIdentityFieldPatterns(
+      registrationCountryConfig, "patient", { emiratesId, exrNumber }, identityDocuments
+    );
+    if (registrationPatternError) {
+      res.status(400).json({ error: registrationPatternError });
+      return;
+    }
+
     // Persist to Cosmos  (patients collection, partition key = /id)
     const patientDoc = {
       id:             supertokensId,
@@ -93,6 +106,8 @@ router.post("/register", async (req: Request, res: Response) => {
       dateOfBirth:    dateOfBirth  ?? "",
       gender:         gender       ?? "",
       emiratesId:     emiratesId   ?? "",
+      exrNumber:      exrNumber    ?? "",
+      identityDocuments: identityDocuments ?? {},
       status:         "active",
       tenantId,
       createdAt:      new Date().toISOString(),
@@ -202,7 +217,21 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
     const {
       fullName, name, phone, emiratesId, exrNumber, email, gender, bloodGroup,
       dob, maritalStatus, height, weight, location, language, displayLanguage,
+      // Country-specific identity fields with no dedicated column (Aadhaar,
+      // PAN, etc.) — keyed by the patient's org's country config
+      // identityFields[].key.
+      identityDocuments,
     } = req.body;
+
+    if (identityDocuments) {
+      const orgId = await resolveOrgId(req);
+      const countryConfig = await getCountryConfigForOrgId(orgId);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "patient", { emiratesId }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
+    }
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -218,6 +247,7 @@ router.put("/profile", requireRole("patient"), async (req: SessionRequest, res: 
       ...(phone        !== undefined && { phone }),
       ...(emiratesId   !== undefined && { emiratesId }),
       ...(exrNumber    !== undefined && { exrNumber }),
+      ...(identityDocuments !== undefined && { identityDocuments: { ...(existing as any).identityDocuments, ...identityDocuments } }),
       ...(email        !== undefined && { email }),
       ...(gender       !== undefined && { gender }),
       ...(bloodGroup   !== undefined && { bloodGroup }),

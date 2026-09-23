@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { useClinicPermissions } from "@/lib/useClinicPermissions";
+import { useCurrency, useIdentityFields } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface Slot {
   dayOfWeek: number;
@@ -132,6 +134,8 @@ const TIMING_DAYS = [
 ];
 
 function ManageDoctorsContent() {
+  const currency = useCurrency();
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
   const router = useRouter();
   const searchParams = useSearchParams();
   const branchId = searchParams.get("branchId");
@@ -488,12 +492,12 @@ function ManageDoctorsContent() {
               {/* Details Grid */}
               <div className="flex flex-col gap-3 mb-8">
                 {[
-                  { label: "Emirates ID", val: selectedDoctor.emiratesId ?? "—" },
+                  { label: doctorIdLabel, val: selectedDoctor.emiratesId ?? "—" },
                   { label: "Gender", val: selectedDoctor.gender?.toUpperCase() ?? "—" },
                   { label: "Specialization", val: selectedDoctor.specialty ?? "—" },
                   { label: "Qualification", val: selectedDoctor.qualification ?? "—" },
                   { label: "Location", val: selectedDoctor.address ?? "—" },
-                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? `$${selectedDoctor.fees}` : "—" },
+                  { label: "Consultation Fees", val: selectedDoctor.fees != null ? formatCurrency(selectedDoctor.fees, currency) : "—" },
                   { label: "Email", val: selectedDoctor.email ?? "—" },
                   { label: "Contact Number", val: selectedDoctor.phone ?? "—" },
                   { label: "Office Phone", val: "—" },

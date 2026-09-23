@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -158,6 +159,7 @@ const DetailRow = ({
 );
 
 export default function PatientProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState<Tab>("about");
@@ -390,7 +392,7 @@ export default function PatientProfilePage({ params }: { params: Promise<{ id: s
                 <div className="space-y-4 max-w-sm">
                   {patient.emiratesId && (
                     <DetailRow
-                      label="Emirates ID"
+                      label={identityFieldsForOrg((patient as any)?.tenantId, "patient")[0]?.label ?? "ID"}
                       value={
                         <div className="flex items-center gap-1.5">
                           {patient.emiratesId}

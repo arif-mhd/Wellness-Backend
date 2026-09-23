@@ -18,6 +18,8 @@ import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { resolveClinicScope, scopeToClinicIds, buildInClause, getActorClinicIds, hasPermission, getActorPermissionState } from "../utils/clinicScope";
 import { sendPushToUser } from "../utils/pushNotifications";
+import { validateIdentityFieldPatterns } from "../config/countries";
+import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -169,6 +171,9 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
     specialty, license, qualification, specializations,
     fees, consultationRates, paymentSettings, resumeFileUrl,
     bio,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.).
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
@@ -192,6 +197,17 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
     await UserRoles.addRoleToUser("public", supertokensId, "doctor");
 
     const now = new Date().toISOString();
+  // Country-specific identity documents — validated against the CLINIC's own
+  // country (the doctor doc doesn't exist yet to resolve from).
+  if (identityDocuments) {
+    const countryConfig = await resolveCountryConfigForDoctor({ clinicId });
+    const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+    if (patternError) {
+      res.status(400).json({ error: patternError });
+      return;
+    }
+  }
+
     const doctorDoc = {
       id: supertokensId,
       supertokens_id: supertokensId,
@@ -212,6 +228,7 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       emiratesIdFileUrl: emiratesIdFileUrl || null,
       specialty: specialty || null,
       license: license || null,
+      identityDocuments: identityDocuments ?? {},
       qualification: qualification || null,
       specializations: specializations ?? [],
       fees: fees ?? null,
@@ -339,11 +356,24 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
     fullName, bio, eligibility, specialty, license, qualification, specializations,
     address, languages, fees, consultationRates, paymentSettings,
     avatarUrl, resumeFileUrl, phone, gender, dateOfBirth, bloodGroup, height, weight,
+    identityDocuments,
   } = req.body;
 
   try {
     const doctor = await getOwnedDoctorAnyBranch(actorId, req.params.id, res);
     if (!doctor) return;
+    // Country-specific identity documents (Medical Council Registration for
+    // IN, Emirates ID for AE) go in the generic bag — check their format
+    // against this doctor's own country, same as the clinic/patient routes.
+    if (identityDocuments) {
+      const countryConfig = await resolveCountryConfigForDoctor(doctor);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
+    }
+
 
     const updated = {
       ...doctor,
@@ -352,6 +382,7 @@ router.patch("/:id", requireRole("clinic"), async (req: SessionRequest, res: Res
       eligibility: eligibility ?? doctor.eligibility,
       specialty: specialty ?? doctor.specialty,
       license: license ?? doctor.license,
+      identityDocuments: identityDocuments ? { ...doctor.identityDocuments, ...identityDocuments } : doctor.identityDocuments,
       qualification: qualification ?? doctor.qualification,
       specializations: specializations ?? doctor.specializations,
       address: address ?? doctor.address,

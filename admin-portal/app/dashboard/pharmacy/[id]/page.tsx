@@ -6,6 +6,8 @@ import Pagination from "@/components/Pagination";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -23,6 +25,9 @@ async function adminFetch(path: string, options: RequestInit = {}) {
 }
 
 interface Pharmacy {
+  // Which white-label organization this record belongs to. The admin API
+  // already returns it (SELECT *); it drives which currency prices render in.
+  tenantId?: string | null;
   id: string;
   supertokens_id: string;
   ownerName: string;
@@ -115,6 +120,8 @@ const DoubleCaret = () => (
 );
 
 export default function PharmacyProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState<"about" | "stock">("about");
@@ -366,7 +373,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                     <DetailRow label="Location" value={pharmacy.location || "—"} />
                     <DetailRow label="Contact Number" value={pharmacy.phone} />
                     {pharmacy.emiratesId && (
-                      <DetailRow label="Emirates ID" value={pharmacy.emiratesId} />
+                      <DetailRow label={identityFieldsForOrg((pharmacy as any)?.tenantId, "pharmacy")[0]?.label ?? "ID"} value={pharmacy.emiratesId} />
                     )}
                     <DetailRow
                       label="Email ID"
@@ -537,8 +544,8 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
                                   {item.expiryDate ?? "—"}
                                 </td>
                                 <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-medium text-slate-500 lg:pl-4 px-2">
-                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Price (AED)</div>
-                                  AED {item.price.toFixed(2)}
+                                  <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Price ({currencyForOrg(pharmacy?.tenantId).code})</div>
+                                  {formatCurrency(item.price.toFixed(2), currencyForOrg(pharmacy?.tenantId))}
                                 </td>
                                 <td className="block lg:table-cell py-2 lg:py-5 text-[13px] font-semibold lg:pl-4 px-2">
                                   <div className="flex lg:hidden text-[10px] uppercase text-slate-400 font-semibold mb-1">Stock Status</div>
@@ -706,7 +713,7 @@ export default function PharmacyProfilePage({ params }: { params: Promise<{ id: 
 
               {/* Price */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price (AED) *</label>
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Price ({currencyForOrg(pharmacy?.tenantId).code}) *</label>
                 <input
                   type="number" min="0" step="0.01"
                   value={productForm.price}

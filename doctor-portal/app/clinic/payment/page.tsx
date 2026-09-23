@@ -4,6 +4,10 @@ import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiFetch, API_URL } from "@/lib/apiFetch";
 import Session from "supertokens-web-js/recipe/session";
+import { useCurrency, CurrencyConfig } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { clinicDayKey, clinicParts } from "@/lib/appointmentTime";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Clinics / Doctors payment page — fully wired to real data. Fee changes go
@@ -48,8 +52,8 @@ const DIAGNOSIS_COLORS: Record<string, string> = {
   Fever: "bg-[#FCE4E4] text-[#7A1212]",
 };
 
-function fmtMoney(n: number): string {
-  return `AED ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtMoney(n: number, currency: CurrencyConfig): string {
+  return formatCurrency(n, currency);
 }
 
 async function getClinicEmail(): Promise<string> {
@@ -126,27 +130,23 @@ function QuickFilterPills({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-// scheduledAt is stored as a naive local wall-clock time with a cosmetic
-// trailing "Z" — must not be handed to `new Date()` as-is, or the quick
-// filters below can misjudge "Today"/"This Week" near timezone boundaries.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
-
-function within(date: string, range: string): boolean {
+function within(date: string, range: string, timezone: string): boolean {
   if (range === "All") return true;
-  const d = parseLocalTime(date);
+  const d = new Date(date);
   const now = new Date();
-  if (range === "Today") return d.toDateString() === now.toDateString();
+  if (range === "Today") return clinicDayKey(d, timezone) === clinicDayKey(now, timezone);
   if (range === "This Week") { const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0, 0, 0, 0); return d >= start; }
-  if (range === "This month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  if (range === "This month") {
+    const a = clinicParts(d, timezone), b = clinicParts(now, timezone);
+    return a.month === b.month && a.year === b.year;
+  }
   return true;
 }
 
 // ─── History list (shared between Clinics tab and a selected doctor) ──────
 function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId?: string | null }) {
+  const currency = useCurrency();
+  const clinicTz = useClinicTimezone();
   const [filter, setFilter] = useState("all");
   const [range, setRange] = useState("All");
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -178,7 +178,7 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-  const visible = useMemo(() => rows.filter((r) => within(r.date, range)), [rows, range]);
+  const visible = useMemo(() => rows.filter((r) => within(r.date, range, clinicTz)), [rows, range, clinicTz]);
 
   return (
     <div>
@@ -248,7 +248,7 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
                 {row.status === "cancelled" && <span className="text-[10.5px] text-[#F25252] font-medium shrink-0">Cancelled</span>}
               </div>
               <span className="text-[12px] text-[#676E76]">{row.date ? new Date(row.date).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
-              <span className="text-[13px] font-semibold text-[#24292E] md:text-right">{fmtMoney(row.earning)}</span>
+              <span className="text-[13px] font-semibold text-[#24292E] md:text-right">{fmtMoney(row.earning, currency)}</span>
             </div>
           ))
         )}
@@ -267,6 +267,7 @@ function EditFeeModal({
   onSubmit: (newValue: string) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }) {
+  const currency = useCurrency();
   const [step, setStep] = useState<FeeStep>("input");
   const [newValue, setNewValue] = useState("");
   const [otp, setOtp] = useState("");
@@ -303,7 +304,7 @@ function EditFeeModal({
         {step === "input" && (
           <>
             <h2 className="text-[18px] font-medium text-[#24292E] mb-6">Edit Consultation Fee</h2>
-            <p className="text-[13px] font-semibold text-[#24292E] mb-5">{label} — Current fee: {currentValue || "—"}</p>
+            <p className="text-[13px] font-semibold text-[#24292E] mb-5">{label} — Current fee: {currentValue ? fmtMoney(Number(currentValue), currency) : "—"}</p>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-medium text-[#3D4B5A] mb-2">New Fees</label>
@@ -440,6 +441,7 @@ function WithdrawModal({
   onSubmit: (amount: number) => Promise<{ ok: boolean; error?: string }>;
   onChangeBankAccount: () => void; onClose: () => void;
 }) {
+  const currency = useCurrency();
   const [step, setStep] = useState<WithdrawStep>("input");
   const [amount, setAmount] = useState("");
   const [otp, setOtp] = useState("");
@@ -479,7 +481,7 @@ function WithdrawModal({
         {step === "input" && (
           <>
             <h2 className="text-[18px] font-medium text-[#24292E] mb-1 text-center">Withdraw Amount</h2>
-            <p className="text-[13px] text-[#676E76] text-center mb-6">Balance in wallet: <span className="font-semibold text-[#24292E]">{fmtMoney(balance)}</span></p>
+            <p className="text-[13px] text-[#676E76] text-center mb-6">Balance in wallet: <span className="font-semibold text-[#24292E]">{fmtMoney(balance, currency)}</span></p>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-medium text-[#3D4B5A] mb-2">Type Amount to Withdraw</label>
@@ -530,7 +532,7 @@ function WithdrawModal({
         {step === "success" && (
           <div className="text-center py-4">
             <h2 className="text-[18px] font-medium text-[#24292E] mb-2">Withdrawal Requested</h2>
-            <p className="text-[13px] text-[#676E76] mb-6">{fmtMoney(Number(amount))} will be processed within 2–3 business days.</p>
+            <p className="text-[13px] text-[#676E76] mb-6">{fmtMoney(Number(amount), currency)} will be processed within 2–3 business days.</p>
             <button onClick={onClose} className="w-full py-3 bg-black text-white text-[13px] font-semibold rounded-xl hover:bg-gray-800 transition-colors">Done</button>
           </div>
         )}
@@ -542,6 +544,7 @@ function WithdrawModal({
 // ─── Main page ───────────────────────────────────────────────────────────
 function ClinicPaymentContent() {
   const searchParams = useSearchParams();
+  const currency = useCurrency();
   const [activeTab, setActiveTab] = useState<"clinics" | "doctors">("clinics");
   const [email, setEmail] = useState("");
   const [hasBranches, setHasBranches] = useState(false);
@@ -735,8 +738,8 @@ function ClinicPaymentContent() {
               )}
             </div>
             <div className="flex flex-col sm:flex-row gap-5">
-              <StatCard label="Total Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.totalEarnings ?? 0)} sub="From completed appointments" />
-              <StatCard label="Available Balance" amount={summaryLoading ? "…" : fmtMoney(summary?.balance ?? 0)} sub={`${fmtMoney(summary?.totalWithdrawn ?? 0)} withdrawn to date`} />
+              <StatCard label="Total Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.totalEarnings ?? 0, currency)} sub="From completed appointments" />
+              <StatCard label="Available Balance" amount={summaryLoading ? "…" : fmtMoney(summary?.balance ?? 0, currency)} sub={`${fmtMoney(summary?.totalWithdrawn ?? 0, currency)} withdrawn to date`} />
             </div>
           </div>
 
@@ -744,8 +747,8 @@ function ClinicPaymentContent() {
           <div className="mb-8">
             <h2 className="text-[#383F45] text-[15px] font-medium mb-3">Earnings by Payment Method</h2>
             <div className="flex flex-col sm:flex-row gap-5">
-              <StatCard label="Cash Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.cashEarnings ?? 0)} sub="Paid directly by patients" />
-              <StatCard label="Insurance Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.insuranceEarnings ?? 0)} sub="Billed through accepted insurance" />
+              <StatCard label="Cash Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.cashEarnings ?? 0, currency)} sub="Paid directly by patients" />
+              <StatCard label="Insurance Earnings" amount={summaryLoading ? "…" : fmtMoney(summary?.insuranceEarnings ?? 0, currency)} sub="Billed through accepted insurance" />
             </div>
           </div>
 
@@ -792,7 +795,7 @@ function ClinicPaymentContent() {
                       {d.specialty && <p className="text-[11px] text-[#9EA5AD] truncate">{d.specialty}</p>}
                     </div>
                   </div>
-                  <span className="text-[13px] font-semibold text-[#24292E] shrink-0">{fmtMoney(d.earnings)}</span>
+                  <span className="text-[13px] font-semibold text-[#24292E] shrink-0">{fmtMoney(d.earnings, currency)}</span>
                 </button>
               ))
             )}
@@ -802,17 +805,17 @@ function ClinicPaymentContent() {
           {selectedDoctor && (
             <div className="lg:col-span-8 flex flex-col gap-8">
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-5 flex items-center justify-between flex-wrap gap-4">
-                <span className="text-[14px] font-medium text-[#24292E]">General Consultation fee: {doctorSummary?.fees ?? "—"}</span>
+                <span className="text-[14px] font-medium text-[#24292E]">General Consultation fee: {doctorSummary?.fees != null && String(doctorSummary.fees) !== "" ? fmtMoney(Number(doctorSummary.fees), currency) : "—"}</span>
                 <button onClick={() => setEditingFee({ targetType: "doctor", label: `${selectedDoctor.fullName} — General Consultation fee`, currentValue: doctorSummary?.fees ?? "" })} className="px-5 py-2 bg-[#5476FC] text-white text-[12px] font-semibold rounded-xl shadow-sm hover:shadow-md transition-all">
                   Edit Fees
                 </button>
               </div>
 
-              <StatCard label={`${selectedDoctor.fullName}'s Total Earnings`} amount={fmtMoney(doctorSummary?.totalEarnings ?? selectedDoctor.earnings)} sub="From completed appointments" />
+              <StatCard label={`${selectedDoctor.fullName}'s Total Earnings`} amount={fmtMoney(doctorSummary?.totalEarnings ?? selectedDoctor.earnings, currency)} sub="From completed appointments" />
 
               <div className="flex flex-col sm:flex-row gap-5">
-                <StatCard label="Cash Earnings" amount={fmtMoney(doctorSummary?.cashEarnings ?? 0)} sub="Paid directly by patients" />
-                <StatCard label="Insurance Earnings" amount={fmtMoney(doctorSummary?.insuranceEarnings ?? 0)} sub="Billed through accepted insurance" />
+                <StatCard label="Cash Earnings" amount={fmtMoney(doctorSummary?.cashEarnings ?? 0, currency)} sub="Paid directly by patients" />
+                <StatCard label="Insurance Earnings" amount={fmtMoney(doctorSummary?.insuranceEarnings ?? 0, currency)} sub="Billed through accepted insurance" />
               </div>
 
               <HistoryList branchId={selectedBranchId} doctorId={selectedDoctor.id} />

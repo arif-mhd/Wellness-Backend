@@ -4,6 +4,8 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -53,6 +55,9 @@ interface BranchRow {
 }
 
 interface Clinic {
+  // Which white-label organization this record belongs to. The admin API
+  // already returns it (SELECT *); it drives which currency prices render in.
+  tenantId?: string | null;
   id: string;
   clinicName?: string | null;
   fullName: string;
@@ -89,6 +94,8 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 );
 
 function ClinicDetailInner({ id }: { id: string }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const { currencyForOrg } = useOrgCurrency();
   const router = useRouter();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +167,7 @@ function ClinicDetailInner({ id }: { id: string }) {
           <DetailRow label="Position in Clinic" value={clinic.positionInClinic} />
           <DetailRow label="Gender" value={clinic.gender} />
           <DetailRow label="Date of Birth" value={clinic.dateOfBirth} />
-          <DetailRow label="Emirates ID / Passport" value={clinic.emiratesIdOrPassport} />
+          <DetailRow label={identityFieldsForOrg((clinic as any)?.tenantId, "clinic")[0]?.label ?? "ID"} value={clinic.emiratesIdOrPassport} />
           <DetailRow label="Languages" value={clinic.languages} />
           {clinic.otherInfo?.filter(o => o.label || o.value).map((o, i) => (
             <DetailRow key={i} label={o.label || "Other"} value={o.value} />
@@ -170,7 +177,7 @@ function ClinicDetailInner({ id }: { id: string }) {
         <div className="bg-white rounded-[1.75rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 space-y-4">
           <h2 className="text-[15px] font-medium text-slate-800 mb-2">Clinic / Company</h2>
           <DetailRow label="License Number" value={clinic.licenseNumber} />
-          <DetailRow label="DOH License" value={clinic.dohLicense} />
+          <DetailRow label={identityFieldsForOrg((clinic as any)?.tenantId, "clinic")[1]?.label ?? "License"} value={clinic.dohLicense} />
           <DetailRow label="Address" value={clinic.address} />
           <DetailRow label="Payment Settings" value={clinic.paymentSettings} />
           {clinic.addressProofFileUrl && (
@@ -191,7 +198,7 @@ function ClinicDetailInner({ id }: { id: string }) {
           <div className="bg-white rounded-[1.75rem] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 p-7 space-y-3">
             <h2 className="text-[15px] font-medium text-slate-800 mb-2">Consultation Rates</h2>
             {clinic.consultationRates.map((r, i) => (
-              <DetailRow key={i} label={r.category} value={`AED ${r.price}`} />
+              <DetailRow key={i} label={r.category} value={formatCurrency(r.price, currencyForOrg(clinic?.tenantId))} />
             ))}
           </div>
         )}
@@ -221,7 +228,7 @@ function ClinicDetailInner({ id }: { id: string }) {
                 <DetailRow label="Address" value={b.address} />
                 <DetailRow label="Phone" value={b.phone} />
                 <DetailRow label="License Number" value={b.licenseNumber} />
-                <DetailRow label="DOH License" value={b.dohLicense} />
+                <DetailRow label={identityFieldsForOrg((clinic as any)?.tenantId, "clinic")[1]?.label ?? "License"} value={b.dohLicense} />
                 <DetailRow label="Payment Settings" value={b.paymentSettings} />
                 <DetailRow label="Status" value={
                   <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
@@ -246,7 +253,7 @@ function ClinicDetailInner({ id }: { id: string }) {
                   <div className="pt-1 space-y-1">
                     <span className="text-[11px] text-slate-400 font-medium block">Consultation Rates</span>
                     {b.consultationRates.map((r, i) => (
-                      <DetailRow key={i} label={r.category} value={`AED ${r.price}`} />
+                      <DetailRow key={i} label={r.category} value={formatCurrency(r.price, currencyForOrg(clinic?.tenantId))} />
                     ))}
                   </div>
                 )}

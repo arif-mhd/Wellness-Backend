@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useBranding } from "@/components/BrandingContext";
+import { useCountryConfig } from "@/components/CountryConfigContext";
 
 type Step = 1 | 2 | 3;
 type AccountType = "pharmacy" | "lab";
@@ -11,6 +12,13 @@ type AccountType = "pharmacy" | "lab";
 export default function RegisterPage() {
   const router = useRouter();
   const branding = useBranding();
+  const { countryConfig } = useCountryConfig();
+  // Every identityFields entry scoped to "pharmacy" for the current org's
+  // country — AE has one (Emirates ID), IN has one (Drug License Number).
+  // Rendered generically so a third country's pharmacy identity requirement
+  // needs only a new registry entry, never a new field on this page.
+  const pharmacyIdentityFields = countryConfig.identityFields.filter((f) => f.appliesTo === "pharmacy");
+  const [pharmacyIdentityValues, setPharmacyIdentityValues] = useState<Record<string, string>>({});
   const [step, setStep]             = useState<Step>(1);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
@@ -30,7 +38,6 @@ export default function RegisterPage() {
   const [licenseNumber, setLicenseNumber] = useState("");
   const [phone, setPhone]                 = useState("");
   const [location, setLocation]           = useState("");
-  const [emiratesId, setEmiratesId]       = useState("");
 
   // Step 2 — lab details
   const [director, setDirector]           = useState("");
@@ -53,6 +60,8 @@ export default function RegisterPage() {
       return null;
     }
     if (!ownerName || !pharmacyName || !licenseNumber || !phone) return "Owner name, pharmacy name, license number and phone are required.";
+    const missingIdentityField = pharmacyIdentityFields.find((f) => f.required && !pharmacyIdentityValues[f.key]);
+    if (missingIdentityField) return `${missingIdentityField.label} is required.`;
     return null;
   }
 
@@ -81,7 +90,19 @@ export default function RegisterPage() {
         body: JSON.stringify(
           isLab
             ? { email, password, director, name: labName, labLicense, location: labLocation, contactNumber }
-            : { email, password, ownerName, pharmacyName, licenseNumber, phone, location, emiratesId }
+            : {
+                email, password, ownerName, pharmacyName, licenseNumber, phone, location,
+                // Legacy-storage fields (e.g. AE's emiratesId) go top-level under
+                // their own key; generic-storage fields (e.g. IN's
+                // drugLicenseNumber) go into identityDocuments. See
+                // CountryConfigContext's IdentityFieldDef.storage.
+                ...Object.fromEntries(
+                  pharmacyIdentityFields.filter((f) => f.storage === "legacy").map((f) => [f.key, pharmacyIdentityValues[f.key] || undefined])
+                ),
+                identityDocuments: Object.fromEntries(
+                  pharmacyIdentityFields.filter((f) => f.storage === "generic" && pharmacyIdentityValues[f.key]).map((f) => [f.key, pharmacyIdentityValues[f.key]])
+                ),
+              }
         ),
       });
       const data = await res.json();
@@ -178,14 +199,26 @@ export default function RegisterPage() {
                 { label: "Owner full name *", value: ownerName, set: setOwnerName, ph: "e.g. Ahmed Al Mansouri" },
                 { label: "Pharmacy name *", value: pharmacyName, set: setPharmacyName, ph: "e.g. Al Shifa Pharmacy" },
                 { label: "License number *", value: licenseNumber, set: setLicenseNumber, ph: "e.g. DHA-2024-XXXXX" },
-                { label: "Phone number *", value: phone, set: setPhone, ph: "+971 50 000 0000" },
-                { label: "Location / Address", value: location, set: setLocation, ph: "Dubai, UAE" },
-                { label: "Emirates ID", value: emiratesId, set: setEmiratesId, ph: "784-XXXX-XXXXXXX-X" },
+                { label: "Phone number *", value: phone, set: setPhone, ph: `${countryConfig.phone.callingCode} 50 000 0000` },
+                { label: "Location / Address", value: location, set: setLocation, ph: "e.g. Dubai" },
               ].map(({ label, value, set, ph }) => (
                 <div key={label}>
                   <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
                   <input type="text" value={value} onChange={e => set(e.target.value)} placeholder={ph}
                     className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition" />
+                </div>
+              ))}
+              {pharmacyIdentityFields.map((field) => (
+                <div key={field.key}>
+                  <label className="block text-xs font-outfit font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    {field.label}{field.required ? " *" : ""}
+                  </label>
+                  <input
+                    type="text"
+                    value={pharmacyIdentityValues[field.key] || ""}
+                    onChange={(e) => setPharmacyIdentityValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full h-12 px-4 bg-[#f3f4fd] rounded-xl text-sm font-outfit text-slate-800 placeholder-slate-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-[#22c55e]/40 transition"
+                  />
                 </div>
               ))}
             </div>
@@ -231,7 +264,7 @@ export default function RegisterPage() {
                       ["License",        licenseNumber],
                       ["Phone",          phone],
                       ["Location",       location || "—"],
-                      ["Emirates ID",    emiratesId || "—"],
+                      ...pharmacyIdentityFields.map((f) => [f.label, pharmacyIdentityValues[f.key] || "—"]),
                     ]
                 ).map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center py-2 border-b border-slate-50">

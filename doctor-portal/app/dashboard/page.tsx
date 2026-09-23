@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/apiFetch";
 import { useSidebar } from "@/components/SidebarContext";
+import { useClinicTimezone, useCurrency } from "@/components/BrandingContext";
+import { clinicDayKey, clinicParts } from "@/lib/appointmentTime";
+import { formatCurrency } from "@/lib/currency";
 
 interface SlotDef {
   dayOfWeek: number;
@@ -41,12 +44,6 @@ function fmt12(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2,"0")}${h >= 12 ? "PM" : "AM"}`;
 }
 
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
-
 // Formats a duration in minutes as "Xh Ym" / "Xm", always showing at least
 // the minutes so a fresh event reads "0m" rather than nothing.
 function formatDuration(totalMins: number) {
@@ -64,18 +61,15 @@ function formatDuration(totalMins: number) {
 //   - in_progress -> "In progress"
 function appointmentTimeLabel(scheduledAt: string, status: string, updatedAt?: string) {
   if (status === "completed") {
-    // updatedAt is set server-side with new Date().toISOString() — genuine,
-    // correctly-suffixed UTC. Parse it directly; parseLocalTime's Z-stripping
-    // workaround is only for scheduledAt (which the patient app mislabels as
-    // UTC when it's really local time) and would corrupt this by ~the user's
-    // UTC offset if applied here.
-    const updated = updatedAt ? new Date(updatedAt) : parseLocalTime(scheduledAt);
+    // Both updatedAt and scheduledAt are genuine UTC instants, so this is
+    // plain elapsed-time math — no timezone needed for a duration.
+    const updated = updatedAt ? new Date(updatedAt) : new Date(scheduledAt);
     const ago = (Date.now() - updated.getTime()) / 60000;
     return ago < 1 ? "Completed just now" : `Completed ${formatDuration(ago)} ago`;
   }
   if (status === "in_progress") return "In progress";
 
-  const diffMins = (parseLocalTime(scheduledAt).getTime() - Date.now()) / 60000;
+  const diffMins = (new Date(scheduledAt).getTime() - Date.now()) / 60000;
   if (diffMins > 0) return `Consultation in ${formatDuration(diffMins)}`;
   return `${formatDuration(-diffMins)} overdue`;
 }
@@ -90,6 +84,8 @@ function pctChange(today: number, yesterday: number): { value: number; direction
 }
 
 export default function DashboardPage() {
+  const clinicTz = useClinicTimezone();
+  const currency = useCurrency();
   const router = useRouter();
 
   const [doctorName, setDoctorName]     = useState<string | null>(null);
@@ -228,8 +224,8 @@ export default function DashboardPage() {
                  d1.getDate() === d2.getDate();
         };
 
-        const todays    = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), today) && a.status !== "cancelled");
-        const yesterdays = all.filter(a => a.scheduledAt && isSameDay(parseLocalTime(a.scheduledAt), yesterday) && a.status !== "cancelled");
+        const todays    = all.filter(a => a.scheduledAt && clinicDayKey(a.scheduledAt, clinicTz) === clinicDayKey(today, clinicTz) && a.status !== "cancelled");
+        const yesterdays = all.filter(a => a.scheduledAt && clinicDayKey(a.scheduledAt, clinicTz) === clinicDayKey(yesterday, clinicTz) && a.status !== "cancelled");
         // Patients who have signalled they're actually present in the
         // waiting room, not just whoever the doctor last connected to.
         const waitingNow = all.filter(a => a.patientWaitingSince && a.status !== "completed" && a.status !== "cancelled");
@@ -248,8 +244,8 @@ export default function DashboardPage() {
           all
             .filter((a) => isCompleted(a) && a.scheduledAt)
             .filter((a) => {
-              const d = parseLocalTime(a.scheduledAt);
-              return d.getFullYear() === year && d.getMonth() === month;
+              const d = clinicParts(a.scheduledAt, clinicTz);
+              return d.year === year && d.month === month;
             })
             .reduce((sum, a) => sum + (a.paymentAmount || 0), 0);
 
@@ -584,7 +580,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-[#24292E] text-[22px] font-medium tracking-[-0.44px]" style={{ fontFamily: "Outfit, sans-serif" }}>
               {dataLoaded
-                ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(revenueThisMonth)
+                ? formatCurrency(Math.round(revenueThisMonth), currency)
                 : "—"}
             </div>
             <div className="flex items-center gap-1">

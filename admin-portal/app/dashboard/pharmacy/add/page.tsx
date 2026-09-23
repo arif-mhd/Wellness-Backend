@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -43,6 +45,7 @@ const inputCls = "w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-5
 const labelCls = "text-[11px] font-semibold text-slate-500 uppercase tracking-wider";
 
 export default function AddPharmacyPage() {
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -350,7 +353,7 @@ export default function AddPharmacyPage() {
                         <input name="strength" value={activeProduct.strength} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="e.g. 500mg" className={inputCls} />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className={labelCls}>Price (AED) *</label>
+                        <label className={labelCls}>Price ({defaultCurrency.code}) *</label>
                         <input type="number" min="0" step="0.01" name="price" value={activeProduct.price} onChange={e => handleProductChange(activeProductIdx, e)} placeholder="0.00" className={inputCls} />
                       </div>
                       <div className="flex flex-col gap-1.5">

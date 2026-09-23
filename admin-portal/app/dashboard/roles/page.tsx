@@ -4,6 +4,7 @@ import Pagination from "@/components/Pagination";
 import { useState, useEffect, useCallback } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -116,6 +117,7 @@ function UserAvatar({ user, size = "md" }: { user: RoleUser; size?: "sm" | "md" 
 }
 
 export default function RolesPage() {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const [activeTab, setActiveTab]   = useState<Tab>("Doctors");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
@@ -312,7 +314,7 @@ export default function RolesPage() {
                           <th className="pb-4 pt-1 font-medium w-[25%]">
                             <div className="flex items-center gap-2 cursor-pointer hover:text-slate-500">Date Joined <DoubleCaret /></div>
                           </th>
-                          <th className="pb-4 pt-1 font-medium w-[25%]">Emirates ID</th>
+                          <th className="pb-4 pt-1 font-medium w-[25%]">{identityFieldsForOrg(null, "doctor")[0]?.label ?? "ID"}</th>
                           {activeTab === "Doctors" && (
                             <th className="pb-4 pt-1 font-medium w-[15%]">Speciality</th>
                           )}
@@ -376,7 +378,7 @@ export default function RolesPage() {
                               <span className="text-[12px] text-slate-700 font-medium">{formatDate(user.dateJoined)}</span>
                             </div>
                             <div className="flex flex-col items-end">
-                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">Emirates ID</span>
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wider">{identityFieldsForOrg(null, "doctor")[0]?.label ?? "ID"}</span>
                               <span className="text-[12px] text-slate-500 font-medium">{user.emiratesId ?? "—"}</span>
                             </div>
                           </div>

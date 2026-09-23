@@ -3,16 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import { useDoctorPermissions } from "@/lib/useDoctorPermissions";
-
-const EMIRATES = [
-  { key: "AUH", city: "Abu Dhabi" },
-  { key: "DXB", city: "Dubai" },
-  { key: "SHJ", city: "Sharjah" },
-  { key: "AJM", city: "Ajman" },
-  { key: "UAQ", city: "Umm Al-Quwain" },
-  { key: "RAK", city: "Ras Al Khaimah" },
-  { key: "FUJ", city: "Fujairah" },
-];
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
+import { useIdentityFields } from "@/components/BrandingContext";
 
 const CONSULTATION_TIMES = [10, 15, 20, 30, 45, 60];
 
@@ -93,14 +86,10 @@ type FormData = {
   weight: string;
   address: string;
   postalCode: string;
-  feesPerEmirate: Record<string, string>;
+  fees: string;
 };
 
 function buildFormData(doc: Doctor): FormData {
-  const fpe: Record<string, string> = {};
-  for (const em of EMIRATES) {
-    fpe[em.key] = doc.feesPerEmirate?.[em.key] ?? doc.fees ?? "";
-  }
   return {
     languages:                Array.isArray(doc.languages) ? doc.languages
                               : (typeof doc.languages === "string" && doc.languages.trim()
@@ -117,11 +106,13 @@ function buildFormData(doc: Doctor): FormData {
     weight:                   String(doc.weight            ?? ""),
     address:                  doc.address                  ?? "",
     postalCode:               doc.postalCode               ?? "",
-    feesPerEmirate:           fpe,
+    fees:                     doc.fees ?? "",
   };
 }
 
 export default function ProfilePage() {
+  const doctorIdLabel = useIdentityFields("doctor")[0]?.label ?? "ID";
+  const currency = useCurrency();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -133,7 +124,7 @@ export default function ProfilePage() {
   const [draftDetails, setDraftDetails] = useState({ dateOfBirth: "", bloodGroup: "", height: "", weight: "", address: "", postalCode: "" });
   const [detailsHeightError, setDetailsHeightError] = useState("");
   const [detailsWeightError, setDetailsWeightError] = useState("");
-  const [draftFees, setDraftFees] = useState<Record<string, string>>({});
+  const [draftFee, setDraftFee] = useState("");
 
   const [editLang, setEditLang] = useState(false);
   const [editConsult, setEditConsult] = useState(false);
@@ -221,10 +212,7 @@ export default function ProfilePage() {
   const doc = doctor ?? {};
   const fd = formData ?? buildFormData(doc);
 
-  const displayFee = (key: string) => {
-    const v = fd.feesPerEmirate[key];
-    return v ? `AED ${v}.00` : "AED —";
-  };
+  const displayFee = () => (fd.fees ? formatCurrency(fd.fees, currency) : `${currency.symbol} —`);
 
   return (
     <>
@@ -411,7 +399,7 @@ export default function ProfilePage() {
                   <EditableFieldRow label="Gender" value={draftPersonal.gender} onChange={v => setDraftPersonal(p => ({ ...p, gender: v }))} />
                   <EditableFieldRow label="Marital Status" value={draftPersonal.maritalStatus} onChange={v => setDraftPersonal(p => ({ ...p, maritalStatus: v }))} />
                   <EditableFieldRow label="Email ID (read-only)" value={doc.email || ""} onChange={() => {}} disabled />
-                  <EditableFieldRow label="Emirates ID (read-only)" value={doc.emiratesId || ""} onChange={() => {}} disabled />
+                  <EditableFieldRow label={`${doctorIdLabel} (read-only)`} value={doc.emiratesId || ""} onChange={() => {}} disabled />
                 </div>
                 <InlineEditBtns
                   onCancel={() => setEditPersonal(false)}
@@ -420,7 +408,7 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                <FieldRow label="Emirates ID" value={doc.emiratesId || "—"} />
+                <FieldRow label={doctorIdLabel} value={doc.emiratesId || "—"} />
                 <FieldRow label="Contact Number" value={fd.phone || "—"} />
                 <FieldRow label="Email ID" value={doc.email || "—"} />
                 <FieldRow label="Gender" value={fd.gender || "—"} />
@@ -510,39 +498,29 @@ export default function ProfilePage() {
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-[#24292E] text-base font-medium tracking-tight">Fee Configuration</h2>
-          {!editFees && <EditBtn onClick={() => { setDraftFees({ ...fd.feesPerEmirate }); setEditFees(true); }} />}
+          {!editFees && <EditBtn onClick={() => { setDraftFee(fd.fees); setEditFees(true); }} />}
         </div>
         <div className="bg-white rounded-xl p-8 border border-white">
-          <span className="text-[#24292E] text-sm font-medium block mb-4">Consultation Fee (AED)</span>
+          <span className="text-[#24292E] text-sm font-medium block mb-4">Consultation Fee ({currency.code})</span>
           {editFees ? (
             <>
-              <div className="flex flex-col gap-3 max-w-xs">
-                {EMIRATES.map(({ key, city }) => (
-                  <div key={key} className="flex items-center justify-between gap-4">
-                    <span className="text-[#676E76] text-xs w-32 shrink-0">{city}</span>
-                    <input
-                      type="number"
-                      value={draftFees[key] ?? ""}
-                      onChange={e => setDraftFees(prev => ({ ...prev, [key]: e.target.value }))}
-                      placeholder="0"
-                      className="w-24 text-xs bg-[#F5F6FA] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#5476FC]/30 border border-transparent focus:border-[#5476FC] text-right"
-                    />
-                  </div>
-                ))}
+              <div className="flex items-center gap-4 max-w-xs">
+                <input
+                  type="number"
+                  value={draftFee}
+                  onChange={e => setDraftFee(e.target.value)}
+                  placeholder="0"
+                  className="w-32 text-xs bg-[#F5F6FA] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#5476FC]/30 border border-transparent focus:border-[#5476FC] text-right"
+                />
               </div>
               <InlineEditBtns
                 onCancel={() => setEditFees(false)}
-                onSave={async () => { await saveSection({ feesPerEmirate: draftFees }); setEditFees(false); }}
+                onSave={async () => { await saveSection({ fees: draftFee }); setEditFees(false); }}
               />
             </>
           ) : (
-            <div className="flex flex-col gap-2 max-w-xs">
-              {EMIRATES.map(({ key, city }) => (
-                <div key={key} className="flex justify-between items-center">
-                  <span className="text-[#676E76] text-xs">{city}</span>
-                  <span className="text-[#24292E] text-xs font-medium">{displayFee(key)}</span>
-                </div>
-              ))}
+            <div className="max-w-xs">
+              <span className="text-[#24292E] text-sm font-medium">{displayFee()}</span>
             </div>
           )}
         </div>

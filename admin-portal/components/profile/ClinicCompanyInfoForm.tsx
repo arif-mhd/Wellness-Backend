@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface RateRow {
   id: string;
@@ -54,6 +56,9 @@ function VerifyField({
 }
 
 export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicCompanyInfoFormProps) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const licenseLabel = identityFieldsForOrg(null, "clinic")[1]?.label ?? "ID";
+  const { defaultCurrency } = useOrgCurrency();
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [dohLicense, setDohLicense] = useState("");
@@ -114,7 +119,7 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
     e.preventDefault();
 
     if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
-    if (!dohLicense.trim()) { setFormError("DOH License is required."); return; }
+    if (!dohLicense.trim()) { setFormError(`${licenseLabel} is required.`); return; }
     if (!address.trim()) { setFormError("Address is required."); return; }
 
     setFormError("");
@@ -154,8 +159,8 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
             <VerifyField placeholder="License Number" value={licenseNumber} onChange={setLicenseNumber} verified={licenseVerified} onVerify={() => handleVerify(setLicenseVerified, licenseNumber, "License Number")} />
           </div>
           <div>
-            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">DOH Lic*</div>
-            <VerifyField placeholder="DOH License" value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
+            <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">{licenseLabel}*</div>
+            <VerifyField placeholder={licenseLabel} value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
           </div>
         </div>
 
@@ -207,7 +212,7 @@ export default function ClinicCompanyInfoForm({ onSubmit, onGoBack }: ClinicComp
                 <input type="text" placeholder="Category" value={row.category} onChange={(e) => updateRateRow(row.id, "category", e.target.value)} className={inputCls} />
                 <div className="flex items-center gap-2">
                   <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-4 py-3.5 border border-transparent">
-                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">AED</span>
+                    <span className="text-[0.72rem] font-bold text-slate-400 select-none mr-2">{defaultCurrency.code}</span>
                     <input type="text" placeholder="Add Price" value={row.price} onChange={(e) => updateRateRow(row.id, "price", e.target.value)} className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit" />
                   </div>
                   {rates.length > 1 && (

@@ -4,6 +4,8 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -27,6 +29,9 @@ interface AvailabilitySlot {
 }
 
 interface Doctor {
+  // Which white-label organization this record belongs to. The admin API
+  // already returns it (SELECT *); it drives which currency prices render in.
+  tenantId?: string | null;
   id: string;
   fullName: string;
   email: string;
@@ -123,6 +128,8 @@ interface ReviewEntry { id: string; rating: number; comment: string; reviewer: {
 const PALETTE = ["#8b5cf6", "#10b981", "#f59e0b", "#06b6d4", "#ef4444", "#3b82f6", "#ec4899", "#84cc16", "#f97316", "#0ea5e9"];
 
 export default function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const { currencyForOrg, defaultCurrency } = useOrgCurrency();
   const router = useRouter();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState<Tab>("about");
@@ -327,7 +334,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <div className="space-y-4">
                       {doctor.emiratesId && (
                         <DetailRow
-                          label="Emirates ID"
+                          label={identityFieldsForOrg((doctor as any)?.tenantId, "doctor")[0]?.label ?? "ID"}
                           value={
                             <div className="flex items-center gap-1.5">
                               {doctor.emiratesId}
@@ -361,7 +368,7 @@ export default function DoctorProfilePage({ params }: { params: Promise<{ id: st
                     <div className="space-y-4">
                       {["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al-Quwain", "Ras Al Khaimah", "Fujairah"].map(emirate => {
                         const fee = doctor.feesPerEmirate?.[emirate] ?? doctor.fees ?? "—";
-                        return <DetailRow key={emirate} label={emirate} value={fee ? `AED ${fee}` : "—"} labelClass="font-medium text-slate-500" />;
+                        return <DetailRow key={emirate} label={emirate} value={fee ? formatCurrency(fee, currencyForOrg(doctor?.tenantId)) : "—"} labelClass="font-medium text-slate-500" />;
                       })}
                     </div>
                   </div>

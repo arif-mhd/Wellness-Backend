@@ -7,6 +7,8 @@ import {
   appointmentsContainer,
 } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
+import { resolveOrgId } from "../utils/orgScope";
+import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
 
@@ -113,6 +115,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
     ]);
 
     // ── Normalise each type into a unified ServiceItem shape ───────────────
+    const currency = await resolveCurrencyForOrgId(await resolveOrgId(req));
     const items: any[] = [];
 
     // Medicine orders
@@ -130,7 +133,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             (orderItems.length > 3 ? ` +${orderItems.length - 3} more` : ""),
           subText: `${orderItems.length} item${orderItems.length !== 1 ? "s" : ""}`,
           date: `Placed on ${formatDate(o.createdAt || o.created_at)}`,
-          price: `AED ${((o.total_amount || o.totalAmount || 0)).toFixed(0)}`,
+          price: formatCurrencyText(o.total_amount || o.totalAmount || 0, currency),
           status: o.status ?? "confirmed",
           rawId: o.id,
           createdAt: o.createdAt || o.created_at || "",
@@ -153,7 +156,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             (bookingItems.length > 3 ? ` +${bookingItems.length - 3} more` : ""),
           subText: `${bookingItems.length} test${bookingItems.length !== 1 ? "s" : ""} · ${b.status || "Confirmed"}`,
           date: `Booked on ${formatDate(b.createdAt)}`,
-          price: `AED ${(b.payment_amount || 0).toFixed(0)}`,
+          price: formatCurrencyText(b.payment_amount || 0, currency),
           status: b.status ?? "confirmed",
           rawId: b.id,
           createdAt: b.createdAt || "",
@@ -176,7 +179,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
             (bookingItems.length > 3 ? ` +${bookingItems.length - 3} more` : ""),
           subText: `${bookingItems.length} vaccine${bookingItems.length !== 1 ? "s" : ""} · ${b.status || "Confirmed"}`,
           date: `Booked on ${formatDate(b.createdAt)}`,
-          price: `AED ${(b.payment_amount || 0).toFixed(0)}`,
+          price: formatCurrencyText(b.payment_amount || 0, currency),
           status: b.status ?? "confirmed",
           rawId: b.id,
           createdAt: b.createdAt || "",
@@ -194,7 +197,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
           subText: a.doctorSpecialty || "General Physician",
           date: `Visited on ${formatDate(a.scheduledAt || a.createdAt)}`,
           price: a.paymentAmount
-            ? `AED ${Number(a.paymentAmount).toFixed(0)}`
+            ? formatCurrencyText(Number(a.paymentAmount), currency)
             : "",
           status: a.status,
           appointmentId: a.id,

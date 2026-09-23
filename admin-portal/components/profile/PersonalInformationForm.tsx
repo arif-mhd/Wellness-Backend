@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 interface PersonalInformationFormProps {
   initialEmail?: string;
@@ -38,6 +39,8 @@ export default function PersonalInformationForm({
   initialLanguages = [],
   onSubmit,
 }: PersonalInformationFormProps) {
+  const { identityFieldsForOrg } = useOrgCurrency();
+  const idLabel = identityFieldsForOrg(null, "doctor")[0]?.label ?? "ID";
   // Form State
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
@@ -181,12 +184,12 @@ export default function PersonalInformationForm({
     }
   };
 
-  // Handle Emirates ID file select
+  // Handle identity-document file select
   const handleEmiratesIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.size > 5 * 1024 * 1024) {
-        setFormError("Emirates ID file exceeds the 5MB size limit.");
+        setFormError(`${idLabel} file exceeds the 5MB size limit.`);
         return;
       }
       setEmiratesIdFile(file);
@@ -221,7 +224,7 @@ export default function PersonalInformationForm({
     }
     setPhoneError("");
     if (!emiratesId.trim()) {
-      setFormError("Emirates ID is required.");
+      setFormError(`${idLabel} is required.`);
       return;
     }
     if (!email.trim()) {
@@ -384,7 +387,7 @@ export default function PersonalInformationForm({
           <div>
             <input
               type="text"
-              placeholder="Emirates ID*"
+              placeholder={`${idLabel}*`}
               value={emiratesId}
               onChange={(e) => setEmiratesId(e.target.value)}
               className="w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-4 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit"
@@ -408,7 +411,7 @@ export default function PersonalInformationForm({
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <span className="text-sm font-semibold text-[#5476FC] hover:underline">
-            {emiratesIdFile ? `Emirates ID Uploaded: ${emiratesIdFile.name}` : "Upload Emirates ID"}
+            {emiratesIdFile ? `${idLabel} Uploaded: ${emiratesIdFile.name}` : `Upload ${idLabel}`}
           </span>
           <span className="text-[0.68rem] text-[#8EA0DE] font-light mt-1">
             Accepted Formats: PDF, JPEG, PNG

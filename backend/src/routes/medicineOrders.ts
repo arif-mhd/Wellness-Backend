@@ -8,6 +8,8 @@ import { uploadBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { validateOrderItems, computeAggregateOrderStatus } from "../utils/pharmacyOrders";
+import { resolveOrgId } from "../utils/orgScope";
+import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -69,10 +71,11 @@ router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async
     await medicineOrdersContainer.items.upsert(order);
 
     const itemNames = validatedItems.map(i => i.name).join(", ");
+    const orderCurrency = await resolveCurrencyForOrgId(await resolveOrgId(req));
     logActivity({
       source: "patient",
       action: "Medicine Order Placed",
-      details: `Order AED ${total_amount.toFixed(2)} — ${itemNames}`,
+      details: `Order ${formatCurrencyText(total_amount, orderCurrency)} — ${itemNames}`,
       performedBy: "Patient",
       performedById: patientId,
       entityType: "medicineOrder",

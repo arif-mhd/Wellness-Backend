@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency, CurrencyConfig } from "@/components/OrgCurrencyContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface FeeRequest {
   id: string;
@@ -37,13 +39,13 @@ async function adminFetch(path: string, options: RequestInit = {}) {
   });
 }
 
-function formatRates(rates: any): string {
+function formatRates(rates: any, currency: CurrencyConfig): string {
   if (rates == null) return "—";
   if (Array.isArray(rates)) {
     if (rates.length === 0) return "—";
-    return rates.map((r: any) => `${r.category}: AED ${r.price}`).join(", ");
+    return rates.map((r: any) => `${r.category}: ${formatCurrency(r.price, currency)}`).join(", ");
   }
-  return `AED ${rates}`;
+  return formatCurrency(rates, currency);
 }
 
 function StatusBadge({ status }: { status: FeeRequest["status"] }) {
@@ -55,6 +57,7 @@ function StatusBadge({ status }: { status: FeeRequest["status"] }) {
 }
 
 function FeeRequestsPageInner() {
+  const { currencyForOrg } = useOrgCurrency();
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
   const [requests, setRequests] = useState<FeeRequest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -296,11 +299,11 @@ function FeeRequestsPageInner() {
             <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-50 space-y-5 mb-6">
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block mb-1.5">Current</span>
-                <span className="text-[13px] text-slate-700 font-medium">{formatRates(selected.oldRates)}</span>
+                <span className="text-[13px] text-slate-700 font-medium">{formatRates(selected.oldRates, currencyForOrg((selected as any)?.tenantId))}</span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block mb-1.5">Requested</span>
-                <span className="text-[13px] text-[#6A8BFF] font-semibold">{formatRates(selected.newRates)}</span>
+                <span className="text-[13px] text-[#6A8BFF] font-semibold">{formatRates(selected.newRates, currencyForOrg((selected as any)?.tenantId))}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-medium">Requested On</span>

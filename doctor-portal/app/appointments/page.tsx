@@ -4,12 +4,10 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Patient } from "./types";
 import { apiFetch } from "@/lib/apiFetch";
-
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
+import { CurrencyConfig } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
+import { useClinicTimezone } from "@/components/BrandingContext";
+import { formatClinicDate, formatClinicTime, clinicDayKey, startOfClinicToday } from "@/lib/appointmentTime";
 
 function ageFromDob(dob?: string): number {
   if (!dob) return 0;
@@ -23,12 +21,8 @@ function ageFromDob(dob?: string): number {
   return Math.max(0, age);
 }
 
-function mapToPatient(apt: any, index: number): Patient {
-  const d = parseLocalTime(apt.scheduledAt);
-  const today = new Date();
-  const isToday = d.getFullYear() === today.getFullYear() &&
-                  d.getMonth() === today.getMonth() &&
-                  d.getDate() === today.getDate();
+function mapToPatient(apt: any, index: number, currency: CurrencyConfig, clinicTz: string): Patient {
+  const isToday = clinicDayKey(apt.scheduledAt, clinicTz) === clinicDayKey(new Date(), clinicTz);
   // The backend now auto-cancels any appointment whose scheduled day has
   // fully passed without completing (see autoExpireStaleAppointments) — so
   // apt.status is authoritative here, no elapsed-time guessing needed.
@@ -73,11 +67,11 @@ function mapToPatient(apt: any, index: number): Patient {
     description: apt.reason ?? "",
     status,
     dateTime: isToday
-      ? (status === "Waiting" ? "Waiting" : d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }))
-      : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
+      ? (status === "Waiting" ? "Waiting" : formatClinicTime(apt.scheduledAt, clinicTz, { hour: "2-digit", minute: "2-digit", hour12: true }))
+      : formatClinicDate(apt.scheduledAt, clinicTz, { day: "2-digit", month: "short", year: "numeric" }) + ", " + formatClinicTime(apt.scheduledAt, clinicTz, { hour: "2-digit", minute: "2-digit", hour12: true }),
     avatar: apt.patientAvatarUrl || "/default-avatar.svg",
     bio: apt.reason ?? "",
-    earnings: `${apt.paymentAmount ?? 250} AED`,
+    earnings: formatCurrency(apt.paymentAmount ?? 250, currency),
     preVisitForm,
     preVisitFormDate,
     scheduledAt: apt.scheduledAt,
@@ -95,12 +89,15 @@ import AllConsultationsTable from "@/components/appointment/AllConsultationsTabl
 import AppointmentDetailsCard from "@/components/appointment/AppointmentDetailsCard";
 import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 import { useSidebar } from "@/components/SidebarContext";
+import { useCurrency } from "@/components/BrandingContext";
 
 
 
 export default function AppointmentsPage() {
   const router = useRouter();
   const { isOpen: sidebarOpen } = useSidebar();
+  const currency = useCurrency();
+  const clinicTz = useClinicTimezone();
   const [activeTab, setActiveTab] = useState<"All" | "Upcoming" | "Past">("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchInput, setShowSearchInput] = useState(false);
@@ -120,11 +117,11 @@ export default function AppointmentsPage() {
       const res = await apiFetch("/api/appointments/doctor");
       if (!res.ok) return;
       const { appointments } = await res.json();
-      const mapped = (appointments ?? []).map(mapToPatient);
+      const mapped = (appointments ?? []).map((apt: any, i: number) => mapToPatient(apt, i, currency, clinicTz));
       setAllAppointments(mapped);
       // Do NOT auto-select; side card only appears when user clicks a row
     } catch { /* silently ignore */ }
-  }, []);
+  }, [currency, clinicTz]);
 
   useEffect(() => {
     fetchAppointments();
@@ -189,8 +186,8 @@ export default function AppointmentsPage() {
   // Shows only non-consulted (non-Completed) appointments, filtered by today/date
   const filteredNewAppointments = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toDateString();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayKey = clinicDayKey(now, clinicTz);
+    const startOfToday = startOfClinicToday(clinicTz);
 
     // "New Appointments" section only appears in "All" tab
     // Only include non-Completed appointments
@@ -199,12 +196,12 @@ export default function AppointmentsPage() {
     // Filter by date
     if (dateFilter === "Today") {
       // Only today's non-completed
-      result = result.filter(appt => !appt.scheduledAt || parseLocalTime(appt.scheduledAt).toDateString() === todayStr);
+      result = result.filter(appt => !appt.scheduledAt || clinicDayKey(appt.scheduledAt, clinicTz) === todayKey);
     } else {
       // All Dates: only show non-completed from today or future — never past-dated stale ones
       result = result.filter(appt => {
         if (!appt.scheduledAt) return true;
-        return parseLocalTime(appt.scheduledAt) >= startOfToday;
+        return new Date(appt.scheduledAt) >= startOfToday;
       });
     }
 
@@ -220,7 +217,7 @@ export default function AppointmentsPage() {
     }
 
     return result;
-  }, [dateFilter, searchQuery, allAppointments]);
+  }, [dateFilter, searchQuery, allAppointments, clinicTz]);
 
   // Filter & Sort All Consultations list
   // - "All" tab: show ALL appointments (completed ones will be faded in the table)
@@ -228,7 +225,7 @@ export default function AppointmentsPage() {
   // - "Past" tab: only Completed appointments OR appointments from past dates
   const filteredAllConsultations = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toDateString();
+    const todayKey = clinicDayKey(now, clinicTz);
 
     let result = [...allAppointments];
 
@@ -237,16 +234,15 @@ export default function AppointmentsPage() {
         // Today's non-completed
         result = result.filter(c =>
           (c.status === "Scheduled" || c.status === "Waiting") &&
-          (!c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr)
+          (!c.scheduledAt || clinicDayKey(c.scheduledAt, clinicTz) === todayKey)
         );
       } else {
         // All Dates: non-completed that are scheduled for today OR the future
         result = result.filter(c => {
           if (c.status === "Completed") return false;
           if (!c.scheduledAt) return true;
-          const d = parseLocalTime(c.scheduledAt);
-          // Include if it's today or a future date
-          return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          // Include if it's today or a future date, in the clinic's own zone
+          return new Date(c.scheduledAt) >= startOfClinicToday(clinicTz);
         });
       }
     } else if (activeTab === "Past") {
@@ -254,7 +250,7 @@ export default function AppointmentsPage() {
         // Today's completed
         result = result.filter(c =>
           c.status === "Completed" &&
-          (!c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr)
+          (!c.scheduledAt || clinicDayKey(c.scheduledAt, clinicTz) === todayKey)
         );
       } else {
         // All Dates: completed appointments (any date, including previous dates)
@@ -264,7 +260,7 @@ export default function AppointmentsPage() {
       // "All" tab — keep all appointments; date filter applied below if Today
       if (dateFilter === "Today") {
         result = result.filter(c =>
-          !c.scheduledAt || parseLocalTime(c.scheduledAt).toDateString() === todayStr
+          !c.scheduledAt || clinicDayKey(c.scheduledAt, clinicTz) === todayKey
         );
       }
       // "All Dates": no date restriction — show everything (completed rows will be faded)

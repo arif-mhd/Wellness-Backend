@@ -20,16 +20,64 @@ export type FeatureKey =
   | "articles"
   | "sos";
 
+// Mirrors backend/src/config/countries.ts's CurrencyConfig shape — duplicated
+// here (no shared package between this portal and the backend) rather than
+// imported, same convention pharmacy-portal already uses for its own copy of
+// CountryConfig. Keep in sync by hand if the backend shape changes.
+export interface CurrencyConfig {
+  code: string;
+  symbol: string;
+  position: "prefix" | "suffix";
+}
+
+export interface IdentityFieldDef {
+  key: string;
+  label: string;
+  required: boolean;
+  appliesTo: "clinic" | "doctor" | "patient" | "pharmacy";
+  storage: "legacy" | "generic";
+  pattern?: string;
+}
+
+export interface AddressFieldDef {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface PhoneConfig {
+  callingCode: string;
+  digitLength: number;
+}
+
 interface Branding {
   name: string;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
   // Every feature enabled until the branding fetch resolves (or if it never
   // does) — an org with nothing configured, or a fetch failure, must never
   // hide sidebar items that were already visible before this existed. See
   // hasFeature() below.
   enabledFeatures: FeatureKey[];
+  // Same UAE-shaped default the portal has always assumed — used until the
+  // branding fetch resolves or on failure, so a network blip degrades to
+  // "today's behavior" instead of showing an unlabeled/wrong currency.
+  currency: CurrencyConfig;
+  // IANA zone every appointment time in this portal is displayed in. The
+  // clinic's own zone is canonical — never the viewing browser's — so a
+  // doctor logging in from abroad still sees their clinic's schedule.
+  timezone: string;
+  // Every identity document the org's country defines, across all roles —
+  // consumers filter by appliesTo ("doctor" vs "clinic"). Lets an onboarding
+  // form ask for a Medical Council Registration in India and an Emirates ID
+  // in the UAE without branching on country.
+  identityFields: IdentityFieldDef[];
+  addressFields: AddressFieldDef[];
+  licenseAuthorities: string[];
+  phone: PhoneConfig;
   // False until the branding fetch settles. Anything showing a logo should
   // render a placeholder while this is false rather than the bundled default,
   // otherwise a white-label portal flashes the platform's own logo before
@@ -43,7 +91,25 @@ const ALL_FEATURES: FeatureKey[] = [
   "ai_chat", "articles", "sos",
 ];
 
-const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, enabledFeatures: ALL_FEATURES, loaded: false };
+const FALLBACK_CURRENCY: CurrencyConfig = { code: "AED", symbol: "AED", position: "prefix" };
+const FALLBACK_TIMEZONE = "Asia/Dubai";
+// The UAE shape this portal has always rendered — used until the fetch
+// resolves or if it fails, so a blip degrades to today's behaviour.
+const FALLBACK_IDENTITY_FIELDS: IdentityFieldDef[] = [
+  { key: "emiratesIdOrPassport", label: "Emirates ID / Passport No.", required: true, appliesTo: "clinic", storage: "legacy" },
+  { key: "dohLicense", label: "DOH/DHA License No.", required: true, appliesTo: "clinic", storage: "legacy" },
+  { key: "emiratesId", label: "Emirates ID", required: true, appliesTo: "doctor", storage: "legacy" },
+  { key: "license", label: "Medical License No.", required: true, appliesTo: "doctor", storage: "legacy" },
+];
+const FALLBACK_ADDRESS_FIELDS: AddressFieldDef[] = [
+  { key: "emirate", label: "Emirate", required: true },
+  { key: "city", label: "City", required: true },
+  { key: "postalCode", label: "P.O. Box", required: false },
+];
+const FALLBACK_LICENSE_AUTHORITIES = ["DOH", "DHA", "MOH"];
+const FALLBACK_PHONE: PhoneConfig = { callingCode: "+971", digitLength: 9 };
+
+const DEFAULT_BRANDING: Branding = { name: "Wellness Central", logoUrl: null, primaryColor: null, secondaryColor: null, supportEmail: null, supportPhone: null, enabledFeatures: ALL_FEATURES, currency: FALLBACK_CURRENCY, timezone: FALLBACK_TIMEZONE, identityFields: FALLBACK_IDENTITY_FIELDS, addressFields: FALLBACK_ADDRESS_FIELDS, licenseAuthorities: FALLBACK_LICENSE_AUTHORITIES, phone: FALLBACK_PHONE, loaded: false };
 
 const BrandingContext = createContext<Branding>(DEFAULT_BRANDING);
 
@@ -78,12 +144,23 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       .then((data) => {
         if (cancelled) return;
         const b = data.branding ?? {};
+        const defaultCurrency: CurrencyConfig | undefined = data.countryConfig?.defaultCurrency;
         const resolved: Branding = {
           name: b.name || DEFAULT_BRANDING.name,
           logoUrl: b.logoUrl || null,
           primaryColor: b.primaryColor || null,
           secondaryColor: b.secondaryColor || null,
+          supportEmail: b.supportEmail || null,
+          supportPhone: b.supportPhone || null,
           enabledFeatures: Array.isArray(data.enabledFeatures) ? data.enabledFeatures : ALL_FEATURES,
+          currency: defaultCurrency
+            ? { code: b.currencyCode || defaultCurrency.code, symbol: defaultCurrency.symbol, position: defaultCurrency.position }
+            : FALLBACK_CURRENCY,
+          timezone: data.countryConfig?.timezone || FALLBACK_TIMEZONE,
+          identityFields: Array.isArray(data.countryConfig?.identityFields) ? data.countryConfig.identityFields : FALLBACK_IDENTITY_FIELDS,
+          addressFields: Array.isArray(data.countryConfig?.addressFields) ? data.countryConfig.addressFields : FALLBACK_ADDRESS_FIELDS,
+          licenseAuthorities: Array.isArray(data.countryConfig?.licenseAuthorities) ? data.countryConfig.licenseAuthorities : FALLBACK_LICENSE_AUTHORITIES,
+          phone: data.countryConfig?.phone ?? FALLBACK_PHONE,
           loaded: true,
         };
         setBranding(resolved);
@@ -113,4 +190,22 @@ export function useBranding(): Branding {
 export function useFeatures(): { enabledFeatures: FeatureKey[]; hasFeature: (key: FeatureKey) => boolean } {
   const { enabledFeatures } = useContext(BrandingContext);
   return { enabledFeatures, hasFeature: (key: FeatureKey) => enabledFeatures.includes(key) };
+}
+
+// Convenience hook for anywhere an amount is displayed — see lib/currency.ts
+// for the formatCurrency() helper this is meant to be paired with.
+export function useCurrency(): CurrencyConfig {
+  return useContext(BrandingContext).currency;
+}
+
+// Convenience hook for anywhere an appointment time is displayed — see
+// lib/appointmentTime.ts for the formatters this is meant to be paired with.
+export function useClinicTimezone(): string {
+  return useContext(BrandingContext).timezone;
+}
+
+// Identity documents scoped to one role, for the onboarding forms — see
+// lib/identityFields.ts for splitting the values on submit.
+export function useIdentityFields(appliesTo: "clinic" | "doctor"): IdentityFieldDef[] {
+  return useContext(BrandingContext).identityFields.filter((f) => f.appliesTo === appliesTo);
 }

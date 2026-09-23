@@ -114,6 +114,21 @@ export async function initDb(): Promise<void> {
         ADD COLUMN IF NOT EXISTS logo_url_light TEXT
     `);
 
+    // Which country this org/brand operates in (ISO 3166-1 alpha-2), and an
+    // optional currency override (ISO 4217) for the rare case a deployment
+    // wants a currency other than its country's default. Defaults every
+    // existing org to 'AE' so current (UAE-only) behavior is unchanged until
+    // an admin explicitly sets a different country — see
+    // src/config/countries.ts for what a country's field-set/currency
+    // actually resolves to, and GET /api/meta/branding for where frontends
+    // read it. currency_code stays NULL (falls back to the country's
+    // default) unless an org needs to override it.
+    await client.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS country_code  CHAR(2) NOT NULL DEFAULT 'AE',
+        ADD COLUMN IF NOT EXISTS currency_code CHAR(3)
+    `);
+
     // Seed the default org once. Every feature defaults ON here so current
     // (pre-white-label) behavior is unchanged for the one tenant that exists
     // today; new orgs created later via the admin API start with everything

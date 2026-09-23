@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
 import { useAccountRole } from "@/hooks/useAccountRole";
+import { useCountryConfig } from "@/components/CountryConfigContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -15,6 +16,7 @@ export default function AddProductPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const { role } = useAccountRole();
+  const { currency } = useCountryConfig();
   const isLab = role === "lab";
 
   // ── Shared fields ──────────────────────────────────────────────────────
@@ -256,7 +258,7 @@ export default function AddProductPage() {
               </div>
 
               <div>
-                <label className={labelCls}>Price (AED) *</label>
+                <label className={labelCls}>Price ({currency.code}) *</label>
                 <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
             </div>
@@ -411,7 +413,7 @@ export default function AddProductPage() {
               </div>
 
               <div>
-                <label className={labelCls}>Price (AED) *</label>
+                <label className={labelCls}>Price ({currency.code}) *</label>
                 <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
             </div>

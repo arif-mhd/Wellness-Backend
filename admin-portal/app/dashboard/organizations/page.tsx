@@ -20,8 +20,20 @@ interface Organization {
   play_store_url: string | null;
   app_store_url: string | null;
   plan_tier: string;
+  country_code: string | null;
+  currency_code: string | null;
   created_at: string;
 }
+
+// Duplicated by hand from backend/src/config/countries.ts's COUNTRY_CONFIGS —
+// no shared package between this portal and the backend. Keep in sync if a
+// country is ever added there. Currency isn't a separate field here since
+// CountryConfig.defaultCurrency is fixed 1:1 per country — picking the
+// country is enough; currencyCode is left for the backend to default.
+const COUNTRIES: { code: string; name: string }[] = [
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "IN", name: "India" },
+];
 
 interface FeatureRow {
   key: string;
@@ -88,6 +100,7 @@ function CreateOrgModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [countryCode, setCountryCode] = useState(COUNTRIES[0].code);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -102,7 +115,7 @@ function CreateOrgModal({ onClose, onCreated }: { onClose: () => void; onCreated
       const res = await apiFetch("/api/admin/organizations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: slug.trim(), name: name.trim(), supportEmail: supportEmail.trim() || undefined }),
+        body: JSON.stringify({ slug: slug.trim(), name: name.trim(), supportEmail: supportEmail.trim() || undefined, countryCode }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -153,6 +166,19 @@ function CreateOrgModal({ onClose, onCreated }: { onClose: () => void; onCreated
               placeholder="support@acmehealth.com"
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:bg-white transition"
             />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Country</label>
+            <select
+              value={countryCode}
+              onChange={e => setCountryCode(e.target.value)}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:bg-white transition"
+            >
+              {COUNTRIES.map(c => (
+                <option key={c.code} value={c.code}>{c.name}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1.5">Determines currency, timezone, and identity-document fields.</p>
           </div>
         </div>
 
@@ -265,6 +291,7 @@ function OrganizationsPageInner() {
           appBundleId: draftOrg.app_bundle_id,
           playStoreUrl: draftOrg.play_store_url,
           appStoreUrl: draftOrg.app_store_url,
+          countryCode: draftOrg.country_code,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -509,6 +536,19 @@ function OrganizationsPageInner() {
                     placeholder="+971 4 000 0000"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:bg-white transition"
                   />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Country</label>
+                  <select
+                    value={draftOrg.country_code ?? COUNTRIES[0].code}
+                    onChange={e => setDraftOrg({ ...draftOrg, country_code: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:bg-white transition"
+                  >
+                    {COUNTRIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1.5">Determines currency, timezone, and identity-document fields.</p>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">

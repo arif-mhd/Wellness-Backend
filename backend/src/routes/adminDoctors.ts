@@ -7,6 +7,8 @@ import { requireRole } from "../middleware/requireRole";
 import { doctorsContainer, appointmentsContainer, feedbackContainer, queryDocuments } from "../config/cosmos";
 import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
+import { validateIdentityFieldPatterns } from "../config/countries";
+import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -308,12 +310,27 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
     slots,
     degreeFileUrl, specFileUrl, otherFileUrl,
     bankDetails,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.).
+    identityDocuments,
   } = req.body;
 
   if (!email || !password || !fullName || !phone) {
     res.status(400).json({ error: "email, password, fullName and phone are required." });
     return;
   }
+
+  // Country-specific identity documents. An admin-created doctor has no
+  // clinic, so this resolves to the platform default org's country.
+  if (identityDocuments) {
+    const countryConfig = await resolveCountryConfigForDoctor({});
+    const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+    if (patternError) {
+      res.status(400).json({ error: patternError });
+      return;
+    }
+  }
+
 
   try {
     const signUpResult = await EmailPassword.signUp("public", email, password);
@@ -357,6 +374,7 @@ router.post("/", requireRole("admin"), async (req: SessionRequest, res: Response
       emiratesIdFileUrl: emiratesIdFileUrl || null,
       specialty: specialty || null,
       license: license || null,
+      identityDocuments: identityDocuments ?? {},
       experience: experience || null,
       medicalSchool: medicalSchool || null,
       residency: residency || null,

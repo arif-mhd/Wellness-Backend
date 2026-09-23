@@ -14,16 +14,6 @@ import { updateAppointmentWithRetry } from "../utils/appointmentWrite";
 
 const router = Router();
 
-// Same "the stored ISO string is actually wall-clock local time, not true
-// UTC" convention used throughout appointments.ts (see its own parseLocalTime)
-// — reused verbatim so this sweep's "minutes until" math agrees with every
-// other "Consultation in Xh Ym" style label already shown across the app.
-function parseLocalTime(isoString: string): Date {
-  if (!isoString) return new Date();
-  const clean = isoString.endsWith("Z") ? isoString.slice(0, -1) : isoString;
-  return new Date(clean);
-}
-
 // Minutes-before-appointment windows, each paired with the boolean flag that
 // ensures a stage fires at most once per appointment. Windows are a couple
 // of minutes wide (rather than an exact instant) so a missed Cloud Scheduler
@@ -55,7 +45,9 @@ router.post("/appointment-reminders/sweep", async (req: Request, res: Response) 
 
     let sent = 0;
     for (const apt of appointments as any[]) {
-      const minutesUntil = (parseLocalTime(apt.scheduledAt).getTime() - Date.now()) / 60000;
+      // scheduledAt is now a true UTC instant (see src/utils/timezone.ts) —
+      // plain Date math, no local/clinic conversion needed for a duration.
+      const minutesUntil = (new Date(apt.scheduledAt).getTime() - Date.now()) / 60000;
 
       for (const stage of STAGES) {
         if (apt[stage.field]) continue;

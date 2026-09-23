@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useOrgCurrency } from "@/components/OrgCurrencyContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -80,6 +81,7 @@ function Avatar({ patient, size = "md" }: { patient: Patient; size?: "sm" | "md"
 }
 
 export default function ManagePatientsPage() {
+  const { identityFieldsForOrg } = useOrgCurrency();
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -384,7 +386,7 @@ export default function ManagePatientsPage() {
               <div className="bg-[#f8fafd] rounded-[1.5rem] p-6 space-y-5 mb-6">
                 {selectedPatient.emiratesId && (
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-medium">Emirates ID</span>
+                    <span className="text-[11px] text-slate-400 font-medium">{identityFieldsForOrg((selectedPatient as any)?.tenantId, "patient")[0]?.label ?? "ID"}</span>
                     <span className="text-[11px] text-slate-800 font-medium">{selectedPatient.emiratesId}</span>
                   </div>
                 )}

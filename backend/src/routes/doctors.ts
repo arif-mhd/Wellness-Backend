@@ -11,6 +11,9 @@ import { notifyClinic } from "./clinicPayments";
 import { loadOrgDocForClinicId } from "./clinicInsurance";
 import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
 import { buildInClause } from "../utils/clinicScope";
+import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor } from "../utils/timezone";
+import { validateIdentityFieldPatterns } from "../config/countries";
+import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -94,6 +97,10 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
     degreeFileUrl, specFileUrl, otherFileUrl,
     // Payment/bank details
     bankDetails,
+    // Country-specific identity/license fields with no dedicated column
+    // (e.g. India's Medical Council Registration No.) — keyed by the
+    // doctor's org's country config identityFields[].key.
+    identityDocuments,
   } = req.body;
 
   try {
@@ -105,6 +112,18 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
     if (!hasDoctorPermission(doctor, "manage_own_profile")) {
       res.status(403).json({ error: "You don't have permission to edit your profile." });
       return;
+    }
+
+    // Country-specific identity documents (Medical Council Registration for
+    // IN, Emirates ID for AE) go in the generic bag — check their format
+    // against this doctor's own country, same as the clinic/patient routes.
+    if (identityDocuments) {
+      const countryConfig = await resolveCountryConfigForDoctor(doctor);
+      const patternError = validateIdentityFieldPatterns(countryConfig, "doctor", { license }, identityDocuments);
+      if (patternError) {
+        res.status(400).json({ error: patternError });
+        return;
+      }
     }
 
     const updated = {
@@ -125,6 +144,7 @@ router.put("/profile", requireRole("doctor"), async (req: SessionRequest, res: R
       emiratesIdFileUrl: emiratesIdFileUrl ?? doctor.emiratesIdFileUrl,
       specialty: specialty ?? doctor.specialty,
       license: license ?? doctor.license,
+      identityDocuments: identityDocuments ? { ...doctor.identityDocuments, ...identityDocuments } : doctor.identityDocuments,
       experience: experience ?? doctor.experience,
       medicalSchool: medicalSchool ?? doctor.medicalSchool,
       residency: residency ?? doctor.residency,
@@ -486,25 +506,6 @@ router.get("/:id/slots", async (req: Request, res: Response) => {
   }
 });
 
-// Doctor slot times (e.g. "09:00") are wall-clock hours in the clinic's own
-// business timezone — Gulf Standard Time, UTC+4, which the UAE does not
-// observe DST for — not true UTC. Elsewhere in this codebase (see
-// parseLocalTime in appointments.ts / internal.ts) that's handled by simply
-// stripping a stray "Z" before parsing, which only works when the Node
-// process itself runs in that same timezone. This route can't rely on the
-// server's OS timezone being configured correctly, so instead it builds the
-// slot's true UTC instant explicitly by subtracting the fixed GST offset —
-// correct no matter what timezone the server process runs in.
-const BUSINESS_UTC_OFFSET_MINUTES = 4 * 60; // Gulf Standard Time (UTC+4)
-
-function businessTimeToInstant(date: string, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map(Number);
-  // Construct as if the digits were UTC, then shift back by the business
-  // offset to land on the real instant they actually represent.
-  const asIfUtc = new Date(`${date}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`);
-  return new Date(asIfUtc.getTime() - BUSINESS_UTC_OFFSET_MINUTES * 60 * 1000);
-}
-
 // ─── GET /api/doctors/:id/available-slots?date=YYYY-MM-DD ───────────────────
 // Returns the list of available time strings (HH:MM) for a specific date,
 // excluding slots already booked for that doctor and any that have already
@@ -525,8 +526,13 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       return;
     }
 
+    const timezone = await resolveTimezoneForDoctor(doctor);
     const slots: any[] = doctor.slots ?? [];
-    const dayOfWeek = new Date(date + "T12:00:00Z").getUTCDay();
+    // Noon anchor avoids DST-transition edge cases when computing which
+    // calendar day-of-week this date is, in the clinic's own timezone —
+    // not the server's (Cloud Run runs in UTC, which silently matched by
+    // coincidence for AE/IN before, since noon UTC is unambiguous).
+    const dayOfWeek = utcToZonedTime(zonedTimeToUtc(date, "12:00", timezone), timezone).getDay();
     const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
 
     if (activeDaySlots.length === 0) {
@@ -549,10 +555,10 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
         const h = Math.floor(cursor / 60).toString().padStart(2, "0");
         const m = (cursor % 60).toString().padStart(2, "0");
 
-        // Check if slot falls in any scheduled absences. slotStart/slotEnd
-        // are real UTC instants (see businessTimeToInstant above), matching
-        // abs.startDate/abs.endDate which are already true UTC ISO strings.
-        const slotStart = businessTimeToInstant(date, `${h}:${m}`);
+        // Check if slot falls in any scheduled absences. slotStart is a real
+        // UTC instant, matching abs.startDate/abs.endDate which are already
+        // true UTC ISO strings.
+        const slotStart = zonedTimeToUtc(date, `${h}:${m}`, timezone);
         const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
         const absences = doctor.absences ?? [];
         const isAbsent = absences.some((abs: any) => {
@@ -575,9 +581,11 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     const uniqueIntervals = Array.from(new Set(intervals)).sort();
 
-    // Find booked slots for this date
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
+    // Find booked slots for this date — bounds are the CLINIC's local day,
+    // converted to true UTC instants (not the calendar-UTC day, which would
+    // be wrong by the clinic's offset).
+    const dayStart = startOfClinicDayUtc(date, timezone).toISOString();
+    const dayEnd = new Date(zonedTimeToUtc(date, "23:59", timezone).getTime() + 59_999).toISOString();
 
     const booked = await queryDocuments<any>(appointmentsContainer, {
       query: `SELECT c.scheduledAt FROM c
@@ -594,8 +602,8 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
 
     const bookedSet = new Set(
       booked.map((b: any) => {
-        const d = new Date(b.scheduledAt);
-        return `${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
+        const local = utcToZonedTime(new Date(b.scheduledAt), timezone);
+        return `${local.getHours().toString().padStart(2, "0")}:${local.getMinutes().toString().padStart(2, "0")}`;
       })
     );
 

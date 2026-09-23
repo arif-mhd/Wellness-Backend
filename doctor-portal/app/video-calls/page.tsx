@@ -13,6 +13,8 @@ import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INF
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import EhrPanel from "@/components/video-call/EhrPanel";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 function fmt(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -82,6 +84,7 @@ function StarRating({ rating }: { rating: number }) {
 function VideoCallInner() {
   const searchParams  = useSearchParams();
   const router        = useRouter();
+  const currency      = useCurrency();
   const appointmentId = searchParams.get("appointmentId") ?? "";
   const isSpecialist  = searchParams.get("role") === "specialist";
 
@@ -820,7 +823,7 @@ function VideoCallInner() {
               <button className="h-8 px-4 rounded-full text-[11px] font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">View Profile in New Tab</button>
             </div>
             <div className="divide-y divide-gray-100">
-              <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Consultation Fee</span><span className="font-semibold">{selectedSpecialist.fees ? `AED ${selectedSpecialist.fees}` : "AED 200.00"}</span></div>
+              <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Consultation Fee</span><span className="font-semibold">{formatCurrency(selectedSpecialist.fees ?? 200, currency)}</span></div>
               <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Specialty</span><span className="font-semibold">{selectedSpecialist.specialty}</span></div>
               <div className="flex justify-between py-2.5 text-xs"><span className="text-gray-500">Insurance Eligibility of Patient</span><span className="text-[#5476fc] font-semibold">Eligible</span></div>
             </div>
@@ -1202,7 +1205,7 @@ function VideoCallInner() {
                         <p className="text-[#24292e] text-xs font-semibold truncate">{doc.fullName}</p>
                         <p className="text-gray-400 text-[10px] truncate">{doc.specialty}</p>
                         <StarRating rating={doc.rating}/>
-                        {doc.fees && <p className="text-[10px] text-gray-400">AED {doc.fees}</p>}
+                        {doc.fees && <p className="text-[10px] text-gray-400">{formatCurrency(doc.fees, currency)}</p>}
                       </div>
                       <button onClick={() => handleSelectDoctor(doc)}
                         className="h-7 px-4 rounded-full text-[10px] font-semibold border border-gray-200 text-gray-600 hover:border-[#5476fc] hover:text-[#5476fc] transition-colors">

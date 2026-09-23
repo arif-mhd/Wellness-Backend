@@ -9,7 +9,8 @@ import { labServicesContainer, labTestsContainer, labBookingsContainer } from ".
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicName } from "./clinicInsurance";
-import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
+import { resolveOrgId, resolveOrgIdForRegistration, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
+import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
@@ -577,10 +578,11 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
     await labBookingsContainer.items.upsert(booking);
 
     const testNames = validatedItems.map((i: any) => i.testName).join(", ");
+    const labCurrency = await resolveCurrencyForOrgId(await resolveOrgId(req));
     logActivity({
       source: "patient",
       action: "Lab Test Booked",
-      details: `Lab booking AED ${total_amount.toFixed(2)} — ${testNames}`,
+      details: `Lab booking ${formatCurrencyText(total_amount, labCurrency)} — ${testNames}`,
       performedBy: "Patient",
       performedById: patientId,
       entityType: "labBooking",

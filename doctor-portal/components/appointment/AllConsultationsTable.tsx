@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { Patient } from "@/app/appointments/types";
+import { useCurrency } from "@/components/BrandingContext";
+import { formatCurrency } from "@/lib/currency";
 
 interface AllConsultationsTableProps {
   consultations: Patient[];
@@ -26,6 +28,7 @@ export default function AllConsultationsTable({
   activeTab,
   fadeCompleted = false,
 }: AllConsultationsTableProps) {
+  const currency = useCurrency();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -144,7 +147,7 @@ export default function AllConsultationsTable({
                       </span>
                     </div>
                     <span className="text-[#676E76] text-[12px] font-medium leading-[1.5] tracking-[-0.24px] select-text">
-                      {patient.earnings ?? "AED 110.00"}
+                      {patient.earnings ?? formatCurrency(110, currency)}
                     </span>
                   </>
                 ) : (
