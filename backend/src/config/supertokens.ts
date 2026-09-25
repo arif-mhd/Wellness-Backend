@@ -2,6 +2,7 @@ import SuperTokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import ThirdParty from "supertokens-node/recipe/thirdparty";
 import AccountLinking from "supertokens-node/recipe/accountlinking";
+import EmailVerification from "supertokens-node/recipe/emailverification";
 import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
@@ -197,6 +198,18 @@ export function initSuperTokens(): void {
 
               const response = await originalImplementation.signInUpPOST(input);
 
+              // SuperTokens returns business-logic outcomes as a status field
+              // with HTTP 200 — SIGN_IN_UP_NOT_ALLOWED, NO_EMAIL_GIVEN_BY_PROVIDER
+              // and so on. Without this they are invisible: the request looks
+              // successful in the access log and the client only sees a generic
+              // failure.
+              if (response.status !== "OK") {
+                console.warn(
+                  `[signInUpPOST] non-OK status: ${response.status}`,
+                  JSON.stringify(response).slice(0, 500)
+                );
+              }
+
               if (response.status === "OK") {
                 const userId = response.user.id;
                 const email = response.user.emails[0]?.trim().toLowerCase();
@@ -257,6 +270,20 @@ export function initSuperTokens(): void {
       // verified email, and never while a session is already active, which
       // would be an account-takeover vector (attaching an attacker-controlled
       // identity to whoever is logged in).
+      // AccountLinking below asks for a verified email before it will link two
+      // accounts, and without this recipe SuperTokens has no notion of an
+      // email being verified — so nothing is ever verified, every link is
+      // refused, and a Google sign-in comes back SIGN_IN_UP_NOT_ALLOWED with
+      // HTTP 200 and nothing logged.
+      //
+      // mode "OPTIONAL" tracks verification without forcing it on anyone, so
+      // existing email/password users are unaffected: nobody is suddenly
+      // blocked or prompted. Google reports email_verified, so social sign-ups
+      // are marked verified automatically and can link.
+      //
+      // Gated with the rest of the social stack: no providers, no change.
+      ...(socialAuthEnabled ? [EmailVerification.init({ mode: "OPTIONAL" })] : []),
+
       ...(socialAuthEnabled
         ? [
             AccountLinking.init({
