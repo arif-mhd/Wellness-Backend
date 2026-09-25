@@ -56,6 +56,11 @@ export const allowedOrigins = (
 };
 
 export function initSuperTokens(): void {
+  // Resolved once so the ThirdParty recipe and the AccountLinking gate below
+  // agree on whether social sign-in exists at all.
+  const providers = socialProviders();
+  const socialAuthEnabled = providers.length > 0;
+
   SuperTokens.init({
     framework: "express",
     supertokens: {
@@ -179,7 +184,7 @@ export function initSuperTokens(): void {
       // present, so a deployment without them simply has no social sign-in
       // rather than failing to boot.
       ThirdParty.init({
-        signInAndUpFeature: { providers: socialProviders() },
+        signInAndUpFeature: { providers },
 
         override: {
           apis: (originalImplementation) => ({
@@ -242,22 +247,26 @@ export function initSuperTokens(): void {
       // taps "Continue with Google" keeps one identity and one patient record
       // instead of silently acquiring a second, unusable account.
       //
-      // Deliberately narrow, because this recipe sits in front of EVERY
-      // sign-in and sign-up on the platform, including the staff portals:
-      // linking only ever happens for a verified email, and never while a
-      // session is already active (which would be an account-takeover vector —
-      // attaching an attacker-controlled identity to whoever is logged in).
-      AccountLinking.init({
-        shouldDoAutomaticAccountLinking: async (_newAccount, user, session) => {
-          if (session !== undefined) return { shouldAutomaticallyLink: false };
-          if (user === undefined) {
-            // First account for this identity: allow it to become primary so a
-            // later verified sign-in can attach to it.
-            return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
-          }
-          return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
-        },
-      }),
+      // Only registered when social sign-in actually exists. This recipe sits
+      // in front of EVERY sign-in and sign-up on the platform, staff portals
+      // included, so with no social providers configured there is nothing to
+      // link and no reason to alter live auth behaviour — a deployment without
+      // credentials behaves exactly as it did before.
+      //
+      // Deliberately narrow even when active: linking only ever happens for a
+      // verified email, and never while a session is already active, which
+      // would be an account-takeover vector (attaching an attacker-controlled
+      // identity to whoever is logged in).
+      ...(socialAuthEnabled
+        ? [
+            AccountLinking.init({
+              shouldDoAutomaticAccountLinking: async (_newAccount, _user, session) => {
+                if (session !== undefined) return { shouldAutomaticallyLink: false };
+                return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
+              },
+            }),
+          ]
+        : []),
 
       Session.init({
         getTokenTransferMethod: () => "header",
