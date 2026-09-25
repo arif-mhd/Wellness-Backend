@@ -1,12 +1,14 @@
 import SuperTokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
+import ThirdParty from "supertokens-node/recipe/thirdparty";
+import AccountLinking from "supertokens-node/recipe/accountlinking";
 import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
-import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
-import { resolveOrgIdByEmail, resolveOrgIdForRegistration } from "../utils/orgScope";
+import { enforcePostSignInGuards, provisionSocialPatient } from "../utils/authGuards";
+import { socialProviders } from "./socialProviders";
 
 // Each portal env var accepts a comma-separated list, because white-labelling
 // means one portal per brand: the org slug is compiled into the build, so
@@ -151,90 +153,109 @@ export function initSuperTokens(): void {
               if (response.status === "OK") {
                 const userId = response.user.id;
 
-                // Reject sign-in when the account belongs to a different
-                // organization than the portal it's logging into. Each
-                // portal deployment sends its own org via X-Org-Slug (see
-                // NEXT_PUBLIC_ORG_SLUG + SuperTokensProvider's preAPIHook on
-                // the doctor/pharmacy portals); an account with no header
-                // sent (e.g. the patient app, which has no per-deployment
-                // portal to scope) or resolving to the default org is never
-                // blocked, since there's nothing more specific to enforce.
-                try {
-                  const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
-                  if (orgSlugHeader) {
-                    const emailField = input.formFields.find((f) => f.id === "email");
-                    const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
-                    if (email) {
-                      const [portalOrgId, accountOrgId] = await Promise.all([
-                        resolveOrgIdForRegistration(orgSlugHeader),
-                        resolveOrgIdByEmail(email),
-                      ]);
-                      if (portalOrgId !== accountOrgId) {
-                        await Session.revokeAllSessionsForUser(userId);
-                        return {
-                          status: "GENERAL_ERROR",
-                          message: "This account belongs to a different organization.",
-                        } as any;
-                      }
-                    }
-                  }
-                } catch (err) {
-                  // A DB hiccup here must not turn into a hung/failed request
-                  // for the client — originalImplementation.signInPOST already
-                  // ran and set session cookies/headers on the response by
-                  // this point, so throwing here would leave the client with
-                  // an ambiguous half-succeeded request instead of a clean
-                  // OK or GENERAL_ERROR body. Fail open (same as "no header
-                  // sent"): a transient lookup failure shouldn't lock a
-                  // legitimate user out of their own account.
-                  console.error("[signInPOST] org-scope check failed, allowing sign-in:", err);
-                }
-
-                try {
-                  const { resource: patient } = await patientsContainer.item(userId, userId).read();
-                  if (patient && (patient.status === "deactivated" || patient.status === "deleted")) {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: patient.status === "deleted"
-                        ? "This account no longer exists."
-                        : "Your account has been deactivated. Please contact support.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a patient (doctor/admin/pharmacy) or no profile doc yet.
-                }
-
-                try {
-                  const { resource: doctor } = await doctorsContainer.item(userId, userId).read();
-                  if (doctor && doctor.status === "deleted") {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: "This account no longer exists. Please contact your clinic.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a doctor or no profile doc yet — allow sign-in.
-                }
-
-                try {
-                  const { resource: clinicUser } = await clinicsContainer.item(userId, userId).read();
-                  if (clinicUser && clinicUser.status === "deleted") {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: "This account no longer exists.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a clinic/branch user or no profile doc yet — allow sign-in.
-                }
+                // Cross-org, deactivated-patient, deleted-doctor and
+                // deleted-clinic-user checks all live in enforcePostSignInGuards
+                // so the ThirdParty recipe applies exactly the same rules from
+                // its own API. See src/utils/authGuards.ts.
+                const emailField = input.formFields.find((f) => f.id === "email");
+                const failure = await enforcePostSignInGuards({
+                  userId,
+                  email: typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined,
+                  orgSlugHeader: input.options.req.getHeaderValue("x-org-slug") ?? undefined,
+                });
+                if (failure) return failure as any;
               }
 
               return response;
             },
           }),
+        },
+      }),
+
+      // ── Google / Apple sign-in (patient app only) ────────────────────────
+      // A separate recipe from EmailPassword with its own endpoints, so the
+      // existing email/password flow is untouched. Providers are configured in
+      // ./socialProviders and are only registered when their credentials are
+      // present, so a deployment without them simply has no social sign-in
+      // rather than failing to boot.
+      ThirdParty.init({
+        signInAndUpFeature: { providers: socialProviders() },
+
+        override: {
+          apis: (originalImplementation) => ({
+            ...originalImplementation,
+
+            signInUpPOST: async (input) => {
+              if (originalImplementation.signInUpPOST === undefined) {
+                throw new Error("signInUpPOST not defined");
+              }
+
+              const response = await originalImplementation.signInUpPOST(input);
+
+              if (response.status === "OK") {
+                const userId = response.user.id;
+                const email = response.user.emails[0]?.trim().toLowerCase();
+                const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug") ?? undefined;
+
+                // A first-time social sign-in is a registration. Give it the
+                // role, org and patient document that POST /api/patients/register
+                // would have, or the user authenticates and is then rejected by
+                // every patient endpoint.
+                if (response.createdNewRecipeUser && email) {
+                  const rawName =
+                    (response.rawUserInfoFromProvider?.fromUserInfoAPI as any)?.name ??
+                    (response.rawUserInfoFromProvider?.fromIdTokenPayload as any)?.name ??
+                    "";
+                  try {
+                    await provisionSocialPatient({
+                      userId,
+                      email,
+                      fullName: String(rawName || "").trim(),
+                      orgSlugHeader,
+                    });
+                  } catch (err) {
+                    // Leaving a half-created account behind is worse than a
+                    // failed sign-up: the credential would exist with no role
+                    // and no patient doc, and retrying would find the user
+                    // already present and never re-provision.
+                    console.error("[signInUpPOST] provisioning failed:", err);
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "We could not finish setting up your account. Please try again.",
+                    } as any;
+                  }
+                }
+
+                const failure = await enforcePostSignInGuards({ userId, email, orgSlugHeader });
+                if (failure) return failure as any;
+              }
+
+              return response;
+            },
+          }),
+        },
+      }),
+
+      // Links a social sign-in to an existing email/password account with the
+      // same address, so a patient who registered with a password and later
+      // taps "Continue with Google" keeps one identity and one patient record
+      // instead of silently acquiring a second, unusable account.
+      //
+      // Deliberately narrow, because this recipe sits in front of EVERY
+      // sign-in and sign-up on the platform, including the staff portals:
+      // linking only ever happens for a verified email, and never while a
+      // session is already active (which would be an account-takeover vector —
+      // attaching an attacker-controlled identity to whoever is logged in).
+      AccountLinking.init({
+        shouldDoAutomaticAccountLinking: async (_newAccount, user, session) => {
+          if (session !== undefined) return { shouldAutomaticallyLink: false };
+          if (user === undefined) {
+            // First account for this identity: allow it to become primary so a
+            // later verified sign-in can attach to it.
+            return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
+          }
+          return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
         },
       }),
 
