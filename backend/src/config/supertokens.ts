@@ -10,6 +10,7 @@ import { pool } from "./database";
 import { devFallbackOrThrow } from "../utils/env";
 import { enforcePostSignInGuards, provisionSocialPatient } from "../utils/authGuards";
 import { socialProviders } from "./socialProviders";
+import { patientsContainer } from "./cosmos";
 
 // Each portal env var accepts a comma-separated list, because white-labelling
 // means one portal per brand: the org slug is compiled into the build, so
@@ -219,7 +220,21 @@ export function initSuperTokens(): void {
                 // role, org and patient document that POST /api/patients/register
                 // would have, or the user authenticates and is then rejected by
                 // every patient endpoint.
-                if (response.createdNewRecipeUser && email) {
+                // Not just brand-new users: an account can exist in
+                // SuperTokens with no patient document — an abandoned or
+                // half-completed registration — and such a user would sign in
+                // successfully and then be rejected by every patient endpoint.
+                // Provisioning on absence repairs that instead of stranding them.
+                const needsPatientDoc =
+                  email !== undefined &&
+                  (response.createdNewRecipeUser ||
+                    !(await patientsContainer
+                      .item(userId, userId)
+                      .read()
+                      .then((r) => Boolean(r.resource))
+                      .catch(() => false)));
+
+                if (needsPatientDoc && email) {
                   const rawName =
                     (response.rawUserInfoFromProvider?.fromUserInfoAPI as any)?.name ??
                     (response.rawUserInfoFromProvider?.fromIdTokenPayload as any)?.name ??

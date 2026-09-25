@@ -38,8 +38,19 @@ export async function markEmailVerified(
     if (token.status === "EMAIL_ALREADY_VERIFIED_ERROR") return true;
     if (token.status !== "OK") return false;
 
-    const result = await EmailVerification.verifyEmailUsingToken("public", token.token);
-    return result.status === "OK";
+    try {
+      const result = await EmailVerification.verifyEmailUsingToken("public", token.token);
+      if (result.status === "OK") return true;
+    } catch (err) {
+      // verifyEmailUsingToken triggers an account-linking attempt once the
+      // email is marked verified, and that attempt can throw even though the
+      // verification itself committed. Treating the throw as failure reported
+      // 21 successful backfills as 21 failures. Re-read the real state instead
+      // of trusting the call to tell us.
+      console.warn(`[markEmailVerified] post-verify step threw for ${supertokensId}; re-checking:`, err);
+    }
+
+    return await EmailVerification.isEmailVerified(new RecipeUserId(supertokensId), email);
   } catch (err) {
     console.error(`[markEmailVerified] failed for ${supertokensId}:`, err);
     return false;
