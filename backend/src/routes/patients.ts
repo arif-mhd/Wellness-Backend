@@ -8,6 +8,7 @@ import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
 import { resolveOrgIdForRegistration, resolveOrgId, getCountryConfigForOrgId } from "../utils/orgScope";
 import { validateIdentityFieldPatterns } from "../config/countries";
+import { markEmailVerified } from "../utils/markEmailVerified";
 import { patientsContainer, otpCodesContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -77,6 +78,13 @@ router.post("/register", async (req: Request, res: Response) => {
 
     // Assign "patient" role
     await UserRoles.addRoleToUser("public", supertokensId, "patient");
+
+    // This route already refused to get here without a verified OTP, so the
+    // address is proven. Recording it lets account linking attach a later
+    // Google sign-in to this account; without it linking is refused with
+    // SIGN_IN_UP_NOT_ALLOWED. Non-fatal — registration succeeding matters more
+    // than the bookkeeping, and backfillEmailVerification.ts can repair it.
+    await markEmailVerified(supertokensId, email);
 
     // Each brand build of the patient app sends its own org slug on this
     // header (see brand.json's orgSlug + api client) — resolves to the
