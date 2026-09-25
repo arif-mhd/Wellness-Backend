@@ -33,9 +33,13 @@
 
 import type { ProviderInput } from "supertokens-node/recipe/thirdparty/types";
 
+// Lower-cased so clientType is stable regardless of how the env var or a
+// brand.json slug is capitalised. The app normalises the same way; a mismatch
+// here fails a sign-in with an unhelpful "no client for clientType" rather
+// than anything pointing at casing.
 const brands = (process.env.SOCIAL_AUTH_BRANDS ?? "wellness")
   .split(",")
-  .map((b) => b.trim())
+  .map((b) => b.trim().toLowerCase())
   .filter(Boolean);
 
 const envKey = (brand: string) => brand.toUpperCase().replace(/-/g, "_");
