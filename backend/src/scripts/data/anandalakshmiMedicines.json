@@ -1,0 +1,2722 @@
+[
+  {
+    "sourceItemId": "2117",
+    "name": "777 Oil",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1433",
+    "name": "Aaramgwadha Mahathikatham Ghrutham 150 Ml",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1782",
+    "name": "ABHAYARISHTAM",
+    "category": "OTC",
+    "price": 100.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2428",
+    "name": "ACCU CHEK INSTANT METER",
+    "category": "Medical Device",
+    "price": 1450.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "957",
+    "name": "Aiswariya Face Pack",
+    "category": "Personal Care",
+    "price": 190.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2224",
+    "name": "Ajax Cap",
+    "category": "OTC",
+    "price": 24.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "6",
+    "name": "Alert Capsules",
+    "category": "OTC",
+    "price": 8.4,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2229",
+    "name": "Aloevera Massage Gel 500ml",
+    "category": "Personal Care",
+    "price": 600.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1708",
+    "name": "Alovera Gel",
+    "category": "OTC",
+    "price": 50.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1781",
+    "name": "AMRUTHARISHTAM",
+    "category": "OTC",
+    "price": 105.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1009",
+    "name": "Amruthhajeevan Rasayam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1789",
+    "name": "Amruthotharam Kashayam",
+    "category": "OTC",
+    "price": 130.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1787",
+    "name": "Amrutotaram Kashayam Tab",
+    "category": "OTC",
+    "price": 3.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1116",
+    "name": "Amurtharishtam 450ml",
+    "category": "OTC",
+    "price": 110.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2323",
+    "name": "Amyron Syrup 200ml",
+    "category": "OTC",
+    "price": 221.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2425",
+    "name": "Anagen Grow Serum",
+    "category": "OTC",
+    "price": 240.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1063",
+    "name": "ANUTHAILAM 10ML",
+    "category": "OTC",
+    "price": 100.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2118",
+    "name": "Aragwadha Mahatikthakam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1475",
+    "name": "Arimodadi Oil 100 Ml",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1703",
+    "name": "Arjuna Tab",
+    "category": "OTC",
+    "price": 5.42,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2142",
+    "name": "Arthoven Tab",
+    "category": "OTC",
+    "price": 5.8,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2116",
+    "name": "Asanavilwadi Thailam (150 ML)",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1783",
+    "name": "ASHOKARISHTOM",
+    "category": "OTC",
+    "price": 110.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1795",
+    "name": "Ashta Choornam",
+    "category": "OTC",
+    "price": 60.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1730",
+    "name": "Ashta Kamadam",
+    "category": "OTC",
+    "price": 800.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2137",
+    "name": "Ashtavargam KAS Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "16",
+    "name": "Ashvagandha TAB",
+    "category": "OTC",
+    "price": 4.33,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1474",
+    "name": "Avipathi Choornam",
+    "category": "OTC",
+    "price": 25.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2230",
+    "name": "Ayur Gum Care Tooth Paste 150 Gm",
+    "category": "Personal Care",
+    "price": 130.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2115",
+    "name": "Ayyappala Kera Thailam (150ml)",
+    "category": "OTC",
+    "price": 190.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "37",
+    "name": "Bala Thailam 1Ltr",
+    "category": "OTC",
+    "price": 1300.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "38",
+    "name": "Bala Thailam 2 Ltr",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2185",
+    "name": "Bala Thailam 200 ML",
+    "category": "OTC",
+    "price": 260.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "39",
+    "name": "Bala Thailam 4 Ltr",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2189",
+    "name": "Bala Thailam 450 ML",
+    "category": "OTC",
+    "price": 580.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2139",
+    "name": "Balaguluchyadi KAS Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2160",
+    "name": "Balarishtam",
+    "category": "OTC",
+    "price": 120.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2352",
+    "name": "BETNOVATE CREAM",
+    "category": "Personal Care",
+    "price": 28.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1726",
+    "name": "BHRINGARAJA  CONDITIONER",
+    "category": "OTC",
+    "price": 90.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1105",
+    "name": "Brahmi Caps",
+    "category": "OTC",
+    "price": 185.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1434",
+    "name": "Brahmi Ghrutham 150 Ml",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2263",
+    "name": "Brolin  Antiseptic Cream",
+    "category": "Personal Care",
+    "price": 40.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "106",
+    "name": "C- Health Granules",
+    "category": "Supplement",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2351",
+    "name": "CALADRYL LOTION",
+    "category": "OTC",
+    "price": 82.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1476",
+    "name": "Campher",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "116",
+    "name": "Cardo Stab TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "117",
+    "name": "Carocarm TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "126",
+    "name": "Catramide Eye Drops",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "133",
+    "name": "Cephagrain Nasal Ddrops",
+    "category": "OTC",
+    "price": 70.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "134",
+    "name": "Cephagrain TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2151",
+    "name": "Cervilon Tab",
+    "category": "OTC",
+    "price": 7.08,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "139",
+    "name": "Chandanadi Thailam 450 ML",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2149",
+    "name": "Chelner Tab",
+    "category": "OTC",
+    "price": 6.09,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2148",
+    "name": "Cheluric Tab",
+    "category": "OTC",
+    "price": 5.63,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2373",
+    "name": "Chinchadi Thailam (2 L)",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2136",
+    "name": "Chiruvilwadi KAS Tab",
+    "category": "OTC",
+    "price": 4.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1727",
+    "name": "CHYMORAL AP TABLET",
+    "category": "OTC",
+    "price": 20.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "165",
+    "name": "Cissan",
+    "category": "OTC",
+    "price": 25.9,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1697",
+    "name": "Cold Balm",
+    "category": "OTC",
+    "price": 46.87,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "185",
+    "name": "Cotton",
+    "category": "Personal Care",
+    "price": 449.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "186",
+    "name": "Cough Syrup",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "187",
+    "name": "Crakot Oinment",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2231",
+    "name": "Cucumber And Mint Massage Creame",
+    "category": "OTC",
+    "price": 550.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2248",
+    "name": "Cuminjan",
+    "category": "OTC",
+    "price": 600.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2120",
+    "name": "Dadimadi Ghritham",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2281",
+    "name": "Dadimashtaka Choornam (50gm)",
+    "category": "OTC",
+    "price": 75.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2328",
+    "name": "Dasamoola Hareethaki Leham",
+    "category": "OTC",
+    "price": 160.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "206",
+    "name": "Dasamoola Kaduthrayam TAB",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1145",
+    "name": "Dasamoola Kashaya Choornam (250 Gm)",
+    "category": "OTC",
+    "price": 348.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2159",
+    "name": "Dasamoola Rasayanam",
+    "category": "Supplement",
+    "price": 220.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2288",
+    "name": "Dasamoolakaduthram Ks Tab     (AVN)",
+    "category": "OTC",
+    "price": 5.6,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1707",
+    "name": "DERMOCALM LOTION",
+    "category": "OTC",
+    "price": 271.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2198",
+    "name": "Dhanwantharam 200ml",
+    "category": "OTC",
+    "price": 190.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2199",
+    "name": "Dhanwantharam 450ml",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1150",
+    "name": "Dhanwantharam Gulika Tab",
+    "category": "OTC",
+    "price": 3.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "209",
+    "name": "Dhanwantharam Kuzhambu 1LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "210",
+    "name": "Dhanwantharam Mezhukupakam 450ML",
+    "category": "OTC",
+    "price": 400.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1790",
+    "name": "Dhanwantharam Tablet",
+    "category": "OTC",
+    "price": 2.4,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "211",
+    "name": "Dhanwantharam Thailam 1 LTR",
+    "category": "OTC",
+    "price": 950.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "212",
+    "name": "Dhanwantharam Thailam 150ML",
+    "category": "OTC",
+    "price": 170.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "213",
+    "name": "Dhanwantharam Thailam 2LTR",
+    "category": "OTC",
+    "price": 1900.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "214",
+    "name": "Dhanwantharam Thailam 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "215",
+    "name": "Dhanyamlam",
+    "category": "OTC",
+    "price": 480.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1667",
+    "name": "Dhawanthara Kashaya Choornam 100 Gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "216",
+    "name": "Dhurdhoora Pathraadi Keram (150ml)",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2435",
+    "name": "DIAMAND BP APPARATUS",
+    "category": "Medical Device",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2436",
+    "name": "DIGITAL WEIGHT  MECHINE",
+    "category": "Medical Device",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1819",
+    "name": "Digitalthermometer",
+    "category": "Medical Device",
+    "price": 550.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "219",
+    "name": "Dispossable Sheet",
+    "category": "OTC",
+    "price": 20.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2132",
+    "name": "Drakshadi KS Tab",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1793",
+    "name": "DRAKSHARISTAM (450 ML)",
+    "category": "OTC",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1151",
+    "name": "Dry Wipes",
+    "category": "OTC",
+    "price": 10.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "234",
+    "name": "Eladi Choornam 250 GM",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1780",
+    "name": "ELADI KERAM 150 ML",
+    "category": "OTC",
+    "price": 210.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2187",
+    "name": "Eladi Keram 200 ML",
+    "category": "OTC",
+    "price": 250.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2206",
+    "name": "Eladi Keram 450ml",
+    "category": "OTC",
+    "price": 560.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "959",
+    "name": "Enema Set",
+    "category": "Medical Device",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "958",
+    "name": "Face Cream",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1152",
+    "name": "Face Cream Ananda",
+    "category": "Personal Care",
+    "price": 700.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2232",
+    "name": "Face Glow Powder 80gm",
+    "category": "Personal Care",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "956",
+    "name": "Face Pack",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "240",
+    "name": "Face Tissue",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "241",
+    "name": "Facepack Powder 30gm",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2144",
+    "name": "Febrojith Tab",
+    "category": "OTC",
+    "price": 6.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "247",
+    "name": "Fine Eye drops",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "266",
+    "name": "Ganda Thailam TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "267",
+    "name": "Gandharva Hastadi KAS TAB",
+    "category": "OTC",
+    "price": 4.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1128",
+    "name": "Gandharva Hastherandam  Sg Cap",
+    "category": "OTC",
+    "price": 8.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2289",
+    "name": "Gandharvahastadi Ks Tab (AVN)",
+    "category": "OTC",
+    "price": 5.25,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "281",
+    "name": "Glysikot TAB",
+    "category": "OTC",
+    "price": 6.67,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2153",
+    "name": "Gt D 3 SG Cap",
+    "category": "OTC",
+    "price": 11.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "297",
+    "name": "Gulgulu Thikthaka Gritham 200 ML",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "298",
+    "name": "Gulgulu Thikthaka KSYM TAB",
+    "category": "OTC",
+    "price": 7.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1104",
+    "name": "Guluchadi KSYM  Choornam 100GM",
+    "category": "OTC",
+    "price": 140.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "299",
+    "name": "Guluchadi KSYM TAB",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "301",
+    "name": "Halin Drops",
+    "category": "OTC",
+    "price": 8.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "304",
+    "name": "Haridrakhandam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "307",
+    "name": "Herbal Leaves",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2228",
+    "name": "Himalayan Shilajith",
+    "category": "OTC",
+    "price": 745.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "308",
+    "name": "Himplasa Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "309",
+    "name": "Hingu vachadhi TAB",
+    "category": "OTC",
+    "price": 3.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2141",
+    "name": "HT-Kot Tab",
+    "category": "OTC",
+    "price": 2.95,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "317",
+    "name": "Ichabhedi Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2278",
+    "name": "Imugest Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "324",
+    "name": "Indukantha Ghritham 200gm",
+    "category": "OTC",
+    "price": 340.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2279",
+    "name": "Indukantha Ghritham Sg Cap",
+    "category": "OTC",
+    "price": 7.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "325",
+    "name": "Indukantham KSYM TAB",
+    "category": "OTC",
+    "price": 4.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "326",
+    "name": "Induppu",
+    "category": "OTC",
+    "price": 100.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2321",
+    "name": "JADAMANCI  CHOORNAM",
+    "category": "OTC",
+    "price": 145.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1061",
+    "name": "JADAMAYDI CHOORNAM 100GM",
+    "category": "OTC",
+    "price": 140.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1435",
+    "name": "Jeevanthyadi Ghrutham 200 Gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2315",
+    "name": "JEEVANTHYADI GRITHAM 150GM",
+    "category": "OTC",
+    "price": 900.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2280",
+    "name": "Kaidaryadi Kashyam (200 Ml)",
+    "category": "OTC",
+    "price": 155.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "338",
+    "name": "Kalyana Gritham TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2158",
+    "name": "Kalyana Gulam",
+    "category": "OTC",
+    "price": 135.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "339",
+    "name": "Kanchanara Gulgulu TAB",
+    "category": "OTC",
+    "price": 3.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1720",
+    "name": "Kanchanara Gulgulu Tab (AVN)",
+    "category": "OTC",
+    "price": 3.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2200",
+    "name": "Karpooradi Thailam  200ml",
+    "category": "OTC",
+    "price": 180.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "341",
+    "name": "Karpooradi Thailam 1 Ltr",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "342",
+    "name": "Karpooradi Thailam 150 ML",
+    "category": "OTC",
+    "price": 210.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "343",
+    "name": "Karpooradi Thailam 2 Ltr",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "344",
+    "name": "Karpooradi Thailam 4 Ltr",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2201",
+    "name": "Karpooradi Thailam 450ml",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "961",
+    "name": "Kasthurimanjal Powder",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2423",
+    "name": "Kesini Oil",
+    "category": "OTC",
+    "price": 350.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "355",
+    "name": "KM Lepam 20gm",
+    "category": "Personal Care",
+    "price": 100.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "356",
+    "name": "Kokilaksham  Kashayam TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "357",
+    "name": "Kolakulathadi choornam 100 GM",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1064",
+    "name": "Kolakulathadi Choornam 250 Gm",
+    "category": "OTC",
+    "price": 220.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "358",
+    "name": "Kolakulathadi choornam 500 GM",
+    "category": "OTC",
+    "price": 470.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2329",
+    "name": "Kooshmanda Rasayanam (250 Gm)",
+    "category": "Supplement",
+    "price": 165.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "360",
+    "name": "Kora Cloth",
+    "category": "OTC",
+    "price": 47.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1132",
+    "name": "Kott Hair Nourshing",
+    "category": "Personal Care",
+    "price": 425.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1131",
+    "name": "Kottaikal Baby Glow",
+    "category": "OTC",
+    "price": 450.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1778",
+    "name": "KOTTAM CHUKKADI CHOORNAM 100GM",
+    "category": "OTC",
+    "price": 100.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1432",
+    "name": "Kottam Chukkadi choornam 250 Gm",
+    "category": "OTC",
+    "price": 230.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "362",
+    "name": "Kottam Chukkadi Thailam 1 LTR",
+    "category": "OTC",
+    "price": 850.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "363",
+    "name": "Kottam Chukkadi Thailam 150 ML",
+    "category": "OTC",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "364",
+    "name": "Kottam Chukkadi Thailam 2 LTR",
+    "category": "OTC",
+    "price": 1800.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "365",
+    "name": "Kottam Chukkadi Thailam 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2202",
+    "name": "Kottamchukkadi Thailam 200ml",
+    "category": "OTC",
+    "price": 185.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2203",
+    "name": "Kottamchukkadi Thailam 450ml",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2266",
+    "name": "Kp Namboothiri T/p Big",
+    "category": "OTC",
+    "price": 66.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1133",
+    "name": "Krimighana Vatika",
+    "category": "OTC",
+    "price": 340.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2152",
+    "name": "Ksheera Bala 101 SG Cap",
+    "category": "OTC",
+    "price": 8.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "368",
+    "name": "Ksheerabala Thailam 2 LTR",
+    "category": "OTC",
+    "price": 1850.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1705",
+    "name": "Kumkumadi Instaglow  Cream",
+    "category": "Personal Care",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2192",
+    "name": "Kumkumadi Lepam 10GM",
+    "category": "Personal Care",
+    "price": 100.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "370",
+    "name": "Kumkumadi Lepam 20gm",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "371",
+    "name": "Kumkumadi Lepam 30gm",
+    "category": "Personal Care",
+    "price": 210.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1125",
+    "name": "Kumkumadi Thailam 50ml",
+    "category": "OTC",
+    "price": 425.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1792",
+    "name": "Kumkumadi Thailm (kottakkal)",
+    "category": "OTC",
+    "price": 630.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "372",
+    "name": "Kundirikkam Powder",
+    "category": "OTC",
+    "price": 260.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1010",
+    "name": "Kunkumadi Thilam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "373",
+    "name": "Kurumthotti Choornam 250 Gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1478",
+    "name": "Kuruthotti Kashyam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2161",
+    "name": "Kutaja Arishtam (450 ML)",
+    "category": "OTC",
+    "price": 120.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "962",
+    "name": "Laha Bhedi Res",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "375",
+    "name": "Laksha Gulu",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "376",
+    "name": "Lancet",
+    "category": "Medical Device",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "378",
+    "name": "Lanset (Sugar Teasting)",
+    "category": "Medical Device",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1704",
+    "name": "Lasuna Tab",
+    "category": "OTC",
+    "price": 2.46,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "394",
+    "name": "Livokot TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2353",
+    "name": "Lodradi Balm",
+    "category": "OTC",
+    "price": 90.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "401",
+    "name": "Maha Kalyana Gritham 200 Ml",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "402",
+    "name": "Maha Manjishtadi TAB",
+    "category": "OTC",
+    "price": 4.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "403",
+    "name": "Maha Narayana Tailam (2 L)",
+    "category": "OTC",
+    "price": 575.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "404",
+    "name": "Maha Rasnadhi KSYM TAB",
+    "category": "OTC",
+    "price": 7.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2122",
+    "name": "Maha Thikthakam Ghritham",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "405",
+    "name": "Maha Thikthkam KSYM TAB",
+    "category": "OTC",
+    "price": 7.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1908",
+    "name": "Mahadhanwantaharam Gulika",
+    "category": "OTC",
+    "price": 1.95,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2292",
+    "name": "Mahakalyanaghritham 150 Ml",
+    "category": "OTC",
+    "price": 265.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2157",
+    "name": "Manibhadra Gulam",
+    "category": "OTC",
+    "price": 130.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1127",
+    "name": "Manjishtadi Kashayam Tab",
+    "category": "OTC",
+    "price": 6.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2285",
+    "name": "Menovin Cap",
+    "category": "OTC",
+    "price": 5.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2286",
+    "name": "Menstrosap Cap",
+    "category": "OTC",
+    "price": 6.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "423",
+    "name": "Migrakot TAB",
+    "category": "OTC",
+    "price": 4.7,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1700",
+    "name": "MTPEX TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2309",
+    "name": "Mudira",
+    "category": "OTC",
+    "price": 160.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "933",
+    "name": "Murivenna 100Ml",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "452",
+    "name": "Murivenna 1LTR",
+    "category": "OTC",
+    "price": 1000.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "453",
+    "name": "Murivenna 2 LTR",
+    "category": "OTC",
+    "price": 1950.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1784",
+    "name": "MURIVENNA 200ML",
+    "category": "OTC",
+    "price": 230.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "454",
+    "name": "Murivenna 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2190",
+    "name": "MURIVENNA 450ML",
+    "category": "OTC",
+    "price": 500.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1785",
+    "name": "MURIVENNA OINTMENT",
+    "category": "OTC",
+    "price": 85.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1430",
+    "name": "Musta Choornam 250 Gm",
+    "category": "OTC",
+    "price": 116.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1791",
+    "name": "Mustarishtom",
+    "category": "OTC",
+    "price": 125.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2133",
+    "name": "Musthadi Marma KAS Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1873",
+    "name": "Muthanga Choornam",
+    "category": "OTC",
+    "price": 650.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2277",
+    "name": "Myaxyl Oil (60 ML)",
+    "category": "OTC",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1118",
+    "name": "Nagaradi Choornam 50 Gm",
+    "category": "OTC",
+    "price": 80.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "460",
+    "name": "Najavara Rice",
+    "category": "OTC",
+    "price": 90.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "461",
+    "name": "Nalpamaradi Choornam 250 Gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1429",
+    "name": "Nalpamardi Keram 150Ml",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2246",
+    "name": "Nalpamardi Keram 200ml",
+    "category": "OTC",
+    "price": 210.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2247",
+    "name": "Nalpamardi Keram450ml",
+    "category": "OTC",
+    "price": 480.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2427",
+    "name": "Narasimha Tab",
+    "category": "OTC",
+    "price": 4.58,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2114",
+    "name": "Narayana Thailam (150 Ml)",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2204",
+    "name": "Narayana Thailam 200ml",
+    "category": "OTC",
+    "price": 950.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2205",
+    "name": "Narayanathailam 450ml",
+    "category": "OTC",
+    "price": 560.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2284",
+    "name": "Neelibhringadi Keram (450 Ml)",
+    "category": "OTC",
+    "price": 350.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2207",
+    "name": "Neelibringadi Keram 200ml",
+    "category": "OTC",
+    "price": 265.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "466",
+    "name": "Neelibringri Keram 150ml",
+    "category": "OTC",
+    "price": 210.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "467",
+    "name": "Nellikka Podi (250 Gm)",
+    "category": "OTC",
+    "price": 268.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2150",
+    "name": "Neurocare Tab",
+    "category": "OTC",
+    "price": 6.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2154",
+    "name": "Nimbamrutherandam SG Cap",
+    "category": "OTC",
+    "price": 11.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2140",
+    "name": "Nisakatakadi KAS Tab",
+    "category": "OTC",
+    "price": 4.6,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "482",
+    "name": "Opthacare 10 ML",
+    "category": "OTC",
+    "price": 103.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2276",
+    "name": "Ostoact Tab",
+    "category": "OTC",
+    "price": 6.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2119",
+    "name": "Padoladi Ghritham",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1698",
+    "name": "PAIN BALM",
+    "category": "OTC",
+    "price": 46.87,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2322",
+    "name": "PANCHAKOLAM KASHYAM CHOORNAM (100 GM)",
+    "category": "OTC",
+    "price": 23.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1786",
+    "name": "PANION  TABLET",
+    "category": "OTC",
+    "price": 3.3,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2320",
+    "name": "PEEDANIL GOLD (DIVYA AYURVEDA)",
+    "category": "OTC",
+    "price": 29.8,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2297",
+    "name": "Perment Capsule",
+    "category": "OTC",
+    "price": 6.98,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1909",
+    "name": "Phalasarphis",
+    "category": "OTC",
+    "price": 210.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "524",
+    "name": "Pilocid GEL",
+    "category": "OTC",
+    "price": 70.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "526",
+    "name": "Pinda Thailam 150ML",
+    "category": "OTC",
+    "price": 150.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "527",
+    "name": "Pinda Thailam 1LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "528",
+    "name": "Pinda Thailam 2LTR",
+    "category": "OTC",
+    "price": 1700.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "529",
+    "name": "Pinda Thailam 4LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2196",
+    "name": "Pindathailam 200ml",
+    "category": "OTC",
+    "price": 175.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2197",
+    "name": "Pindathailam 450 Ml",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1472",
+    "name": "Plantain Leaf",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2147",
+    "name": "Point Cap",
+    "category": "OTC",
+    "price": 6.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2138",
+    "name": "Prasarnyadi KAS Tab",
+    "category": "OTC",
+    "price": 4.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2426",
+    "name": "Pravala Bhasma Cap",
+    "category": "OTC",
+    "price": 7.2,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2223",
+    "name": "Prostact Cap",
+    "category": "OTC",
+    "price": 6.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "538",
+    "name": "Protek TAB",
+    "category": "OTC",
+    "price": 5.75,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "539",
+    "name": "Psoravin Oil 1 LTR",
+    "category": "OTC",
+    "price": 1250.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "540",
+    "name": "Psoravin Oil 150 ML",
+    "category": "OTC",
+    "price": 250.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "541",
+    "name": "Psoravin Oil 2 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "542",
+    "name": "Psoravin Oil 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "543",
+    "name": "Psorokot Gel",
+    "category": "OTC",
+    "price": 125.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "544",
+    "name": "Psorokot TAB",
+    "category": "OTC",
+    "price": 6.45,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1706",
+    "name": "PSORWIN OIL 450ML",
+    "category": "OTC",
+    "price": 550.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1689",
+    "name": "PULSE OXYMETER CONTEC CMS 50D",
+    "category": "Medical Device",
+    "price": 755.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "550",
+    "name": "Punarnavadi KSYM TAB",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1126",
+    "name": "Punarnnavadi Kashyam Tab(Nagarjuna)",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2156",
+    "name": "Rajanyadi Choornam",
+    "category": "OTC",
+    "price": 65.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1431",
+    "name": "Ramacham (250 Gm)",
+    "category": "OTC",
+    "price": 290.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "564",
+    "name": "Rasna Sapthakam KSYM TAB",
+    "category": "OTC",
+    "price": 4.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2121",
+    "name": "Rasnadasamoola Ghritham",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1129",
+    "name": "Rasnadi Choornam 10gm",
+    "category": "OTC",
+    "price": 30.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "565",
+    "name": "Rasnadi Choornam 15gm",
+    "category": "OTC",
+    "price": 20.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2290",
+    "name": "Rasnasapthakam Ks Ta AVN)",
+    "category": "OTC",
+    "price": 5.6,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "566",
+    "name": "Rasnerandadi KSYM TAB",
+    "category": "OTC",
+    "price": 7.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "567",
+    "name": "Rasothamadi Lepam",
+    "category": "Personal Care",
+    "price": 60.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2326",
+    "name": "Renogest Tab",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "570",
+    "name": "Respocare 100gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1443",
+    "name": "REVITALIZING  NIGHT CREAM",
+    "category": "Personal Care",
+    "price": 270.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "572",
+    "name": "Rheumat Balm 20gm",
+    "category": "OTC",
+    "price": 75.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "573",
+    "name": "Rheumat Balm 30gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2146",
+    "name": "Rhukot Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "587",
+    "name": "Rose Water 100ml",
+    "category": "Personal Care",
+    "price": 30.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "588",
+    "name": "Rose Water 250GM",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "589",
+    "name": "Sadhakuppa",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "593",
+    "name": "sahacharadi  tailam 5 litre",
+    "category": "OTC",
+    "price": 3900.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "594",
+    "name": "Sahacharadi KSYM TAB",
+    "category": "OTC",
+    "price": 4.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "595",
+    "name": "Sahacharadi Mezhukupakam 450 ML",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "597",
+    "name": "Sahacharadi Thailam 1 LTR",
+    "category": "OTC",
+    "price": 950.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "598",
+    "name": "Sahacharadi Thailam 150 ML",
+    "category": "OTC",
+    "price": 160.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "599",
+    "name": "Sahacharadi Thailam 2 LTR",
+    "category": "OTC",
+    "price": 1900.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "596",
+    "name": "sahacharadi Thailam 200 ML",
+    "category": "OTC",
+    "price": 175.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "600",
+    "name": "Sahacharadi Thailam 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2188",
+    "name": "Sahacharadi Thailam 450 ML",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "608",
+    "name": "Sanagen forte",
+    "category": "OTC",
+    "price": 26.6,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2287",
+    "name": "Saplint Plus Lintment",
+    "category": "OTC",
+    "price": 80.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2134",
+    "name": "Sapthasaram KAS Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "2291",
+    "name": "Sathadhuthaghrutham Ointment",
+    "category": "OTC",
+    "price": 108.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "609",
+    "name": "Sciatilon Gel Capsule",
+    "category": "OTC",
+    "price": 7.03,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "611",
+    "name": "Septilin TAB",
+    "category": "OTC",
+    "price": 4.28,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "617",
+    "name": "Shaddaranam TAB",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "621",
+    "name": "Shathavari TAB",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2424",
+    "name": "Shikakai Powder",
+    "category": "OTC",
+    "price": 40.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2325",
+    "name": "Six-C Oinment",
+    "category": "OTC",
+    "price": 80.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "637",
+    "name": "Spondylon Gel Capsule",
+    "category": "OTC",
+    "price": 7.97,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "644",
+    "name": "Step Capsule",
+    "category": "OTC",
+    "price": 8.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2143",
+    "name": "Stiffain Tab",
+    "category": "OTC",
+    "price": 11.71,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1149",
+    "name": "Sudarsana Tab 120s",
+    "category": "OTC",
+    "price": 4.6,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "652",
+    "name": "Sukumara Ghritham 200 gm",
+    "category": "OTC",
+    "price": 380.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "653",
+    "name": "Sukumara Kashayam TAB",
+    "category": "OTC",
+    "price": 4.85,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "654",
+    "name": "Sukumara KSYM 200 ML",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "955",
+    "name": "Supres Cough syruo",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1065",
+    "name": "Surgical Mask",
+    "category": "OTC",
+    "price": 2.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "656",
+    "name": "Swaasaanandam Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "661",
+    "name": "Syringe Vasthi",
+    "category": "Medical Device",
+    "price": 150.01,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2155",
+    "name": "Thaleesadi Choornam",
+    "category": "OTC",
+    "price": 65.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "679",
+    "name": "Thampoola Lehyam",
+    "category": "OTC",
+    "price": 110.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1779",
+    "name": "THICKTHAKA GHRITHAM",
+    "category": "OTC",
+    "price": 390.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "935",
+    "name": "Thriphala Ghrutham 150gm",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "683",
+    "name": "Thriphala Ghrutham 200gm",
+    "category": "OTC",
+    "price": 340.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "684",
+    "name": "Thriphala TAB",
+    "category": "OTC",
+    "price": 2.34,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "685",
+    "name": "Thriphaladi Choornam 100 GM",
+    "category": "OTC",
+    "price": 78.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "686",
+    "name": "Thriphaladi Choornam 250 GM",
+    "category": "OTC",
+    "price": 240.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "687",
+    "name": "Thriphaladi Choornam 500 GM",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "688",
+    "name": "Thriphaladi Keram 1 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "689",
+    "name": "Thriphaladi Keram 150 ML",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "690",
+    "name": "Thriphaladi Keram 2 LTR",
+    "category": "OTC",
+    "price": 2000.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "691",
+    "name": "Thriphaladi Keram 4 LTR",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1725",
+    "name": "TRIPHALA TAB (HIM)",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1477",
+    "name": "Twine",
+    "category": "Personal Care",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "1805",
+    "name": "Two Fold Stretcher",
+    "category": "OTC",
+    "price": 7000.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2145",
+    "name": "Ulset Tab",
+    "category": "OTC",
+    "price": 4.7,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "705",
+    "name": "Urdu Dal Poiwder",
+    "category": "OTC",
+    "price": 185.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2313",
+    "name": "V WASH PLUS LOTION",
+    "category": "OTC",
+    "price": 200.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1106",
+    "name": "Vac Typh",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "706",
+    "name": "Vachashunadi Keram 150ML",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "707",
+    "name": "Vachashunadi Keram 200ML",
+    "category": "OTC",
+    "price": 180.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1119",
+    "name": "Vaiswanara Choornam 25gm",
+    "category": "OTC",
+    "price": 60.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "708",
+    "name": "Valiya Karpoorathi Choornam",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "711",
+    "name": "Varanadi Ghrutham 150gm",
+    "category": "OTC",
+    "price": 340.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "712",
+    "name": "Varanadi KAS TAB",
+    "category": "OTC",
+    "price": 3.5,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2324",
+    "name": "Vgel",
+    "category": "OTC",
+    "price": 145.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "2135",
+    "name": "Vidaryadi KAS Tab",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "731",
+    "name": "Vilvadi TAB",
+    "category": "OTC",
+    "price": 5.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "736",
+    "name": "Virechana Gulika",
+    "category": "OTC",
+    "price": 1,
+    "inStock": false,
+    "pricePlaceholder": true
+  },
+  {
+    "sourceItemId": "737",
+    "name": "Vyoshadi Vadakam",
+    "category": "OTC",
+    "price": 60.0,
+    "inStock": true,
+    "pricePlaceholder": false
+  },
+  {
+    "sourceItemId": "1794",
+    "name": "Vyswanaram Chewable Tab",
+    "category": "OTC",
+    "price": 196.88,
+    "inStock": true,
+    "pricePlaceholder": false
+  }
+]
