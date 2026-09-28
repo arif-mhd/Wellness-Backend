@@ -1,12 +1,16 @@
 import SuperTokens from "supertokens-node";
+import supertokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
+import ThirdParty from "supertokens-node/recipe/thirdparty";
+import EmailVerification from "supertokens-node/recipe/emailverification";
 import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
 import Dashboard from "supertokens-node/recipe/dashboard";
 import { pool } from "./database";
-import { patientsContainer, doctorsContainer, clinicsContainer } from "./cosmos";
 import { devFallbackOrThrow } from "../utils/env";
-import { resolveOrgIdByEmail, resolveOrgIdForRegistration } from "../utils/orgScope";
+import { enforcePostSignInGuards, provisionSocialPatient } from "../utils/authGuards";
+import { socialProviders } from "./socialProviders";
+import { patientsContainer } from "./cosmos";
 
 // Each portal env var accepts a comma-separated list, because white-labelling
 // means one portal per brand: the org slug is compiled into the build, so
@@ -54,6 +58,11 @@ export const allowedOrigins = (
 };
 
 export function initSuperTokens(): void {
+  // Resolved once so the ThirdParty and EmailVerification recipes below agree
+  // on whether social sign-in exists at all.
+  const providers = socialProviders();
+  const socialAuthEnabled = providers.length > 0;
+
   SuperTokens.init({
     framework: "express",
     supertokens: {
@@ -151,85 +160,17 @@ export function initSuperTokens(): void {
               if (response.status === "OK") {
                 const userId = response.user.id;
 
-                // Reject sign-in when the account belongs to a different
-                // organization than the portal it's logging into. Each
-                // portal deployment sends its own org via X-Org-Slug (see
-                // NEXT_PUBLIC_ORG_SLUG + SuperTokensProvider's preAPIHook on
-                // the doctor/pharmacy portals); an account with no header
-                // sent (e.g. the patient app, which has no per-deployment
-                // portal to scope) or resolving to the default org is never
-                // blocked, since there's nothing more specific to enforce.
-                try {
-                  const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug");
-                  if (orgSlugHeader) {
-                    const emailField = input.formFields.find((f) => f.id === "email");
-                    const email = typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined;
-                    if (email) {
-                      const [portalOrgId, accountOrgId] = await Promise.all([
-                        resolveOrgIdForRegistration(orgSlugHeader),
-                        resolveOrgIdByEmail(email),
-                      ]);
-                      if (portalOrgId !== accountOrgId) {
-                        await Session.revokeAllSessionsForUser(userId);
-                        return {
-                          status: "GENERAL_ERROR",
-                          message: "This account belongs to a different organization.",
-                        } as any;
-                      }
-                    }
-                  }
-                } catch (err) {
-                  // A DB hiccup here must not turn into a hung/failed request
-                  // for the client — originalImplementation.signInPOST already
-                  // ran and set session cookies/headers on the response by
-                  // this point, so throwing here would leave the client with
-                  // an ambiguous half-succeeded request instead of a clean
-                  // OK or GENERAL_ERROR body. Fail open (same as "no header
-                  // sent"): a transient lookup failure shouldn't lock a
-                  // legitimate user out of their own account.
-                  console.error("[signInPOST] org-scope check failed, allowing sign-in:", err);
-                }
-
-                try {
-                  const { resource: patient } = await patientsContainer.item(userId, userId).read();
-                  if (patient && (patient.status === "deactivated" || patient.status === "deleted")) {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: patient.status === "deleted"
-                        ? "This account no longer exists."
-                        : "Your account has been deactivated. Please contact support.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a patient (doctor/admin/pharmacy) or no profile doc yet.
-                }
-
-                try {
-                  const { resource: doctor } = await doctorsContainer.item(userId, userId).read();
-                  if (doctor && doctor.status === "deleted") {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: "This account no longer exists. Please contact your clinic.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a doctor or no profile doc yet — allow sign-in.
-                }
-
-                try {
-                  const { resource: clinicUser } = await clinicsContainer.item(userId, userId).read();
-                  if (clinicUser && clinicUser.status === "deleted") {
-                    await Session.revokeAllSessionsForUser(userId);
-                    return {
-                      status: "GENERAL_ERROR",
-                      message: "This account no longer exists.",
-                    } as any;
-                  }
-                } catch {
-                  // Not a clinic/branch user or no profile doc yet — allow sign-in.
-                }
+                // Cross-org, deactivated-patient, deleted-doctor and
+                // deleted-clinic-user checks all live in enforcePostSignInGuards
+                // so the ThirdParty recipe applies exactly the same rules from
+                // its own API. See src/utils/authGuards.ts.
+                const emailField = input.formFields.find((f) => f.id === "email");
+                const failure = await enforcePostSignInGuards({
+                  userId,
+                  email: typeof emailField?.value === "string" ? emailField.value.trim().toLowerCase() : undefined,
+                  orgSlugHeader: input.options.req.getHeaderValue("x-org-slug") ?? undefined,
+                });
+                if (failure) return failure as any;
               }
 
               return response;
@@ -237,6 +178,177 @@ export function initSuperTokens(): void {
           }),
         },
       }),
+
+      // ── Google / Apple sign-in (patient app only) ────────────────────────
+      // A separate recipe from EmailPassword with its own endpoints, so the
+      // existing email/password flow is untouched. Providers are configured in
+      // ./socialProviders and are only registered when their credentials are
+      // present, so a deployment without them simply has no social sign-in
+      // rather than failing to boot.
+      ThirdParty.init({
+        signInAndUpFeature: { providers },
+
+        override: {
+          apis: (originalImplementation) => ({
+            ...originalImplementation,
+
+            signInUpPOST: async (input) => {
+              if (originalImplementation.signInUpPOST === undefined) {
+                throw new Error("signInUpPOST not defined");
+              }
+
+              const response = await originalImplementation.signInUpPOST(input);
+
+              // SuperTokens returns business-logic outcomes as a status field
+              // with HTTP 200 — SIGN_IN_UP_NOT_ALLOWED, NO_EMAIL_GIVEN_BY_PROVIDER
+              // and so on. Without this they are invisible: the request looks
+              // successful in the access log and the client only sees a generic
+              // failure.
+              if (response.status !== "OK") {
+                console.warn(
+                  `[signInUpPOST] non-OK status: ${response.status}`,
+                  JSON.stringify(response).slice(0, 500)
+                );
+              }
+
+              if (response.status === "OK") {
+                const userId = response.user.id;
+                const email = response.user.emails[0]?.trim().toLowerCase();
+                const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug") ?? undefined;
+
+                // Account linking would normally attach this Google identity to
+                // an existing password account, but that is a paid SuperTokens
+                // feature and this core rejects it with HTTP 402. Without
+                // linking, a Google sign-in on an address that already has a
+                // password account means a SECOND account and a second patient
+                // record — one person, two identities, split medical history.
+                //
+                // Checked on every sign-in, not only when this request created
+                // the user. A failed earlier attempt can leave a third-party
+                // credential behind (the 402 errors did exactly that), and then
+                // the next attempt is not a new sign-up, skips the check, and
+                // creates the duplicate this exists to prevent.
+                if (email) {
+                  try {
+                    const existing = await supertokens.listUsersByAccountInfo("public", { email });
+                    const conflicting = existing.find(
+                      (u) =>
+                        u.id !== userId &&
+                        u.loginMethods.some((lm) => lm.recipeId === "emailpassword")
+                    );
+
+                    if (conflicting) {
+                      await Session.revokeAllSessionsForUser(userId);
+
+                      // Remove the third-party credential so a retry is a clean
+                      // new sign-up rather than slipping past this check. Its
+                      // patient document is deleted too, but only when it holds
+                      // nothing a person entered — provisioning creates it empty,
+                      // so anything filled in means real data worth keeping.
+                      try {
+                        const { resource: doc } = await patientsContainer
+                          .item(userId, userId)
+                          .read()
+                          .catch(() => ({ resource: undefined as any }));
+                        const isEmpty =
+                          doc && !doc.phone && !doc.dateOfBirth && !doc.gender && !doc.emiratesId;
+                        if (doc && isEmpty) {
+                          await patientsContainer.item(userId, userId).delete();
+                        } else if (doc) {
+                          console.warn(
+                            `[signInUpPOST] leaving patient doc ${userId} in place: it has data`
+                          );
+                        }
+                        await supertokens.deleteUser(userId);
+                      } catch (cleanupErr) {
+                        console.error("[signInUpPOST] cleanup after conflict failed:", cleanupErr);
+                      }
+
+                      return {
+                        status: "GENERAL_ERROR",
+                        message:
+                          "An account with this email already exists. Please sign in with your password instead.",
+                      } as any;
+                    }
+                  } catch (err) {
+                    // Failing open would create the duplicate this prevents.
+                    console.error("[signInUpPOST] duplicate-account check failed:", err);
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "Could not complete sign-in. Please try again.",
+                    } as any;
+                  }
+                }
+
+                // A first-time social sign-in is a registration. Give it the
+                // role, org and patient document that POST /api/patients/register
+                // would have, or the user authenticates and is then rejected by
+                // every patient endpoint.
+                // Not just brand-new users: an account can exist in
+                // SuperTokens with no patient document — an abandoned or
+                // half-completed registration — and such a user would sign in
+                // successfully and then be rejected by every patient endpoint.
+                // Provisioning on absence repairs that instead of stranding them.
+                const needsPatientDoc =
+                  email !== undefined &&
+                  (response.createdNewRecipeUser ||
+                    !(await patientsContainer
+                      .item(userId, userId)
+                      .read()
+                      .then((r) => Boolean(r.resource))
+                      .catch(() => false)));
+
+                if (needsPatientDoc && email) {
+                  // Apple returns the user's name only on the very first
+                  // sign-in and never puts it in the identity token, so the app
+                  // forwards it in X-Social-Name. Client-supplied and used as a
+                  // display name only, never as identity — the token is what
+                  // establishes who this is.
+                  const rawName =
+                    (response.rawUserInfoFromProvider?.fromUserInfoAPI as any)?.name ??
+                    (response.rawUserInfoFromProvider?.fromIdTokenPayload as any)?.name ??
+                    input.options.req.getHeaderValue("x-social-name") ??
+                    "";
+                  try {
+                    await provisionSocialPatient({
+                      userId,
+                      email,
+                      fullName: String(rawName || "").trim(),
+                      orgSlugHeader,
+                    });
+                  } catch (err) {
+                    // Leaving a half-created account behind is worse than a
+                    // failed sign-up: the credential would exist with no role
+                    // and no patient doc, and retrying would find the user
+                    // already present and never re-provision.
+                    console.error("[signInUpPOST] provisioning failed:", err);
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "We could not finish setting up your account. Please try again.",
+                    } as any;
+                  }
+                }
+
+                const failure = await enforcePostSignInGuards({ userId, email, orgSlugHeader });
+                if (failure) return failure as any;
+              }
+
+              return response;
+            },
+          }),
+        },
+      }),
+
+      // Records which emails are verified. Not needed for account linking any
+      // more — that is a paid SuperTokens feature this core rejects — but
+      // POST /api/patients/register writes verification here after an OTP
+      // passes, and utils/markEmailVerified.ts would throw without the recipe.
+      //
+      // mode "OPTIONAL" tracks verification without imposing it: nobody is
+      // newly blocked or prompted. Gated with the rest of the social stack.
+      ...(socialAuthEnabled ? [EmailVerification.init({ mode: "OPTIONAL" })] : []),
 
       Session.init({
         getTokenTransferMethod: () => "header",
