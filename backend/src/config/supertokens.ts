@@ -1,7 +1,7 @@
 import SuperTokens from "supertokens-node";
+import supertokens from "supertokens-node";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import ThirdParty from "supertokens-node/recipe/thirdparty";
-import AccountLinking from "supertokens-node/recipe/accountlinking";
 import EmailVerification from "supertokens-node/recipe/emailverification";
 import Session from "supertokens-node/recipe/session";
 import UserRoles from "supertokens-node/recipe/userroles";
@@ -58,8 +58,8 @@ export const allowedOrigins = (
 };
 
 export function initSuperTokens(): void {
-  // Resolved once so the ThirdParty recipe and the AccountLinking gate below
-  // agree on whether social sign-in exists at all.
+  // Resolved once so the ThirdParty and EmailVerification recipes below agree
+  // on whether social sign-in exists at all.
   const providers = socialProviders();
   const socialAuthEnabled = providers.length > 0;
 
@@ -216,6 +216,50 @@ export function initSuperTokens(): void {
                 const email = response.user.emails[0]?.trim().toLowerCase();
                 const orgSlugHeader = input.options.req.getHeaderValue("x-org-slug") ?? undefined;
 
+                // Account linking would normally attach this Google identity to
+                // an existing password account, but that is a paid SuperTokens
+                // feature and this core rejects it with HTTP 402. Without
+                // linking, signing in with Google on an address that already has
+                // a password account would silently create a SECOND account and
+                // a second patient record — the same person with two identities
+                // and split medical history.
+                //
+                // So refuse instead, and say why. The newly created third-party
+                // credential is deleted first: leaving it behind would mean the
+                // next attempt is no longer a new sign-up, slipping past this
+                // check and creating exactly the duplicate it exists to prevent.
+                if (response.createdNewRecipeUser && email) {
+                  try {
+                    const existing = await supertokens.listUsersByAccountInfo("public", { email });
+                    const hasPasswordAccount = existing.some(
+                      (u) =>
+                        u.id !== userId &&
+                        u.loginMethods.some((lm) => lm.recipeId === "emailpassword")
+                    );
+
+                    if (hasPasswordAccount) {
+                      await Session.revokeAllSessionsForUser(userId);
+                      await supertokens.deleteUser(userId);
+                      return {
+                        status: "GENERAL_ERROR",
+                        message:
+                          "An account with this email already exists. Please sign in with your password instead.",
+                      } as any;
+                    }
+                  } catch (err) {
+                    // Failing open here would create the duplicate account this
+                    // check exists to prevent, so fail closed. The credential is
+                    // left in place because we could not establish whether
+                    // deleting it is safe.
+                    console.error("[signInUpPOST] duplicate-account check failed:", err);
+                    await Session.revokeAllSessionsForUser(userId);
+                    return {
+                      status: "GENERAL_ERROR",
+                      message: "Could not complete sign-in. Please try again.",
+                    } as any;
+                  }
+                }
+
                 // A first-time social sign-in is a registration. Give it the
                 // role, org and patient document that POST /api/patients/register
                 // would have, or the user authenticates and is then rejected by
@@ -270,45 +314,14 @@ export function initSuperTokens(): void {
         },
       }),
 
-      // Links a social sign-in to an existing email/password account with the
-      // same address, so a patient who registered with a password and later
-      // taps "Continue with Google" keeps one identity and one patient record
-      // instead of silently acquiring a second, unusable account.
+      // Records which emails are verified. Not needed for account linking any
+      // more — that is a paid SuperTokens feature this core rejects — but
+      // POST /api/patients/register writes verification here after an OTP
+      // passes, and utils/markEmailVerified.ts would throw without the recipe.
       //
-      // Only registered when social sign-in actually exists. This recipe sits
-      // in front of EVERY sign-in and sign-up on the platform, staff portals
-      // included, so with no social providers configured there is nothing to
-      // link and no reason to alter live auth behaviour — a deployment without
-      // credentials behaves exactly as it did before.
-      //
-      // Deliberately narrow even when active: linking only ever happens for a
-      // verified email, and never while a session is already active, which
-      // would be an account-takeover vector (attaching an attacker-controlled
-      // identity to whoever is logged in).
-      // AccountLinking below asks for a verified email before it will link two
-      // accounts, and without this recipe SuperTokens has no notion of an
-      // email being verified — so nothing is ever verified, every link is
-      // refused, and a Google sign-in comes back SIGN_IN_UP_NOT_ALLOWED with
-      // HTTP 200 and nothing logged.
-      //
-      // mode "OPTIONAL" tracks verification without forcing it on anyone, so
-      // existing email/password users are unaffected: nobody is suddenly
-      // blocked or prompted. Google reports email_verified, so social sign-ups
-      // are marked verified automatically and can link.
-      //
-      // Gated with the rest of the social stack: no providers, no change.
+      // mode "OPTIONAL" tracks verification without imposing it: nobody is
+      // newly blocked or prompted. Gated with the rest of the social stack.
       ...(socialAuthEnabled ? [EmailVerification.init({ mode: "OPTIONAL" })] : []),
-
-      ...(socialAuthEnabled
-        ? [
-            AccountLinking.init({
-              shouldDoAutomaticAccountLinking: async (_newAccount, _user, session) => {
-                if (session !== undefined) return { shouldAutomaticallyLink: false };
-                return { shouldAutomaticallyLink: true, shouldRequireVerification: true };
-              },
-            }),
-          ]
-        : []),
 
       Session.init({
         getTokenTransferMethod: () => "header",
