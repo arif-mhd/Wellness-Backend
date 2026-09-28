@@ -300,9 +300,15 @@ export function initSuperTokens(): void {
                       .catch(() => false)));
 
                 if (needsPatientDoc && email) {
+                  // Apple returns the user's name only on the very first
+                  // sign-in and never puts it in the identity token, so the app
+                  // forwards it in X-Social-Name. Client-supplied and used as a
+                  // display name only, never as identity — the token is what
+                  // establishes who this is.
                   const rawName =
                     (response.rawUserInfoFromProvider?.fromUserInfoAPI as any)?.name ??
                     (response.rawUserInfoFromProvider?.fromIdTokenPayload as any)?.name ??
+                    input.options.req.getHeaderValue("x-social-name") ??
                     "";
                   try {
                     await provisionSocialPatient({
