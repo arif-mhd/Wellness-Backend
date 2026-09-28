@@ -219,27 +219,51 @@ export function initSuperTokens(): void {
                 // Account linking would normally attach this Google identity to
                 // an existing password account, but that is a paid SuperTokens
                 // feature and this core rejects it with HTTP 402. Without
-                // linking, signing in with Google on an address that already has
-                // a password account would silently create a SECOND account and
-                // a second patient record — the same person with two identities
-                // and split medical history.
+                // linking, a Google sign-in on an address that already has a
+                // password account means a SECOND account and a second patient
+                // record — one person, two identities, split medical history.
                 //
-                // So refuse instead, and say why. The newly created third-party
-                // credential is deleted first: leaving it behind would mean the
-                // next attempt is no longer a new sign-up, slipping past this
-                // check and creating exactly the duplicate it exists to prevent.
-                if (response.createdNewRecipeUser && email) {
+                // Checked on every sign-in, not only when this request created
+                // the user. A failed earlier attempt can leave a third-party
+                // credential behind (the 402 errors did exactly that), and then
+                // the next attempt is not a new sign-up, skips the check, and
+                // creates the duplicate this exists to prevent.
+                if (email) {
                   try {
                     const existing = await supertokens.listUsersByAccountInfo("public", { email });
-                    const hasPasswordAccount = existing.some(
+                    const conflicting = existing.find(
                       (u) =>
                         u.id !== userId &&
                         u.loginMethods.some((lm) => lm.recipeId === "emailpassword")
                     );
 
-                    if (hasPasswordAccount) {
+                    if (conflicting) {
                       await Session.revokeAllSessionsForUser(userId);
-                      await supertokens.deleteUser(userId);
+
+                      // Remove the third-party credential so a retry is a clean
+                      // new sign-up rather than slipping past this check. Its
+                      // patient document is deleted too, but only when it holds
+                      // nothing a person entered — provisioning creates it empty,
+                      // so anything filled in means real data worth keeping.
+                      try {
+                        const { resource: doc } = await patientsContainer
+                          .item(userId, userId)
+                          .read()
+                          .catch(() => ({ resource: undefined as any }));
+                        const isEmpty =
+                          doc && !doc.phone && !doc.dateOfBirth && !doc.gender && !doc.emiratesId;
+                        if (doc && isEmpty) {
+                          await patientsContainer.item(userId, userId).delete();
+                        } else if (doc) {
+                          console.warn(
+                            `[signInUpPOST] leaving patient doc ${userId} in place: it has data`
+                          );
+                        }
+                        await supertokens.deleteUser(userId);
+                      } catch (cleanupErr) {
+                        console.error("[signInUpPOST] cleanup after conflict failed:", cleanupErr);
+                      }
+
                       return {
                         status: "GENERAL_ERROR",
                         message:
@@ -247,10 +271,7 @@ export function initSuperTokens(): void {
                       } as any;
                     }
                   } catch (err) {
-                    // Failing open here would create the duplicate account this
-                    // check exists to prevent, so fail closed. The credential is
-                    // left in place because we could not establish whether
-                    // deleting it is safe.
+                    // Failing open would create the duplicate this prevents.
                     console.error("[signInUpPOST] duplicate-account check failed:", err);
                     await Session.revokeAllSessionsForUser(userId);
                     return {
