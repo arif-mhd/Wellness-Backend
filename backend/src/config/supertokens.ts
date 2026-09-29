@@ -238,13 +238,37 @@ export function initSuperTokens(): void {
                     );
 
                     if (conflicting) {
-                      await Session.revokeAllSessionsForUser(userId);
+                      const passwordMethod = conflicting.loginMethods.find(
+                        (lm) => lm.recipeId === "emailpassword"
+                      )!;
 
-                      // Remove the third-party credential so a retry is a clean
-                      // new sign-up rather than slipping past this check. Its
-                      // patient document is deleted too, but only when it holds
-                      // nothing a person entered — provisioning creates it empty,
-                      // so anything filled in means real data worth keeping.
+                      // Sign them into the account they already have, rather
+                      // than refusing or creating a second one. This is what
+                      // account linking would do; that is a paid SuperTokens
+                      // feature this core rejects with HTTP 402, so the session
+                      // is issued against the existing user directly instead.
+                      //
+                      // Only when that account's email is verified. Otherwise
+                      // anyone able to create a Google account on someone's
+                      // address could take over their account — the exact
+                      // condition SuperTokens' own linking enforces. Patient
+                      // emails are verified because registration requires an
+                      // OTP; see utils/markEmailVerified.ts.
+                      if (!passwordMethod.verified) {
+                        await Session.revokeAllSessionsForUser(userId);
+                        console.warn(
+                          `[signInUpPOST] refusing: ${email} has an UNVERIFIED password account`
+                        );
+                        return {
+                          status: "GENERAL_ERROR",
+                          message:
+                            "An account with this email already exists. Please sign in with your password instead.",
+                        } as any;
+                      }
+
+                      // Discard the third-party credential this request made.
+                      // Left behind it would accumulate, and its empty patient
+                      // document would shadow the real one.
                       try {
                         const { resource: doc } = await patientsContainer
                           .item(userId, userId)
@@ -254,20 +278,28 @@ export function initSuperTokens(): void {
                           doc && !doc.phone && !doc.dateOfBirth && !doc.gender && !doc.emiratesId;
                         if (doc && isEmpty) {
                           await patientsContainer.item(userId, userId).delete();
-                        } else if (doc) {
-                          console.warn(
-                            `[signInUpPOST] leaving patient doc ${userId} in place: it has data`
-                          );
                         }
+                        await Session.revokeAllSessionsForUser(userId);
                         await supertokens.deleteUser(userId);
                       } catch (cleanupErr) {
-                        console.error("[signInUpPOST] cleanup after conflict failed:", cleanupErr);
+                        console.error("[signInUpPOST] cleanup before hand-off failed:", cleanupErr);
                       }
 
+                      await Session.createNewSession(
+                        input.options.req,
+                        input.options.res,
+                        "public",
+                        passwordMethod.recipeUserId
+                      );
+
+                      console.log(
+                        `[signInUpPOST] ${email}: signed into existing account ${conflicting.id}`
+                      );
+
                       return {
-                        status: "GENERAL_ERROR",
-                        message:
-                          "An account with this email already exists. Please sign in with your password instead.",
+                        status: "OK",
+                        user: conflicting,
+                        createdNewRecipeUser: false,
                       } as any;
                     }
                   } catch (err) {
