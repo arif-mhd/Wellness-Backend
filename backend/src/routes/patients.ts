@@ -725,8 +725,16 @@ router.put("/family/:memberId", requireRole("patient"), async (req: SessionReque
       return;
     }
 
+    // Strip id — spreading the raw body onto the member let a client hand
+    // the member a brand new id (e.g. colliding with a sibling's, or one no
+    // longer matching any appointment's stored familyMemberId), silently
+    // orphaning it from everything already booked under the real one. The
+    // URL's :memberId is the only legitimate source for which member (and
+    // therefore which id) this request is allowed to touch.
+    const { id: _ignoredId, ...updateFields } = req.body ?? {};
+
     const familyMembers = currentMembers.map((m: any) =>
-      m.id === memberId ? { ...m, ...req.body } : m
+      m.id === memberId ? { ...m, ...updateFields, id: m.id } : m
     );
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
     res.json({ status: "OK" });
