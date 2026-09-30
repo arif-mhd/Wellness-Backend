@@ -5,7 +5,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer } from "../config/cosmos";
+import { updateLabBookingWithRetry, LabBookingWriteNotAuthorizedError, LabBookingAlreadyHandledError } from "../utils/labBookingWrite";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicName } from "./clinicInsurance";
@@ -561,6 +562,12 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       total_amount += test.price;
     }
 
+    // A test flagged requires_doctor_approval needs a clinic-assigned doctor
+    // to sign off before it's actually confirmed — see POST/PATCH
+    // /bookings/:bookingId/approve|reject below. Everything else keeps the
+    // old behavior of going straight to "confirmed".
+    const needsDoctorApproval = validatedItems.some(i => i.requires_doctor_approval);
+
     const booking = {
       id:                bookingId,
       patientId,
@@ -568,7 +575,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       consultationDate:  consultationDate ?? null,
       consultationSlot:  consultationSlot ?? null,
       notes:             notes ?? null,
-      status:            "confirmed",
+      status:            needsDoctorApproval ? "pending_doctor_approval" : "confirmed",
       payment_status:    "paid",
       payment_amount:    total_amount,
       createdAt:         now,
@@ -596,6 +603,30 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
   }
 });
 
+// Best-effort join used by the two patient-facing reads below: once a
+// booking has been approved, attach the reviewing doctor's name so the
+// patient app can show who approved it instead of just a doctor id. Never
+// fails the request if a lookup comes up empty — the booking itself is
+// still valid without it.
+async function withAssignedDoctorNames(bookings: any[]): Promise<any[]> {
+  const doctorIds = Array.from(new Set(bookings.map(b => b.approvedBy).filter(Boolean)));
+  if (doctorIds.length === 0) return bookings;
+
+  const names = new Map<string, string>();
+  await Promise.all(doctorIds.map(async (id) => {
+    try {
+      const { resource: doctor } = await doctorsContainer.item(id, id).read();
+      if (doctor?.fullName) names.set(id, doctor.fullName);
+    } catch {
+      // lookup failed — leave this booking without a resolved name
+    }
+  }));
+
+  return bookings.map(b => b.approvedBy && names.has(b.approvedBy)
+    ? { ...b, assignedDoctorName: names.get(b.approvedBy) }
+    : b);
+}
+
 // ─── GET /api/lab/bookings ────────────────────────────────────────────────────
 // Optional ?profileId= filters to bookings that include at least one item for
 // that specific profile (account owner or a family member) — matches the same
@@ -615,9 +646,60 @@ router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res:
       query,
       parameters,
     }, { partitionKey: patientId }).fetchAll();
-    res.json(resources);
+    res.json(await withAssignedDoctorNames(resources));
   } catch (err) {
     console.error("Get lab bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Labs (clinic-owned, for now) this doctor has been assigned to by their
+// clinic — see PUT /api/clinics/labs/assigned-doctors. Cross-partition
+// (labServicesContainer is keyed by /id), but cheap at this scale: the
+// number of labs on the platform is nowhere near appointment/booking volume.
+async function getAssignedLabIds(doctorId: string): Promise<string[]> {
+  const { resources } = await labServicesContainer.items.query({
+    query: "SELECT c.id FROM c WHERE ARRAY_CONTAINS(c.assignedDoctorIds, @doctorId)",
+    parameters: [{ name: "@doctorId", value: doctorId }],
+  }).fetchAll();
+  return resources.map((r: any) => r.id);
+}
+
+// ─── GET /api/lab/bookings/pending-approval ───────────────────────────────────
+// The shared claim queue for a doctor assigned to one or more labs: every
+// booking awaiting doctor sign-off on any of those labs. Any assigned doctor
+// can see and act on any of these — first to approve/reject wins (see
+// POST .../approve and .../reject below). Registered BEFORE
+// GET /bookings/:bookingId — that route's :bookingId param would otherwise
+// swallow this literal path first, since Express matches in registration
+// order and "pending-approval" matches :bookingId just fine syntactically.
+router.get("/bookings/pending-approval", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  try {
+    const doctorId = req.session!.getUserId();
+    const labIds = await getAssignedLabIds(doctorId);
+    if (labIds.length === 0) { res.json([]); return; }
+
+    const { resources } = await labBookingsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.status = 'pending_doctor_approval' AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE ARRAY_CONTAINS(@labIds, i.labId)) ORDER BY c.createdAt ASC",
+      parameters: [{ name: "@labIds", value: labIds }],
+    }).fetchAll();
+
+    // Best-effort join so the doctor sees a real patient name, not a raw id.
+    const patientIds = Array.from(new Set(resources.map((b: any) => b.patientId)));
+    const names = new Map<string, string>();
+    await Promise.all(patientIds.map(async (id) => {
+      try {
+        const { resource: patient } = await patientsContainer.item(id, id).read();
+        if (patient?.fullName) names.set(id, patient.fullName);
+      } catch {
+        // lookup failed — leave this booking without a resolved name
+      }
+    }));
+    const withNames = resources.map((b: any) => ({ ...b, patientName: names.get(b.patientId) ?? "Patient" }));
+
+    res.json(withNames);
+  } catch (err) {
+    console.error("Get pending lab approvals error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -632,7 +714,8 @@ router.get("/bookings/:bookingId", requireRole("patient"), async (req: SessionRe
       parameters: [{ name: "@id", value: bookingId }, { name: "@pid", value: patientId }],
     }, { partitionKey: patientId }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
-    res.json(resources[0]);
+    const [booking] = await withAssignedDoctorNames(resources);
+    res.json(booking);
   } catch (err) {
     console.error("Get lab booking error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -693,6 +776,85 @@ router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: Sess
     res.json(updated);
   } catch (err) {
     console.error("Update booking status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Shared by approve/reject below: locates a booking this doctor is actually
+// allowed to act on (cross-partition, same shape as PATCH .../status above —
+// a doctor, like a lab, doesn't know the booking's patientId up front) and
+// applies computeUpdate through the ETag-guarded retry helper so two
+// doctors racing on the same booking can't silently overwrite each other.
+async function reviewBooking(
+  doctorId: string,
+  bookingId: string,
+  computeUpdate: (booking: any) => any
+): Promise<any> {
+  const labIds = await getAssignedLabIds(doctorId);
+  if (labIds.length === 0) throw new LabBookingWriteNotAuthorizedError("You aren't assigned to any labs.");
+
+  const { resources } = await labBookingsContainer.items.query({
+    query: "SELECT * FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE ARRAY_CONTAINS(@labIds, i.labId))",
+    parameters: [{ name: "@id", value: bookingId }, { name: "@labIds", value: labIds }],
+  }, { maxItemCount: 1 }).fetchAll();
+
+  if (!resources.length) return null;
+  const { patientId } = resources[0];
+
+  return updateLabBookingWithRetry(bookingId, patientId, (booking) => {
+    if (booking.status !== "pending_doctor_approval") throw new LabBookingAlreadyHandledError();
+    return computeUpdate(booking);
+  });
+}
+
+// ─── POST /api/lab/bookings/:bookingId/approve ────────────────────────────────
+router.post("/bookings/:bookingId/approve", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  try {
+    const doctorId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const now = new Date().toISOString();
+
+    const updated = await reviewBooking(doctorId, bookingId, (booking) => ({
+      ...booking,
+      status: "confirmed",
+      approvedBy: doctorId,
+      approvedAt: now,
+      updatedAt: now,
+    }));
+
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+    res.json(updated);
+  } catch (err: any) {
+    if (err instanceof LabBookingWriteNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
+    if (err instanceof LabBookingAlreadyHandledError) { res.status(409).json({ error: err.message }); return; }
+    console.error("Approve lab booking error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/bookings/:bookingId/reject ─────────────────────────────────
+router.post("/bookings/:bookingId/reject", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  try {
+    const doctorId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const { reason } = req.body;
+    const now = new Date().toISOString();
+
+    const updated = await reviewBooking(doctorId, bookingId, (booking) => ({
+      ...booking,
+      status: "cancelled",
+      rejectedBy: doctorId,
+      rejectedReason: typeof reason === "string" ? reason.slice(0, 500) : "",
+      rejectedAt: now,
+      updatedAt: now,
+    }));
+
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+    res.json(updated);
+  } catch (err: any) {
+    if (err instanceof LabBookingWriteNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
+    if (err instanceof LabBookingAlreadyHandledError) { res.status(409).json({ error: err.message }); return; }
+    console.error("Reject lab booking error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { labServicesContainer } from "../config/cosmos";
+import { labServicesContainer, doctorsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { resolveClinicScope } from "../utils/clinicScope";
 import { resolveClinicName } from "./clinicInsurance";
@@ -117,6 +117,7 @@ router.post("/", requireRole("clinic"), async (req: SessionRequest, res: Respons
       clinicIds:      [clinicId],
       affiliation:    "owned" as const,
       linkRequests:   [],
+      assignedDoctorIds: [] as string[],
       registeredAt:   now,
       approvedAt:     null,
       approvedBy:     null,
@@ -221,6 +222,71 @@ router.delete("/link-request", requireRole("clinic"), async (req: SessionRequest
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Clinic lab cancel link-request error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PUT /api/clinics/labs/assigned-doctors ──────────────────────────────────
+// Full-replace, but scoped to only THIS clinic's own doctors within the
+// lab's assignedDoctorIds array — a lab can be "linked" (clinicIds has more
+// than one entry) and shared across several clinic branches, each with its
+// own doctor roster, so a naive full-array replace here would silently wipe
+// out another clinic's assignments on the same shared lab. Doctors already
+// assigned by OTHER clinics are preserved untouched; only the subset that
+// belongs to the calling clinic is replaced with the new list.
+router.put("/assigned-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const clinicId = await requireClinicId(req, res);
+  if (!clinicId) return;
+
+  const { doctorIds } = req.body;
+  if (!Array.isArray(doctorIds) || !doctorIds.every((id) => typeof id === "string")) {
+    res.status(400).json({ error: "doctorIds must be an array of strings." });
+    return;
+  }
+
+  try {
+    const lab = await findLabByClinicId(clinicId);
+    if (!lab) {
+      res.status(404).json({ error: "No affiliated lab found." });
+      return;
+    }
+
+    // Every id being assigned must actually be one of this clinic's own
+    // doctors — otherwise a clinic could hand lab-approval rights to a
+    // doctor it has no relationship with.
+    const uniqueIds = Array.from(new Set(doctorIds));
+    if (uniqueIds.length > 0) {
+      const { resources: ownDoctors } = await doctorsContainer.items.query({
+        query: "SELECT c.id FROM c WHERE c.clinicId = @clinicId AND ARRAY_CONTAINS(@ids, c.id)",
+        parameters: [{ name: "@clinicId", value: clinicId }, { name: "@ids", value: uniqueIds }],
+      }).fetchAll();
+      if (ownDoctors.length !== uniqueIds.length) {
+        res.status(400).json({ error: "One or more doctorIds don't belong to this clinic." });
+        return;
+      }
+    }
+
+    const existingAssigned: string[] = lab.assignedDoctorIds ?? [];
+    let keptFromOtherClinics = existingAssigned;
+    if (existingAssigned.length > 0) {
+      const { resources: existingDoctors } = await doctorsContainer.items.query({
+        query: "SELECT c.id, c.clinicId FROM c WHERE ARRAY_CONTAINS(@ids, c.id)",
+        parameters: [{ name: "@ids", value: existingAssigned }],
+      }).fetchAll();
+      const otherClinicsOwnIds = new Set(
+        existingDoctors.filter((d: any) => d.clinicId !== clinicId).map((d: any) => d.id)
+      );
+      keptFromOtherClinics = existingAssigned.filter((id) => otherClinicsOwnIds.has(id));
+    }
+
+    const updated = {
+      ...lab,
+      assignedDoctorIds: Array.from(new Set([...keptFromOtherClinics, ...uniqueIds])),
+    };
+    await labServicesContainer.items.upsert(updated);
+    res.json({ status: "OK", lab: updated });
+  } catch (err) {
+    console.error("Clinic lab assign-doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

@@ -51,6 +51,7 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       clinicIds:               [],
       affiliation:             null,
       linkRequests:            [],
+      assignedDoctorIds:       [] as string[],
       createdAt:               now,
       approvedAt:              now,
       approvedBy:              adminId,
@@ -239,25 +240,50 @@ router.post("/:labId/approve", async (req: SessionRequest, res: Response) => {
     await UserRoles.removeUserRole("public", labId, "lab_pending");
     await UserRoles.addRoleToUser("public", labId, "lab");
 
+    const now = new Date().toISOString();
     const updated = {
       ...lab,
       status:     "approved",
-      approvedAt: new Date().toISOString(),
+      approvedAt: now,
       approvedBy: adminId,
     };
     await labServicesContainer.items.upsert(updated);
 
+    // A lab can add tests before it's approved (POST /my-tests) — those go
+    // in as status: "pending_approval" and, until now, stayed stuck there
+    // forever: nothing re-evaluated them once the lab itself was approved,
+    // so GET /tests (which only ever returns status: "approved") kept
+    // hiding a newly-approved lab's entire catalogue from patients until
+    // the lab happened to re-save each test individually. Bulk-promote them
+    // here, the same moment the lab itself goes live.
+    const { resources: pendingTests } = await labTestsContainer.items
+      .query({
+        query: "SELECT * FROM c WHERE c.labId = @labId AND c.status = 'pending_approval'",
+        parameters: [{ name: "@labId", value: labId }],
+      })
+      .fetchAll();
+    for (const test of pendingTests) {
+      await labTestsContainer.items.upsert({
+        ...test,
+        status:         "approved",
+        approvedAt:     now,
+        approvedBy:     adminId,
+        rejectedAt:     null,
+        rejectedReason: null,
+      });
+    }
+
     logActivity({
       source: "admin",
       action: "Lab Approved",
-      details: `${lab.name ?? labId} approved`,
+      details: `${lab.name ?? labId} approved${pendingTests.length ? ` — ${pendingTests.length} pending test(s) also approved` : ""}`,
       performedBy: "Admin",
       performedById: adminId,
       entityType: "lab",
       entityId: labId,
     });
 
-    res.json({ status: "OK", lab: updated });
+    res.json({ status: "OK", lab: updated, testsApproved: pendingTests.length });
   } catch (err) {
     console.error("Lab approve error:", err);
     res.status(500).json({ error: "Internal server error" });

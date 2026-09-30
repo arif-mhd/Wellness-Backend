@@ -15,6 +15,13 @@ interface Lab {
   status: "pending_approval" | "approved" | "rejected";
   affiliation: "owned" | "linked" | null;
   rejectedReason?: string | null;
+  assignedDoctorIds?: string[];
+}
+
+interface ClinicDoctor {
+  id: string;
+  fullName: string;
+  specialty?: string | null;
 }
 
 interface PendingLinkRequest {
@@ -88,6 +95,16 @@ function ClinicLabContent() {
   // Link form
   const [linkEmail, setLinkEmail] = useState("");
 
+  // Doctor-assignment: which of this clinic's own doctors can approve this
+  // lab's bookings that need doctor sign-off (see backend PUT
+  // /api/clinics/labs/assigned-doctors). Roster is the same list the
+  // /clinic/doctors page fetches.
+  const [clinicDoctors, setClinicDoctors] = useState<ClinicDoctor[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState<Set<string>>(new Set());
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignError, setAssignError] = useState("");
+
   const load = () => {
     setLoading(true);
     apiFetch(`/api/clinics/labs/me${qs}`)
@@ -98,6 +115,47 @@ function ClinicLabContent() {
       })
       .catch(() => { setLab(null); setPendingLinkRequest(null); })
       .finally(() => setLoading(false));
+
+    apiFetch(`/api/clinics/doctors${qs}`)
+      .then((r) => r.json())
+      .then((data) => setClinicDoctors(Array.isArray(data.doctors) ? data.doctors : []))
+      .catch(() => setClinicDoctors([]));
+  };
+
+  const openAssignModal = () => {
+    setSelectedDoctorIds(new Set(lab?.assignedDoctorIds ?? []));
+    setAssignError("");
+    setShowAssignModal(true);
+  };
+
+  const toggleDoctor = (id: string) => {
+    setSelectedDoctorIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveAssignedDoctors = async () => {
+    setAssignBusy(true);
+    setAssignError("");
+    try {
+      const res = await apiFetch(`/api/clinics/labs/assigned-doctors${qs}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorIds: Array.from(selectedDoctorIds) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to update assigned doctors.");
+      }
+      setShowAssignModal(false);
+      load();
+    } catch (err: any) {
+      setAssignError(err.message ?? "Failed to update assigned doctors.");
+    } finally {
+      setAssignBusy(false);
+    }
   };
 
   // Wait for the branch list to resolve first (for an org owner) so the
@@ -251,6 +309,42 @@ function ClinicLabContent() {
             {lab.status === "rejected" && (
               <p className="text-[11px] text-[#D92D20]">{lab.rejectedReason ?? "This lab's registration was rejected."}</p>
             )}
+
+            {lab.status === "approved" && (
+              <>
+                <div className="h-px bg-[#EBEEF5]" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[#24292E] text-[13px] font-semibold">Doctors assigned to this lab</span>
+                    <p className="text-[#9EA5AD] text-[11px]">
+                      These doctors can approve or reject bookings for tests that need doctor sign-off, from their
+                      own doctor-portal login.
+                    </p>
+                    {(lab.assignedDoctorIds?.length ?? 0) === 0 ? (
+                      <span className="text-[#9EA5AD] text-[12px] mt-1">No doctors assigned yet.</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {(lab.assignedDoctorIds ?? []).map((id) => {
+                          const doc = clinicDoctors.find((d) => d.id === id);
+                          return (
+                            <span key={id} className="px-2.5 py-1 rounded-full bg-[#EEF2FF] text-[#5476FC] text-[11px] font-medium">
+                              {doc?.fullName ?? id}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={openAssignModal}
+                    className="shrink-0 border border-[#D6DEFF] text-[#5476FC] text-[12px] font-medium px-4 py-2 rounded-lg hover:bg-[#EEF2FF] transition-all"
+                  >
+                    Manage
+                  </button>
+                </div>
+              </>
+            )}
+
             <button
               onClick={handleUnlink}
               disabled={busy}
@@ -356,6 +450,54 @@ function ClinicLabContent() {
           </form>
         )}
       </div>
+
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowAssignModal(false)}>
+          <div
+            className="bg-white rounded-2xl p-5 w-full max-w-[420px] flex flex-col gap-4 max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-[#24292E] text-[15px] font-semibold">Assign Doctors to This Lab</h2>
+            {assignError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center">{assignError}</div>}
+            {clinicDoctors.length === 0 ? (
+              <p className="text-[#9EA5AD] text-[12px] py-4 text-center">No doctors found for this clinic yet.</p>
+            ) : (
+              <div className="flex flex-col gap-2 overflow-y-auto">
+                {clinicDoctors.map((doc) => (
+                  <label key={doc.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#F9FAFB] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="accent-[#5476FC]"
+                      checked={selectedDoctorIds.has(doc.id)}
+                      onChange={() => toggleDoctor(doc.id)}
+                    />
+                    <span className="text-[12px] text-[#344054]">
+                      {doc.fullName}{doc.specialty ? ` · ${doc.specialty}` : ""}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(false)}
+                className="flex-1 border border-[#D6DEFF] text-[#676E76] text-[13px] font-medium py-2.5 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAssignedDoctors}
+                disabled={assignBusy}
+                className="flex-1 bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-md disabled:opacity-50"
+              >
+                {assignBusy ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
