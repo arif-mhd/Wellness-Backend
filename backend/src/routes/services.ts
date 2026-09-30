@@ -26,6 +26,20 @@ function formatDate(iso?: string): string {
   }
 }
 
+// Vaccination bookings await lab approval before they're confirmed. "confirmed"
+// is the legacy pre-approval status, so it reads as pending too.
+function vaccinationStatusText(status?: string): string {
+  switch (status) {
+    case "pending_approval":
+    case "confirmed":
+      return "Awaiting approval";
+    case "approved":  return "Approved";
+    case "rejected":  return "Declined";
+    case "cancelled": return "Cancelled";
+    default:          return "Awaiting approval";
+  }
+}
+
 // ─── GET /api/services/history ────────────────────────────────────────────────
 // Returns all of the authenticated patient's service history in a unified list:
 //   - Medicine orders
@@ -177,7 +191,7 @@ router.get("/history", requireRole("patient"), async (req: SessionRequest, res: 
           title:
             names.join(", ") +
             (bookingItems.length > 3 ? ` +${bookingItems.length - 3} more` : ""),
-          subText: `${bookingItems.length} vaccine${bookingItems.length !== 1 ? "s" : ""} · ${b.status || "Confirmed"}`,
+          subText: `${bookingItems.length} vaccine${bookingItems.length !== 1 ? "s" : ""} · ${vaccinationStatusText(b.status)}`,
           date: `Booked on ${formatDate(b.createdAt)}`,
           price: formatCurrencyText(b.payment_amount || 0, currency),
           status: b.status ?? "confirmed",

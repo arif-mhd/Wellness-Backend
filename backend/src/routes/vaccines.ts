@@ -78,13 +78,22 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
       total_amount += vaccine.price;
     }
 
+    // Starts pending — a lab must approve it before the vaccination is
+    // considered booked (see PATCH /api/lab/vaccination-bookings/:id/approve).
     const booking = {
       id: bookingId,
       patientId,
       items: validatedItems,
-      status: "confirmed",
+      status: "pending_approval",
       payment_status: "paid",
       payment_amount: total_amount,
+      approvedAt: null,
+      approvedByLabId: null,
+      approvedByLabName: null,
+      rejectedAt: null,
+      rejectedByLabId: null,
+      rejectedByLabName: null,
+      rejectedReason: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -177,6 +186,7 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
     if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
     const booking = resources[0];
     if (booking.status === "cancelled") { res.status(400).json({ error: "Booking already cancelled" }); return; }
+    if (booking.status === "rejected") { res.status(400).json({ error: "Booking was rejected by the lab" }); return; }
     const updated = { ...booking, status: "cancelled", updatedAt: new Date().toISOString() };
     await vaccinationBookingsContainer.items.upsert(updated);
     res.json(updated);

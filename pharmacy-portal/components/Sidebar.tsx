@@ -33,6 +33,12 @@ const OrdersIcon = ({ active }: { active: boolean }) => (
     <path d="M6.667 6h2.666M6.667 9.333h2.666" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const VaccinationIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M14.667 1.333 13.333 2.667M10 6l-6.667 6.667L2 14l1.333-1.333L10 6Z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="m9.333 3.333 3.334 3.334M11.333 1.333 14.667 4.667M6 7.333l2.667 2.667" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const FeedbackIcon = ({ active }: { active: boolean }) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M14.667 8c0 3.682-2.985 6.667-6.667 6.667-1.258 0-2.434-.348-3.441-.951L2 14.667l1.196-2.278A6.63 6.63 0 0 1 1.333 8c0-3.682 2.985-6.667 6.667-6.667S14.667 4.318 14.667 8z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -96,6 +102,7 @@ const NAV_ITEMS_LAB = [
   { href: "/dashboard/orders", label: "Bookings", Icon: OrdersIcon },
   { href: "/dashboard/inventory", label: "Inventory", Icon: InventoryIcon },
   { href: "/dashboard/add-product", label: "Add Lab Test", Icon: AddProductIcon },
+  { href: "/dashboard/vaccinations", label: "Vaccinations", Icon: VaccinationIcon },
   { href: "/dashboard/feedback", label: "Feedback", Icon: FeedbackIcon },
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
 ];

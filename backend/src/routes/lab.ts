@@ -5,7 +5,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labServicesContainer, labTestsContainer, labBookingsContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveClinicName } from "./clinicInsurance";
@@ -693,6 +693,173 @@ router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: Sess
     res.json(updated);
   } catch (err) {
     console.error("Update booking status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/vaccines ────────────────────────────────────────────────────
+// The vaccine catalogue as the lab sees it. Vaccines are an admin-owned global
+// catalogue with no owning lab (unlike labTests, which carry a labId), so every
+// lab sees the same list — this is a read-only reference view so the lab knows
+// what patients can book.
+router.get("/vaccines", requireRole("lab"), async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await vaccinesContainer.items.query({
+      query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC",
+    }).fetchAll();
+    res.json({ vaccines: resources });
+  } catch (err) {
+    console.error("Lab vaccines error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/vaccination-bookings ────────────────────────────────────────
+// Because no vaccine carries a labId there is nothing to scope a booking to a
+// particular lab, so this is a SHARED queue: every lab sees every vaccination
+// booking, and whichever lab acts on one first claims it (see the approve/
+// reject routes below, which stamp approvedByLabId/rejectedByLabId).
+// vaccinationBookings is partitioned by /patientId so this is cross-partition.
+router.get("/vaccination-bookings", requireRole("lab"), async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await vaccinationBookingsContainer.items.query(
+      { query: "SELECT * FROM c ORDER BY c.createdAt DESC" },
+      { maxItemCount: 100 }
+    ).fetchAll();
+    res.json({ bookings: resources });
+  } catch (err) {
+    console.error("Lab vaccination bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Shared by the approve and reject routes below. Bookings created before this
+// workflow existed have status "confirmed" and no approval fields; treat those
+// as still actionable so the existing backlog can be worked through.
+const VACCINATION_ACTIONABLE = ["pending_approval", "confirmed"];
+
+// ─── PATCH /api/lab/vaccination-bookings/:bookingId/approve ───────────────────
+router.patch("/vaccination-bookings/:bookingId/approve", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { bookingId } = req.params;
+
+    const { resources } = await vaccinationBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: bookingId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    const booking = resources[0];
+    if (booking.status === "cancelled") {
+      res.status(400).json({ error: "Booking was cancelled by the patient." });
+      return;
+    }
+    if (!VACCINATION_ACTIONABLE.includes(booking.status)) {
+      // Another lab already decided this one — surface that rather than
+      // silently overwriting their decision.
+      res.status(409).json({ error: `Booking already ${booking.status}.` });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const labDoc = await labServicesContainer.item(labId, labId).read().catch(() => ({ resource: null as any }));
+    const updated = {
+      ...booking,
+      status: "approved",
+      approvedAt: now,
+      approvedByLabId: labId,
+      approvedByLabName: labDoc.resource?.name ?? null,
+      rejectedAt: null,
+      rejectedByLabId: null,
+      rejectedReason: null,
+      updatedAt: now,
+    };
+    await vaccinationBookingsContainer.items.upsert(updated);
+
+    logActivity({
+      source: "lab",
+      action: "Vaccination Approved",
+      details: `Vaccination booking ${bookingId.slice(0, 8)} approved`,
+      performedBy: labDoc.resource?.name ?? "Lab",
+      performedById: labId,
+      entityType: "vaccinationBooking",
+      entityId: bookingId,
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Approve vaccination booking error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /api/lab/vaccination-bookings/:bookingId/reject ────────────────────
+// A reason is required — it is shown to the patient verbatim on the booking
+// details screen, so "rejected" is never a dead end they can't act on.
+router.patch("/vaccination-bookings/:bookingId/reject", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+
+    if (!reason) {
+      res.status(400).json({ error: "A rejection reason is required." });
+      return;
+    }
+
+    const { resources } = await vaccinationBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: bookingId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    const booking = resources[0];
+    if (booking.status === "cancelled") {
+      res.status(400).json({ error: "Booking was cancelled by the patient." });
+      return;
+    }
+    if (!VACCINATION_ACTIONABLE.includes(booking.status)) {
+      res.status(409).json({ error: `Booking already ${booking.status}.` });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const labDoc = await labServicesContainer.item(labId, labId).read().catch(() => ({ resource: null as any }));
+    const updated = {
+      ...booking,
+      status: "rejected",
+      rejectedAt: now,
+      rejectedByLabId: labId,
+      rejectedByLabName: labDoc.resource?.name ?? null,
+      rejectedReason: reason,
+      approvedAt: null,
+      approvedByLabId: null,
+      updatedAt: now,
+    };
+    await vaccinationBookingsContainer.items.upsert(updated);
+
+    logActivity({
+      source: "lab",
+      action: "Vaccination Rejected",
+      details: `Vaccination booking ${bookingId.slice(0, 8)} rejected — ${reason}`,
+      performedBy: labDoc.resource?.name ?? "Lab",
+      performedById: labId,
+      entityType: "vaccinationBooking",
+      entityId: bookingId,
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Reject vaccination booking error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
