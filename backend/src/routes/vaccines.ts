@@ -15,7 +15,10 @@ const router = Router();
 router.get("/", async (req: Request, res: Response) => {
   try {
     const { category } = req.query as { category?: string };
-    let query = "SELECT * FROM c WHERE c.is_active = true";
+    // Lab-added vaccines carry a status and must be approved before patients
+    // can see them. Admin-catalogue docs predate that field entirely, so an
+    // undefined status counts as approved (same idiom as labTests).
+    let query ="SELECT * FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')";
     const parameters: any[] = [];
     if (category) {
       query += " AND (LOWER(c.category) = LOWER(@cat) OR LOWER(c.vaccineType) = LOWER(@cat) OR LOWER(c.age_group) = LOWER(@cat))";
@@ -55,7 +58,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
     for (const item of items) {
       const { resources } = await vaccinesContainer.items
         .query({
-          query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
+          query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
           parameters: [{ name: "@id", value: item.vaccineId }],
         })
         .fetchAll();
@@ -202,7 +205,7 @@ router.get("/:vaccineId", async (req: Request, res: Response) => {
     const { vaccineId } = req.params;
     const { resources } = await vaccinesContainer.items
       .query({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true",
+        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
         parameters: [{ name: "@id", value: vaccineId }],
       })
       .fetchAll();

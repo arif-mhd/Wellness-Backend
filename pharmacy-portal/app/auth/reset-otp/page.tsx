@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,7 +11,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const OTP_LENGTH = 6;
 const COUNTDOWN_SECONDS = 600;
 
-export default function ResetOtpPage() {
+// useSearchParams() opts a component out of static prerendering, so the part
+// that reads it lives below a Suspense boundary (see the default export) —
+// otherwise `next build` fails prerendering this route.
+function ResetOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branding = useBranding();
@@ -225,5 +228,17 @@ export default function ResetOtpPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function ResetOtpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-tr from-slate-50 via-white to-indigo-50/30 flex items-center justify-center font-outfit">
+        <span className="text-[#9EA5AD] text-sm">Loading…</span>
+      </div>
+    }>
+      <ResetOtpContent />
+    </Suspense>
   );
 }

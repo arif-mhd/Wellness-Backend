@@ -111,6 +111,64 @@ router.patch("/:vaccineId", requireRole("admin"), async (req: Request, res: Resp
   }
 });
 
+// ─── POST /api/admin/vaccines/:vaccineId/approve ──────────────────────────────
+// Clears a lab-added vaccine for patients to book. Mirrors adminLab.ts's
+// test/lab approval. Admin-created vaccines never need this — they have no
+// status field and are treated as approved everywhere.
+router.post("/:vaccineId/approve", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const { vaccineId } = req.params;
+    const { resources } = await vaccinesContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.id = @id", parameters: [{ name: "@id", value: vaccineId }] })
+      .fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Vaccine not found" }); return; }
+
+    const now = new Date().toISOString();
+    const updated = {
+      ...resources[0],
+      status: "approved",
+      approvedAt: now,
+      rejectedAt: null,
+      rejectedReason: null,
+      updatedAt: now,
+    };
+    await vaccinesContainer.items.upsert(updated);
+    res.json(updated);
+  } catch (err) {
+    console.error("Approve vaccine error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/admin/vaccines/:vaccineId/reject ───────────────────────────────
+router.post("/:vaccineId/reject", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const { vaccineId } = req.params;
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (!reason) { res.status(400).json({ error: "A rejection reason is required." }); return; }
+
+    const { resources } = await vaccinesContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.id = @id", parameters: [{ name: "@id", value: vaccineId }] })
+      .fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Vaccine not found" }); return; }
+
+    const now = new Date().toISOString();
+    const updated = {
+      ...resources[0],
+      status: "rejected",
+      rejectedAt: now,
+      rejectedReason: reason,
+      approvedAt: null,
+      updatedAt: now,
+    };
+    await vaccinesContainer.items.upsert(updated);
+    res.json(updated);
+  } catch (err) {
+    console.error("Reject vaccine error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── PATCH /api/admin/vaccines/:vaccineId/toggle ──────────────────────────────
 router.patch("/:vaccineId/toggle", requireRole("admin"), async (req: Request, res: Response) => {
   try {

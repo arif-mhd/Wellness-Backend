@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -9,7 +9,10 @@ import { useBranding } from "@/components/BrandingContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export default function ResetPasswordPage() {
+// useSearchParams() opts a component out of static prerendering, so the part
+// that reads it lives below a Suspense boundary (see the default export) —
+// otherwise `next build` fails prerendering this route.
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const branding = useBranding();
@@ -199,5 +202,17 @@ export default function ResetPasswordPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-tr from-slate-50 via-white to-indigo-50/30 flex items-center justify-center font-outfit">
+        <span className="text-[#9EA5AD] text-sm">Loading…</span>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
