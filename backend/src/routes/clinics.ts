@@ -891,4 +891,64 @@ router.get("/:id/diagnosis", async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/clinics/vaccination-doctors ────────────────────────────────────
+// Which of this clinic's doctors are nominated to review vaccination bookings.
+// Unlike lab tests — where the assignment hangs off the lab document, scoped by
+// item.labId — vaccines are a global catalogue with no owning lab, so the
+// assignment lives on the clinic itself.
+router.get("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+
+  try {
+    const { resource: clinic } = await clinicsContainer.item(scope.scopeId, scope.scopeId).read();
+    if (!clinic) { res.status(404).json({ error: "Clinic not found." }); return; }
+    res.json({ doctorIds: clinic.assignedVaccinationDoctorIds ?? [] });
+  } catch (err) {
+    console.error("Get vaccination doctors error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PUT /api/clinics/vaccination-doctors ────────────────────────────────────
+// Full replace. The assignment is stored on the clinic, so unlike the shared
+// lab document there's no other clinic's roster to preserve here.
+router.put("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
+  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
+  if (!scope) return;
+
+  const { doctorIds } = req.body;
+  if (!Array.isArray(doctorIds) || !doctorIds.every((id) => typeof id === "string")) {
+    res.status(400).json({ error: "doctorIds must be an array of strings." });
+    return;
+  }
+
+  try {
+    const { resource: clinic } = await clinicsContainer.item(scope.scopeId, scope.scopeId).read();
+    if (!clinic) { res.status(404).json({ error: "Clinic not found." }); return; }
+
+    // Every id must be one of this clinic's own doctors — otherwise a clinic
+    // could hand vaccination sign-off rights to a doctor it has no
+    // relationship with.
+    const uniqueIds = Array.from(new Set(doctorIds));
+    if (uniqueIds.length > 0) {
+      const { resources: ownDoctors } = await doctorsContainer.items.query({
+        query: "SELECT c.id FROM c WHERE c.clinicId = @clinicId AND ARRAY_CONTAINS(@ids, c.id)",
+        parameters: [{ name: "@clinicId", value: scope.scopeId }, { name: "@ids", value: uniqueIds }],
+      }).fetchAll();
+      if (ownDoctors.length !== uniqueIds.length) {
+        res.status(400).json({ error: "One or more doctorIds don't belong to this clinic." });
+        return;
+      }
+    }
+
+    const updated = { ...clinic, assignedVaccinationDoctorIds: uniqueIds };
+    await clinicsContainer.items.upsert(updated);
+    res.json({ status: "OK", doctorIds: uniqueIds });
+  } catch (err) {
+    console.error("Assign vaccination doctors error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 export default router;
