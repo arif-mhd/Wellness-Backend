@@ -57,6 +57,12 @@ const PaymentIcon = ({ active }: { active: boolean }) => (
     <path d="M14 5.333v7.334a.667.667 0 0 1-.667.666H2.667A.667.667 0 0 1 2 12.667V4a1.333 1.333 0 0 0 1.333 1.333H14Zm0 5.334h-3.333a.667.667 0 0 1-.667-.667v-1.333a.667.667 0 0 1 .667-.667H14v2.667Z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const LabApprovalsIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M6 1.333h4M6.667 1.333v3.16c0 .3-.09.594-.26.842L3.14 10.4a1.333 1.333 0 0 0 1.1 2.093h7.52a1.333 1.333 0 0 0 1.1-2.093L9.593 5.335a1.333 1.333 0 0 1-.26-.842v-3.16" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4.667 9.333h6.666" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const HelpIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="8" cy="8" r="6.667" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,13 +91,16 @@ const CollapseIcon = () => (
 // `perm`, when set, gates the whole nav item for a doctor who's had that
 // permission explicitly revoked by their clinic org owner — a standalone
 // doctor (no clinic-set permissions) sees every item, unchanged.
-const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics"; feature?: FeatureKey }[] = [
+const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics"; feature?: FeatureKey; requiresLabAssignment?: boolean }[] = [
   { href: "/dashboard", label: "Home", Icon: HomeIcon },
   { href: "/appointments", label: "Appointments", Icon: ApptIcon, feature: "appointments" },
   { href: "/dashboard/patients", label: "Patients", Icon: PatientsIcon },
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon, perm: "view_analytics" },
   { href: "/dashboard/prescriptions", label: "Tasks", Icon: TasksIcon, feature: "prescriptions" },
   { href: "/dashboard/schedule", label: "Schedule", Icon: ScheduleIcon, feature: "appointments" },
+  // Only shown to a doctor their clinic has assigned to one of its labs —
+  // see SidebarContext's hasLabAssignment (from GET /api/doctors/me).
+  { href: "/dashboard/lab-approvals", label: "Lab Approvals", Icon: LabApprovalsIcon, requiresLabAssignment: true },
   { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
   { href: "/dashboard/profile/payments", label: "Payment", Icon: PaymentIcon },
 ];
@@ -100,7 +109,7 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState, hasLabAssignment } = useSidebar();
   const branding = useBranding();
   const { hasFeature } = useFeatures();
   const [doctorName, setDoctorName] = useState("");
@@ -108,7 +117,11 @@ export default function Sidebar() {
   const [doctorAvatar, setDoctorAvatar] = useState("");
   const [scheduleSlots, setScheduleSlots] = useState<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>([]);
   const { can } = useDoctorPermissions();
-  const visibleNavItems = NAV_ITEMS.filter((item) => (!item.perm || can(item.perm)) && (!item.feature || hasFeature(item.feature)));
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    (!item.perm || can(item.perm)) &&
+    (!item.feature || hasFeature(item.feature)) &&
+    (!item.requiresLabAssignment || hasLabAssignment)
+  );
 
   // Single toggle — no setTimeout, no stacked delays
   const toggle = () => setOpen(!open);

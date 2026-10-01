@@ -13,6 +13,10 @@ interface SidebarContextType {
   isOnline: boolean;
   isManuallyOffline: boolean;
   setOnlineState: (isOnline: boolean, isManuallyOffline: boolean) => void;
+  // Labs (clinic-owned, for now) this doctor has been assigned to — drives
+  // whether the Sidebar shows the "Lab Approvals" nav item. Piggybacks on
+  // the same /api/doctors/me poll below rather than adding a new one.
+  hasLabAssignment: boolean;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -30,6 +34,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   // same state and a toggle updates everywhere the instant it succeeds.
   const [isOnline, setIsOnline] = useState(true);
   const [isManuallyOffline, setIsManuallyOffline] = useState(false);
+  const [hasLabAssignment, setHasLabAssignment] = useState(false);
 
   const setOnlineState = useCallback((online: boolean, manuallyOffline: boolean) => {
     setIsOnline(online);
@@ -53,6 +58,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
           const d = data.doctor ?? {};
           setIsOnline(d.isOnline !== false);
           setIsManuallyOffline(d.isManuallyOffline ?? false);
+          setHasLabAssignment((data.labAssignments ?? []).length > 0);
           if (!id) id = setInterval(fetchStatus, 30_000);
         })
         .catch(() => { });
@@ -64,7 +70,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   return (
     <SidebarContext.Provider value={{
       isOpen, setIsOpen, isMobileOpen, setIsMobileOpen, showWaitingRoom, setShowWaitingRoom,
-      isOnline, isManuallyOffline, setOnlineState,
+      isOnline, isManuallyOffline, setOnlineState, hasLabAssignment,
     }}>
       {children}
     </SidebarContext.Provider>
@@ -84,6 +90,7 @@ export function useSidebar() {
       isOnline: true,
       isManuallyOffline: false,
       setOnlineState: () => { },
+      hasLabAssignment: false,
     };
   }
   return context;

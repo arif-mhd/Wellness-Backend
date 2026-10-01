@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
-import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer, clinicsContainer } from "../config/cosmos";
+import { doctorsContainer, appointmentsContainer, queryDocuments, patientsContainer, otpCodesContainer, feedbackContainer, clinicsContainer, labServicesContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -69,7 +69,17 @@ router.get("/me", requireRole("doctor"), async (req: SessionRequest, res: Respon
   try {
     const { resource: doctor } = await doctorsContainer.item(doctorId, doctorId).read();
     if (!doctor) { res.status(404).json({ error: "Doctor not found." }); return; }
-    res.json({ doctor });
+
+    // Which labs (clinic-owned, for now) this doctor has been assigned to —
+    // drives whether doctor-portal's sidebar shows the "Lab Approvals" tab.
+    // Piggybacks on this same already-polled endpoint (SidebarContext polls
+    // it every 30s) rather than adding a new one.
+    const { resources: labs } = await labServicesContainer.items.query({
+      query: "SELECT c.id, c.name FROM c WHERE ARRAY_CONTAINS(c.assignedDoctorIds, @doctorId)",
+      parameters: [{ name: "@doctorId", value: doctorId }],
+    }).fetchAll();
+
+    res.json({ doctor, labAssignments: labs });
   } catch (err) {
     console.error("Get doctor me error:", err);
     res.status(500).json({ error: "Internal server error." });
