@@ -64,6 +64,30 @@ export default async function DataDeletionPage() {
           We will verify your identity and process the request within 30 days.
         </p>
 
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">
+          Deleting Individual Data Without Closing Your Account
+        </h2>
+        <p className="mb-3">
+          You do not have to delete your whole account to remove information. From inside the app
+          you can delete the following at any time, and deletion is immediate:
+        </p>
+        <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-[#C4C9CF]">
+          <li><span className="font-medium text-[#24292E]">Food and workout logs</span> — delete any individual entry from the tracking screens.</li>
+          <li><span className="font-medium text-[#24292E]">Workout routines</span> — delete a routine you created.</li>
+          <li><span className="font-medium text-[#24292E]">Menstrual cycle entries</span> — delete a logged period.</li>
+          <li><span className="font-medium text-[#24292E]">Family member profiles</span> — remove a dependant you added, along with their profile.</li>
+          <li><span className="font-medium text-[#24292E]">Diabetes records</span> — delete readings you have logged.</li>
+          <li><span className="font-medium text-[#24292E]">Profile details and saved addresses</span> — edit or clear them from your profile.</li>
+          <li><span className="font-medium text-[#24292E]">Signed-in devices</span> — sign a device out from Settings.</li>
+        </ul>
+        <p className="mb-6">
+          Medical records created by a clinician — consultation notes, prescriptions and test
+          results — cannot be deleted individually, because healthcare record-keeping rules require
+          them to be retained. To ask about removing those, email{" "}
+          <a href={`mailto:${contactEmail}`} className="text-[#5476FC] font-medium hover:underline">{contactEmail}</a>{" "}
+          and we will explain what can be erased and what we are required to keep.
+        </p>
+
         <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">What Gets Deleted</h2>
         <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-[#C4C9CF]">
           <li>Your login credentials and ability to sign in — deleted immediately and permanently.</li>
