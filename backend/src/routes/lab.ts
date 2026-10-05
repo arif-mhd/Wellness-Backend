@@ -5,7 +5,8 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer } from "../config/cosmos";
+import { catalogOwnedFields } from "./adminLabCatalog";
 import { updateLabBookingWithRetry, LabBookingWriteNotAuthorizedError, LabBookingAlreadyHandledError } from "../utils/labBookingWrite";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
@@ -25,7 +26,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // affiliated lab, even though that lab may also serve other branches).
 router.get("/tests", async (req: Request, res: Response) => {
   try {
-    const { category, labId, clinicId } = req.query as { category?: string; labId?: string; clinicId?: string };
+    const { category, labId, clinicId, catalogTestId, unlinked } = req.query as { category?: string; labId?: string; clinicId?: string; catalogTestId?: string; unlinked?: string };
     // Legacy-safe: test docs created before the approval workflow existed have
     // no `status` field at all — treat those as approved, same pattern used
     // for pharmacyProducts.inStock everywhere else in this codebase.
@@ -76,11 +77,75 @@ router.get("/tests", async (req: Request, res: Response) => {
       query += " AND LOWER(c.category) = LOWER(@cat)";
       parameters.push({ name: "@cat", value: category });
     }
+    // ?catalogTestId= — every lab offering one catalog test (the patient
+    // app's "pick a lab" step). ?unlinked=true — only standalone custom tests
+    // that aren't part of any catalog group.
+    if (catalogTestId) {
+      query += " AND c.catalogTestId = @catalogTestId";
+      parameters.push({ name: "@catalogTestId", value: catalogTestId });
+    } else if (unlinked === "true") {
+      query += " AND (NOT IS_DEFINED(c.catalogTestId) OR c.catalogTestId = null)";
+    }
     query += " ORDER BY c.createdAt DESC";
     const { resources } = await labTestsContainer.items.query({ query, parameters }).fetchAll();
     res.json(resources);
   } catch (err) {
     console.error("Get lab tests error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/catalog ─────────────────────────────────────────────────────
+// Public: catalog tests that at least one approved, active lab in this brand's
+// org actually offers, with the cheapest price and how many labs offer it.
+// Scoped the same way as GET /tests so the two always agree.
+router.get("/catalog", async (req: Request, res: Response) => {
+  try {
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+    if (orgLabIds.length === 0) { res.json([]); return; }
+
+    const { clause, parameters } = buildInClause("c.labId", orgLabIds);
+    const { resources: tests } = await labTestsContainer.items.query({
+      query: `SELECT c.catalogTestId, c.price, c.labId FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved') AND IS_DEFINED(c.catalogTestId) AND c.catalogTestId != null AND ${clause}`,
+      parameters,
+    }).fetchAll();
+
+    const stats = new Map<string, { minPrice: number; labs: Set<string> }>();
+    tests.forEach((t: any) => {
+      const s = stats.get(t.catalogTestId) ?? { minPrice: Infinity, labs: new Set<string>() };
+      s.minPrice = Math.min(s.minPrice, t.price);
+      s.labs.add(t.labId);
+      stats.set(t.catalogTestId, s);
+    });
+    if (stats.size === 0) { res.json([]); return; }
+
+    const { resources: catalog } = await labTestCatalogContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
+      .fetchAll();
+
+    res.json(
+      catalog
+        .filter((c: any) => stats.has(c.id))
+        .map((c: any) => ({ ...c, minPrice: stats.get(c.id)!.minPrice, labCount: stats.get(c.id)!.labs.size }))
+    );
+  } catch (err) {
+    console.error("Get lab catalog error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/catalog-tests ───────────────────────────────────────────────
+// Lab-side picker: every active catalog test the lab can choose to offer.
+router.get("/catalog-tests", requireRole("lab"), async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await labTestCatalogContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
+      .fetchAll();
+    res.json({ tests: resources });
+  } catch (err) {
+    console.error("Get catalog tests error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -352,11 +417,27 @@ router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req:
       name, category, price, turnaround_hours, requires_fasting,
       requires_doctor_approval, homeVisitAvailable, description, recommendedFor,
       ageRange, targetGroups, normalValues, howItsDone, recommendedFrequency,
-      patientInstructions,
+      patientInstructions, catalogTestId,
     } = req.body;
 
-    if (!name || !category || price == null) {
-      res.status(400).json({ error: "name, category, and price are required" });
+    // A test picked from the admin catalog takes its name/category/approval
+    // flag/etc. from the catalog doc — the lab only supplies price, turnaround
+    // and home-visit. No catalogTestId means a custom test, as before.
+    let catalog: any = null;
+    if (catalogTestId) {
+      const { resource } = await labTestCatalogContainer.item(catalogTestId, catalogTestId).read();
+      if (!resource || !resource.is_active) { res.status(404).json({ error: "Catalog test not found" }); return; }
+      catalog = resource;
+
+      const { resources: dupes } = await labTestsContainer.items.query({
+        query: "SELECT c.id FROM c WHERE c.labId = @labId AND c.catalogTestId = @cid",
+        parameters: [{ name: "@labId", value: labId }, { name: "@cid", value: catalogTestId }],
+      }, { partitionKey: labId }).fetchAll();
+      if (dupes.length) { res.status(409).json({ error: "You already offer this test." }); return; }
+    }
+
+    if ((!catalog && (!name || !category)) || price == null) {
+      res.status(400).json({ error: catalog ? "price is required" : "name, category, and price are required" });
       return;
     }
 
@@ -369,6 +450,7 @@ router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req:
       id:                       testId,
       labId,
       labName:                  labDoc?.name ?? null,
+      catalogTestId:            catalog ? catalog.id : null,
       name,
       category,
       price:                    parseFloat(price),
@@ -385,6 +467,7 @@ router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req:
       howItsDone:                howItsDone ?? null,
       recommendedFrequency:     recommendedFrequency ?? null,
       patientInstructions:      patientInstructions ?? null,
+      ...(catalog ? catalogOwnedFields(catalog) : {}),
       status:                   isOnboarded ? "approved" : "pending_approval",
       flagged:                  false,
       flaggedAt:                null,
@@ -446,6 +529,19 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
       ...(recommendedFrequency !== undefined && { recommendedFrequency }),
       ...(patientInstructions !== undefined && { patientInstructions }),
       ...(is_active !== undefined && { is_active: is_active === "true" || is_active === true }),
+      // Tests linked to a catalog test keep the catalog's wording and its
+      // approval/fasting flags — only price, turnaround, home visit and
+      // is_active are the lab's to change.
+      ...(existing.catalogTestId && {
+        name: existing.name,
+        category: existing.category,
+        description: existing.description,
+        requires_fasting: existing.requires_fasting,
+        requires_doctor_approval: existing.requires_doctor_approval,
+        recommendedFor: existing.recommendedFor,
+        howItsDone: existing.howItsDone,
+        patientInstructions: existing.patientInstructions,
+      }),
       status: isOnboarded ? "approved" : "pending_approval",
       rejectedAt: null,
       rejectedReason: null,

@@ -98,6 +98,7 @@ export const labBookingsContainer: Container = db.container("labBookings");
 
 /** Vaccines catalogue — partition key: /id */
 export const vaccinesContainer: Container = db.container("vaccines");
+export const labTestCatalogContainer: Container = db.container("labTestCatalog");
 
 /** Vaccination bookings — partition key: /patientId */
 export const vaccinationBookingsContainer: Container = db.container("vaccinationBookings");
@@ -181,6 +182,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "labTests",               partitionKey: { paths: ["/labId"] } },
     { id: "labBookings",            partitionKey: { paths: ["/patientId"] } },
     { id: "vaccines",               partitionKey: { paths: ["/id"] } },
+    { id: "labTestCatalog",         partitionKey: { paths: ["/id"] } },
     { id: "vaccinationBookings",    partitionKey: { paths: ["/patientId"] } },
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
