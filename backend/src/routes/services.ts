@@ -30,13 +30,13 @@ function formatDate(iso?: string): string {
 // is the legacy pre-approval status, so it reads as pending too.
 function vaccinationStatusText(status?: string): string {
   switch (status) {
-    case "pending_approval":
-    case "confirmed":
-      return "Awaiting approval";
-    case "approved":  return "Approved";
+    case "pending_doctor_approval": return "Awaiting approval";
+    // "confirmed" is both the post-approval state and the status of bookings
+    // created before approval existed.
+    case "confirmed": return "Confirmed";
     case "rejected":  return "Declined";
     case "cancelled": return "Cancelled";
-    default:          return "Awaiting approval";
+    default:          return "Confirmed";
   }
 }
 

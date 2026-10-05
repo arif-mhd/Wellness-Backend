@@ -102,7 +102,7 @@ const NAV_ITEMS_LAB = [
   { href: "/dashboard/orders", label: "Bookings", Icon: OrdersIcon },
   { href: "/dashboard/inventory", label: "Inventory", Icon: InventoryIcon },
   { href: "/dashboard/add-product", label: "Add Lab Test", Icon: AddProductIcon },
-  { href: "/dashboard/vaccinations", label: "Vaccinations", Icon: VaccinationIcon },
+  { href: "/dashboard/vaccinations", label: "Vaccines", Icon: VaccinationIcon },
   { href: "/dashboard/feedback", label: "Feedback", Icon: FeedbackIcon },
   { href: "/dashboard/analytics", label: "Analytics", Icon: AnalyticsIcon },
 ];

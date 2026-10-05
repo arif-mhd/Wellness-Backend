@@ -87,6 +87,12 @@ const PharmacyIcon = ({ active }: { active: boolean }) => (
     <path d="M14.5 3.5 20.5 9.5" />
   </svg>
 );
+const VaccinationIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "white" : "#3D4B5A"} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2l-2 2M15 9L5 19l-2 2 2-2z" />
+    <path d="M14 5l5 5M17 2l5 5M9 11l4 4" />
+  </svg>
+);
 const LabIcon = ({ active }: { active: boolean }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "white" : "#3D4B5A"} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 2h6" />
@@ -149,6 +155,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   // org owner.
   { href: "/clinic/pharmacy", label: "Pharmacy", Icon: PharmacyIcon, feature: "pharmacy" },
   { href: "/clinic/lab", label: "Lab", Icon: LabIcon, feature: "lab_booking" },
+  { href: "/clinic/vaccination", label: "Vaccination", Icon: VaccinationIcon, feature: "vaccination" },
 ];
 const ACCOUNTS_NAV_ITEM: NavItem = { href: "/clinic/accounts", label: "User Roles", Icon: AccountsIcon };
 const BRANCHES_NAV_ITEM: NavItem = { href: "/clinic/branches", label: "Branches", Icon: BranchIcon };

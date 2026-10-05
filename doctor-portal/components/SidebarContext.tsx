@@ -17,6 +17,9 @@ interface SidebarContextType {
   // whether the Sidebar shows the "Lab Approvals" nav item. Piggybacks on
   // the same /api/doctors/me poll below rather than adding a new one.
   hasLabAssignment: boolean;
+  // Same, for vaccination sign-off. The assignment lives on the clinic
+  // (assignedVaccinationDoctorIds) since vaccines have no owning lab.
+  hasVaccinationAssignment: boolean;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -35,6 +38,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState(true);
   const [isManuallyOffline, setIsManuallyOffline] = useState(false);
   const [hasLabAssignment, setHasLabAssignment] = useState(false);
+  const [hasVaccinationAssignment, setHasVaccinationAssignment] = useState(false);
 
   const setOnlineState = useCallback((online: boolean, manuallyOffline: boolean) => {
     setIsOnline(online);
@@ -59,6 +63,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
           setIsOnline(d.isOnline !== false);
           setIsManuallyOffline(d.isManuallyOffline ?? false);
           setHasLabAssignment((data.labAssignments ?? []).length > 0);
+          setHasVaccinationAssignment(data.hasVaccinationAssignment === true);
           if (!id) id = setInterval(fetchStatus, 30_000);
         })
         .catch(() => { });
@@ -70,7 +75,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   return (
     <SidebarContext.Provider value={{
       isOpen, setIsOpen, isMobileOpen, setIsMobileOpen, showWaitingRoom, setShowWaitingRoom,
-      isOnline, isManuallyOffline, setOnlineState, hasLabAssignment,
+      isOnline, isManuallyOffline, setOnlineState, hasLabAssignment, hasVaccinationAssignment,
     }}>
       {children}
     </SidebarContext.Provider>
@@ -91,6 +96,7 @@ export function useSidebar() {
       isManuallyOffline: false,
       setOnlineState: () => { },
       hasLabAssignment: false,
+      hasVaccinationAssignment: false,
     };
   }
   return context;

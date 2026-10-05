@@ -52,14 +52,25 @@ export default async function PrivacyPolicyPage() {
   const hasFeature = (key: FeatureKey) => branding.enabledFeatures.includes(key);
 
   const appName = branding.name;
-  const contactEmail = branding.supportEmail || "support@example.com";
+  // Falls back to the platform address rather than a placeholder: this page is
+  // a public legal document linked from app store listings, and
+  // "support@example.com" on it is worse than wrong. Each org should still set
+  // its own support_email so patients reach the right brand.
+  const contactEmail = branding.supportEmail || "arif@methuselahventures.ai";
   const lastUpdated = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto px-6 py-16 font-outfit text-slate-700 leading-relaxed">
-        <h1 className="text-3xl font-marcellus text-slate-900 mb-2">{appName} Privacy Policy</h1>
-        <p className="text-sm text-slate-400 mb-10">Last updated: {lastUpdated}</p>
+    <div className="min-h-screen bg-[#F7F8FA] font-outfit">
+      <header className="bg-white border-b border-[#EBEEF5]">
+        <div className="max-w-3xl mx-auto px-6 py-5">
+          <span className="text-[#24292E] text-[17px] font-medium tracking-[-0.34px]">{appName}</span>
+        </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-6 py-10 md:py-14">
+        <div className="bg-white rounded-2xl border border-[#EBEEF5] shadow-sm px-6 py-8 md:px-12 md:py-12 text-[#676E76] text-[15px] leading-[1.75]">
+          <h1 className="text-[#24292E] text-[28px] font-medium tracking-[-0.56px] mb-1.5">Privacy Policy</h1>
+          <p className="text-[13px] text-[#9EA5AD] mb-10">Last updated: {lastUpdated}</p>
 
         <p className="mb-6">
           This Privacy Policy explains how {appName} ("we", "us", "our") collects, uses, shares, and
@@ -67,18 +78,18 @@ export default async function PrivacyPolicyPage() {
           "App"). By creating an account or using the App, you agree to the practices described here.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Information We Collect</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Information We Collect</h2>
         <p className="mb-2">We collect the following categories of information:</p>
-        <ul className="list-disc pl-6 mb-6 space-y-1.5">
-          <li><span className="font-medium text-slate-800">Personal information</span> — your name, email address, phone number, date of birth, gender, and a government-issued identity document where required for account verification.</li>
-          <li><span className="font-medium text-slate-800">Health information</span> — symptoms, medical history, prescriptions, consultation notes, and other information you share with a doctor through the App{hasFeature("ai_chat") ? ", including through our AI-assisted symptom-checker chat" : ""}.</li>
-          <li><span className="font-medium text-slate-800">Location information</span> — delivery and appointment addresses you provide{hasFeature("pharmacy") ? " for medicine delivery" : ""}{hasFeature("lab_booking") ? " or lab sample collection" : ""}.</li>
-          <li><span className="font-medium text-slate-800">Payment information</span> — details needed to process payments for consultations{hasFeature("pharmacy") ? ", medicines" : ""}{hasFeature("lab_booking") ? ", lab tests" : ""}, and other services, generally handled by our payment processor rather than stored directly by us.</li>
-          <li><span className="font-medium text-slate-800">Device and usage information</span> — device identifiers, app version, and how you interact with the App, used to keep the service reliable and secure.</li>
+        <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-[#C4C9CF]">
+          <li><span className="font-medium text-[#24292E]">Personal information</span> — your name, email address, phone number, date of birth, gender, and a government-issued identity document where required for account verification.</li>
+          <li><span className="font-medium text-[#24292E]">Health information</span> — symptoms, medical history, prescriptions, consultation notes, and other information you share with a doctor through the App{hasFeature("ai_chat") ? ", including through our AI-assisted symptom-checker chat" : ""}.</li>
+          <li><span className="font-medium text-[#24292E]">Location information</span> — delivery and appointment addresses you provide{hasFeature("pharmacy") ? " for medicine delivery" : ""}{hasFeature("lab_booking") ? " or lab sample collection" : ""}.</li>
+          <li><span className="font-medium text-[#24292E]">Payment information</span> — details needed to process payments for consultations{hasFeature("pharmacy") ? ", medicines" : ""}{hasFeature("lab_booking") ? ", lab tests" : ""}, and other services, generally handled by our payment processor rather than stored directly by us.</li>
+          <li><span className="font-medium text-[#24292E]">Device and usage information</span> — device identifiers, app version, and how you interact with the App, used to keep the service reliable and secure.</li>
         </ul>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">How We Use Your Information</h2>
-        <ul className="list-disc pl-6 mb-6 space-y-1.5">
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">How We Use Your Information</h2>
+        <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-[#C4C9CF]">
           <li>To create and manage your account, and verify your identity.</li>
           <li>To connect you with doctors{hasFeature("pharmacy") ? ", pharmacies" : ""}{hasFeature("lab_booking") ? ", labs" : ""} and deliver the healthcare services you request.</li>
           <li>To process payments for services booked through the App.</li>
@@ -87,9 +98,9 @@ export default async function PrivacyPolicyPage() {
           <li>To comply with applicable healthcare, tax, and other legal requirements.</li>
         </ul>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">How We Share Your Information</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">How We Share Your Information</h2>
         <p className="mb-2">We share your information only as needed to provide our services:</p>
-        <ul className="list-disc pl-6 mb-6 space-y-1.5">
+        <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-[#C4C9CF]">
           <li>With the doctor(s) you consult, so they can provide care.</li>
           {hasFeature("pharmacy") && <li>With pharmacies, to fulfill medicine orders you place.</li>}
           {hasFeature("lab_booking") && <li>With diagnostic labs, to fulfill test bookings you place.</li>}
@@ -99,14 +110,14 @@ export default async function PrivacyPolicyPage() {
         </ul>
         <p className="mb-6">We do not sell your personal or health information to third parties.</p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Data Security</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Data Security</h2>
         <p className="mb-6">
           All data sent between the App and our servers is encrypted in transit (HTTPS/TLS). We use
           reasonable administrative, technical, and physical safeguards to protect your information,
           though no method of transmission or storage is completely secure.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Data Retention &amp; Deletion</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Data Retention &amp; Deletion</h2>
         <p className="mb-6">
           We retain your information for as long as your account is active or as needed to provide
           services, comply with legal obligations, and resolve disputes. You can request deletion of
@@ -115,32 +126,37 @@ export default async function PrivacyPolicyPage() {
           page for details on how, and exactly what is deleted versus retained.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Your Rights</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Your Rights</h2>
         <p className="mb-6">
           You may access, correct, or request deletion of your personal information at any time
           through the App's settings, or by contacting us at the email below.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Children's Privacy</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Children's Privacy</h2>
         <p className="mb-6">
           The App is not directed at children under 18. A parent or guardian may add a child as a
           family member/dependent profile under their own account to manage the child's care.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Changes to This Policy</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Changes to This Policy</h2>
         <p className="mb-6">
           We may update this Privacy Policy from time to time. We will notify you of material changes
           through the App or by other reasonable means. Continued use of the App after a change
           constitutes acceptance of the updated policy.
         </p>
 
-        <h2 className="text-xl font-marcellus text-slate-900 mt-10 mb-3">Contact Us</h2>
+        <h2 className="text-[#24292E] text-[18px] font-medium tracking-[-0.36px] mt-9 mb-3">Contact Us</h2>
         <p className="mb-6">
           If you have questions about this Privacy Policy or how your information is handled, contact
           us at{" "}
           <a href={`mailto:${contactEmail}`} className="text-[#5476FC] font-medium hover:underline">{contactEmail}</a>.
         </p>
-      </div>
+        </div>
+
+        <p className="text-center text-[13px] text-[#9EA5AD] mt-8">
+          © {new Date().getFullYear()} {appName}
+        </p>
+      </main>
     </div>
   );
 }
