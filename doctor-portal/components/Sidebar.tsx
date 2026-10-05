@@ -63,6 +63,12 @@ const LabApprovalsIcon = ({ active }: { active: boolean }) => (
     <path d="M4.667 9.333h6.666" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const VaccinationIcon = ({ active }: { active: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M14.667 1.333 13.333 2.667M10 6l-6.667 6.667L2 14l1.333-1.333L10 6Z" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="m9.333 3.333 3.334 3.334M11.333 1.333 14.667 4.667M6 7.333l2.667 2.667" stroke={active ? "white" : "#3D4B5A"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 const HelpIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="8" cy="8" r="6.667" stroke="#3D4B5A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -91,7 +97,7 @@ const CollapseIcon = () => (
 // `perm`, when set, gates the whole nav item for a doctor who's had that
 // permission explicitly revoked by their clinic org owner — a standalone
 // doctor (no clinic-set permissions) sees every item, unchanged.
-const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics"; feature?: FeatureKey; requiresLabAssignment?: boolean }[] = [
+const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytics"; feature?: FeatureKey; requiresLabAssignment?: boolean; requiresVaccinationAssignment?: boolean }[] = [
   { href: "/dashboard", label: "Home", Icon: HomeIcon },
   { href: "/appointments", label: "Appointments", Icon: ApptIcon, feature: "appointments" },
   { href: "/dashboard/patients", label: "Patients", Icon: PatientsIcon },
@@ -101,6 +107,9 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
   // Only shown to a doctor their clinic has assigned to one of its labs —
   // see SidebarContext's hasLabAssignment (from GET /api/doctors/me).
   { href: "/dashboard/lab-approvals", label: "Lab Approvals", Icon: LabApprovalsIcon, requiresLabAssignment: true },
+  // Only shown to a doctor their clinic has nominated for vaccination
+  // sign-off — see SidebarContext's hasVaccinationAssignment.
+  { href: "/dashboard/vaccination-approvals", label: "Vaccinations", Icon: VaccinationIcon, requiresVaccinationAssignment: true },
   { href: "/dashboard/messages", label: "Messages", Icon: MessagesIcon },
   { href: "/dashboard/profile/payments", label: "Payment", Icon: PaymentIcon },
 ];
@@ -109,7 +118,7 @@ const NAV_ITEMS: { href: string; label: string; Icon: any; perm?: "view_analytic
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState, hasLabAssignment } = useSidebar();
+  const { isOpen: open, setIsOpen: setOpen, isMobileOpen, setIsMobileOpen, isOnline, isManuallyOffline, setOnlineState, hasLabAssignment, hasVaccinationAssignment } = useSidebar();
   const branding = useBranding();
   const { hasFeature } = useFeatures();
   const [doctorName, setDoctorName] = useState("");
@@ -120,7 +129,8 @@ export default function Sidebar() {
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     (!item.perm || can(item.perm)) &&
     (!item.feature || hasFeature(item.feature)) &&
-    (!item.requiresLabAssignment || hasLabAssignment)
+    (!item.requiresLabAssignment || hasLabAssignment) &&
+    (!item.requiresVaccinationAssignment || hasVaccinationAssignment)
   );
 
   // Single toggle — no setTimeout, no stacked delays

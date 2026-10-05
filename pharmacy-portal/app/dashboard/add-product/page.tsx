@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import Link from "next/link";
@@ -54,6 +54,25 @@ export default function AddProductPage() {
   const [recommendedFrequency, setRecommendedFrequency] = useState("");
   const [patientInstructions, setPatientInstructions] = useState("");
 
+  // ── Lab catalog ─────────────────────────────────────────────────────────
+  // A lab can offer a test from the admin catalog (only price/turnaround/home
+  // visit are the lab's to set — name, category, fasting and doctor-approval
+  // come from the catalog) or add a custom test not in it.
+  const [catalogTests, setCatalogTests] = useState<{ id: string; name: string; category: string; description?: string; requires_fasting: boolean; requires_doctor_approval: boolean }[]>([]);
+  const [catalogTestId, setCatalogTestId] = useState("");
+  const selectedCatalog = catalogTests.find(c => c.id === catalogTestId) ?? null;
+
+  useEffect(() => {
+    if (!isLab) return;
+    (async () => {
+      try {
+        const token = await Session.getAccessToken();
+        const res = await fetch(`${API_URL}/api/lab/catalog-tests`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
+        if (res.ok) setCatalogTests((await res.json()).tests ?? []);
+      } catch { /* picker just stays empty — custom tests still work */ }
+    })();
+  }, [isLab]);
+
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -65,11 +84,32 @@ export default function AddProductPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name || !category || !price) { setError("Name, category and price are required."); return; }
+    if (isLab && selectedCatalog) {
+      if (!price) { setError("Price is required."); return; }
+    } else if (!name || !category || !price) { setError("Name, category and price are required."); return; }
     setError(""); setLoading(true);
     try {
       const token = await Session.getAccessToken();
       const form = new FormData();
+
+      if (isLab && selectedCatalog) {
+        form.append("catalogTestId", selectedCatalog.id);
+        form.append("price", price);
+        if (turnaroundHours) form.append("turnaround_hours", turnaroundHours);
+        form.append("homeVisitAvailable", String(homeVisitAvailable));
+        const res = await fetch(`${API_URL}/api/lab/my-tests`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token ?? ""}` },
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) { setError(data.error || "Failed to add test."); return; }
+        setItemStatus(data.test?.status ?? "pending_approval");
+        setSuccess(true);
+        setTimeout(() => router.replace("/dashboard/inventory"), 2000);
+        return;
+      }
+
       form.append("name", name);
       form.append("category", category);
       form.append("price", price);
@@ -201,7 +241,44 @@ export default function AddProductPage() {
 
         {isLab ? (
           <>
+            {/* Catalog or custom */}
+            <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-3 transition-all hover:border-gray-300">
+              <label className={labelCls}>Test</label>
+              <select value={catalogTestId} onChange={e => setCatalogTestId(e.target.value)}
+                className="w-full h-12 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all appearance-none">
+                <option value="">Custom test (not in the catalog)</option>
+                {catalogTests.map(c => <option key={c.id} value={c.id}>{c.name} — {c.category}</option>)}
+              </select>
+              <p className="text-[11px] text-[#A0A8B0]">
+                Pick a standard test so patients see it grouped with the same test from other labs. Only add a custom test if yours isn&apos;t listed.
+              </p>
+              {selectedCatalog && (
+                <div className="bg-[#F5F7FB] rounded-xl px-4 py-3 text-xs text-[#676E76] space-y-1">
+                  <p className="text-sm font-semibold text-[#24292E]">{selectedCatalog.name}</p>
+                  <p>{selectedCatalog.category}{selectedCatalog.requires_fasting ? " · Fasting required" : ""}{selectedCatalog.requires_doctor_approval ? " · Needs doctor approval" : ""}</p>
+                  {selectedCatalog.description && <p>{selectedCatalog.description}</p>}
+                </div>
+              )}
+            </div>
+
+            {selectedCatalog && (
+              <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-5 transition-all hover:border-gray-300">
+                <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-2 border-b border-[#EBEEF5] pb-3">Your Pricing</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Price ({currency.code}) *</label>
+                    <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Turnaround Time (hours)</label>
+                    <input type="number" min="0" value={turnaroundHours} onChange={e => setTurnaroundHours(e.target.value)} placeholder="e.g. 24" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Core test info */}
+            {!selectedCatalog && (
             <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-5 transition-all hover:border-gray-300">
               <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-2 border-b border-[#EBEEF5] pb-3">Test Information</h2>
 
@@ -262,6 +339,7 @@ export default function AddProductPage() {
                 <input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
             </div>
+            )}
 
             {/* Home visit toggle — the important new one, called out clearly */}
             <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
@@ -281,6 +359,7 @@ export default function AddProductPage() {
             </div>
 
             {/* Fasting toggle */}
+            {!selectedCatalog && (
             <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
               <div className="flex items-center justify-between">
                 <div>
@@ -296,8 +375,10 @@ export default function AddProductPage() {
                 </button>
               </div>
             </div>
+            )}
 
             {/* Doctor approval toggle */}
+            {!selectedCatalog && (
             <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
               <div className="flex items-center justify-between">
                 <div>
@@ -313,6 +394,7 @@ export default function AddProductPage() {
                 </button>
               </div>
             </div>
+            )}
 
             {/* Info banner */}
             <div className="bg-[#EEF2FF] border border-[#C7D2FE] rounded-xl px-4 py-3 text-xs text-[#4F46E5] flex gap-3 items-start">
