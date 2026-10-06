@@ -3,15 +3,31 @@ core_config_version: 0
 port: 8080
 host: 0.0.0.0
 
-# The mobile app manages its access token manually (captures it once at
-# sign-in, stores it in SecureStore, reuses it for every request) and has no
-# refresh-token flow wired up anywhere — so once an access token expires,
-# the session is dead until the user logs in again, regardless of how
-# recently/actively they were using the app. The SuperTokens default here is
-# 3600 seconds (1 hour), which was causing users to be logged out roughly
-# hourly. Raised to 30 days as a stopgap until real token refresh is
-# implemented client-side. Tradeoff: a stolen/leaked access token stays
-# valid for this whole window instead of 1 hour — acceptable short-term
-# given tokens are stored in SecureStore (OS keychain/keystore), not
-# acceptable as a permanent fix for a healthcare app.
+# Sessions are meant to last until the user signs out. Nothing below should
+# ever end one on its own for somebody who keeps using the app.
+#
+# How long a refresh token lives is the real ceiling on that, because it is
+# what a returning user presents to get a new access token. SuperTokens
+# rotates it on every refresh and starts the window again, so this is an
+# idle timeout, not a session cap: open the app once inside the window and
+# the clock resets. The default is shorter than a patient might plausibly
+# leave the app alone between appointments, so it is set explicitly here.
+# 525600 minutes = 365 days.
+refresh_token_validity: 525600
+
+# Access token lifetime. SuperTokens' own default is 3600 (1 hour); this was
+# raised to 30 days as a stopgap at a point when the apps had no working
+# refresh flow, so an expired access token simply ended the session.
+#
+# That is no longer true — utils/sessionRefresh.ts in the patient app now
+# refreshes and, critically, distinguishes "the server says this session is
+# over" from "the server did not answer", which is what previously turned a
+# momentary auth-server blip into a permanent logout.
+#
+# This stays at 30 days until the apps carrying that fix are live in both
+# stores. Dropping it sooner would make every current build refresh hourly
+# while still signing the user out whenever a refresh went unanswered —
+# turning a rare failure into a frequent one. Once those builds ship, take
+# this back to 3600: a 30-day access token cannot be revoked, which is a
+# poor property for an app holding medical records.
 access_token_validity: 2592000
