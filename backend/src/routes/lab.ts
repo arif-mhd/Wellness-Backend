@@ -536,7 +536,6 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
         name: existing.name,
         category: existing.category,
         description: existing.description,
-        requires_fasting: existing.requires_fasting,
         requires_doctor_approval: existing.requires_doctor_approval,
         recommendedFor: existing.recommendedFor,
         howItsDone: existing.howItsDone,

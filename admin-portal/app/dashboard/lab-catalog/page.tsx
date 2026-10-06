@@ -18,7 +18,6 @@ interface CatalogTest {
   name: string;
   category: string;
   description?: string;
-  requires_fasting: boolean;
   requires_doctor_approval: boolean;
   recommendedFor?: string;
   howItsDone?: string;
@@ -38,7 +37,7 @@ interface UnlinkedTest {
 
 const EMPTY = {
   name: "", category: "", description: "", recommendedFor: "", howItsDone: "", patientInstructions: "",
-  requires_fasting: false, requires_doctor_approval: false,
+  requires_doctor_approval: false,
 };
 
 const inputCls = "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100";
@@ -78,7 +77,7 @@ export default function LabCatalogPage() {
     setForm({
       name: t.name, category: t.category, description: t.description ?? "", recommendedFor: t.recommendedFor ?? "",
       howItsDone: t.howItsDone ?? "", patientInstructions: t.patientInstructions ?? "",
-      requires_fasting: t.requires_fasting, requires_doctor_approval: t.requires_doctor_approval,
+      requires_doctor_approval: t.requires_doctor_approval,
     });
     setEditingId(t.id); setError(""); setShowForm(true);
   };
@@ -251,10 +250,6 @@ export default function LabCatalogPage() {
               <textarea placeholder="Recommended for" value={form.recommendedFor} onChange={(e) => setForm({ ...form, recommendedFor: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="How it's done" value={form.howItsDone} onChange={(e) => setForm({ ...form, howItsDone: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="Patient instructions" value={form.patientInstructions} onChange={(e) => setForm({ ...form, patientInstructions: e.target.value })} className={inputCls} rows={2} />
-              <label className="flex items-center gap-2 text-[13px] text-slate-700">
-                <input type="checkbox" checked={form.requires_fasting} onChange={(e) => setForm({ ...form, requires_fasting: e.target.checked })} />
-                Requires fasting
-              </label>
               <label className="flex items-center gap-2 text-[13px] text-slate-700">
                 <input type="checkbox" checked={form.requires_doctor_approval} onChange={(e) => setForm({ ...form, requires_doctor_approval: e.target.checked })} />
                 Requires doctor approval before it's confirmed
