@@ -10,13 +10,13 @@ router.use(requireRole("admin"));
 // The fields a catalog test owns. A lab test linked to a catalog test takes
 // these from the catalog (never from the lab), so every lab offering the same
 // test shows the same name/category and — importantly — the same
-// requires_doctor_approval decision, which only an admin gets to make.
+// requires_doctor_approval decision, which only an admin gets to make. Fasting
+// is deliberately not here — each lab decides that for its own offering.
 export function catalogOwnedFields(catalog: any) {
   return {
     name: catalog.name,
     category: catalog.category,
     description: catalog.description ?? "",
-    requires_fasting: !!catalog.requires_fasting,
     requires_doctor_approval: !!catalog.requires_doctor_approval,
     recommendedFor: catalog.recommendedFor ?? "",
     howItsDone: catalog.howItsDone ?? "",
@@ -27,7 +27,7 @@ export function catalogOwnedFields(catalog: any) {
 // ─── POST /api/admin/lab-catalog ──────────────────────────────────────────────
 router.post("/", async (req: SessionRequest, res: Response) => {
   try {
-    const { name, category, description, requires_fasting, requires_doctor_approval, recommendedFor, howItsDone, patientInstructions } = req.body;
+    const { name, category, description, requires_doctor_approval, recommendedFor, howItsDone, patientInstructions } = req.body;
     if (!name || !category) {
       res.status(400).json({ error: "name and category are required" });
       return;
@@ -38,7 +38,6 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       name: String(name).trim(),
       category: String(category).trim(),
       description: description ?? "",
-      requires_fasting: !!requires_fasting,
       requires_doctor_approval: !!requires_doctor_approval,
       recommendedFor: recommendedFor ?? "",
       howItsDone: howItsDone ?? "",
@@ -148,7 +147,7 @@ router.patch("/:id", async (req: SessionRequest, res: Response) => {
     const { resource } = await labTestCatalogContainer.item(id, id).read();
     if (!resource) { res.status(404).json({ error: "Catalog test not found" }); return; }
 
-    const allowed = ["name", "category", "description", "requires_fasting", "requires_doctor_approval", "recommendedFor", "howItsDone", "patientInstructions"];
+    const allowed = ["name", "category", "description", "requires_doctor_approval", "recommendedFor", "howItsDone", "patientInstructions"];
     const patch: any = {};
     for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
     const updated = { ...resource, ...patch, updatedAt: new Date().toISOString() };

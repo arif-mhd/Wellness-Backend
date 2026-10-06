@@ -30,6 +30,7 @@ export default function LabApprovalsPage() {
   const [loaded, setLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -37,9 +38,15 @@ export default function LabApprovalsPage() {
       if (res.ok) {
         const data = await res.json();
         setBookings(Array.isArray(data) ? data : []);
+        setLoadError("");
+      } else {
+        // Previously swallowed, which made a failing request look identical
+        // to "nothing waiting".
+        const err = await res.json().catch(() => ({}));
+        setLoadError(`Couldn't load the queue (${res.status}${err.error ? `: ${err.error}` : ""}).`);
       }
     } catch {
-      // transient network failure — keep whatever list is already shown
+      setLoadError("Couldn't reach the server.");
     } finally {
       setLoaded(true);
     }
@@ -99,6 +106,10 @@ export default function LabApprovalsPage() {
           whoever gets to one first handles it.
         </p>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-5">{loadError}</div>
+      )}
 
       {actionError && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-5">{actionError}</div>

@@ -97,6 +97,7 @@ export default function AddProductPage() {
         form.append("price", price);
         if (turnaroundHours) form.append("turnaround_hours", turnaroundHours);
         form.append("homeVisitAvailable", String(homeVisitAvailable));
+        form.append("requires_fasting", String(requiresFasting));
         const res = await fetch(`${API_URL}/api/lab/my-tests`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token ?? ""}` },
@@ -255,7 +256,9 @@ export default function AddProductPage() {
               {selectedCatalog && (
                 <div className="bg-[#F5F7FB] rounded-xl px-4 py-3 text-xs text-[#676E76] space-y-1">
                   <p className="text-sm font-semibold text-[#24292E]">{selectedCatalog.name}</p>
-                  <p>{selectedCatalog.category}{selectedCatalog.requires_fasting ? " · Fasting required" : ""}{selectedCatalog.requires_doctor_approval ? " · Needs doctor approval" : ""}</p>
+                  <p>{selectedCatalog.category}</p>
+                  <p>Doctor approval: {selectedCatalog.requires_doctor_approval ? "Required" : "Not required"}</p>
+                  <p className="text-[11px] text-[#A0A8B0]">Doctor approval is set by the platform admin for every lab offering this test.</p>
                   {selectedCatalog.description && <p>{selectedCatalog.description}</p>}
                 </div>
               )}
@@ -358,8 +361,7 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Fasting toggle */}
-            {!selectedCatalog && (
+            {/* Fasting toggle — the lab's own call, for catalog and custom tests alike */}
             <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 transition-all hover:border-gray-300">
               <div className="flex items-center justify-between">
                 <div>
@@ -375,7 +377,6 @@ export default function AddProductPage() {
                 </button>
               </div>
             </div>
-            )}
 
             {/* Doctor approval toggle */}
             {!selectedCatalog && (
