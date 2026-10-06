@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "seed": "ts-node-dev --transpile-only src/data/seed.ts",
     "seed:fhir": "ts-node-dev --transpile-only src/data/seedFhirDemo.ts",
+    "seed:lab-catalog": "ts-node src/scripts/seedLabCatalog.ts",
     "fhir:add": "ts-node-dev --transpile-only src/data/addFhirRecord.ts",
     "migrate:vaccination-approvals": "ts-node --transpile-only src/data/migrateVaccinationApprovalStatus.ts",
     "otp": "ts-node scripts/fetch-otp.ts",
