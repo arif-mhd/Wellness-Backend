@@ -7,7 +7,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
-import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope, loadBranchTarget, saveBranchTarget, rawBranchDoc } from "../utils/clinicScope";
 import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getCountryConfigForOrgId } from "../utils/orgScope";
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { getClinicAppointmentsData } from "./clinicAppointments";
@@ -895,15 +895,17 @@ router.get("/:id/diagnosis", async (req: Request, res: Response) => {
 // Which of this clinic's doctors are nominated to review vaccination bookings.
 // Unlike lab tests — where the assignment hangs off the lab document, scoped by
 // item.labId — vaccines are a global catalogue with no owning lab, so the
-// assignment lives on the clinic itself.
+// assignment lives on the clinic itself. Like a branch's lab, it's one list
+// per branch: on the org doc for the main branch, inside its branches[] entry
+// for a secondary one (see loadBranchTarget).
 router.get("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
 
   try {
-    const { resource: clinic } = await clinicsContainer.item(scope.scopeId, scope.scopeId).read();
-    if (!clinic) { res.status(404).json({ error: "Clinic not found." }); return; }
-    res.json({ doctorIds: clinic.assignedVaccinationDoctorIds ?? [] });
+    const target = await loadBranchTarget(scope);
+    if (!target) { res.status(404).json({ error: "Clinic not found." }); return; }
+    res.json({ doctorIds: rawBranchDoc(target).assignedVaccinationDoctorIds ?? [] });
   } catch (err) {
     console.error("Get vaccination doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -911,8 +913,8 @@ router.get("/vaccination-doctors", requireRole("clinic"), async (req: SessionReq
 });
 
 // ─── PUT /api/clinics/vaccination-doctors ────────────────────────────────────
-// Full replace. The assignment is stored on the clinic, so unlike the shared
-// lab document there's no other clinic's roster to preserve here.
+// Full replace of this branch's list. Each branch has its own, so unlike the
+// shared lab document there's no other branch's roster to preserve here.
 router.put("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
   const scope = await resolveClinicScope(req, res, { allowAggregate: false });
   if (!scope) return;
@@ -924,10 +926,10 @@ router.put("/vaccination-doctors", requireRole("clinic"), async (req: SessionReq
   }
 
   try {
-    const { resource: clinic } = await clinicsContainer.item(scope.scopeId, scope.scopeId).read();
-    if (!clinic) { res.status(404).json({ error: "Clinic not found." }); return; }
+    const target = await loadBranchTarget(scope);
+    if (!target) { res.status(404).json({ error: "Clinic not found." }); return; }
 
-    // Every id must be one of this clinic's own doctors — otherwise a clinic
+    // Every id must be one of this branch's own doctors — otherwise a clinic
     // could hand vaccination sign-off rights to a doctor it has no
     // relationship with.
     const uniqueIds = Array.from(new Set(doctorIds));
@@ -942,8 +944,7 @@ router.put("/vaccination-doctors", requireRole("clinic"), async (req: SessionReq
       }
     }
 
-    const updated = { ...clinic, assignedVaccinationDoctorIds: uniqueIds };
-    await clinicsContainer.items.upsert(updated);
+    await saveBranchTarget(target, { assignedVaccinationDoctorIds: uniqueIds });
     res.json({ status: "OK", doctorIds: uniqueIds });
   } catch (err) {
     console.error("Assign vaccination doctors error:", err);

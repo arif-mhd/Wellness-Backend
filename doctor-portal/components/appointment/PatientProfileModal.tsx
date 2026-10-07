@@ -220,6 +220,15 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             }
           }
 
+          // Real lab results this doctor is entitled to see (tests they
+          // approved or recommended) — see GET /api/lab/bookings/my-results.
+          let labBookings: any[] = [];
+          try {
+            const lr = await apiFetch(`/api/lab/bookings/my-results?patientId=${encodeURIComponent(patient.id)}`);
+            if (lr.ok) labBookings = await lr.json();
+          } catch { /* results are optional here */ }
+          const matchedBookingIds = new Set<string>();
+
           const allMeds: any[] = [];
           const allLabs: any[] = [];
           mapped.forEach((c) => {
@@ -235,14 +244,28 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             }
             if (c.emr?.labs) {
               c.emr.labs.forEach((l: any) => {
+                const booking = l.testId ? labBookings.find((b: any) => (b.items ?? []).some((i: any) => i.testId === l.testId)) : undefined;
+                if (booking) matchedBookingIds.add(booking.id);
                 allLabs.push({
                   name: l.name,
                   date: c.date.split(",")[0],
-                  status: "Pending",
+                  status: booking ? "Ready" : "Pending",
+                  files: booking?.results ?? [],
                   description: l.notes || "Lab recommendation from consultation."
                 });
               });
             }
+          });
+          // Resulted tests this doctor approved but didn't recommend in an
+          // EMR (the patient self-booked and the doctor signed off).
+          labBookings.filter((b: any) => !matchedBookingIds.has(b.id)).forEach((b: any) => {
+            allLabs.push({
+              name: (b.items ?? []).map((i: any) => i.testName).join(", "),
+              date: new Date(b.createdAt).toLocaleDateString(),
+              status: "Ready",
+              files: b.results ?? [],
+              description: "Self-booked lab test approved by you.",
+            });
           });
           setPrescribedMedicines(allMeds);
           setLabReports(allLabs);
@@ -1189,11 +1212,9 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                                   {report.name}
                                 </span>
                               </div>
-                              {/* Doctor-recommended labs have no real result/report data or
-                                  attachment anywhere in this system yet — always shown as
-                                  Pending rather than fabricating a downloadable report. */}
-                              <span className="px-[8px] py-[6px] rounded-[12px] bg-[#FF9500] text-white text-[12px] font-normal leading-[1] whitespace-nowrap">
-                                Report Pending
+                              {/* Pending until the lab uploads its report; real files only. */}
+                              <span className={`px-[8px] py-[6px] rounded-[12px] text-white text-[12px] font-normal leading-[1] whitespace-nowrap ${report.status === "Ready" ? "bg-[#1FAF65]" : "bg-[#FF9500]"}`}>
+                                {report.status === "Ready" ? "Report Ready" : "Report Pending"}
                               </span>
                             </div>
 
@@ -1201,6 +1222,22 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                             <p className="text-[#676E76] text-[12px] leading-[1.5] tracking-[-0.24px] pl-[48px]">
                               {report.description}
                             </p>
+
+                            {(report.files?.length ?? 0) > 0 && (
+                              <div className="flex flex-wrap gap-2 pl-[48px]">
+                                {report.files.map((f: any) => (
+                                  <a
+                                    key={f.id}
+                                    href={f.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1.5 rounded-[10px] bg-[#E0E7FF] text-[#182A6F] text-[12px] font-medium hover:bg-[#D3DBFF] transition-colors"
+                                  >
+                                    View Report{f.labName ? ` · ${f.labName}` : ""}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           {i < labReports.length - 1 && <div className="w-full h-px bg-[#EBEEF5] my-2" />}
                         </React.Fragment>

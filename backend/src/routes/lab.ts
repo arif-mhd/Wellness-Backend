@@ -1,11 +1,12 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
 import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer, appointmentsContainer } from "../config/cosmos";
+import { uploadBlob, deleteBlob, generateShortLivedSasUrl } from "../config/blob";
 import { catalogOwnedFields } from "./adminLabCatalog";
 import { updateLabBookingWithRetry, LabBookingWriteNotAuthorizedError, LabBookingAlreadyHandledError } from "../utils/labBookingWrite";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -17,6 +18,36 @@ import { buildInClause } from "../utils/clinicScope";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+// Lab result reports — PDF only, since the lab's own system produces the
+// signed/accredited report and we just store and serve it.
+const resultUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "application/pdf") cb(null, true);
+    else cb(new Error("Only PDF files are allowed"));
+  },
+});
+
+// Result files live in private blob storage; only the path is persisted, and
+// a short-lived signed URL is minted on each authorized read (same approach as
+// appointment recordings). blobPath itself is never sent to a client.
+function presentResults(results: any[] | undefined, onlyLabId?: string) {
+  return (results ?? [])
+    .filter((r) => !onlyLabId || r.labId === onlyLabId)
+    .map((r) => ({
+      id: r.id,
+      labId: r.labId,
+      labName: r.labName,
+      fileName: r.fileName,
+      uploadedAt: r.uploadedAt,
+      url: generateShortLivedSasUrl(r.blobPath),
+    }));
+}
+function withResultUrls(bookings: any[], onlyLabId?: string): any[] {
+  return bookings.map((b) => ({ ...b, results: presentResults(b.results, onlyLabId) }));
+}
 
 // ─── GET /api/lab/tests ───────────────────────────────────────────────────────
 // Public: returns all approved, active lab tests. Supports ?category=, ?labId=
@@ -582,7 +613,9 @@ router.get("/my-bookings", requireRole("lab"), async (req: SessionRequest, res: 
       { maxItemCount: 100 }
     ).fetchAll();
 
-    res.json({ bookings: resources });
+    // A lab only ever sees its own uploaded reports, even on a booking that
+    // also contains another lab's tests.
+    res.json({ bookings: withResultUrls(resources, labId) });
   } catch (err) {
     console.error("Lab bookings error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -616,11 +649,29 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       consultationSlot,
       notes,
       profileId,          // fallback owner when an item doesn't set its own forPatientId
+      appointmentId,      // optional — set when booking tests a doctor recommended in a consultation
     } = req.body;
 
     if (!items?.length) {
       res.status(400).json({ error: "items is required" });
       return;
+    }
+
+    // Tests the doctor already recommended during this consultation don't need
+    // a second doctor's sign-off. The appointment is loaded and checked here
+    // (never trusted from the client): it must be this patient's, and only
+    // tests actually listed in its EMR lab recommendations are exempted — a
+    // made-up appointmentId can't be used to skip approval on anything else.
+    const recommendedBy = new Map<string, string>();
+    if (appointmentId) {
+      const { resource: apt } = await appointmentsContainer.item(appointmentId, appointmentId).read();
+      if (!apt || apt.patientId !== patientId) {
+        res.status(403).json({ error: "Appointment not found for this patient." });
+        return;
+      }
+      for (const lab of apt.emr?.labs ?? []) {
+        if (lab?.testId) recommendedBy.set(lab.testId, lab.contributorDoctorId ?? apt.doctorId);
+      }
     }
 
     const now = new Date().toISOString();
@@ -652,7 +703,9 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
         forPatientId:  item.forPatientId ?? profileId ?? patientId,
         visitMode:     item.visitMode ?? "Laboratory",
         scheduledAt:   item.scheduledAt ?? null,
-        requires_doctor_approval: test.requires_doctor_approval,
+        recommendedByDoctorId: recommendedBy.get(test.id) ?? null,
+        // Doctor-recommended tests are already doctor-approved by definition.
+        requires_doctor_approval: !!test.requires_doctor_approval && !recommendedBy.has(test.id),
       });
       total_amount += test.price;
     }
@@ -666,6 +719,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
     const booking = {
       id:                bookingId,
       patientId,
+      appointmentId:     appointmentId ?? null,
       items:             validatedItems,
       consultationDate:  consultationDate ?? null,
       consultationSlot:  consultationSlot ?? null,
@@ -741,7 +795,7 @@ router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res:
       query,
       parameters,
     }, { partitionKey: patientId }).fetchAll();
-    res.json(await withAssignedDoctorNames(resources));
+    res.json(withResultUrls(await withAssignedDoctorNames(resources)));
   } catch (err) {
     console.error("Get lab bookings error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -759,6 +813,41 @@ async function getAssignedLabIds(doctorId: string): Promise<string[]> {
   }).fetchAll();
   return resources.map((r: any) => r.id);
 }
+
+// ─── GET /api/lab/bookings/my-results ─────────────────────────────────────────
+// Resulted lab bookings a doctor is entitled to see: ones they approved (self-
+// booked tests) or recommended during a consultation. Nothing else — a doctor
+// with no relationship to a booking never sees it. Optional ?patientId= narrows
+// to one patient (the account holder or a family-member profile).
+router.get("/bookings/my-results", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
+  try {
+    const doctorId = req.session!.getUserId();
+    const patientId = typeof req.query.patientId === "string" ? req.query.patientId : null;
+
+    let query = "SELECT * FROM c WHERE IS_DEFINED(c.results) AND ARRAY_LENGTH(c.results) > 0 AND (c.approvedBy = @did OR EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.recommendedByDoctorId = @did))";
+    const parameters: any[] = [{ name: "@did", value: doctorId }];
+    if (patientId) {
+      query += " AND (c.patientId = @pid OR EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.forPatientId = @pid))";
+      parameters.push({ name: "@pid", value: patientId });
+    }
+    query += " ORDER BY c.updatedAt DESC";
+    const { resources } = await labBookingsContainer.items.query({ query, parameters }, { maxItemCount: 100 }).fetchAll();
+
+    const ids = Array.from(new Set(resources.map((b: any) => b.patientId)));
+    const names = new Map<string, string>();
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const { resource: p } = await patientsContainer.item(id, id).read();
+        if (p?.fullName) names.set(id, p.fullName);
+      } catch { /* leave unnamed */ }
+    }));
+
+    res.json(withResultUrls(resources).map((b: any) => ({ ...b, patientName: names.get(b.patientId) ?? "Patient" })));
+  } catch (err) {
+    console.error("Get doctor lab results error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // ─── GET /api/lab/bookings/pending-approval ───────────────────────────────────
 // The shared claim queue for a doctor assigned to one or more labs: every
@@ -809,7 +898,7 @@ router.get("/bookings/:bookingId", requireRole("patient"), async (req: SessionRe
       parameters: [{ name: "@id", value: bookingId }, { name: "@pid", value: patientId }],
     }, { partitionKey: patientId }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
-    const [booking] = await withAssignedDoctorNames(resources);
+    const [booking] = withResultUrls(await withAssignedDoctorNames(resources));
     res.json(booking);
   } catch (err) {
     console.error("Get lab booking error:", err);
@@ -833,7 +922,7 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
     }
     const updated = { ...booking, status: "cancelled", updatedAt: new Date().toISOString() };
     await labBookingsContainer.items.upsert(updated);
-    res.json(updated);
+    res.json(withResultUrls([updated])[0]);
   } catch (err) {
     console.error("Cancel lab booking error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -865,12 +954,113 @@ router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: Sess
 
     if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
 
-    const booking = resources[0];
-    const updated = { ...booking, status, updatedAt: new Date().toISOString() };
-    await labBookingsContainer.items.upsert(updated);
-    res.json(updated);
-  } catch (err) {
+    // Written through the ETag-guarded helper (not a plain upsert) so a result
+    // upload landing at the same moment can't be silently overwritten.
+    const updated = await updateLabBookingWithRetry(bookingId, resources[0].patientId, (booking) => {
+      // Marking results ready needs this lab's own report on file.
+      if (status === "results" && !(booking.results ?? []).some((r: any) => r.labId === labId)) {
+        throw new LabBookingWriteNotAuthorizedError("Upload the result PDF before marking results ready.");
+      }
+      return { ...booking, status, updatedAt: new Date().toISOString() };
+    });
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+    res.json(withResultUrls([updated], labId)[0]);
+  } catch (err: any) {
+    if (err instanceof LabBookingWriteNotAuthorizedError) { res.status(400).json({ error: err.message }); return; }
     console.error("Update booking status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/lab/bookings/:bookingId/results ────────────────────────────────
+// A lab uploads its report (PDF) for a booking it has tests on, while the
+// booking is being analyzed. A lab can upload several files (e.g. one per test).
+router.post("/bookings/:bookingId/results", requireRole("lab"), (req: SessionRequest, res: Response, next: NextFunction) => {
+  resultUpload.single("result")(req as any, res as any, (err: any) => {
+    if (err) { res.status(400).json({ error: err.message ?? "Upload failed" }); return; }
+    next();
+  });
+}, async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) { res.status(400).json({ error: "A PDF file is required (field name: result)." }); return; }
+
+    const { resources } = await labBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid)",
+        parameters: [{ name: "@id", value: bookingId }, { name: "@lid", value: labId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+    const { patientId } = resources[0];
+
+    const resultId = uuidv4();
+    const blobPath = `labResults/${patientId}/${bookingId}/${resultId}.pdf`;
+
+    let entry: any;
+    const updated = await updateLabBookingWithRetry(bookingId, patientId, (booking) => {
+      if (booking.status !== "analyzing") {
+        throw new LabBookingWriteNotAuthorizedError("Results can only be uploaded while the booking is being analyzed.");
+      }
+      const labName = (booking.items ?? []).find((i: any) => i.labId === labId)?.labName ?? null;
+      entry = { id: resultId, labId, labName, fileName: file.originalname, blobPath, uploadedAt: new Date().toISOString() };
+      return { ...booking, results: [...(booking.results ?? []), entry], updatedAt: entry.uploadedAt };
+    });
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    // Uploaded only after the booking accepted the entry, so a rejected
+    // request never leaves an orphaned file; a failed upload rolls the entry back.
+    try {
+      await uploadBlob(blobPath, file.buffer, "application/pdf");
+    } catch (uploadErr) {
+      await updateLabBookingWithRetry(bookingId, patientId, (b) => ({ ...b, results: (b.results ?? []).filter((r: any) => r.id !== resultId) }));
+      throw uploadErr;
+    }
+
+    res.status(201).json(withResultUrls([updated], labId)[0]);
+  } catch (err: any) {
+    if (err instanceof LabBookingWriteNotAuthorizedError) { res.status(400).json({ error: err.message }); return; }
+    console.error("Upload lab result error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── DELETE /api/lab/bookings/:bookingId/results/:resultId ────────────────────
+// A lab can remove its own report (e.g. uploaded the wrong file) until the
+// booking has moved past analyzing.
+router.delete("/bookings/:bookingId/results/:resultId", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { bookingId, resultId } = req.params;
+
+    const { resources } = await labBookingsContainer.items.query(
+      {
+        query: "SELECT * FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid)",
+        parameters: [{ name: "@id", value: bookingId }, { name: "@lid", value: labId }],
+      },
+      { maxItemCount: 1 }
+    ).fetchAll();
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    let removed: any;
+    const updated = await updateLabBookingWithRetry(bookingId, resources[0].patientId, (booking) => {
+      if (booking.status !== "analyzing") {
+        throw new LabBookingWriteNotAuthorizedError("Results can only be removed while the booking is being analyzed.");
+      }
+      removed = (booking.results ?? []).find((r: any) => r.id === resultId && r.labId === labId);
+      if (!removed) throw new LabBookingWriteNotAuthorizedError("Result not found.");
+      return { ...booking, results: booking.results.filter((r: any) => r.id !== resultId), updatedAt: new Date().toISOString() };
+    });
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    await deleteBlob(removed.blobPath).catch(() => {});
+    res.json(withResultUrls([updated], labId)[0]);
+  } catch (err: any) {
+    if (err instanceof LabBookingWriteNotAuthorizedError) { res.status(400).json({ error: err.message }); return; }
+    console.error("Delete lab result error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
