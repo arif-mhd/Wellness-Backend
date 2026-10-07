@@ -83,6 +83,11 @@ router.post("/:labId/tests", async (req: SessionRequest, res: Response) => {
       res.status(400).json({ error: "name, category, and price are required" });
       return;
     }
+    const priceNum = Number(price);
+    if (price === "" || !Number.isFinite(priceNum) || priceNum < 0) {
+      res.status(400).json({ error: "price must be a non-negative number" });
+      return;
+    }
 
     // Verify lab exists
     const { resources: labs } = await labServicesContainer.items.query({
@@ -104,7 +109,7 @@ router.post("/:labId/tests", async (req: SessionRequest, res: Response) => {
       labName: labs[0].name,
       name,
       category,
-      price:                    parseFloat(price),
+      price:                    priceNum,
       turnaround_hours:         turnaround_hours ?? null,
       requires_fasting:         Boolean(requires_fasting),
       requires_doctor_approval: Boolean(requires_doctor_approval),

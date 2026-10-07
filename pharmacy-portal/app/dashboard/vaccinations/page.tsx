@@ -85,14 +85,19 @@ export default function VaccinationsPage() {
     // still null, and bailing early there would strand the page on "loading".
     if (roleLoading) return;
     if (!isLab) { setLoading(false); return; }
+    setError(null);
     try {
       const [res, catRes] = await Promise.all([
         apiFetch("/api/lab/vaccines"),
-        apiFetch("/api/lab/catalog-vaccines"),
+        // Picker just stays empty on failure — custom vaccines still work.
+        apiFetch("/api/lab/catalog-vaccines").catch(() => null),
       ]);
-      if (res.ok) { const d = await res.json(); setVaccines(d.vaccines ?? []); }
-      // Picker just stays empty on failure — custom vaccines still work.
-      if (catRes.ok) { const d = await catRes.json(); setCatalogVaccines(d.vaccines ?? []); }
+      // A failed response must surface as an error, not fall through to the
+      // "No vaccines available" empty state.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      setVaccines(d.vaccines ?? []);
+      if (catRes?.ok) { const c = await catRes.json(); setCatalogVaccines(c.vaccines ?? []); }
     } catch {
       setError("Could not load the vaccine catalogue.");
     } finally {
@@ -101,6 +106,12 @@ export default function VaccinationsPage() {
   }, [isLab, roleLoading]);
 
   useEffect(() => { load(); }, [load]);
+
+  const retry = () => { setLoading(true); load(); };
+
+  // Nothing loaded yet, so there's no list to fall back on — show the failure
+  // in place of the table rather than an empty catalogue.
+  const loadFailed = error !== null && vaccines.length === 0;
 
   const submitVaccine = async () => {
     // A catalogue vaccine inherits its clinical details, so only the price is
@@ -179,9 +190,11 @@ export default function VaccinationsPage() {
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
         <div className="flex flex-col gap-1">
-          <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]">
-            {vaccines.length} vaccine{vaccines.length !== 1 ? "s" : ""} available
-          </span>
+          {!loadFailed && (
+            <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]">
+              {vaccines.length} vaccine{vaccines.length !== 1 ? "s" : ""} available
+            </span>
+          )}
           <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
             Vaccines
           </h1>
@@ -195,14 +208,25 @@ export default function VaccinationsPage() {
         </button>
       </div>
 
-      {error && (
+      {error && !loadFailed && (
         <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
           {error}
         </div>
       )}
 
       <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden">
-        {vaccines.length === 0 ? (
+        {loadFailed ? (
+          <div className="py-20 flex flex-col items-center text-center">
+            <p className="font-semibold text-[#24292E] mb-1 text-base">Couldn&apos;t load vaccines</p>
+            <p className="text-sm text-[#676E76] mb-4">Something went wrong while fetching your catalogue.</p>
+            <button
+              onClick={retry}
+              className="px-4 py-2 text-xs font-medium text-white bg-[#5476FC] rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Try again
+            </button>
+          </div>
+        ) : vaccines.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-center">
             <p className="font-semibold text-[#24292E] mb-1 text-base">No vaccines available</p>
             <p className="text-sm text-[#676E76]">Add your own, or wait for the Wellness catalogue to be populated</p>
