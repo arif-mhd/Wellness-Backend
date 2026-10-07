@@ -2,33 +2,141 @@ import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { vaccinesContainer, vaccinationBookingsContainer, clinicsContainer, doctorsContainer, patientsContainer } from "../config/cosmos";
+import { vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, clinicsContainer, doctorsContainer, patientsContainer, labServicesContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
-import { resolveOrgId } from "../utils/orgScope";
+import { resolveOrgId, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
+import { buildInClause } from "../utils/clinicScope";
 import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
 
 // ─── GET /api/vaccines ────────────────────────────────────────────────────────
-// Public: returns all active vaccines
+// Public: per-provider vaccine offerings. Mirrors GET /api/lab/tests exactly,
+// including the org scoping — without it a brand's patients could see another
+// brand's providers' vaccines.
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { category } = req.query as { category?: string };
+    const { category, labId, catalogVaccineId, unlinked } = req.query as {
+      category?: string; labId?: string; catalogVaccineId?: string; unlinked?: string;
+    };
     // Lab-added vaccines carry a status and must be approved before patients
     // can see them. Admin-catalogue docs predate that field entirely, so an
     // undefined status counts as approved (same idiom as labTests).
-    let query ="SELECT * FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')";
+    let query = "SELECT * FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')";
     const parameters: any[] = [];
+
+    // Scope to this brand's own providers. A brand with no approved provider
+    // sees nothing rather than the whole platform's catalogue. The labId
+    // filter below narrows within that set — it never widens past it.
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+
+    // Admin-catalogue vaccines (no labId) predate per-provider offerings and
+    // belong to no lab, so they stay visible to every org — dropping them
+    // would empty the catalogue for brands that haven't onboarded a provider.
+    const { clause: orgClause, parameters: orgParams } = orgLabIds.length
+      ? buildInClause("c.labId", orgLabIds)
+      : { clause: "false", parameters: [] as any[] };
+    query += ` AND (NOT IS_DEFINED(c.labId) OR ${orgClause})`;
+    parameters.push(...orgParams);
+
+    if (labId) {
+      if (!orgLabIds.includes(labId)) { res.json([]); return; }
+      query += " AND c.labId = @labId";
+      parameters.push({ name: "@labId", value: labId });
+    }
     if (category) {
       query += " AND (LOWER(c.category) = LOWER(@cat) OR LOWER(c.vaccineType) = LOWER(@cat) OR LOWER(c.age_group) = LOWER(@cat))";
       parameters.push({ name: "@cat", value: category });
+    }
+    // ?catalogVaccineId= — every provider offering one catalogue vaccine (the
+    // patient app's "pick a provider" step). ?unlinked=true — only standalone
+    // custom vaccines that aren't part of any catalogue group.
+    if (catalogVaccineId) {
+      query += " AND c.catalogVaccineId = @catalogVaccineId";
+      parameters.push({ name: "@catalogVaccineId", value: catalogVaccineId });
+    } else if (unlinked === "true") {
+      query += " AND (NOT IS_DEFINED(c.catalogVaccineId) OR c.catalogVaccineId = null)";
     }
     query += " ORDER BY c.createdAt DESC";
     const { resources } = await vaccinesContainer.items.query({ query, parameters }).fetchAll();
     res.json(resources);
   } catch (err) {
     console.error("Get vaccines error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/vaccines/catalog ────────────────────────────────────────────────
+// The browse list: one row per catalogue vaccine this org actually offers,
+// with the cheapest price and how many providers offer it. Mirrors
+// GET /api/lab/catalog, and is scoped the same way as GET / above so the two
+// always agree.
+router.get("/catalog", async (req: Request, res: Response) => {
+  try {
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+    if (orgLabIds.length === 0) { res.json([]); return; }
+
+    const { clause, parameters } = buildInClause("c.labId", orgLabIds);
+    const { resources: offerings } = await vaccinesContainer.items.query({
+      query: `SELECT c.catalogVaccineId, c.price, c.labId FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved') AND IS_DEFINED(c.catalogVaccineId) AND c.catalogVaccineId != null AND ${clause}`,
+      parameters,
+    }).fetchAll();
+
+    const stats = new Map<string, { minPrice: number; labs: Set<string> }>();
+    offerings.forEach((o: any) => {
+      const s = stats.get(o.catalogVaccineId) ?? { minPrice: Infinity, labs: new Set<string>() };
+      s.minPrice = Math.min(s.minPrice, o.price);
+      s.labs.add(o.labId);
+      stats.set(o.catalogVaccineId, s);
+    });
+    if (stats.size === 0) { res.json([]); return; }
+
+    const { resources: catalog } = await vaccineCatalogContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
+      .fetchAll();
+
+    res.json(
+      catalog
+        .filter((c: any) => stats.has(c.id))
+        .map((c: any) => ({ ...c, minPrice: stats.get(c.id)!.minPrice, labCount: stats.get(c.id)!.labs.size }))
+    );
+  } catch (err) {
+    console.error("Get vaccine catalog error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/vaccines/providers ──────────────────────────────────────────────
+// Public — approved providers carrying at least one orderable vaccine, for the
+// patient app's "browse by provider" screen. Mirrors GET /api/lab/labs.
+router.get("/providers", async (req: Request, res: Response) => {
+  try {
+    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+    const orgId = await resolveOrgIdFromHeader(orgSlug);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+    if (orgLabIds.length === 0) { res.json([]); return; }
+
+    const { clause, parameters } = buildInClause("c.labId", orgLabIds);
+    const { resources: offerings } = await vaccinesContainer.items.query({
+      query: `SELECT DISTINCT VALUE c.labId FROM c WHERE c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved') AND ${clause}`,
+      parameters,
+    }).fetchAll();
+    if (offerings.length === 0) { res.json([]); return; }
+
+    const { clause: labClause, parameters: labParams } = buildInClause("c.id", offerings as string[]);
+    const { resources: labs } = await labServicesContainer.items.query({
+      query: `SELECT c.id, c.name, c.location FROM c WHERE c.status = 'approved' AND ${labClause}`,
+      parameters: labParams,
+    }).fetchAll();
+
+    res.json(labs);
+  } catch (err) {
+    console.error("Get vaccine providers error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -73,6 +181,13 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
         vaccineId: vaccine.id,
         vaccineName: vaccine.name,
         manufacturer: vaccine.manufacturer ?? null,
+        // Carried onto the item so the provider's fulfilment queue can scope
+        // by it — the same EXISTS(... i.labId) pattern lab bookings use.
+        // Null for an admin-catalogue vaccine that no provider has adopted.
+        labId: vaccine.labId ?? null,
+        labName: vaccine.labName ?? null,
+        catalogVaccineId: vaccine.catalogVaccineId ?? null,
+        doses_required: vaccine.doses_required ?? 1,
         price: vaccine.price,
         forPatientId: item.forPatientId ?? profileId ?? patientId,
         visitMode: item.visitMode ?? "Laboratory",
@@ -368,6 +483,92 @@ router.post("/bookings/:bookingId/reject", requireRole("doctor"), async (req: Se
     if (err instanceof VaccinationNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
     if (err instanceof VaccinationAlreadyHandledError) { res.status(409).json({ error: err.message }); return; }
     console.error("Reject vaccination booking error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── Provider fulfilment ──────────────────────────────────────────────────────
+// Once a doctor has approved a booking, the provider that offers the vaccine
+// carries it through to completion. Mirrors lab.ts's GET /my-bookings +
+// PATCH /bookings/:id/status.
+
+// confirmed is where doctor approval leaves a booking; the provider moves it
+// on from there. Kept deliberately parallel to lab.ts's
+// ["awaiting","confirmed","analyzing","results","cancelled"].
+const VACCINATION_FULFILMENT_STATUSES = ["confirmed", "scheduled", "administered", "completed", "cancelled"];
+
+// ─── GET /api/vaccines/my-bookings ────────────────────────────────────────────
+// Every booking containing at least one vaccine this provider offers.
+// vaccinationBookings is partitioned by /patientId so this is cross-partition.
+router.get("/my-bookings", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { resources } = await vaccinationBookingsContainer.items.query({
+      query: "SELECT * FROM c WHERE EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid) ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@lid", value: labId }],
+    }, { maxItemCount: 100 }).fetchAll();
+
+    // Best-effort join so the provider sees a real patient name, not a raw id.
+    const patientIds = Array.from(new Set(resources.map((b: any) => b.patientId)));
+    const names = new Map<string, string>();
+    await Promise.all(patientIds.map(async (id) => {
+      try {
+        const { resource: patient } = await patientsContainer.item(id, id).read();
+        if (patient?.fullName) names.set(id, patient.fullName);
+      } catch { /* lookup failed — fall back to a generic label */ }
+    }));
+
+    res.json({ bookings: resources.map((b: any) => ({ ...b, patientName: names.get(b.patientId) ?? "Patient" })) });
+  } catch (err) {
+    console.error("Provider vaccination bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /api/vaccines/bookings/:bookingId/status ───────────────────────────
+// The provider moves an approved booking through its fulfilment stages.
+router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { bookingId } = req.params;
+    const { status } = req.body;
+
+    if (!VACCINATION_FULFILMENT_STATUSES.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${VACCINATION_FULFILMENT_STATUSES.join(", ")}` });
+      return;
+    }
+
+    const { resources } = await vaccinationBookingsContainer.items.query({
+      query: "SELECT * FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.labId = @lid)",
+      parameters: [{ name: "@id", value: bookingId }, { name: "@lid", value: labId }],
+    }, { maxItemCount: 1 }).fetchAll();
+
+    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    const booking = resources[0];
+    // A booking still awaiting sign-off isn't the provider's to move, and one
+    // the doctor declined shouldn't be revivable.
+    if (booking.status === "pending_doctor_approval") {
+      res.status(409).json({ error: "This booking is still awaiting doctor approval." });
+      return;
+    }
+    if (booking.status === "rejected") {
+      res.status(409).json({ error: "This booking was declined by a doctor." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updated = await updateVaccinationBookingWithRetry(bookingId, booking.patientId, (latest) => ({
+      ...latest,
+      status,
+      ...(status === "completed" ? { completedAt: now } : {}),
+      updatedAt: now,
+    }));
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Update vaccination booking status error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

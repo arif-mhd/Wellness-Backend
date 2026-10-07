@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Session from "supertokens-web-js/recipe/session";
 import { useAccountRole } from "@/hooks/useAccountRole";
 import { useCountryConfig } from "@/components/CountryConfigContext";
@@ -32,6 +33,15 @@ interface Vaccine {
   rejectedReason?: string | null;
 }
 
+interface CatalogVaccine {
+  id: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  ageRange?: string | null;
+  doses_required?: number;
+}
+
 const EMPTY_VACCINE_FORM = {
   name: "",
   manufacturer: "",
@@ -48,6 +58,7 @@ type VaccineForm = typeof EMPTY_VACCINE_FORM;
 // vaccination booking is a clinical decision and belongs to a clinic-assigned
 // doctor — see doctor-portal's /dashboard/vaccination-approvals.
 export default function VaccinationsPage() {
+  const router = useRouter();
   const { role, loading: roleLoading } = useAccountRole();
   const { currency } = useCountryConfig();
   const isLab = role === "lab";
@@ -56,11 +67,16 @@ export default function VaccinationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Add-vaccine form
+  // Add-vaccine form. A provider normally picks from the Wellness catalogue
+  // and supplies only a price; "Custom vaccine" opens the full field set.
   const [showAddVaccine, setShowAddVaccine] = useState(false);
   const [form, setForm] = useState<VaccineForm>(EMPTY_VACCINE_FORM);
+  const [catalogVaccines, setCatalogVaccines] = useState<CatalogVaccine[]>([]);
+  const [catalogVaccineId, setCatalogVaccineId] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const selectedCatalog = catalogVaccines.find((c) => c.id === catalogVaccineId) ?? null;
 
   const setField = (k: keyof VaccineForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -70,8 +86,13 @@ export default function VaccinationsPage() {
     if (roleLoading) return;
     if (!isLab) { setLoading(false); return; }
     try {
-      const res = await apiFetch("/api/lab/vaccines");
+      const [res, catRes] = await Promise.all([
+        apiFetch("/api/lab/vaccines"),
+        apiFetch("/api/lab/catalog-vaccines"),
+      ]);
       if (res.ok) { const d = await res.json(); setVaccines(d.vaccines ?? []); }
+      // Picker just stays empty on failure — custom vaccines still work.
+      if (catRes.ok) { const d = await catRes.json(); setCatalogVaccines(d.vaccines ?? []); }
     } catch {
       setError("Could not load the vaccine catalogue.");
     } finally {
@@ -82,8 +103,14 @@ export default function VaccinationsPage() {
   useEffect(() => { load(); }, [load]);
 
   const submitVaccine = async () => {
-    if (!form.name.trim() || !form.price.trim()) {
-      setFormError("Name and price are required.");
+    // A catalogue vaccine inherits its clinical details, so only the price is
+    // asked for. A custom one has to name itself.
+    if (!selectedCatalog && !form.name.trim()) {
+      setFormError("Name is required for a custom vaccine.");
+      return;
+    }
+    if (!form.price.trim()) {
+      setFormError("Price is required.");
       return;
     }
     const price = Number(form.price);
@@ -94,23 +121,27 @@ export default function VaccinationsPage() {
     setSaving(true);
     setFormError(null);
     try {
+      const body = selectedCatalog
+        ? { catalogVaccineId: selectedCatalog.id, price, manufacturer: form.manufacturer.trim() || null }
+        : {
+            name: form.name.trim(),
+            manufacturer: form.manufacturer.trim() || null,
+            vaccineType: form.vaccineType.trim() || null,
+            category: form.category.trim() || null,
+            ageRange: form.ageRange.trim() || null,
+            description: form.description.trim() || null,
+            doses_required: Number(form.doses_required) || 1,
+            price,
+          };
       const res = await apiFetch("/api/lab/vaccines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          manufacturer: form.manufacturer.trim() || null,
-          vaccineType: form.vaccineType.trim() || null,
-          category: form.category.trim() || null,
-          ageRange: form.ageRange.trim() || null,
-          description: form.description.trim() || null,
-          doses_required: Number(form.doses_required) || 1,
-          price,
-        }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setShowAddVaccine(false);
         setForm(EMPTY_VACCINE_FORM);
+        setCatalogVaccineId("");
         await load();
       } else {
         const d = await res.json().catch(() => ({}));
@@ -191,7 +222,11 @@ export default function VaccinationsPage() {
               </thead>
               <tbody className="divide-y divide-[#EBEEF5]">
                 {vaccines.map((v) => (
-                  <tr key={v.id} className="group hover:bg-[#F8FAFC] transition-colors duration-200">
+                  <tr
+                    key={v.id}
+                    onClick={() => { if (v.labId) router.push(`/dashboard/vaccinations/${v.id}`); }}
+                    className={`group hover:bg-[#F8FAFC] transition-colors duration-200 ${v.labId ? "cursor-pointer" : ""}`}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-0.5">
                         <span className="font-medium text-sm text-[#24292E]">{v.name}</span>
@@ -259,23 +294,59 @@ export default function VaccinationsPage() {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Name" required value={form.name} onChange={(v) => setField("name", v)} placeholder="e.g. Influenza (Quadrivalent)" span2 />
-              <Field label="Manufacturer" value={form.manufacturer} onChange={(v) => setField("manufacturer", v)} placeholder="e.g. Sanofi" />
-              <Field label="Type" value={form.vaccineType} onChange={(v) => setField("vaccineType", v)} placeholder="e.g. Inactivated" />
-              <Field label="Category" value={form.category} onChange={(v) => setField("category", v)} placeholder="e.g. Seasonal" />
-              <Field label="Age range" value={form.ageRange} onChange={(v) => setField("ageRange", v)} placeholder="e.g. 6 months+" />
-              <Field label="Doses required" type="number" value={form.doses_required} onChange={(v) => setField("doses_required", v)} />
-              <Field label={`Price (${currency.symbol})`} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
               <div className="col-span-2 flex flex-col gap-1.5">
-                <label className="text-[11px] font-medium text-[#676E76]">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setField("description", e.target.value)}
-                  rows={3}
-                  placeholder="What this vaccine protects against, and anything the patient should know"
-                  className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-3 text-sm text-[#24292E] outline-none focus:border-[#5476FC] resize-none"
-                />
+                <label className="text-[11px] font-medium text-[#676E76]">Vaccine</label>
+                <select
+                  value={catalogVaccineId}
+                  onChange={(e) => { setCatalogVaccineId(e.target.value); setFormError(null); }}
+                  className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-2.5 text-sm text-[#24292E] outline-none focus:border-[#5476FC]"
+                >
+                  <option value="">Custom vaccine (not in the catalogue)</option>
+                  {catalogVaccines.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.category ? ` · ${c.category}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {selectedCatalog ? (
+                <>
+                  <div className="col-span-2 rounded-xl bg-[#F8FAFC] border border-[#EBEEF5] px-4 py-3">
+                    <p className="text-[12px] text-[#24292E] font-medium mb-1">{selectedCatalog.name}</p>
+                    {selectedCatalog.description && (
+                      <p className="text-[11px] text-[#676E76] leading-relaxed">{selectedCatalog.description}</p>
+                    )}
+                    <p className="text-[10px] text-[#A0A8B0] mt-2">
+                      {[selectedCatalog.ageRange, `${selectedCatalog.doses_required ?? 1} dose${(selectedCatalog.doses_required ?? 1) !== 1 ? "s" : ""}`]
+                        .filter(Boolean).join(" · ")}
+                      {" · details come from the Wellness catalogue"}
+                    </p>
+                  </div>
+                  <Field label="Manufacturer" value={form.manufacturer} onChange={(v) => setField("manufacturer", v)} placeholder="e.g. Sanofi" />
+                  <Field label={`Your price (${currency.symbol})`} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
+                </>
+              ) : (
+                <>
+                  <Field label="Name" required value={form.name} onChange={(v) => setField("name", v)} placeholder="e.g. Influenza (Quadrivalent)" span2 />
+                  <Field label="Manufacturer" value={form.manufacturer} onChange={(v) => setField("manufacturer", v)} placeholder="e.g. Sanofi" />
+                  <Field label="Type" value={form.vaccineType} onChange={(v) => setField("vaccineType", v)} placeholder="e.g. Inactivated" />
+                  <Field label="Category" value={form.category} onChange={(v) => setField("category", v)} placeholder="e.g. Seasonal" />
+                  <Field label="Age range" value={form.ageRange} onChange={(v) => setField("ageRange", v)} placeholder="e.g. 6 months+" />
+                  <Field label="Doses required" type="number" value={form.doses_required} onChange={(v) => setField("doses_required", v)} />
+                  <Field label={`Price (${currency.symbol})`} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <label className="text-[11px] font-medium text-[#676E76]">Description</label>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setField("description", e.target.value)}
+                      rows={3}
+                      placeholder="What this vaccine protects against, and anything the patient should know"
+                      className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-3 text-sm text-[#24292E] outline-none focus:border-[#5476FC] resize-none"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 mt-6">
@@ -287,7 +358,7 @@ export default function VaccinationsPage() {
               </button>
               <button
                 onClick={submitVaccine}
-                disabled={saving || !form.name.trim() || !form.price.trim()}
+                disabled={saving || !form.price.trim() || (!selectedCatalog && !form.name.trim())}
                 className="px-4 py-2 text-xs font-medium text-white bg-[#5476FC] rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {saving ? "Adding..." : "Add Vaccine"}

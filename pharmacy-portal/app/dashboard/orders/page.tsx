@@ -67,6 +67,50 @@ const NEXT_BOOKING_STATUS: Record<string, { next: string; label: string } | unde
   analyzing: { next: "results",   label: "Mark Results Ready" },
 };
 
+interface VaccinationBookingItem {
+  vaccineId: string;
+  vaccineName: string;
+  manufacturer?: string | null;
+  labId?: string | null;
+  price: number;
+  forPatientId?: string;
+  visitMode: "Laboratory" | "Home";
+  scheduledAt?: string | null;
+}
+
+interface VaccinationBooking {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  items: VaccinationBookingItem[];
+  status: string;
+  payment_amount?: number;
+  createdAt: string;
+  rejectedReason?: string | null;
+}
+
+// The provider picks up where doctor approval leaves off, at "confirmed".
+const NEXT_VACCINATION_STATUS: Record<string, { next: string; label: string } | undefined> = {
+  confirmed:    { next: "scheduled",    label: "Mark Scheduled" },
+  scheduled:    { next: "administered", label: "Mark Administered" },
+  administered: { next: "completed",    label: "Mark Completed" },
+};
+
+const VACCINATION_STATUS_STYLE: Record<string, string> = {
+  pending_doctor_approval: "bg-amber-50 text-amber-700 border-amber-100",
+  confirmed:    "bg-blue-50 text-blue-700 border-blue-100",
+  scheduled:    "bg-indigo-50 text-indigo-700 border-indigo-100",
+  administered: "bg-purple-50 text-purple-700 border-purple-100",
+  completed:    "bg-green-50 text-green-700 border-green-100",
+  rejected:     "bg-red-50 text-red-600 border-red-100",
+  cancelled:    "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+function vaccinationStatusLabel(s: string) {
+  if (s === "pending_doctor_approval") return "Awaiting Doctor";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function OrdersPage() {
   const { role } = useAccountRole();
   const { currency } = useCountryConfig();
@@ -74,14 +118,20 @@ export default function OrdersPage() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [vaccinationBookings, setVaccinationBookings] = useState<VaccinationBooking[]>([]);
+  const [labTab, setLabTab] = useState<"tests" | "vaccinations">("tests");
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       if (isLab) {
-        const res = await apiFetch("/api/lab/my-bookings");
+        const [res, vRes] = await Promise.all([
+          apiFetch("/api/lab/my-bookings"),
+          apiFetch("/api/vaccines/my-bookings"),
+        ]);
         if (res.ok) { const d = await res.json(); setBookings(d.bookings ?? []); }
+        if (vRes.ok) { const d = await vRes.json(); setVaccinationBookings(d.bookings ?? []); }
       } else {
         const res = await apiFetch("/api/pharmacy/orders");
         if (res.ok) { const d = await res.json(); setOrders(d.orders); }
@@ -101,6 +151,24 @@ export default function OrdersPage() {
     setUpdating(orderId);
     try {
       const res = await apiFetch(`/api/pharmacy/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        await load();
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const updateVaccinationStatus = async (bookingId: string, newStatus: string) => {
+    setUpdating(bookingId);
+    try {
+      const res = await apiFetch(`/api/vaccines/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -148,14 +216,124 @@ export default function OrdersPage() {
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 mt-2">
           <div className="flex flex-col gap-1">
             <span className="text-[#707070] font-normal text-sm tracking-[-0.28px]">
-              {bookings.length} booking{bookings.length !== 1 ? "s" : ""} found
+              {labTab === "tests"
+                ? `${bookings.length} booking${bookings.length !== 1 ? "s" : ""} found`
+                : `${vaccinationBookings.length} vaccination${vaccinationBookings.length !== 1 ? "s" : ""} found`}
             </span>
             <h1 className="text-[#383F45] font-normal text-[32px] leading-none tracking-[-0.64px]">
               Bookings
             </h1>
           </div>
+
+          <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#EBEEF5] rounded-xl p-1 self-start">
+            <button
+              onClick={() => setLabTab("tests")}
+              className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+                labTab === "tests" ? "bg-white text-[#24292E] shadow-sm" : "text-[#676E76] hover:text-[#24292E]"
+              }`}
+            >
+              Lab Tests ({bookings.length})
+            </button>
+            <button
+              onClick={() => setLabTab("vaccinations")}
+              className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+                labTab === "vaccinations" ? "bg-white text-[#24292E] shadow-sm" : "text-[#676E76] hover:text-[#24292E]"
+              }`}
+            >
+              Vaccinations ({vaccinationBookings.length})
+            </button>
+          </div>
         </div>
 
+        {labTab === "vaccinations" ? (
+          <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden">
+            {vaccinationBookings.length === 0 ? (
+              <div className="py-20 flex flex-col items-center text-center">
+                <p className="font-semibold text-[#24292E] mb-1 text-base">No vaccination bookings yet</p>
+                <p className="text-sm text-[#676E76]">Approved vaccination bookings for your vaccines appear here</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#F8FAFC] border-b border-[#EBEEF5]">
+                      <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Booking</th>
+                      <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Vaccine(s)</th>
+                      <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider">Visit Mode / Scheduled</th>
+                      <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Total</th>
+                      <th className="px-6 py-4 text-xs font-medium text-[#676E76] uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EBEEF5]">
+                    {vaccinationBookings.map((b) => {
+                      const action = NEXT_VACCINATION_STATUS[b.status];
+                      return (
+                        <tr key={b.id} className="group hover:bg-[#F8FAFC] transition-colors duration-200">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm text-[#24292E]">{b.patientName ?? "Patient"}</span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${VACCINATION_STATUS_STYLE[b.status] ?? "bg-blue-50 text-blue-700 border-blue-100"}`}>
+                                  {vaccinationStatusLabel(b.status)}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-[#676E76]">#{b.id.slice(0, 8)} · Booked {new Date(b.createdAt).toLocaleDateString()}</span>
+                              {b.status === "rejected" && b.rejectedReason && (
+                                <span className="text-[10px] text-red-500">Declined: {b.rejectedReason}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-[#383F45]">
+                            <ul className="flex flex-col gap-1">
+                              {b.items.map((item, idx) => (
+                                <li key={idx} className="flex items-center justify-between gap-4">
+                                  <span className="text-xs">{item.vaccineName}</span>
+                                  <span className="text-[11px] text-[#676E76]">{formatCurrency(item.price.toFixed(2), currency)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-[#383F45] max-w-[220px]">
+                            <ul className="flex flex-col gap-1">
+                              {b.items.map((item, idx) => (
+                                <li key={idx} className="flex flex-col">
+                                  <span className="text-xs font-medium">{item.visitMode}</span>
+                                  {item.scheduledAt && (
+                                    <span className="text-[11px] text-[#676E76]">
+                                      {new Date(item.scheduledAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#5476FC]">
+                            {formatCurrency((b.payment_amount ?? 0).toFixed(2), currency)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            {action ? (
+                              <button
+                                onClick={() => updateVaccinationStatus(b.id, action.next)}
+                                disabled={updating === b.id}
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              >
+                                {updating === b.id ? "Updating..." : action.label}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-[#A0A8B0]">
+                                {b.status === "pending_doctor_approval" ? "Awaiting doctor" : "No action needed"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden">
           {bookings.length === 0 ? (
             <div className="py-20 flex flex-col items-center text-center">
@@ -246,6 +424,7 @@ export default function OrdersPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     );
   }

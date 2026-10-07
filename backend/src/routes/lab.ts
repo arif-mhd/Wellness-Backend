@@ -5,7 +5,7 @@ import UserRoles from "supertokens-node/recipe/userroles";
 import multer from "multer";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer } from "../config/cosmos";
+import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer } from "../config/cosmos";
 import { catalogOwnedFields } from "./adminLabCatalog";
 import { updateLabBookingWithRetry, LabBookingWriteNotAuthorizedError, LabBookingAlreadyHandledError } from "../utils/labBookingWrite";
 import { SessionRequest } from "supertokens-node/framework/express";
@@ -977,6 +977,36 @@ router.get("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Res
   }
 });
 
+// ─── GET /api/lab/catalog-vaccines ────────────────────────────────────────────
+// Provider-side picker: every active catalogue vaccine this provider can
+// choose to offer. Mirrors GET /api/lab/catalog-tests.
+router.get("/catalog-vaccines", requireRole("lab"), async (_req: SessionRequest, res: Response) => {
+  try {
+    const { resources } = await vaccineCatalogContainer.items
+      .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
+      .fetchAll();
+    res.json({ vaccines: resources });
+  } catch (err) {
+    console.error("Get catalog vaccines error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/lab/vaccines/:vaccineId ─────────────────────────────────────────
+// A single vaccine this provider owns, for its detail/edit page.
+router.get("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { vaccineId } = req.params;
+    const { resource } = await vaccinesContainer.item(vaccineId, vaccineId).read();
+    if (!resource || resource.labId !== labId) { res.status(404).json({ error: "Vaccine not found" }); return; }
+    res.json({ vaccine: resource });
+  } catch (err) {
+    console.error("Lab vaccine fetch error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── POST /api/lab/vaccines ───────────────────────────────────────────────────
 // A lab adds a vaccine of its own. Approval-gated exactly like POST
 // /my-tests: an already-approved lab's vaccines go straight live, a
@@ -986,18 +1016,35 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
   try {
     const labId = req.session!.getUserId();
     const {
+      catalogVaccineId,
       name, manufacturer, vaccineType, category, description, recommendedFor,
       ageRange, targetGroups, doseSchedule, howAdministered, sideEffects,
       patientInstructions, price, originalPrice, doses_required, age_group,
     } = req.body;
 
-    if (!name || price === undefined || price === null || price === "") {
-      res.status(400).json({ error: "name and price are required" });
+    if (price === undefined || price === null || price === "") {
+      res.status(400).json({ error: "price is required" });
       return;
     }
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
       res.status(400).json({ error: "price must be a non-negative number" });
+      return;
+    }
+
+    // Adopting a catalogue vaccine inherits its clinical details, so the
+    // provider only supplies the price. A custom vaccine (no catalogVaccineId)
+    // still has to name itself. Mirrors POST /my-tests's catalogTestId.
+    let catalogDoc: any = null;
+    if (catalogVaccineId) {
+      const { resource } = await vaccineCatalogContainer.item(catalogVaccineId, catalogVaccineId).read();
+      if (!resource || resource.is_active === false) {
+        res.status(400).json({ error: "Catalogue vaccine not found." });
+        return;
+      }
+      catalogDoc = resource;
+    } else if (!name) {
+      res.status(400).json({ error: "name is required for a custom vaccine" });
       return;
     }
 
@@ -1009,21 +1056,22 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
       id: `${labId}_${Date.now()}`,
       labId,
       labName: labDoc?.name ?? null,
-      name,
+      catalogVaccineId: catalogVaccineId ?? null,
+      name: catalogDoc?.name ?? name,
       manufacturer: manufacturer ?? null,
       vaccineType: vaccineType ?? null,
-      category: category ?? null,
-      description: description ?? null,
-      recommendedFor: recommendedFor ?? null,
-      ageRange: ageRange ?? null,
+      category: catalogDoc?.category ?? category ?? null,
+      description: catalogDoc?.description ?? description ?? null,
+      recommendedFor: catalogDoc?.recommendedFor || recommendedFor || null,
+      ageRange: catalogDoc?.ageRange ?? ageRange ?? null,
       targetGroups: Array.isArray(targetGroups) ? targetGroups : [],
       doseSchedule: doseSchedule ?? null,
-      howAdministered: howAdministered ?? null,
-      sideEffects: sideEffects ?? null,
-      patientInstructions: patientInstructions ?? null,
+      howAdministered: catalogDoc?.howAdministered || howAdministered || null,
+      sideEffects: catalogDoc?.sideEffects || sideEffects || null,
+      patientInstructions: catalogDoc?.patientInstructions || patientInstructions || null,
       price: priceNum,
       originalPrice: originalPrice ? Number(originalPrice) : null,
-      doses_required: doses_required ? Number(doses_required) : 1,
+      doses_required: Number(doses_required ?? catalogDoc?.doses_required ?? 1),
       age_group: age_group ?? null,
       is_active: true,
       status: isOnboarded ? "approved" : "pending_approval",
@@ -1114,6 +1162,24 @@ router.patch("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequ
     res.json({ status: "OK", vaccine: updated });
   } catch (err) {
     console.error("Lab update vaccine error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── DELETE /api/lab/vaccines/:vaccineId ─────────────────────────────────────
+// Removes a vaccine this provider owns. Mirrors DELETE /my-tests/:testId.
+router.delete("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequest, res: Response) => {
+  try {
+    const labId = req.session!.getUserId();
+    const { vaccineId } = req.params;
+
+    const { resource: existing } = await vaccinesContainer.item(vaccineId, vaccineId).read();
+    if (!existing || existing.labId !== labId) { res.status(404).json({ error: "Vaccine not found" }); return; }
+
+    await vaccinesContainer.item(vaccineId, vaccineId).delete();
+    res.json({ status: "OK" });
+  } catch (err) {
+    console.error("Lab delete vaccine error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

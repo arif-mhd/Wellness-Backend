@@ -7,8 +7,10 @@
     "seed": "ts-node-dev --transpile-only src/data/seed.ts",
     "seed:fhir": "ts-node-dev --transpile-only src/data/seedFhirDemo.ts",
     "seed:lab-catalog": "ts-node src/scripts/seedLabCatalog.ts",
+    "seed:vaccine-catalog": "ts-node src/scripts/seedVaccineCatalog.ts",
     "fhir:add": "ts-node-dev --transpile-only src/data/addFhirRecord.ts",
     "migrate:vaccination-approvals": "ts-node --transpile-only src/data/migrateVaccinationApprovalStatus.ts",
+    "migrate:vaccine-catalog-links": "ts-node --transpile-only src/data/migrateVaccineCatalogLinks.ts",
     "otp": "ts-node scripts/fetch-otp.ts",
     "build": "tsc && node -e \"const fs=require('fs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/wellness-logo.png','dist/assets/wellness-logo.png')\"",
     "start": "node dist/index.js"
