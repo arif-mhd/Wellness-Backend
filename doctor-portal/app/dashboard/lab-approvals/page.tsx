@@ -32,7 +32,14 @@ export default function LabApprovalsPage() {
   const [actionError, setActionError] = useState("");
   const [loadError, setLoadError] = useState("");
 
+  const [resulted, setResulted] = useState<any[]>([]);
+
   const load = useCallback(async () => {
+    // Reports for tests this doctor approved — best effort, separate from the queue.
+    apiFetch("/api/lab/bookings/my-results")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setResulted(Array.isArray(d) ? d : []))
+      .catch(() => {});
     try {
       const res = await apiFetch("/api/lab/bookings/pending-approval");
       if (res.ok) {
@@ -165,6 +172,29 @@ export default function LabApprovalsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {resulted.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-[#383F45] text-[20px] font-normal tracking-[-0.4px] mb-4">Results</h2>
+          <div className="flex flex-col gap-3">
+            {resulted.map((b) => (
+              <div key={b.id} className="bg-white rounded-xl shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[#24292E] text-[14px] font-medium">{b.patientName}</span>
+                  <span className="text-[#676E76] text-xs">{(b.items ?? []).map((i: any) => i.testName).join(", ")}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(b.results ?? []).map((f: any) => (
+                    <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-[10px] bg-[#E0E7FF] text-[#182A6F] text-[12px] font-medium hover:bg-[#D3DBFF] transition-colors">
+                      View Report{f.labName ? ` · ${f.labName}` : ""}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

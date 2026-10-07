@@ -55,6 +55,7 @@ interface Booking {
   consultationSlot?: string;
   notes?: string;
   status: string;
+  results?: { id: string; fileName: string; uploadedAt: string; url: string }[];
   payment_status?: string;
   payment_amount?: number;
   createdAt: string;
@@ -183,8 +184,11 @@ export default function OrdersPage() {
     }
   };
 
+  const [bookingError, setBookingError] = useState("");
+
   const updateBookingStatus = async (bookingId: string, newStatus: string) => {
     setUpdating(bookingId);
+    setBookingError("");
     try {
       const res = await apiFetch(`/api/lab/bookings/${bookingId}/status`, {
         method: "PATCH",
@@ -193,9 +197,50 @@ export default function OrdersPage() {
       });
       if (res.ok) {
         await load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setBookingError(err.error ?? "Couldn't update this booking.");
       }
     } catch {
-      // silently fail
+      setBookingError("Couldn't reach the server.");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // The lab's own signed report for a booking (PDF). Mark Results Ready stays
+  // disabled until at least one is uploaded.
+  const uploadResult = async (bookingId: string, file: File) => {
+    setUpdating(bookingId);
+    setBookingError("");
+    try {
+      const form = new FormData();
+      form.append("result", file);
+      const res = await apiFetch(`/api/lab/bookings/${bookingId}/results`, { method: "POST", body: form });
+      if (res.ok) {
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setBookingError(err.error ?? "Upload failed.");
+      }
+    } catch {
+      setBookingError("Couldn't reach the server.");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const removeResult = async (bookingId: string, resultId: string) => {
+    setUpdating(bookingId);
+    setBookingError("");
+    try {
+      const res = await apiFetch(`/api/lab/bookings/${bookingId}/results/${resultId}`, { method: "DELETE" });
+      if (res.ok) {
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setBookingError(err.error ?? "Couldn't remove the file.");
+      }
     } finally {
       setUpdating(null);
     }
@@ -335,6 +380,9 @@ export default function OrdersPage() {
           </div>
         ) : (
         <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm overflow-hidden">
+          {bookingError && (
+            <div className="m-4 px-4 py-3 bg-[#FEE2E2] border border-[#FCA5A5] rounded-xl text-sm text-[#F25252] font-medium">{bookingError}</div>
+          )}
           {bookings.length === 0 ? (
             <div className="py-20 flex flex-col items-center text-center">
               <div className="w-12 h-12 rounded-xl bg-[#F8FAFC] flex items-center justify-center mb-4">
@@ -405,16 +453,47 @@ export default function OrdersPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-[#5476FC]">
                           {formatCurrency((booking.payment_amount ?? 0).toFixed(2), currency)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          {action && (
-                            <button
-                              onClick={() => updateBookingStatus(booking.id, action.next)}
-                              disabled={updating === booking.id}
-                              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                            >
-                              {updating === booking.id ? "Updating..." : action.label}
-                            </button>
-                          )}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex flex-col items-end gap-2">
+                            {(booking.status === "analyzing" || booking.status === "results") && (booking.results?.length ?? 0) > 0 && (
+                              <ul className="flex flex-col gap-1 items-end">
+                                {booking.results!.map((r) => (
+                                  <li key={r.id} className="flex items-center gap-2 text-[11px] text-[#383F45]">
+                                    <a href={r.url} target="_blank" rel="noreferrer" className="text-[#5476FC] hover:underline max-w-[160px] truncate">{r.fileName}</a>
+                                    {booking.status === "analyzing" && (
+                                      <button onClick={() => removeResult(booking.id, r.id)} disabled={updating === booking.id} className="text-[#F25252] hover:underline disabled:opacity-50">Remove</button>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {booking.status === "analyzing" && (
+                              <label className="px-3 py-1.5 text-xs font-medium text-[#5476FC] border border-[#C7D2FE] rounded-lg hover:bg-[#EEF2FF] cursor-pointer transition-colors">
+                                {updating === booking.id ? "Working..." : "Upload result PDF"}
+                                <input
+                                  type="file"
+                                  accept="application/pdf"
+                                  className="hidden"
+                                  disabled={updating === booking.id}
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    e.target.value = "";
+                                    if (f) uploadResult(booking.id, f);
+                                  }}
+                                />
+                              </label>
+                            )}
+                            {action && (
+                              <button
+                                onClick={() => updateBookingStatus(booking.id, action.next)}
+                                disabled={updating === booking.id || (booking.status === "analyzing" && (booking.results?.length ?? 0) === 0)}
+                                title={booking.status === "analyzing" && (booking.results?.length ?? 0) === 0 ? "Upload the result PDF first" : undefined}
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              >
+                                {updating === booking.id ? "Updating..." : action.label}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
