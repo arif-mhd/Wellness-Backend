@@ -96,9 +96,14 @@ export const labTestsContainer: Container = db.container("labTests");
 /** Lab bookings — partition key: /patientId */
 export const labBookingsContainer: Container = db.container("labBookings");
 
-/** Vaccines catalogue — partition key: /id */
+/** Per-provider vaccine offerings (priced) — partition key: /id */
 export const vaccinesContainer: Container = db.container("vaccines");
 export const labTestCatalogContainer: Container = db.container("labTestCatalog");
+
+/** Abstract vaccine catalogue (admin-owned, unpriced) — partition key: /id.
+ *  Mirrors labTestCatalog: a catalogue entry is the vaccine itself, and each
+ *  lab offers it at its own price via a `vaccines` doc carrying catalogVaccineId. */
+export const vaccineCatalogContainer: Container = db.container("vaccineCatalog");
 
 /** Vaccination bookings — partition key: /patientId */
 export const vaccinationBookingsContainer: Container = db.container("vaccinationBookings");
@@ -183,6 +188,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "labBookings",            partitionKey: { paths: ["/patientId"] } },
     { id: "vaccines",               partitionKey: { paths: ["/id"] } },
     { id: "labTestCatalog",         partitionKey: { paths: ["/id"] } },
+    { id: "vaccineCatalog",         partitionKey: { paths: ["/id"] } },
     { id: "vaccinationBookings",    partitionKey: { paths: ["/patientId"] } },
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
