@@ -319,27 +319,34 @@ router.get("/bookings/:bookingId", requireRole("patient"), async (req: SessionRe
 });
 
 // ─── PATCH /api/vaccines/bookings/:bookingId/cancel ───────────────────────────
+// Once the vaccine has been given there's nothing left to cancel.
+const VACCINATION_UNCANCELLABLE_STATUSES: Record<string, string> = {
+  cancelled: "Booking already cancelled",
+  rejected: "Booking was rejected by the lab",
+  administered: "The vaccine has already been administered",
+  completed: "This booking has already been completed",
+};
+
+class VaccinationNotCancellableError extends Error {
+  constructor(message: string) { super(message); this.name = "VaccinationNotCancellableError"; }
+}
+
 router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { bookingId } = req.params;
-    const { resources } = await vaccinationBookingsContainer.items
-      .query(
-        {
-          query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @pid",
-          parameters: [{ name: "@id", value: bookingId }, { name: "@pid", value: patientId }],
-        },
-        { partitionKey: patientId }
-      )
-      .fetchAll();
-    if (!resources.length) { res.status(404).json({ error: "Booking not found" }); return; }
-    const booking = resources[0];
-    if (booking.status === "cancelled") { res.status(400).json({ error: "Booking already cancelled" }); return; }
-    if (booking.status === "rejected") { res.status(400).json({ error: "Booking was rejected by the lab" }); return; }
-    const updated = { ...booking, status: "cancelled", updatedAt: new Date().toISOString() };
-    await vaccinationBookingsContainer.items.upsert(updated);
+    // Reading by (id, patientId) scopes the booking to this patient; the etag
+    // check stops a cancel from overwriting a concurrent "administered" update.
+    const updated = await updateVaccinationBookingWithRetry(bookingId, patientId, (booking) => {
+      const blocked = VACCINATION_UNCANCELLABLE_STATUSES[booking.status];
+      if (blocked) throw new VaccinationNotCancellableError(blocked);
+      return { ...booking, status: "cancelled", updatedAt: new Date().toISOString() };
+    });
+    if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
     res.json(updated);
-  } catch (err) {
+  } catch (err: any) {
+    if (err instanceof VaccinationNotCancellableError) { res.status(400).json({ error: err.message }); return; }
+    if (err.code === 404) { res.status(404).json({ error: "Booking not found" }); return; }
     console.error("Cancel vaccination booking error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -497,6 +504,18 @@ router.post("/bookings/:bookingId/reject", requireRole("doctor"), async (req: Se
 // ["awaiting","confirmed","analyzing","results","cancelled"].
 const VACCINATION_FULFILMENT_STATUSES = ["confirmed", "scheduled", "administered", "completed", "cancelled"];
 
+// Fulfilment only moves forward, and can't be cancelled once the vaccine has
+// been given. completed and cancelled are terminal.
+const VACCINATION_STATUS_TRANSITIONS: Record<string, string[]> = {
+  confirmed: ["scheduled", "administered", "cancelled"],
+  scheduled: ["administered", "cancelled"],
+  administered: ["completed"],
+};
+
+class VaccinationInvalidTransitionError extends Error {
+  constructor(message: string) { super(message); this.name = "VaccinationInvalidTransitionError"; }
+}
+
 // ─── GET /api/vaccines/my-bookings ────────────────────────────────────────────
 // Every booking containing at least one vaccine this provider offers.
 // vaccinationBookings is partitioned by /patientId so this is cross-partition.
@@ -558,16 +577,24 @@ router.patch("/bookings/:bookingId/status", requireRole("lab"), async (req: Sess
     }
 
     const now = new Date().toISOString();
-    const updated = await updateVaccinationBookingWithRetry(bookingId, booking.patientId, (latest) => ({
-      ...latest,
-      status,
-      ...(status === "completed" ? { completedAt: now } : {}),
-      updatedAt: now,
-    }));
+    // Checked against the latest read so a patient cancelling concurrently
+    // can't be overwritten by a stale transition.
+    const updated = await updateVaccinationBookingWithRetry(bookingId, booking.patientId, (latest) => {
+      if (!(VACCINATION_STATUS_TRANSITIONS[latest.status] ?? []).includes(status)) {
+        throw new VaccinationInvalidTransitionError(`Cannot change a ${latest.status} booking to ${status}.`);
+      }
+      return {
+        ...latest,
+        status,
+        ...(status === "completed" ? { completedAt: now } : {}),
+        updatedAt: now,
+      };
+    });
     if (!updated) { res.status(404).json({ error: "Booking not found" }); return; }
 
     res.json(updated);
-  } catch (err) {
+  } catch (err: any) {
+    if (err instanceof VaccinationInvalidTransitionError) { res.status(409).json({ error: err.message }); return; }
     console.error("Update vaccination booking status error:", err);
     res.status(500).json({ error: "Internal server error" });
   }

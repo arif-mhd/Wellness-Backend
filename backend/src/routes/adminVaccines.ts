@@ -5,6 +5,22 @@ import { vaccinesContainer } from "../config/cosmos";
 
 const router = Router();
 
+// Same rule lab.ts applies to provider-priced vaccines. Returns an error
+// message, or null when the price fields are absent or valid.
+function validateVaccinePrices(price: unknown, originalPrice: unknown): string | null {
+  if (price !== undefined) {
+    const p = Number(price);
+    if (price === null || price === "" || !Number.isFinite(p) || p < 0) {
+      return "price must be a non-negative number";
+    }
+  }
+  if (originalPrice !== undefined && originalPrice !== null && originalPrice !== "") {
+    const op = Number(originalPrice);
+    if (!Number.isFinite(op) || op < 0) return "originalPrice must be a non-negative number";
+  }
+  return null;
+}
+
 // ─── POST /api/admin/vaccines ─────────────────────────────────────────────────
 // Admin creates a new vaccine
 router.post("/", requireRole("admin"), async (req: Request, res: Response) => {
@@ -32,6 +48,8 @@ router.post("/", requireRole("admin"), async (req: Request, res: Response) => {
       res.status(400).json({ error: "name and price are required" });
       return;
     }
+    const priceError = validateVaccinePrices(price, originalPrice);
+    if (priceError) { res.status(400).json({ error: priceError }); return; }
 
     const now = new Date().toISOString();
     const vaccine = {
@@ -102,7 +120,18 @@ router.patch("/:vaccineId", requireRole("admin"), async (req: Request, res: Resp
       .fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Vaccine not found" }); return; }
 
-    const updated = { ...resources[0], ...req.body, id: vaccineId, updatedAt: new Date().toISOString() };
+    const { price, originalPrice } = req.body;
+    const priceError = validateVaccinePrices(price, originalPrice);
+    if (priceError) { res.status(400).json({ error: priceError }); return; }
+
+    const updated = {
+      ...resources[0],
+      ...req.body,
+      ...(price !== undefined && { price: Number(price) }),
+      ...(originalPrice !== undefined && { originalPrice: originalPrice ? Number(originalPrice) : null }),
+      id: vaccineId,
+      updatedAt: new Date().toISOString(),
+    };
     await vaccinesContainer.items.upsert(updated);
     res.json(updated);
   } catch (err) {

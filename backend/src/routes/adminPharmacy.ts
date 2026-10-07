@@ -79,6 +79,11 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
       res.status(400).json({ error: "name, category, and price are required" });
       return;
     }
+    const priceNum = Number(price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      res.status(400).json({ error: "price must be a non-negative number" });
+      return;
+    }
 
     // Verify pharmacy exists
     const { resources: pharmacies } = await pharmaciesContainer.items.query({
@@ -102,7 +107,7 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
       name,
       description:         description || null,
       category,
-      price:               parseFloat(price),
+      price:               priceNum,
       inStock:             inStock === "false" || inStock === false ? false : true,
       requiresPrescription: requiresPrescription === true || requiresPrescription === "true",
       batchNumber:         batchNumber || null,

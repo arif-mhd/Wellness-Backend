@@ -11,6 +11,7 @@ import { devFallbackOrThrow } from "../utils/env";
 import { enforcePostSignInGuards, provisionSocialPatient } from "../utils/authGuards";
 import { socialProviders } from "./socialProviders";
 import { patientsContainer } from "./cosmos";
+import { markEmailVerified } from "../utils/markEmailVerified";
 
 // Each portal env var accepts a comma-separated list, because white-labelling
 // means one portal per brand: the org slug is compiled into the build, so
@@ -254,7 +255,27 @@ export function initSuperTokens(): void {
                       // condition SuperTokens' own linking enforces. Patient
                       // emails are verified because registration requires an
                       // OTP; see utils/markEmailVerified.ts.
-                      if (!passwordMethod.verified) {
+                      // Accounts registered before markEmailVerified existed
+                      // were never marked, which refused every one of them
+                      // here. A patient document is the same proof
+                      // backfillEmailVerification.ts accepts: the register
+                      // route never creates one without a passed OTP. So
+                      // record the verification now rather than refusing.
+                      let passwordVerified = passwordMethod.verified;
+                      if (!passwordVerified) {
+                        const { resource: existingPatient } = await patientsContainer
+                          .item(conflicting.id, conflicting.id)
+                          .read()
+                          .catch(() => ({ resource: undefined as any }));
+                        if (existingPatient && existingPatient.status !== "deleted") {
+                          passwordVerified = await markEmailVerified(
+                            passwordMethod.recipeUserId.getAsString(),
+                            email
+                          );
+                        }
+                      }
+
+                      if (!passwordVerified) {
                         await Session.revokeAllSessionsForUser(userId);
                         console.warn(
                           `[signInUpPOST] refusing: ${email} has an UNVERIFIED password account`
@@ -284,6 +305,20 @@ export function initSuperTokens(): void {
                       } catch (cleanupErr) {
                         console.error("[signInUpPOST] cleanup before hand-off failed:", cleanupErr);
                       }
+
+                      // The hand-off returns before the guards at the end of
+                      // this function, so apply them here against the account
+                      // being signed into — otherwise a Google sign-in from
+                      // another brand's app, or onto a deactivated account,
+                      // would get a session the password flow would refuse.
+                      // Checked before the session is created, so a rejected
+                      // sign-in never holds one.
+                      const handOffFailure = await enforcePostSignInGuards({
+                        userId: conflicting.id,
+                        email,
+                        orgSlugHeader,
+                      });
+                      if (handOffFailure) return handOffFailure as any;
 
                       await Session.createNewSession(
                         input.options.req,
