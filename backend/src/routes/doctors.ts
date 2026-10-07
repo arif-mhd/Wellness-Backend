@@ -10,7 +10,7 @@ import { hasDoctorPermission } from "../utils/doctorPermissions";
 import { notifyClinic } from "./clinicPayments";
 import { loadOrgDocForClinicId } from "./clinicInsurance";
 import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
-import { buildInClause } from "../utils/clinicScope";
+import { buildInClause, VACCINATION_DOCTOR_QUERY } from "../utils/clinicScope";
 import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor } from "../utils/timezone";
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { resolveCountryConfigForDoctor } from "../utils/orgScope";
@@ -83,7 +83,7 @@ router.get("/me", requireRole("doctor"), async (req: SessionRequest, res: Respon
     // vaccines are a global catalogue with no owning lab to hang it off.
     // Drives the "Vaccination Approvals" tab.
     const { resources: vaccinationClinics } = await clinicsContainer.items.query({
-      query: "SELECT VALUE c.id FROM c WHERE ARRAY_CONTAINS(c.assignedVaccinationDoctorIds, @doctorId)",
+      query: VACCINATION_DOCTOR_QUERY,
       parameters: [{ name: "@doctorId", value: doctorId }],
     }).fetchAll();
 

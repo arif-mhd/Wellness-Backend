@@ -6,7 +6,7 @@ import { vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContaine
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveOrgId, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
-import { buildInClause } from "../utils/clinicScope";
+import { buildInClause, VACCINATION_DOCTOR_QUERY } from "../utils/clinicScope";
 import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
@@ -369,7 +369,7 @@ class VaccinationAlreadyHandledError extends Error {
 // True when this doctor's clinic has nominated them to review vaccinations.
 async function isVaccinationDoctor(doctorId: string): Promise<boolean> {
   const { resources } = await clinicsContainer.items.query({
-    query: "SELECT VALUE c.id FROM c WHERE ARRAY_CONTAINS(c.assignedVaccinationDoctorIds, @doctorId)",
+    query: VACCINATION_DOCTOR_QUERY,
     parameters: [{ name: "@doctorId", value: doctorId }],
   }).fetchAll();
   return resources.length > 0;
