@@ -454,6 +454,11 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
           let patientBloodGroup = patient?.bloodGroup ?? "";
           let patientHeight = patient?.height ?? "";
           let patientWeight = patient?.weight ?? "";
+          // The language this patient speaks (their profile's `language`) — not
+          // to be confused with apt.consultationLanguage, the language they
+          // asked the doctor to consult in at booking time. Both are shown to
+          // the doctor so they know who they're about to speak with.
+          let patientLanguage: string | null = patient?.language ?? null;
 
           // Format chronic illnesses/diseases
           let chronicIllnesses = Array.isArray(patient?.chronicDiseases) 
@@ -496,6 +501,9 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
               if (member.bloodGroup) patientBloodGroup = member.bloodGroup;
               if (member.height) patientHeight = member.height;
               if (member.weight) patientWeight = member.weight;
+              // Each family member has their own spoken language; fall back to
+              // the account holder's if the member hasn't set one.
+              patientLanguage = member.language ?? patientLanguage;
 
               chronicIllnesses = Array.isArray(member.chronicDiseases)
                 ? member.chronicDiseases.join(", ")
@@ -536,6 +544,7 @@ router.get("/doctor", requireRole("doctor"), async (req: SessionRequest, res: Re
             patientBloodGroup,
             patientHeight,
             patientWeight,
+            patientLanguage,
             patientChronicIllnesses: chronicIllnesses,
             patientCurrentMedications: currentMedications,
             patientAllergies: allergies,

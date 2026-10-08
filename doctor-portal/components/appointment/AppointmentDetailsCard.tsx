@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Patient } from "@/app/appointments/types";
+import LanguageChips from "./LanguageChips";
 
 interface AppointmentDetailsCardProps {
   patient: Patient | null;
@@ -114,6 +115,7 @@ export default function AppointmentDetailsCard({
                 For: {patient.profileRelationship ?? "Family Member"} of {patient.accountOwnerName}
               </span>
             )}
+            <LanguageChips spoken={patient.patientLanguage} preferred={patient.consultationLanguage} className="mt-1.5" />
           </div>
         </div>
 

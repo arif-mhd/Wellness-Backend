@@ -31,6 +31,10 @@ interface RealConsultation {
   completedAt: string | null;
   status: string;
   reason: string;
+  // From the appointment itself, so these show no matter which screen opened
+  // the modal: what the patient speaks, and what they asked to be consulted in.
+  patientLanguage?: string | null;
+  consultationLanguage?: string | null;
   emr: {
     sections?: {
       reasonForVisit?: string;
@@ -198,6 +202,8 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
               completedAt: completedD ? formatTime(completedD) : null,
               status: a.status,
               reason: a.reason ?? "",
+              patientLanguage: a.patientLanguage ?? null,
+              consultationLanguage: a.consultationLanguage ?? null,
               emr: a.emr ?? null,
             };
           });
@@ -471,7 +477,8 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
               { label: "Blood Group", value: patient.bloodGroup || "N/A" },
               { label: "Height (cm)", value: patient.height || "N/A" },
               { label: "Weight (kg)", value: patient.weight || "N/A" },
-              { label: "Consultation Language", value: patient.consultationLanguage || "Not specified" },
+              { label: "Speaks", value: selectedConsultation?.patientLanguage || patient.patientLanguage || "Not specified" },
+              { label: "Consultation Language", value: selectedConsultation?.consultationLanguage || patient.consultationLanguage || "Not specified" },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col gap-2 flex-1 min-w-[100px]">
                 <span className="text-[#676E76] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">{stat.label}</span>
@@ -757,7 +764,8 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                         <ModalField label="Gender" value={patient.gender} />
                         <ModalField label="Blood Group" value={patient.bloodGroup} />
                         <ModalField label="Email" value={patient.email} />
-                        <ModalField label="Consultation Language" value={patient.consultationLanguage} />
+                        <ModalField label="Speaks" value={selectedConsultation?.patientLanguage || patient.patientLanguage} />
+                        <ModalField label="Consultation Language" value={selectedConsultation?.consultationLanguage || patient.consultationLanguage} />
                       </div>
                     </div>
 

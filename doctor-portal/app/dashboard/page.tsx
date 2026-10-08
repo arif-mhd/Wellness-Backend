@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/apiFetch";
 import { useSidebar } from "@/components/SidebarContext";
+import LanguageChips from "@/components/appointment/LanguageChips";
 import { useClinicTimezone, useCurrency } from "@/components/BrandingContext";
 import { clinicDayKey, clinicParts } from "@/lib/appointmentTime";
 import { formatCurrency } from "@/lib/currency";
@@ -35,6 +36,8 @@ interface PatientRow {
   scheduledAt: string;
   updatedAt: string;
   visitType?: "online" | "offline";
+  consultationLanguage?: string | null;
+  patientLanguage?: string | null;
 }
 
 const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -270,6 +273,8 @@ export default function DashboardPage() {
           scheduledAt: a.scheduledAt,
           updatedAt:   a.updatedAt ?? a.scheduledAt,
           visitType:   a.visitType === "offline" ? "offline" : "online",
+          consultationLanguage: a.consultationLanguage ?? null,
+          patientLanguage: a.patientLanguage ?? null,
         }));
         setPatients(rows);
         if (rows.length > 0) setSelectedPatientId(rows[0].id);
@@ -680,6 +685,7 @@ export default function DashboardPage() {
                               </div>
                             ))}
                           </div>
+                          <LanguageChips spoken={p.patientLanguage} preferred={p.consultationLanguage} className="mt-1.5" />
                         </div>
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-6 mt-3 sm:mt-0">

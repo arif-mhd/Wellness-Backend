@@ -81,6 +81,8 @@ function mapToPatient(apt: any, index: number, currency: CurrencyConfig, clinicT
       : undefined,
     accountOwnerName: apt.familyMemberId ? apt.accountOwnerName : undefined,
     profileRelationship: apt.familyMemberId ? apt.profileRelationship : undefined,
+    consultationLanguage: apt.consultationLanguage ?? null,
+    patientLanguage: apt.patientLanguage ?? null,
     visitType: apt.visitType === 'offline' ? 'offline' : 'online',
   };
 }
