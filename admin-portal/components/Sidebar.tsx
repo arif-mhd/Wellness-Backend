@@ -110,6 +110,15 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/vaccine-catalog",
+    label: "Vaccine Catalog",
+    icon: (active: boolean) => (
+      <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="m18 2 4 4M17 7l3-3M19 9 8.7 19.3a2.4 2.4 0 0 1-3.4 0l-.6-.6a2.4 2.4 0 0 1 0-3.4L15 5M9 11l4 4M5 19l-3 3M14 4l6 6" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/vaccination",
     label: "Vaccination",
     icon: (active: boolean) => (

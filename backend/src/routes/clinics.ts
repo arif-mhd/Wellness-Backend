@@ -7,7 +7,7 @@ import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
-import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope, loadBranchTarget, saveBranchTarget, rawBranchDoc } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, mainBranchFrom, branchAsPublicClinic, hasPermission, ClinicScope } from "../utils/clinicScope";
 import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getCountryConfigForOrgId } from "../utils/orgScope";
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { getClinicAppointmentsData } from "./clinicAppointments";
@@ -887,67 +887,6 @@ router.get("/:id/diagnosis", async (req: Request, res: Response) => {
     res.json({ diagnosis, total: appointments.length });
   } catch (err) {
     console.error("Clinic diagnosis fetch error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /api/clinics/vaccination-doctors ────────────────────────────────────
-// Which of this clinic's doctors are nominated to review vaccination bookings.
-// Unlike lab tests — where the assignment hangs off the lab document, scoped by
-// item.labId — vaccines are a global catalogue with no owning lab, so the
-// assignment lives on the clinic itself. Like a branch's lab, it's one list
-// per branch: on the org doc for the main branch, inside its branches[] entry
-// for a secondary one (see loadBranchTarget).
-router.get("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-
-  try {
-    const target = await loadBranchTarget(scope);
-    if (!target) { res.status(404).json({ error: "Clinic not found." }); return; }
-    res.json({ doctorIds: rawBranchDoc(target).assignedVaccinationDoctorIds ?? [] });
-  } catch (err) {
-    console.error("Get vaccination doctors error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── PUT /api/clinics/vaccination-doctors ────────────────────────────────────
-// Full replace of this branch's list. Each branch has its own, so unlike the
-// shared lab document there's no other branch's roster to preserve here.
-router.put("/vaccination-doctors", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: false });
-  if (!scope) return;
-
-  const { doctorIds } = req.body;
-  if (!Array.isArray(doctorIds) || !doctorIds.every((id) => typeof id === "string")) {
-    res.status(400).json({ error: "doctorIds must be an array of strings." });
-    return;
-  }
-
-  try {
-    const target = await loadBranchTarget(scope);
-    if (!target) { res.status(404).json({ error: "Clinic not found." }); return; }
-
-    // Every id must be one of this branch's own doctors — otherwise a clinic
-    // could hand vaccination sign-off rights to a doctor it has no
-    // relationship with.
-    const uniqueIds = Array.from(new Set(doctorIds));
-    if (uniqueIds.length > 0) {
-      const { resources: ownDoctors } = await doctorsContainer.items.query({
-        query: "SELECT c.id FROM c WHERE c.clinicId = @clinicId AND ARRAY_CONTAINS(@ids, c.id)",
-        parameters: [{ name: "@clinicId", value: scope.scopeId }, { name: "@ids", value: uniqueIds }],
-      }).fetchAll();
-      if (ownDoctors.length !== uniqueIds.length) {
-        res.status(400).json({ error: "One or more doctorIds don't belong to this clinic." });
-        return;
-      }
-    }
-
-    await saveBranchTarget(target, { assignedVaccinationDoctorIds: uniqueIds });
-    res.json({ status: "OK", doctorIds: uniqueIds });
-  } catch (err) {
-    console.error("Assign vaccination doctors error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

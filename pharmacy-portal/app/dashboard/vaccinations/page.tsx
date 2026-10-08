@@ -26,8 +26,9 @@ interface Vaccine {
   ageRange?: string | null;
   doses_required?: number;
   price: number;
-  // Absent on the shared admin catalogue; set on vaccines this lab added.
   labId?: string | null;
+  // Set when picked from the Wellness catalogue; null for a custom vaccine.
+  catalogVaccineId?: string | null;
   status?: string | null;
   is_active?: boolean;
   rejectedReason?: string | null;
@@ -228,8 +229,8 @@ export default function VaccinationsPage() {
           </div>
         ) : vaccines.length === 0 ? (
           <div className="py-20 flex flex-col items-center text-center">
-            <p className="font-semibold text-[#24292E] mb-1 text-base">No vaccines available</p>
-            <p className="text-sm text-[#676E76]">Add your own, or wait for the Wellness catalogue to be populated</p>
+            <p className="font-semibold text-[#24292E] mb-1 text-base">No vaccines added yet</p>
+            <p className="text-sm text-[#676E76]">Add the vaccines your lab offers — pick from the Wellness catalogue or add a custom one</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -248,8 +249,8 @@ export default function VaccinationsPage() {
                 {vaccines.map((v) => (
                   <tr
                     key={v.id}
-                    onClick={() => { if (v.labId) router.push(`/dashboard/vaccinations/${v.id}`); }}
-                    className={`group hover:bg-[#F8FAFC] transition-colors duration-200 ${v.labId ? "cursor-pointer" : ""}`}
+                    onClick={() => router.push(`/dashboard/vaccinations/${v.id}`)}
+                    className="group hover:bg-[#F8FAFC] transition-colors duration-200 cursor-pointer"
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-0.5">
@@ -261,10 +262,9 @@ export default function VaccinationsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {v.labId ? (
-                        <div className="flex flex-col items-start gap-1">
+                      <div className="flex flex-col items-start gap-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-50 text-blue-700 border-blue-100">
-                            Added by you
+                            {v.catalogVaccineId ? "Catalogue" : "Custom"}
                           </span>
                           {v.status === "pending_approval" && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-amber-50 text-amber-700 border-amber-100">
@@ -281,10 +281,7 @@ export default function VaccinationsPage() {
                               Inactive
                             </span>
                           )}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-[#A0A8B0]">Wellness catalogue</span>
-                      )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-xs text-[#383F45]">
                       {[v.vaccineType, v.category].filter(Boolean).join(" · ") || "—"}

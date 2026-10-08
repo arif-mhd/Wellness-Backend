@@ -37,6 +37,7 @@ interface Vaccine {
   age_group?: string;
   is_active: boolean;
   createdAt?: string;
+  labName?: string | null;
 }
 
 const DoubleCaret = () => (
@@ -107,15 +108,18 @@ export default function ManageVaccinationPage() {
           <div className={`${selected ? "lg:col-span-8" : "lg:col-span-12"} flex flex-col gap-5`}>
             {/* Header */}
             <div className="flex items-start sm:items-center justify-between gap-4">
-              <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Vaccines</h1>
+              <div>
+                <h1 className="text-[28px] font-medium text-[#1e293b] tracking-tight">Manage Vaccines</h1>
+                <p className="text-[13px] text-slate-500 mt-1">
+                  Vaccines offered by labs, each at the lab&apos;s own price. To add a new vaccine, add it to the Vaccine
+                  Catalog — labs then pick it and set their price.
+                </p>
+              </div>
               <button
-                onClick={() => router.push("/dashboard/vaccination/add")}
-                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap md:whitespace-normal transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
+                onClick={() => router.push("/dashboard/vaccine-catalog")}
+                className="bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] hover:from-[#7A90FF] hover:to-[#4466FC] text-white text-[13px] font-semibold px-6 py-3 rounded-xl flex items-center gap-2 whitespace-nowrap transition duration-200 shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:-translate-y-0.5 active:translate-y-0"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Vaccine
+                Vaccine Catalog
               </button>
             </div>
 
@@ -157,6 +161,7 @@ export default function ManageVaccinationPage() {
                     <thead>
                       <tr className="border-b border-slate-100 text-[12px] font-semibold text-slate-800 tracking-wider">
                         <th className="pb-4 pt-1 font-semibold pl-2">Name</th>
+                        <th className="pb-4 pt-1 font-semibold text-center">Lab</th>
                         <th className="pb-4 pt-1 font-semibold text-center">Type</th>
                         <th className="pb-4 pt-1 font-semibold text-center">Doses</th>
                         <th className="pb-4 pt-1 font-semibold text-center">Price</th>
@@ -191,6 +196,9 @@ export default function ManageVaccinationPage() {
                               </div>
                             </td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium text-center">
+                              {vaccine.labName ?? "—"}
+                            </td>
+                            <td className="py-4 text-[12px] text-slate-500 font-medium text-center">
                               {vaccine.vaccineType ?? vaccine.age_group ?? "General"}
                             </td>
                             <td className="py-4 text-[12px] text-slate-500 font-medium text-center">
@@ -214,8 +222,8 @@ export default function ManageVaccinationPage() {
 
                       {paged.length === 0 && !loading && (
                         <tr>
-                          <td colSpan={5} className="py-16 text-center text-slate-400 text-[13px] font-medium">
-                            {search ? `No vaccines found for "${search}"` : "No vaccines added yet. Click 'Add Vaccine' to get started."}
+                          <td colSpan={6} className="py-16 text-center text-slate-400 text-[13px] font-medium">
+                            {search ? `No vaccines found for "${search}"` : "No lab offers a vaccine yet."}
                           </td>
                         </tr>
                       )}
@@ -276,7 +284,7 @@ export default function ManageVaccinationPage() {
                   })}
                   {paged.length === 0 && !loading && (
                     <div className="py-16 text-center text-slate-400 text-[13px] font-medium">
-                      {search ? `No vaccines found for "${search}"` : "No vaccines added yet. Click 'Add Vaccine' to get started."}
+                      {search ? `No vaccines found for "${search}"` : "No lab offers a vaccine yet."}
                     </div>
                   )}
                 </div>
@@ -328,6 +336,7 @@ export default function ManageVaccinationPage() {
                 <div>
                   <h3 className="text-[15px] font-medium text-slate-800">{selected.name}</h3>
                   {selected.manufacturer && <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selected.manufacturer}</p>}
+                  {selected.labName && <p className="text-[11px] font-medium text-slate-400 mt-0.5">Offered by {selected.labName}</p>}
                 </div>
               </div>
 

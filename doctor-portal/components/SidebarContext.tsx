@@ -17,8 +17,8 @@ interface SidebarContextType {
   // whether the Sidebar shows the "Lab Approvals" nav item. Piggybacks on
   // the same /api/doctors/me poll below rather than adding a new one.
   hasLabAssignment: boolean;
-  // Same, for vaccination sign-off. The assignment lives on the clinic
-  // (assignedVaccinationDoctorIds) since vaccines have no owning lab.
+  // Same, for vaccination sign-off — a lab's assigned doctors also review its
+  // vaccination bookings, so the backend derives this from the lab assignment.
   hasVaccinationAssignment: boolean;
 }
 

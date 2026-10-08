@@ -317,8 +317,8 @@ function ClinicLabContent() {
                   <div className="flex flex-col gap-1">
                     <span className="text-[#24292E] text-[13px] font-semibold">Doctors assigned to this lab</span>
                     <p className="text-[#9EA5AD] text-[11px]">
-                      These doctors can approve or reject bookings for tests that need doctor sign-off, from their
-                      own doctor-portal login.
+                      These doctors can approve or reject bookings for this lab&apos;s tests that need doctor
+                      sign-off and for its vaccinations, from their own doctor-portal login.
                     </p>
                     {(lab.assignedDoctorIds?.length ?? 0) === 0 ? (
                       <span className="text-[#9EA5AD] text-[12px] mt-1">No doctors assigned yet.</span>
@@ -458,6 +458,7 @@ function ClinicLabContent() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-[#24292E] text-[15px] font-semibold">Assign Doctors to This Lab</h2>
+            <p className="text-[#9EA5AD] text-[11px] -mt-2">They&apos;ll review this lab&apos;s test and vaccination bookings.</p>
             {assignError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center">{assignError}</div>}
             {clinicDoctors.length === 0 ? (
               <p className="text-[#9EA5AD] text-[12px] py-4 text-center">No doctors found for this clinic yet.</p>

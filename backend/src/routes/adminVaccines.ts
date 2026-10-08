@@ -1,5 +1,4 @@
 import { Router, Request, Response } from "express";
-import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { vaccinesContainer } from "../config/cosmos";
 
@@ -22,72 +21,21 @@ function validateVaccinePrices(price: unknown, originalPrice: unknown): string |
 }
 
 // ─── POST /api/admin/vaccines ─────────────────────────────────────────────────
-// Admin creates a new vaccine
-router.post("/", requireRole("admin"), async (req: Request, res: Response) => {
-  try {
-    const {
-      name,
-      manufacturer,
-      vaccineType,
-      category,
-      description,
-      recommendedFor,
-      ageRange,
-      targetGroups,
-      doseSchedule,
-      howAdministered,
-      sideEffects,
-      patientInstructions,
-      price,
-      originalPrice,
-      doses_required,
-      age_group,
-    } = req.body;
-
-    if (!name || price === undefined) {
-      res.status(400).json({ error: "name and price are required" });
-      return;
-    }
-    const priceError = validateVaccinePrices(price, originalPrice);
-    if (priceError) { res.status(400).json({ error: priceError }); return; }
-
-    const now = new Date().toISOString();
-    const vaccine = {
-      id: uuidv4(),
-      name,
-      manufacturer: manufacturer ?? null,
-      vaccineType: vaccineType ?? null,
-      category: category ?? null,
-      description: description ?? null,
-      recommendedFor: recommendedFor ?? null,
-      ageRange: ageRange ?? null,
-      targetGroups: targetGroups ?? [],
-      doseSchedule: doseSchedule ?? null,
-      howAdministered: howAdministered ?? null,
-      sideEffects: sideEffects ?? null,
-      patientInstructions: patientInstructions ?? null,
-      price: Number(price),
-      originalPrice: originalPrice ? Number(originalPrice) : null,
-      doses_required: doses_required ?? 1,
-      age_group: age_group ?? null,
-      is_active: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await vaccinesContainer.items.upsert(vaccine);
-    res.status(201).json(vaccine);
-  } catch (err) {
-    console.error("Create vaccine error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
+// Retired. Like lab tests, a bookable vaccine always belongs to a lab: admins
+// add vaccines to the shared catalogue (POST /api/admin/vaccine-catalog) and
+// each lab picks from it and sets its own price. A vaccine created here had no
+// lab, so no one could fulfil or approve its bookings.
+router.post("/", requireRole("admin"), (_req: Request, res: Response) => {
+  res.status(410).json({ error: "Add vaccines to the Vaccine Catalog instead — labs pick from it and set their own price." });
 });
 
 // ─── GET /api/admin/vaccines ──────────────────────────────────────────────────
+// Every vaccine a lab offers. Legacy lab-less vaccines are left out — they're
+// no longer bookable (see GET /api/vaccines).
 router.get("/", requireRole("admin"), async (_req: Request, res: Response) => {
   try {
     const { resources } = await vaccinesContainer.items
-      .query({ query: "SELECT * FROM c ORDER BY c.createdAt DESC", parameters: [] })
+      .query({ query: "SELECT * FROM c WHERE IS_DEFINED(c.labId) AND c.labId != null ORDER BY c.createdAt DESC", parameters: [] })
       .fetchAll();
     res.json(resources);
   } catch (err) {

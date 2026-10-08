@@ -806,7 +806,9 @@ router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res:
 // clinic — see PUT /api/clinics/labs/assigned-doctors. Cross-partition
 // (labServicesContainer is keyed by /id), but cheap at this scale: the
 // number of labs on the platform is nowhere near appointment/booking volume.
-async function getAssignedLabIds(doctorId: string): Promise<string[]> {
+// Also gates vaccination sign-off (vaccines.ts) — a lab's vaccines are
+// reviewed by that lab's assigned doctors.
+export async function getAssignedLabIds(doctorId: string): Promise<string[]> {
   const { resources } = await labServicesContainer.items.query({
     query: "SELECT c.id FROM c WHERE ARRAY_CONTAINS(c.assignedDoctorIds, @doctorId)",
     parameters: [{ name: "@doctorId", value: doctorId }],
@@ -1145,19 +1147,15 @@ router.post("/bookings/:bookingId/reject", requireRole("doctor"), async (req: Se
 });
 
 // ─── GET /api/lab/vaccines ────────────────────────────────────────────────────
-// The vaccine catalogue as the lab sees it: the shared admin-owned catalogue
-// (docs with no labId) plus any vaccines THIS lab added itself. Another lab's
-// own vaccines are deliberately excluded. A lab's own entries come back
-// regardless of is_active/status so it can see and fix a pending or
-// deactivated one; the admin catalogue is filtered to what's actually live.
+// Only the vaccines THIS lab actually offers — ones it picked from the
+// catalogue or added as custom. Legacy admin-created vaccines (no labId) and
+// other labs' vaccines are excluded. Entries come back regardless of
+// is_active/status so the lab can see and fix a pending or deactivated one.
 router.get("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Response) => {
   try {
     const labId = req.session!.getUserId();
     const { resources } = await vaccinesContainer.items.query({
-      query: `SELECT * FROM c
-              WHERE (NOT IS_DEFINED(c.labId) AND c.is_active = true)
-                 OR c.labId = @lid
-              ORDER BY c.name ASC`,
+      query: "SELECT * FROM c WHERE c.labId = @lid ORDER BY c.name ASC",
       parameters: [{ name: "@lid", value: labId }],
     }).fetchAll();
     res.json({ vaccines: resources });
@@ -1169,13 +1167,22 @@ router.get("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Res
 
 // ─── GET /api/lab/catalog-vaccines ────────────────────────────────────────────
 // Provider-side picker: every active catalogue vaccine this provider can
-// choose to offer. Mirrors GET /api/lab/catalog-tests.
-router.get("/catalog-vaccines", requireRole("lab"), async (_req: SessionRequest, res: Response) => {
+// still choose to offer — ones it already offers are left out, so it can only
+// add new ones. Mirrors GET /api/lab/catalog-tests.
+router.get("/catalog-vaccines", requireRole("lab"), async (req: SessionRequest, res: Response) => {
   try {
-    const { resources } = await vaccineCatalogContainer.items
-      .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
-      .fetchAll();
-    res.json({ vaccines: resources });
+    const labId = req.session!.getUserId();
+    const [{ resources }, { resources: adopted }] = await Promise.all([
+      vaccineCatalogContainer.items
+        .query({ query: "SELECT * FROM c WHERE c.is_active = true ORDER BY c.name ASC" })
+        .fetchAll(),
+      vaccinesContainer.items.query({
+        query: "SELECT VALUE c.catalogVaccineId FROM c WHERE c.labId = @lid AND IS_DEFINED(c.catalogVaccineId) AND c.catalogVaccineId != null",
+        parameters: [{ name: "@lid", value: labId }],
+      }).fetchAll(),
+    ]);
+    const adoptedIds = new Set(adopted as string[]);
+    res.json({ vaccines: resources.filter((c: any) => !adoptedIds.has(c.id)) });
   } catch (err) {
     console.error("Get catalog vaccines error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -1238,6 +1245,22 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
       return;
     }
 
+    // A lab offers each vaccine once — no second copy of a catalogue vaccine,
+    // and no custom vaccine named like one it already has.
+    const { resources: duplicates } = await vaccinesContainer.items.query({
+      query: catalogDoc
+        ? "SELECT VALUE c.id FROM c WHERE c.labId = @lid AND c.catalogVaccineId = @cid"
+        : "SELECT VALUE c.id FROM c WHERE c.labId = @lid AND LOWER(TRIM(c.name)) = LOWER(TRIM(@name))",
+      parameters: [
+        { name: "@lid", value: labId },
+        catalogDoc ? { name: "@cid", value: catalogDoc.id } : { name: "@name", value: String(name) },
+      ],
+    }).fetchAll();
+    if (duplicates.length > 0) {
+      res.status(409).json({ error: "You already offer this vaccine." });
+      return;
+    }
+
     const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
     const isOnboarded = labDoc?.status === "approved";
 
@@ -1277,7 +1300,7 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
     logActivity({
       source: "lab",
       action: "Vaccine Added",
-      details: `Vaccine "${name}" added${isOnboarded ? "" : " (pending admin approval)"}`,
+      details: `Vaccine "${vaccine.name}" added${isOnboarded ? "" : " (pending admin approval)"}`,
       performedBy: labDoc?.name ?? "Lab",
       performedById: labId,
       entityType: "vaccine",
