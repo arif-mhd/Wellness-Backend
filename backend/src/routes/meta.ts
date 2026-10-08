@@ -4,6 +4,8 @@ import { pool } from "../config/database";
 import { DEFAULT_ORG_SLUG } from "../config/features";
 import { COUNTRY_CONFIGS } from "../config/countries";
 import { resolveCountryConfigForOrgRow } from "../utils/orgScope";
+import { DIET_FOOD_CATALOGS } from "../data/dietFoodCatalogs";
+import { dietFoodsContainer } from "../config/cosmos";
 
 const router = Router();
 
@@ -65,12 +67,44 @@ router.get("/branding", async (req: Request, res: Response) => {
         personaName: org.persona_name,
         countryCode,
         currencyCode,
+        dietFoodCatalog: org.diet_food_catalog ?? null,
       },
       enabledFeatures: featureRows.map((r) => r.feature_key),
       countryConfig,
     });
   } catch (err) {
     console.error("Get branding error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// GET /api/meta/diet-foods?org=acme
+// Public — the food names the doctor portal's diet-plan builder suggests for
+// this org, read from the `dietFoods` container (see src/data/dietFoodCatalogs.ts). Returns { catalog: null } for
+// an org with no catalogue configured, in which case the portal keeps plain
+// free-text food entry. Same ?org= / DEFAULT_ORG_SLUG fallback as /branding.
+router.get("/diet-foods", async (req: Request, res: Response) => {
+  const slug = typeof req.query.org === "string" ? req.query.org : DEFAULT_ORG_SLUG;
+
+  try {
+    const { rows } = await pool.query(`SELECT diet_food_catalog FROM organizations WHERE slug = $1`, [slug]);
+    if (!rows[0]) {
+      res.status(404).json({ error: `Unknown organization: ${slug}` });
+      return;
+    }
+    const meta = rows[0].diet_food_catalog ? DIET_FOOD_CATALOGS[rows[0].diet_food_catalog] : undefined;
+    if (!meta) {
+      res.json({ catalog: null });
+      return;
+    }
+
+    const { resources: foods } = await dietFoodsContainer.items.query(
+      { query: "SELECT c.name, c.diets, c.meals FROM c ORDER BY c.name" },
+      { partitionKey: meta.id }
+    ).fetchAll();
+    res.json({ catalog: { ...meta, foods } });
+  } catch (err) {
+    console.error("Get diet foods error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

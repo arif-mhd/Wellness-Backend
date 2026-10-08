@@ -8,6 +8,7 @@ import { uploadBlob, generateSasUrl } from "../config/blob";
 import { logActivity } from "../utils/activityLogger";
 import { FEATURE_KEYS, DEFAULT_ORG_SLUG } from "../config/features";
 import { COUNTRY_CODES } from "../config/countries";
+import { DIET_FOOD_CATALOG_IDS } from "../data/dietFoodCatalogs";
 import { resolveCountryConfigForOrgRow } from "../utils/orgScope";
 
 const router = Router();
@@ -109,10 +110,15 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
   const {
     name, primaryColor, secondaryColor, supportEmail, supportPhone,
     appBundleId, playStoreUrl, appStoreUrl, planTier, personaName,
-    countryCode, currencyCode,
+    countryCode, currencyCode, dietFoodCatalog,
   } = req.body;
   if (countryCode && !COUNTRY_CODES.includes(countryCode)) {
     res.status(400).json({ error: `Unknown countryCode: ${countryCode}. Supported: ${COUNTRY_CODES.join(", ")}` });
+    return;
+  }
+  // "" clears the catalogue (back to free-text only); undefined leaves it as is.
+  if (dietFoodCatalog && !DIET_FOOD_CATALOG_IDS.includes(dietFoodCatalog)) {
+    res.status(400).json({ error: `Unknown dietFoodCatalog: ${dietFoodCatalog}. Supported: ${DIET_FOOD_CATALOG_IDS.join(", ")}` });
     return;
   }
   const adminId = req.session!.getUserId();
@@ -132,10 +138,11 @@ router.put("/:id", async (req: SessionRequest, res: Response) => {
          persona_name    = COALESCE($11, persona_name),
          country_code    = COALESCE($12, country_code),
          currency_code   = COALESCE($13, currency_code),
+         diet_food_catalog = CASE WHEN $14::text IS NULL THEN diet_food_catalog ELSE NULLIF($14::text, '') END,
          updated_at      = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName, countryCode ?? null, currencyCode ?? null]
+      [id, name, primaryColor, secondaryColor, supportEmail, supportPhone, appBundleId, playStoreUrl, appStoreUrl, planTier, personaName, countryCode ?? null, currencyCode ?? null, dietFoodCatalog ?? null]
     );
     if (!rows[0]) {
       res.status(404).json({ error: "Organization not found." });

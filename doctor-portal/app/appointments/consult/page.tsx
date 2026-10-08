@@ -12,7 +12,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
-import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN } from "@/components/video-call/AddDietPlan";
+import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN, fromSavedDietPlan, hasDietPlanContent, toDietPlanPayload } from "@/components/video-call/AddDietPlan";
 import EhrPanel from "@/components/video-call/EhrPanel";
 import { useCurrency } from "@/components/BrandingContext";
 import { formatCurrency } from "@/lib/currency";
@@ -663,13 +663,7 @@ function ConsultRoom() {
         if (res.ok) {
           const { dietPlan: saved } = await res.json();
           if (saved) {
-            setDietPlan({
-              title: saved.title ?? "",
-              notes: saved.notes ?? "",
-              meals: saved.meals ?? [],
-              targetCalories: saved.targetCalories != null ? String(saved.targetCalories) : "",
-              restrictions: Array.isArray(saved.restrictions) ? saved.restrictions.join(", ") : (saved.restrictions ?? ""),
-            });
+            setDietPlan(fromSavedDietPlan(saved));
             setDietPlanVisible(!!saved.visibleToPatient);
           }
         }
@@ -683,16 +677,7 @@ function ConsultRoom() {
     const res = await apiFetch(`/api/appointments/${appointmentId}/diet-plan`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: dietPlan.title || "Diet Plan",
-        notes: dietPlan.notes,
-        meals: dietPlan.meals,
-        targetCalories: dietPlan.targetCalories ? Number(dietPlan.targetCalories) : null,
-        restrictions: dietPlan.restrictions
-          ? dietPlan.restrictions.split(",").map((r) => r.trim()).filter(Boolean)
-          : [],
-        visibleToPatient,
-      }),
+      body: JSON.stringify(toDietPlanPayload(dietPlan, visibleToPatient)),
     });
     if (!res.ok) throw new Error("Could not save the diet plan.");
   };
@@ -722,7 +707,7 @@ function ConsultRoom() {
       if (res.ok) {
         // Also persist the diet-plan draft (keeps current visibleToPatient state —
         // the toggle is the only thing that changes patient-facing visibility).
-        if (dietPlan.title.trim() || dietPlan.meals.length > 0) {
+        if (hasDietPlanContent(dietPlan)) {
           try { await saveDietPlan(dietPlanVisible); } catch { /* non-fatal */ }
         }
         setEmrSavedAtLeastOnce(true);
