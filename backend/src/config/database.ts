@@ -129,6 +129,15 @@ export async function initDb(): Promise<void> {
         ADD COLUMN IF NOT EXISTS currency_code CHAR(3)
     `);
 
+    // Which diet food catalogue (see src/data/dietFoodCatalogs.ts) the
+    // doctor portal's diet-plan builder offers as pick-list suggestions for
+    // this org — e.g. 'ayurveda' for an Ayurveda hospital. NULL keeps today's
+    // free-text-only food entry, so existing orgs are unaffected.
+    await client.query(`
+      ALTER TABLE organizations
+        ADD COLUMN IF NOT EXISTS diet_food_catalog TEXT
+    `);
+
     // Seed the default org once. Every feature defaults ON here so current
     // (pre-white-label) behavior is unchanged for the one tenant that exists
     // today; new orgs created later via the admin API start with everything

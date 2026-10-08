@@ -22,6 +22,7 @@ interface Organization {
   plan_tier: string;
   country_code: string | null;
   currency_code: string | null;
+  diet_food_catalog: string | null;
   created_at: string;
 }
 
@@ -33,6 +34,12 @@ interface Organization {
 const COUNTRIES: { code: string; name: string }[] = [
   { code: "AE", name: "United Arab Emirates" },
   { code: "IN", name: "India" },
+];
+
+// Duplicated by hand from backend/src/data/dietFoodCatalogs.ts's
+// DIET_FOOD_CATALOGS keys — keep in sync if a catalogue is added there.
+const DIET_FOOD_CATALOGS: { id: string; name: string }[] = [
+  { id: "ayurveda", name: "Ayurveda (Anandalakshmi diet sheets)" },
 ];
 
 interface FeatureRow {
@@ -292,6 +299,8 @@ function OrganizationsPageInner() {
           playStoreUrl: draftOrg.play_store_url,
           appStoreUrl: draftOrg.app_store_url,
           countryCode: draftOrg.country_code,
+          // "" clears it on the backend (back to free-text food entry).
+          dietFoodCatalog: draftOrg.diet_food_catalog ?? "",
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -549,6 +558,20 @@ function OrganizationsPageInner() {
                     ))}
                   </select>
                   <p className="text-[11px] text-slate-400 mt-1.5">Determines currency, timezone, and identity-document fields.</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Diet food catalogue</label>
+                  <select
+                    value={draftOrg.diet_food_catalog ?? ""}
+                    onChange={e => setDraftOrg({ ...draftOrg, diet_food_catalog: e.target.value || null })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#6A8BFF]/30 focus:bg-white transition"
+                  >
+                    <option value="">None (free-text food entry)</option>
+                    {DIET_FOOD_CATALOGS.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1.5">Food names doctors pick from when building a diet plan. Custom foods are always allowed.</p>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">

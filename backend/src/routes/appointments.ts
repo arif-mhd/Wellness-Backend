@@ -2050,6 +2050,7 @@ router.get("/:id/prescription-pdf", requireRole("patient"), async (req: SessionR
 // consultation) without affecting what the patient currently sees.
 //
 // Body: { title, notes?, meals, targetCalories?, targetMacros?, restrictions?,
+//         dietType?, dietTypeLabel?, phases?: [{ diet, days?, meals }],
 //         visibleToPatient: boolean }
 //
 // visibleToPatient is the "reflect to patient" toggle from the consult screen:
@@ -2059,10 +2060,14 @@ router.get("/:id/prescription-pdf", requireRole("patient"), async (req: SessionR
 router.put("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   const doctorId = req.session!.getUserId();
   const { id } = req.params;
-  const { title, notes, meals, targetCalories, targetMacros, restrictions, visibleToPatient } = req.body;
+  const { title, notes, meals, targetCalories, targetMacros, restrictions, visibleToPatient, dietType, dietTypeLabel, phases } = req.body;
 
   if (!title || !Array.isArray(meals)) {
     res.status(400).json({ error: "title and meals are required" });
+    return;
+  }
+  if (phases !== undefined && (!Array.isArray(phases) || phases.some((p: any) => !p?.diet || !Array.isArray(p.meals)))) {
+    res.status(400).json({ error: "phases must be an array of { diet, days?, meals }" });
     return;
   }
 
@@ -2096,6 +2101,17 @@ router.put("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, 
       targetCalories: targetCalories ?? null,
       targetMacros: targetMacros ?? null,
       restrictions: restrictions ?? [],
+      // Diet-catalogue orgs (e.g. Ayurveda) pick a diet type for the plan; a
+      // sequence type (Snehapanam → Purgation) carries one phase per diet, in
+      // order. `meals` then mirrors the first phase so older readers (patient
+      // app, adherence progress) still see a usable plan.
+      dietType: dietType ?? null,
+      dietTypeLabel: dietTypeLabel ?? null,
+      phases: (phases ?? []).map((p: any) => ({
+        diet: p.diet,
+        days: Number.isFinite(Number(p.days)) && Number(p.days) > 0 ? Number(p.days) : null,
+        meals: p.meals,
+      })),
       visibleToPatient: !!visibleToPatient,
       status: visibleToPatient ? "active" : "draft",
       startDate: existing?.startDate ?? now,

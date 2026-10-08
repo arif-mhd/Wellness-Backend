@@ -1105,6 +1105,12 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                       {plan.notes && <p className="text-[#676E76] text-[12px] leading-[1.4]">{plan.notes}</p>}
 
                       <div className="flex flex-wrap gap-4">
+                        {plan.dietTypeLabel && (
+                          <div className="flex flex-col gap-1 px-4 py-2 rounded-[10px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                            <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Diet Type</span>
+                            <span className="text-[#24292E] text-[13px] font-medium">{plan.dietTypeLabel}</span>
+                          </div>
+                        )}
                         {plan.targetCalories && (
                           <div className="flex flex-col gap-1 px-4 py-2 rounded-[10px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
                             <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wide">Target Calories</span>
@@ -1119,7 +1125,27 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                         )}
                       </div>
 
-                      {plan.meals?.length > 0 && (
+                      {plan.phases?.length > 0 ? (
+                        <div className="flex flex-col gap-4">
+                          {plan.phases.map((phase: any, pi: number) => (
+                            <div key={pi} className="flex flex-col gap-2">
+                              <span className="text-[#24292E] text-[12px] font-semibold">
+                                {pi > 0 && "Then — "}{phase.diet} diet{phase.days ? ` · ${phase.days} day${phase.days === 1 ? "" : "s"}` : ""}
+                              </span>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {phase.meals?.map((meal: any) => (
+                                  <div key={meal.id ?? meal.mealType} className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                                    <span className="text-[#5476FC] text-[11px] font-bold uppercase tracking-wide">{meal.mealType}</span>
+                                    {meal.items?.map((item: any, i: number) => (
+                                      <span key={i} className="text-[#676E76] text-[12px]">{item.foodName} — {item.quantity}</span>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : plan.meals?.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {plan.meals.map((meal: any) => (
                             <div key={meal.id ?? meal.mealType} className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">

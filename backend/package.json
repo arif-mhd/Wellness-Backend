@@ -8,6 +8,7 @@
     "seed:fhir": "ts-node-dev --transpile-only src/data/seedFhirDemo.ts",
     "seed:lab-catalog": "ts-node src/scripts/seedLabCatalog.ts",
     "seed:vaccine-catalog": "ts-node src/scripts/seedVaccineCatalog.ts",
+    "seed:diet-foods": "ts-node src/scripts/seedDietFoods.ts",
     "fhir:add": "ts-node-dev --transpile-only src/data/addFhirRecord.ts",
     "migrate:vaccination-approvals": "ts-node --transpile-only src/data/migrateVaccinationApprovalStatus.ts",
     "migrate:vaccine-catalog-links": "ts-node --transpile-only src/data/migrateVaccineCatalogLinks.ts",

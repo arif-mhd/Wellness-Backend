@@ -154,6 +154,11 @@ export const withdrawalRequestsContainer: Container = db.container("withdrawalRe
 /** Push notification tokens — partition key: /userId (one doc per user, holds every device's Expo push token) */
 export const pushTokensContainer: Container = db.container("pushTokens");
 
+/** Diet food catalogues — partition key: /catalogId (one doc per food name a
+ *  doctor can pick when building a diet plan, e.g. catalogId "ayurveda"; see
+ *  src/data/dietFoodCatalogs.ts and src/scripts/seedDietFoods.ts) */
+export const dietFoodsContainer: Container = db.container("dietFoods");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -204,6 +209,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "feeChangeRequests",      partitionKey: { paths: ["/orgId"] } },
     { id: "withdrawalRequests",     partitionKey: { paths: ["/orgId"] } },
     { id: "pushTokens",             partitionKey: { paths: ["/userId"] } },
+    { id: "dietFoods",              partitionKey: { paths: ["/catalogId"] } },
   ];
 
   for (const spec of required) {
