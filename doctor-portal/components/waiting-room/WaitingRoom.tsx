@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
 import PreVisitFormModal from "@/components/appointment/PreVisitFormModal";
+import LanguageChips from "@/components/appointment/LanguageChips";
 import ConsultationRoom, { EhrVisit } from "./ConsultationRoom";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { clinicDayKey, formatClinicDateTime } from "@/lib/appointmentTime";
@@ -38,6 +39,8 @@ interface SlotAppointment {
   accountOwnerName?: string;
   visitType?: "online" | "offline";
   profileRelationship?: string;
+  consultationLanguage?: string | null;
+  patientLanguage?: string | null;
 }
 
 function ageFromDob(dob?: string): number | null {
@@ -75,6 +78,8 @@ function buildSlotAppointment(a: any): SlotAppointment {
     visitType: a.visitType === "offline" ? "offline" : "online",
     accountOwnerName: a.accountOwnerName,
     profileRelationship: a.profileRelationship,
+    consultationLanguage: a.consultationLanguage ?? null,
+    patientLanguage: a.patientLanguage ?? null,
   };
 }
 
@@ -304,6 +309,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
                   For: {apt.profileRelationship ?? "Family Member"} of {apt.accountOwnerName}
                 </span>
               )}
+              <LanguageChips spoken={apt.patientLanguage} preferred={apt.consultationLanguage} className="mt-1" />
             </div>
           </div>
 

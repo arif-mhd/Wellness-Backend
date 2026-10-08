@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Patient } from "@/app/appointments/types";
+import LanguageChips from "./LanguageChips";
 import { useCurrency } from "@/components/BrandingContext";
 import { formatCurrency } from "@/lib/currency";
 
@@ -122,6 +123,7 @@ export default function AllConsultationsTable({
                       For: {patient.profileRelationship ?? "Family Member"} of {patient.accountOwnerName}
                     </span>
                   )}
+                  <LanguageChips spoken={patient.patientLanguage} preferred={patient.consultationLanguage} className="mt-1" />
                 </div>
               </div>
 
