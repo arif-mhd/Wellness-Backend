@@ -232,6 +232,55 @@ export function branchAsPublicClinic(org: any, branch: any) {
   };
 }
 
+// ─── Branch/org document resolution ──────────────────────────────────────────
+// Per-branch settings live either directly on the org's own top-level Cosmos
+// doc ("my main branch" — a standalone clinic, the org owner acting as
+// themselves, or a main-branch senior-staff account whose branchId is stamped
+// as the org's own id — see resolveClinicScope's comment for why those three
+// cases all collapse to the same scopeId) or, for a real secondary branch,
+// nested inside the parent org doc's branches[] array (a real branch has no
+// standalone Cosmos document of its own). This resolves a single-mode scope
+// down to wherever those fields actually live, and how to save back to it.
+export type BranchTarget =
+  | { kind: "org"; org: any; view: any }
+  | { kind: "branch"; org: any; branchIndex: number; view: any };
+
+// mainBranchFrom/branchAsPublicClinic (target.view) hand-pick an explicit
+// field list and are also used for PUBLIC/patient-facing clinic views, so
+// private fields (bank details...) were deliberately
+// never added there. Reads of those go through the raw underlying document.
+export function rawBranchDoc(target: BranchTarget): any {
+  return target.kind === "org" ? target.org : target.org.branches[target.branchIndex];
+}
+
+export async function loadBranchTarget(scope: Extract<ClinicScope, { mode: "single" }>): Promise<BranchTarget | null> {
+  const isMainBranch = !scope.orgId || scope.scopeId === scope.orgId;
+  const orgId = scope.orgId ?? scope.scopeId;
+
+  const { resource: org } = await clinicsContainer.item(orgId, orgId).read().catch(() => ({ resource: undefined as any }));
+  if (!org) return null;
+
+  if (isMainBranch) {
+    return { kind: "org", org, view: mainBranchFrom(org) };
+  }
+
+  const branchIndex = (org.branches ?? []).findIndex((b: any) => b.id === scope.scopeId);
+  if (branchIndex === -1) return null;
+  return { kind: "branch", org, branchIndex, view: branchAsPublicClinic(org, org.branches[branchIndex]) };
+}
+
+export async function saveBranchTarget(target: BranchTarget, fields: Record<string, any>) {
+  if (target.kind === "org") {
+    const updated = { ...target.org, ...fields, updatedAt: new Date().toISOString() };
+    await clinicsContainer.items.upsert(updated);
+    return;
+  }
+  const branches = [...target.org.branches];
+  branches[target.branchIndex] = { ...branches[target.branchIndex], ...fields };
+  const updated = { ...target.org, branches, updatedAt: new Date().toISOString() };
+  await clinicsContainer.items.upsert(updated);
+}
+
 // Builds a parameterized "field IN (@p0, @p1, ...)" clause for a list of ids —
 // the same expansion pattern used all over the clinic routes for doctorIds.
 export function buildInClause(field: string, ids: string[]) {

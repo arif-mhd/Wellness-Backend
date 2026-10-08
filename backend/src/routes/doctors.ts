@@ -79,15 +79,9 @@ router.get("/me", requireRole("doctor"), async (req: SessionRequest, res: Respon
       parameters: [{ name: "@doctorId", value: doctorId }],
     }).fetchAll();
 
-    // Same idea for vaccinations, but the assignment lives on the CLINIC —
-    // vaccines are a global catalogue with no owning lab to hang it off.
-    // Drives the "Vaccination Approvals" tab.
-    const { resources: vaccinationClinics } = await clinicsContainer.items.query({
-      query: "SELECT VALUE c.id FROM c WHERE ARRAY_CONTAINS(c.assignedVaccinationDoctorIds, @doctorId)",
-      parameters: [{ name: "@doctorId", value: doctorId }],
-    }).fetchAll();
-
-    res.json({ doctor, labAssignments: labs, hasVaccinationAssignment: vaccinationClinics.length > 0 });
+    // A lab's assigned doctors also review its vaccination bookings, so the
+    // same assignment drives the "Vaccinations" tab.
+    res.json({ doctor, labAssignments: labs, hasVaccinationAssignment: labs.length > 0 });
   } catch (err) {
     console.error("Get doctor me error:", err);
     res.status(500).json({ error: "Internal server error." });

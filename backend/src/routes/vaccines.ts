@@ -2,11 +2,12 @@ import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, clinicsContainer, doctorsContainer, patientsContainer, labServicesContainer } from "../config/cosmos";
+import { vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labServicesContainer } from "../config/cosmos";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
 import { resolveOrgId, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
 import { buildInClause } from "../utils/clinicScope";
+import { getAssignedLabIds } from "./lab";
 import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 
 const router = Router();
@@ -33,13 +34,12 @@ router.get("/", async (req: Request, res: Response) => {
     const orgId = await resolveOrgIdFromHeader(orgSlug);
     const orgLabIds = await getLabIdsForOrg(orgId);
 
-    // Admin-catalogue vaccines (no labId) predate per-provider offerings and
-    // belong to no lab, so they stay visible to every org — dropping them
-    // would empty the catalogue for brands that haven't onboarded a provider.
-    const { clause: orgClause, parameters: orgParams } = orgLabIds.length
-      ? buildInClause("c.labId", orgLabIds)
-      : { clause: "false", parameters: [] as any[] };
-    query += ` AND (NOT IS_DEFINED(c.labId) OR ${orgClause})`;
+    // Only vaccines a lab actually offers. Legacy admin-created vaccines (no
+    // labId) have no provider to give them and no lab doctors to approve the
+    // booking, so they're not bookable.
+    if (orgLabIds.length === 0) { res.json([]); return; }
+    const { clause: orgClause, parameters: orgParams } = buildInClause("c.labId", orgLabIds);
+    query += ` AND ${orgClause}`;
     parameters.push(...orgParams);
 
     if (labId) {
@@ -166,7 +166,8 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
     for (const item of items) {
       const { resources } = await vaccinesContainer.items
         .query({
-          query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
+          // Must be offered by a lab — see GET / above.
+          query: "SELECT * FROM c WHERE c.id = @id AND IS_DEFINED(c.labId) AND c.labId != null AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
           parameters: [{ name: "@id", value: item.vaccineId }],
         })
         .fetchAll();
@@ -183,8 +184,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
         manufacturer: vaccine.manufacturer ?? null,
         // Carried onto the item so the provider's fulfilment queue can scope
         // by it — the same EXISTS(... i.labId) pattern lab bookings use.
-        // Null for an admin-catalogue vaccine that no provider has adopted.
-        labId: vaccine.labId ?? null,
+        labId: vaccine.labId,
         labName: vaccine.labName ?? null,
         catalogVaccineId: vaccine.catalogVaccineId ?? null,
         doses_required: vaccine.doses_required ?? 1,
@@ -196,9 +196,9 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
       total_amount += vaccine.price;
     }
 
-    // Starts pending — a clinic-assigned doctor must sign off before the
-    // vaccination is confirmed. Mirrors how lab.ts handles a lab test flagged
-    // requires_doctor_approval (see POST /bookings/:id/approve below).
+    // Starts pending — one of the providing lab's assigned doctors must sign
+    // off before the vaccination is confirmed. Mirrors how lab.ts handles a lab
+    // test flagged requires_doctor_approval (see POST /bookings/:id/approve).
     const booking = {
       id: bookingId,
       patientId,
@@ -265,7 +265,9 @@ router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res:
 });
 
 // ─── GET /api/vaccines/bookings/pending-approval ──────────────────────────────
-// The shared claim queue for a vaccination-assigned doctor. Registered BEFORE
+// The shared claim queue for a doctor assigned to one or more labs: every
+// vaccination booking awaiting sign-off for those labs' vaccines — the same
+// queue shape as lab.ts's lab-test approvals. Registered BEFORE
 // GET /bookings/:bookingId — Express matches in registration order and
 // "pending-approval" matches :bookingId just fine syntactically, so the
 // patient route would otherwise swallow this literal path and 404 the doctor.
@@ -273,10 +275,12 @@ router.get("/bookings", requireRole("patient"), async (req: SessionRequest, res:
 router.get("/bookings/pending-approval", requireRole("doctor"), async (req: SessionRequest, res: Response) => {
   try {
     const doctorId = req.session!.getUserId();
-    if (!(await isVaccinationDoctor(doctorId))) { res.json([]); return; }
+    const labIds = await getAssignedLabIds(doctorId);
+    if (labIds.length === 0) { res.json([]); return; }
 
     const { resources } = await vaccinationBookingsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.status = 'pending_doctor_approval' ORDER BY c.createdAt ASC",
+      query: "SELECT * FROM c WHERE c.status = 'pending_doctor_approval' AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE ARRAY_CONTAINS(@labIds, i.labId)) ORDER BY c.createdAt ASC",
+      parameters: [{ name: "@labIds", value: labIds }],
     }, { maxItemCount: 100 }).fetchAll();
 
     // Best-effort join so the doctor sees a real patient name, not a raw id.
@@ -353,26 +357,17 @@ router.patch("/bookings/:bookingId/cancel", requireRole("patient"), async (req: 
 });
 
 // ─── Doctor approval ──────────────────────────────────────────────────────────
-// A vaccination booking needs a clinic-assigned doctor to sign off before it's
-// confirmed, mirroring how lab.ts handles a test flagged
-// requires_doctor_approval. Vaccines are a global catalogue with no owning lab,
-// so unlike lab tests (scoped by item.labId) the assignment lives on the CLINIC
-// — see PUT /api/clinics/vaccination-doctors.
+// A vaccination booking needs sign-off before it's confirmed, mirroring how
+// lab.ts handles a test flagged requires_doctor_approval. Vaccines are offered
+// by a lab, so the reviewers are that lab's assigned doctors (scoped by
+// item.labId) — set on the clinic's Lab page via
+// PUT /api/clinics/labs/assigned-doctors.
 
 class VaccinationNotAuthorizedError extends Error {
   constructor(message = "Not authorized.") { super(message); this.name = "VaccinationNotAuthorizedError"; }
 }
 class VaccinationAlreadyHandledError extends Error {
   constructor(message = "This booking has already been reviewed.") { super(message); this.name = "VaccinationAlreadyHandledError"; }
-}
-
-// True when this doctor's clinic has nominated them to review vaccinations.
-async function isVaccinationDoctor(doctorId: string): Promise<boolean> {
-  const { resources } = await clinicsContainer.items.query({
-    query: "SELECT VALUE c.id FROM c WHERE ARRAY_CONTAINS(c.assignedVaccinationDoctorIds, @doctorId)",
-    parameters: [{ name: "@doctorId", value: doctorId }],
-  }).fetchAll();
-  return resources.length > 0;
 }
 
 // Read -> recompute -> conditional replace, retrying on a 412, so two doctors
@@ -404,13 +399,16 @@ async function reviewVaccinationBooking(
   bookingId: string,
   computeUpdate: (booking: any) => any
 ): Promise<any> {
-  if (!(await isVaccinationDoctor(doctorId))) {
-    throw new VaccinationNotAuthorizedError("You aren't assigned to review vaccinations.");
+  const labIds = await getAssignedLabIds(doctorId);
+  if (labIds.length === 0) {
+    throw new VaccinationNotAuthorizedError("You aren't assigned to any labs.");
   }
 
+  // Only a booking for one of this doctor's labs' vaccines — anything else
+  // is a 404, same as lab.ts's reviewLabBooking.
   const { resources } = await vaccinationBookingsContainer.items.query({
-    query: "SELECT c.patientId FROM c WHERE c.id = @id",
-    parameters: [{ name: "@id", value: bookingId }],
+    query: "SELECT c.patientId FROM c WHERE c.id = @id AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE ARRAY_CONTAINS(@labIds, i.labId))",
+    parameters: [{ name: "@id", value: bookingId }, { name: "@labIds", value: labIds }],
   }, { maxItemCount: 1 }).fetchAll();
   if (!resources.length) return null;
 
