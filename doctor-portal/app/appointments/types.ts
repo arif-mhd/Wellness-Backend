@@ -49,4 +49,7 @@ export interface Patient {
   visitType?: 'online' | 'offline';
   /** Language the patient asked to consult in, chosen from this doctor's own spoken languages at booking time. Unset for appointments booked before this existed. */
   consultationLanguage?: string | null;
+  // What the patient speaks (their profile), vs. consultationLanguage — the
+  // language they asked the doctor to consult in when booking.
+  patientLanguage?: string | null;
 }
