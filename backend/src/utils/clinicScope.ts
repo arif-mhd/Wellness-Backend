@@ -247,7 +247,7 @@ export type BranchTarget =
 
 // mainBranchFrom/branchAsPublicClinic (target.view) hand-pick an explicit
 // field list and are also used for PUBLIC/patient-facing clinic views, so
-// private fields (bank details, reviewer assignments...) were deliberately
+// private fields (bank details...) were deliberately
 // never added there. Reads of those go through the raw underlying document.
 export function rawBranchDoc(target: BranchTarget): any {
   return target.kind === "org" ? target.org : target.org.branches[target.branchIndex];
@@ -280,13 +280,6 @@ export async function saveBranchTarget(target: BranchTarget, fields: Record<stri
   const updated = { ...target.org, branches, updatedAt: new Date().toISOString() };
   await clinicsContainer.items.upsert(updated);
 }
-
-// Org docs where @doctorId is a vaccination reviewer for the main branch (top
-// level) or any secondary branch (inside branches[]) — see
-// PUT /api/clinics/vaccination-doctors.
-export const VACCINATION_DOCTOR_QUERY =
-  "SELECT VALUE c.id FROM c WHERE ARRAY_CONTAINS(c.assignedVaccinationDoctorIds, @doctorId) " +
-  "OR EXISTS(SELECT VALUE b FROM b IN c.branches WHERE ARRAY_CONTAINS(b.assignedVaccinationDoctorIds, @doctorId))";
 
 // Builds a parameterized "field IN (@p0, @p1, ...)" clause for a list of ids —
 // the same expansion pattern used all over the clinic routes for doctorIds.
