@@ -921,12 +921,47 @@ router.get("/foods", async (req: SessionRequest, res: Response) => {
 //         foodId: string, quantity: number, unit?: "grams"|"ml",
 //         // For OFF-sourced foods the client also sends the full nutrition snapshot:
 //         foodName?: string, image?: string, per100g?: { calories, protein, fat, carbs, fiber } }
+// A custom food (one not in any catalog, e.g. a diet-plan item like "Kanji")
+// instead sends: { custom: true, foodName, quantityLabel?: "1 cup", calories?: number }
+// — calories are stored as null when the patient doesn't know them.
 router.post("/food-log", requireFeature("fitness"), async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { date, meal, foodId, quantity, unit = "grams",
       foodName: clientFoodName, image: clientImage, per100g: clientPer100g,
-      profileId, dietPlanId } = req.body;
+      profileId, dietPlanId, custom, quantityLabel, calories: clientCalories } = req.body;
+
+    if (custom) {
+      const name = typeof clientFoodName === "string" ? clientFoodName.trim() : "";
+      if (!date || !meal || !name) {
+        res.status(400).json({ error: "date, meal and foodName are required" });
+        return;
+      }
+      const kcal = clientCalories == null || clientCalories === "" ? null : Number(clientCalories);
+      const entry = {
+        id: crypto.randomUUID(),
+        patientId,
+        profileId: profileId ?? patientId,
+        date,
+        meal,
+        foodId: foodId || `custom-${crypto.randomUUID()}`,
+        foodName: name,
+        image: "",
+        custom: true,
+        quantity: null,
+        unit: null,
+        quantityLabel: typeof quantityLabel === "string" && quantityLabel.trim() ? quantityLabel.trim() : null,
+        calories: kcal != null && Number.isFinite(kcal) && kcal >= 0 ? Math.round(kcal) : null,
+        protein: null,
+        fat: null,
+        carbs: null,
+        dietPlanId: dietPlanId ?? null,
+        loggedAt: new Date().toISOString(),
+      };
+      await foodLogsContainer.items.upsert(entry);
+      res.json({ entry });
+      return;
+    }
 
     if (!date || !meal || !foodId || quantity == null) {
       res.status(400).json({ error: "date, meal, foodId and quantity are required" });
@@ -1169,6 +1204,9 @@ router.get("/daily-summary", async (req: SessionRequest, res: Response) => {
     ]);
 
     const totalFoodCalories = foodEntries.reduce((s: number, e: any) => s + (e.calories ?? 0), 0);
+    // A custom food logged without calories makes the day's total unknown,
+    // so clients hide the calorie count rather than show a wrong one.
+    const foodCaloriesKnown = foodEntries.every((e: any) => e.calories != null);
     const totalExerciseCalories = workoutEntries.reduce((s: number, e: any) => s + (e.caloriesBurned ?? 0), 0);
     const macros = {
       protein: Math.round(foodEntries.reduce((s: number, e: any) => s + (e.protein ?? 0), 0) * 10) / 10,
@@ -1187,6 +1225,7 @@ router.get("/daily-summary", async (req: SessionRequest, res: Response) => {
       summary: {
         date,
         totalFoodCalories,
+        foodCaloriesKnown,
         totalExerciseCalories,
         macros,
         meals,
