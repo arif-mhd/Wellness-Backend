@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import { Patient } from "@/app/appointments/types";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDate, formatClinicTime, clinicDayKey } from "@/lib/appointmentTime";
+import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN, fromSavedDietPlan, hasDietPlanContent, toDietPlanPayload } from "@/components/video-call/AddDietPlan";
 
 interface PatientProfileModalProps {
   patient: Patient;
@@ -321,6 +322,54 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
       }
     })();
   }, [activeTab, dietPlansLoaded, patient.id]);
+
+  // Adding/editing a diet plan after the consultation — the same editor the
+  // consult screen uses, saved against the chosen consultation (one plan per
+  // appointment, so picking one that already has a plan edits it).
+  const [dietEditor, setDietEditor] = useState<{ appointmentId: string; draft: DietPlanDraft; visible: boolean } | null>(null);
+  const [savingDietPlan, setSavingDietPlan] = useState(false);
+  const [dietPlanError, setDietPlanError] = useState<string | null>(null);
+
+  const openDietEditor = (appointmentId: string) => {
+    const existing = dietPlans.find((p) => p.appointmentId === appointmentId);
+    setDietPlanError(null);
+    setDietEditor({
+      appointmentId,
+      draft: existing ? fromSavedDietPlan(existing) : EMPTY_DIET_PLAN,
+      visible: existing ? !!existing.visibleToPatient : false,
+    });
+  };
+
+  const saveDietEditor = async () => {
+    if (!dietEditor) return;
+    if (!hasDietPlanContent(dietEditor.draft)) {
+      setDietPlanError("Add at least one food item or a title before saving.");
+      return;
+    }
+    setSavingDietPlan(true);
+    setDietPlanError(null);
+    try {
+      const res = await apiFetch(`/api/appointments/${dietEditor.appointmentId}/diet-plan`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toDietPlanPayload(dietEditor.draft, dietEditor.visible)),
+      });
+      if (res.ok) {
+        setDietEditor(null);
+        setDietPlansLoaded(false); // reload the list
+      } else if (res.status === 403) {
+        setDietPlanError("You can only add or edit diet plans for your own consultations.");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setDietPlanError(body.error ?? "Could not save the diet plan.");
+      }
+    } catch {
+      setDietPlanError("Could not save the diet plan.");
+    } finally {
+      setSavingDietPlan(false);
+    }
+  };
+
   const [labsViewMode, setLabsViewMode] = useState<"cards" | "table">(
     mode === "lab-reports" ? "table" : "cards"
   );
@@ -1078,6 +1127,59 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
         {/* Diet Plan tab content */}
         {activeTab === "Diet Plan" && (
           <div className="w-full animate-fade-in">
+            {dietEditor ? (
+              <div className="bg-white rounded-[12px] p-8 flex flex-col gap-5 border border-white shadow-sm mb-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[12px] font-semibold text-[#676E76]">Consultation</label>
+                  <select
+                    value={dietEditor.appointmentId}
+                    onChange={(e) => openDietEditor(e.target.value)}
+                    className="w-full h-11 px-4 rounded-xl bg-[#F5F6FA] border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC]"
+                  >
+                    {consultations.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.scheduledFor} · {c.doctor}{dietPlans.some((p) => p.appointmentId === c.id) ? " · has a diet plan" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <AddDietPlan
+                  plan={dietEditor.draft}
+                  onChange={(draft) => setDietEditor((ed) => (ed ? { ...ed, draft } : ed))}
+                  visibleToPatient={dietEditor.visible}
+                  onToggleVisible={() => setDietEditor((ed) => (ed ? { ...ed, visible: !ed.visible } : ed))}
+                />
+                {dietPlanError && <p className="text-[#E84949] text-[12px] font-medium">{dietPlanError}</p>}
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDietEditor(null)}
+                    disabled={savingDietPlan}
+                    className="h-10 px-6 rounded-full border border-[#EBEEF5] text-[#676E76] text-[13px] font-semibold hover:bg-[#F5F6FA] transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveDietEditor}
+                    disabled={savingDietPlan}
+                    className="h-10 px-6 rounded-full bg-[#5476FC] text-white text-[13px] font-semibold hover:bg-[#3B5BFC] disabled:opacity-60 transition-all"
+                  >
+                    {savingDietPlan ? "Saving…" : "Save diet plan"}
+                  </button>
+                </div>
+              </div>
+            ) : consultations.length > 0 && !loadingDietPlans && (
+              <div className="flex justify-end mb-5">
+                <button
+                  type="button"
+                  onClick={() => openDietEditor(selectedConsultation?.id ?? consultations[0].id)}
+                  className="h-10 px-5 rounded-full bg-[#5476FC] text-white text-[13px] font-semibold hover:bg-[#3B5BFC] transition-all"
+                >
+                  + Add diet plan
+                </button>
+              </div>
+            )}
             {loadingDietPlans ? (
               <div className="flex items-center justify-center h-48 bg-white rounded-[12px] text-[#9EA5AD] text-[14px]">
                 Loading diet plans…
@@ -1105,9 +1207,20 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                             {plan.status === "active" ? "Active — visible to patient" : plan.status === "superseded" ? "Superseded" : "Draft (not visible to patient)"}
                           </span>
                         </div>
-                        <span className="text-[#9EA5AD] text-[11px]">
-                          Updated {new Date(plan.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[#9EA5AD] text-[11px]">
+                            Updated {new Date(plan.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                          </span>
+                          {plan.appointmentId && !dietEditor && consultations.some((c) => c.id === plan.appointmentId) && (
+                            <button
+                              type="button"
+                              onClick={() => openDietEditor(plan.appointmentId)}
+                              className="h-8 px-4 rounded-full bg-[#E8F1FF] text-[#5476FC] text-[12px] font-semibold hover:bg-[#5476FC] hover:text-white transition-all"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {plan.notes && <p className="text-[#676E76] text-[12px] leading-[1.4]">{plan.notes}</p>}
@@ -1135,23 +1248,35 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
 
                       {plan.phases?.length > 0 ? (
                         <div className="flex flex-col gap-4">
-                          {plan.phases.map((phase: any, pi: number) => (
-                            <div key={pi} className="flex flex-col gap-2">
-                              <span className="text-[#24292E] text-[12px] font-semibold">
-                                {pi > 0 && "Then — "}{phase.diet} diet{phase.days ? ` · ${phase.days} day${phase.days === 1 ? "" : "s"}` : ""}
-                              </span>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {phase.meals?.map((meal: any) => (
-                                  <div key={meal.id ?? meal.mealType} className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
-                                    <span className="text-[#5476FC] text-[11px] font-bold uppercase tracking-wide">{meal.mealType}</span>
-                                    {meal.items?.map((item: any, i: number) => (
-                                      <span key={i} className="text-[#676E76] text-[12px]">{item.foodName} — {item.quantity}</span>
-                                    ))}
+                          {plan.phases.map((phase: any, pi: number) => {
+                            const dayPlans: any[] = phase.dayPlans?.length ? phase.dayPlans : [{ meals: phase.meals ?? [] }];
+                            // Day numbers run on across phases, matching the editor.
+                            const dayOffset = plan.phases.slice(0, pi).reduce((sum: number, p: any) => sum + (p.dayPlans?.length || 1), 0);
+                            return (
+                              <div key={pi} className="flex flex-col gap-2">
+                                <span className="text-[#24292E] text-[12px] font-semibold">
+                                  {pi > 0 && "Then — "}{phase.diet} diet · {dayPlans.length} day{dayPlans.length === 1 ? "" : "s"}
+                                </span>
+                                {dayPlans.map((d: any, di: number) => (
+                                  <div key={di} className="flex flex-col gap-2">
+                                    {dayPlans.length > 1 && (
+                                      <span className="text-[#9EA5AD] text-[10px] font-semibold uppercase tracking-wide">Day {dayOffset + di + 1}</span>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {(d.meals ?? []).map((meal: any) => (
+                                        <div key={meal.id ?? meal.mealType} className="flex flex-col gap-1.5 p-4 rounded-[12px] bg-[#F5F6FA] border border-[#EBEEF5]/40">
+                                          <span className="text-[#5476FC] text-[11px] font-bold uppercase tracking-wide">{meal.mealType}</span>
+                                          {meal.items?.map((item: any, i: number) => (
+                                            <span key={i} className="text-[#676E76] text-[12px]">{item.foodName} — {item.quantity}</span>
+                                          ))}
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : plan.meals?.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -20,10 +20,11 @@ export interface DietMeal {
 
 // One stage of a diet-type plan, e.g. the Snehapanam part of a
 // "Snehapanam → Purgation" plan. Single-diet types have exactly one phase.
+// dayPlans holds each day's meals (Day 1, Day 2…), so the foods can differ
+// from day to day.
 export interface DietPhase {
   diet: string;
-  days: string;
-  meals: DietMeal[];
+  dayPlans: DietMeal[][];
 }
 
 export interface DietPlanDraft {
@@ -52,12 +53,16 @@ export const EMPTY_DIET_PLAN: DietPlanDraft = {
 
 // True when the doctor has entered anything worth saving.
 export function hasDietPlanContent(plan: DietPlanDraft): boolean {
-  return !!plan.title.trim() || plan.meals.length > 0 || plan.phases.some((p) => p.meals.length > 0);
+  return !!plan.title.trim() || plan.meals.length > 0 || plan.phases.some(phaseHasMeals);
+}
+
+function phaseHasMeals(phase: DietPhase): boolean {
+  return phase.dayPlans.some((meals) => meals.length > 0);
 }
 
 // Request body for PUT /api/appointments/:id/diet-plan. For a phased plan,
-// `meals` mirrors the first phase so older readers (patient app, adherence
-// progress) still see a usable plan.
+// `meals` mirrors the first phase's Day 1 so older readers still see a
+// usable plan.
 export function toDietPlanPayload(plan: DietPlanDraft, visibleToPatient: boolean) {
   const phased = plan.phases.length > 0;
   return {
@@ -65,7 +70,7 @@ export function toDietPlanPayload(plan: DietPlanDraft, visibleToPatient: boolean
     // patient, who only sees the prescribed foods, not the diet type.
     title: plan.title || "Diet Plan",
     notes: plan.notes,
-    meals: phased ? plan.phases[0].meals : plan.meals,
+    meals: phased ? plan.phases[0].dayPlans[0] ?? [] : plan.meals,
     targetCalories: plan.targetCalories ? Number(plan.targetCalories) : null,
     restrictions: plan.restrictions
       ? plan.restrictions.split(",").map((r) => r.trim()).filter(Boolean)
@@ -73,7 +78,7 @@ export function toDietPlanPayload(plan: DietPlanDraft, visibleToPatient: boolean
     ...(phased && {
       dietType: plan.dietType,
       dietTypeLabel: plan.dietTypeLabel,
-      phases: plan.phases.map((p) => ({ diet: p.diet, days: p.days ? Number(p.days) : null, meals: p.meals })),
+      phases: plan.phases.map((p) => ({ diet: p.diet, dayPlans: p.dayPlans.map((meals) => ({ meals })) })),
     }),
     visibleToPatient,
   };
@@ -90,7 +95,12 @@ export function fromSavedDietPlan(saved: any): DietPlanDraft {
     dietType: saved.dietType ?? "",
     dietTypeLabel: saved.dietTypeLabel ?? "",
     phases: Array.isArray(saved.phases)
-      ? saved.phases.map((p: any) => ({ diet: p.diet, days: p.days != null ? String(p.days) : "", meals: p.meals ?? [] }))
+      ? saved.phases.map((p: any) => ({
+          diet: p.diet,
+          dayPlans: Array.isArray(p.dayPlans) && p.dayPlans.length > 0
+            ? p.dayPlans.map((d: any) => d.meals ?? [])
+            : [p.meals ?? []],
+        }))
       : [],
   };
 }
@@ -395,21 +405,51 @@ function MealsEditor({
   );
 }
 
-// One phase of a diet-type plan: heading, optional duration, and its meals.
+// Fresh ids for copied meals, so a copied day never shares a meal id (used
+// as the remove-item key) with the day it was copied from.
+function cloneMeals(meals: DietMeal[]): DietMeal[] {
+  return meals.map((m, i) => ({ ...m, id: `${Date.now()}-${i}`, items: m.items.map((it) => ({ ...it })) }));
+}
+
+// One phase of a diet-type plan: heading, day tabs, and the selected day's
+// meals. Day numbers run on across phases (dayOffset), so in Snehapanam →
+// Purgation the Purgation days follow on from the last Snehapanam day.
 function PhaseSection({
   phase,
   index,
   total,
+  dayOffset,
   catalog,
   onChange,
 }: {
   phase: DietPhase;
   index: number;
   total: number;
+  dayOffset: number;
   catalog: DietFoodCatalog | null;
   onChange: (phase: DietPhase) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(0);
+  const day = Math.min(selectedDay, phase.dayPlans.length - 1);
+
+  const setDayMeals = (meals: DietMeal[]) => {
+    onChange({ ...phase, dayPlans: phase.dayPlans.map((m, i) => (i === day ? meals : m)) });
+  };
+
+  const addDay = (copyCurrent: boolean) => {
+    onChange({ ...phase, dayPlans: [...phase.dayPlans, copyCurrent ? cloneMeals(phase.dayPlans[day]) : []] });
+    setSelectedDay(phase.dayPlans.length);
+  };
+
+  const removeDay = () => {
+    if (phase.dayPlans.length <= 1) return;
+    if (phase.dayPlans[day].length > 0 && !window.confirm(`Remove Day ${dayOffset + day + 1} and its meals?`)) return;
+    onChange({ ...phase, dayPlans: phase.dayPlans.filter((_, i) => i !== day) });
+    setSelectedDay(Math.max(0, day - 1));
+  };
+
+  const dayCount = phase.dayPlans.length;
 
   return (
     <div className="flex flex-col gap-3 p-4 rounded-2xl border border-[#EBEEF5] bg-[#FAFBFD]">
@@ -420,24 +460,58 @@ function PhaseSection({
               {index === 0 ? `Step 1 of ${total}` : `Then — step ${index + 1} of ${total}`}
             </span>
           )}
-          <span className="text-[#24292E] text-[13px] font-bold">{phase.diet} diet</span>
+          <span className="text-[#24292E] text-[13px] font-bold">
+            {phase.diet} diet · {dayCount} day{dayCount === 1 ? "" : "s"}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            value={phase.days}
-            onChange={(e) => onChange({ ...phase, days: e.target.value })}
-            placeholder="Days"
-            title="Number of days (optional)"
-            className="w-20 h-9 px-3 rounded-lg bg-white border border-[#EBEEF5] text-xs font-semibold text-[#383F45] placeholder-[#838B95] outline-none focus:ring-1 focus:ring-[#5476FC]"
-          />
-          <AddButton onClick={() => setAddOpen((v) => !v)} />
-        </div>
+        <AddButton onClick={() => setAddOpen((v) => !v)} />
       </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {phase.dayPlans.map((meals, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setSelectedDay(i)}
+            className={`h-8 px-3 rounded-lg text-[11px] font-bold transition-all ${
+              i === day ? "bg-[#5476FC] text-white" : "bg-white border border-[#EBEEF5] text-[#676E76] hover:border-[#5476FC]"
+            }`}
+            title={meals.length === 0 ? "No meals yet" : undefined}
+          >
+            Day {dayOffset + i + 1}{meals.length === 0 && i !== day ? " ·" : ""}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => addDay(false)}
+          className="h-8 px-3 rounded-lg text-[11px] font-bold text-[#5476FC] bg-[#E8F1FF] hover:bg-[#5476FC] hover:text-white transition-all"
+        >
+          + Add day
+        </button>
+        <button
+          type="button"
+          onClick={() => addDay(true)}
+          disabled={phase.dayPlans[day].length === 0}
+          className="h-8 px-3 rounded-lg text-[11px] font-bold text-[#5476FC] bg-white border border-[#E8F1FF] hover:border-[#5476FC] disabled:opacity-40 transition-all"
+          title="Add a new day with the same meals as this one"
+        >
+          Copy Day {dayOffset + day + 1}
+        </button>
+        {dayCount > 1 && (
+          <button
+            type="button"
+            onClick={removeDay}
+            className="h-8 px-3 rounded-lg text-[11px] font-bold text-[#E84949] hover:bg-red-50 transition-all"
+          >
+            Remove Day {dayOffset + day + 1}
+          </button>
+        )}
+      </div>
+
       <MealsEditor
-        meals={phase.meals}
-        onChange={(meals) => onChange({ ...phase, meals })}
+        key={day}
+        meals={phase.dayPlans[day]}
+        onChange={setDayMeals}
         catalog={catalog}
         diet={phase.diet}
         addOpen={addOpen}
@@ -479,15 +553,15 @@ export default function AddDietPlan({ plan, onChange, visibleToPatient, onToggle
   const selectDietType = (typeId: string) => {
     const type = catalog?.planTypes.find((t) => t.id === typeId);
     if (!type) {
-      if (plan.phases.some((p) => p.meals.length > 0) && !window.confirm("Clear the diet type? Meals entered for it will be removed.")) return;
+      if (plan.phases.some(phaseHasMeals) && !window.confirm("Clear the diet type? Meals entered for it will be removed.")) return;
       onChange({ ...plan, dietType: "", dietTypeLabel: "", phases: [] });
       return;
     }
-    const dropped = plan.phases.filter((p) => !type.phases.includes(p.diet) && p.meals.length > 0);
+    const dropped = plan.phases.filter((p) => !type.phases.includes(p.diet) && phaseHasMeals(p));
     if (dropped.length && !window.confirm(`Meals entered for ${dropped.map((p) => p.diet).join(", ")} will be removed. Continue?`)) return;
 
     const phases = type.phases.map((diet, i) =>
-      plan.phases.find((p) => p.diet === diet) ?? { diet, days: "", meals: i === 0 && !phased ? plan.meals : [] }
+      plan.phases.find((p) => p.diet === diet) ?? { diet, dayPlans: [i === 0 && !phased ? plan.meals : []] }
     );
     onChange({ ...plan, dietType: type.id, dietTypeLabel: type.label, phases, meals: [] });
   };
@@ -571,6 +645,7 @@ export default function AddDietPlan({ plan, onChange, visibleToPatient, onToggle
             phase={phase}
             index={i}
             total={plan.phases.length}
+            dayOffset={plan.phases.slice(0, i).reduce((sum, p) => sum + p.dayPlans.length, 0)}
             catalog={catalog}
             onChange={(p) => updatePhase(i, p)}
           />
