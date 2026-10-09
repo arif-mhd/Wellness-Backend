@@ -43,17 +43,41 @@ export async function computeDietPlanProgress(patientId: string, planId: string)
     byDate.set(entry.date, list);
   }
 
+  // A meal counts as logged once, however many foods were logged for it
+  // (Appam + Banana for Breakfast is one meal), and never beyond what the
+  // plan prescribes for that day.
+  const mealsLoggedOn = (date: string) => {
+    const meals = new Set((byDate.get(date) ?? []).map((e) => String(e.meal ?? "").toLowerCase()));
+    return Math.min(meals.size, mealsPlannedOn(date));
+  };
+
   const days = Array.from(byDate.entries()).map(([date, entries]) => ({
     date,
-    mealsLogged: entries.length,
+    mealsLogged: mealsLoggedOn(date),
     mealsPlanned: mealsPlannedOn(date),
     calories: entries.reduce((sum, e) => sum + (e.calories ?? 0), 0),
   }));
 
-  const totalMealsLogged = logs.length;
-  const totalMealsPlanned = days.length > 0
-    ? days.reduce((sum, d) => sum + d.mealsPlanned, 0)
-    : mealsPerDay;
+  // Planned meals run from Day 1 through today (or the latest logged date,
+  // in case the server's UTC day lags the patient's), capped at the plan's
+  // length for day-wise plans — so unlogged days count against adherence.
+  const DAY_MS = 86_400_000;
+  const today = new Date().toISOString().slice(0, 10);
+  const lastLogged = logs.length > 0 ? String(logs[logs.length - 1].date) : "";
+  const end = lastLogged > today ? lastLogged : today;
+  let elapsedDays = day1 ? Math.floor((Date.parse(end) - Date.parse(day1)) / DAY_MS) + 1 : 1;
+  if (!Number.isFinite(elapsedDays) || elapsedDays < 1) elapsedDays = 1;
+  if (dayMealCounts.length > 0) elapsedDays = Math.min(elapsedDays, dayMealCounts.length);
+
+  let totalMealsPlanned = 0;
+  let totalMealsLogged = 0;
+  for (let i = 0; i < elapsedDays; i++) {
+    const date = day1
+      ? new Date(Date.parse(day1) + i * DAY_MS).toISOString().slice(0, 10)
+      : today;
+    totalMealsPlanned += mealsPlannedOn(date);
+    totalMealsLogged += mealsLoggedOn(date);
+  }
   const adherencePercent = totalMealsPlanned > 0
     ? Math.min(100, Math.round((totalMealsLogged / totalMealsPlanned) * 100))
     : 0;
