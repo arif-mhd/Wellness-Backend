@@ -2059,7 +2059,7 @@ router.get("/:id/prescription-pdf", requireRole("patient"), async (req: SessionR
 // consultation) without affecting what the patient currently sees.
 //
 // Body: { title, notes?, meals, targetCalories?, targetMacros?, restrictions?,
-//         dietType?, dietTypeLabel?, phases?: [{ diet, days?, meals }],
+//         dietType?, dietTypeLabel?, phases?: [{ diet, dayPlans: [{ meals }] }],
 //         visibleToPatient: boolean }
 //
 // visibleToPatient is the "reflect to patient" toggle from the consult screen:
@@ -2075,8 +2075,8 @@ router.put("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, 
     res.status(400).json({ error: "title and meals are required" });
     return;
   }
-  if (phases !== undefined && (!Array.isArray(phases) || phases.some((p: any) => !p?.diet || !Array.isArray(p.meals)))) {
-    res.status(400).json({ error: "phases must be an array of { diet, days?, meals }" });
+  if (phases !== undefined && (!Array.isArray(phases) || phases.some((p: any) => !p?.diet || !(Array.isArray(p.dayPlans) || Array.isArray(p.meals))))) {
+    res.status(400).json({ error: "phases must be an array of { diet, dayPlans: [{ meals }] }" });
     return;
   }
 
@@ -2116,13 +2116,20 @@ router.put("/:id/diet-plan", requireRole("doctor"), async (req: SessionRequest, 
       // app, adherence progress) still see a usable plan.
       dietType: dietType ?? null,
       dietTypeLabel: dietTypeLabel ?? null,
-      phases: (phases ?? []).map((p: any) => ({
-        diet: p.diet,
-        days: Number.isFinite(Number(p.days)) && Number(p.days) > 0 ? Number(p.days) : null,
-        meals: p.meals,
-      })),
+      // Each phase holds one entry per day (dayPlans), so a 5-day Snehapanam
+      // can prescribe different foods on each day; `days` is just the count
+      // and the phase's `meals` mirrors its Day 1.
+      phases: (phases ?? []).map((p: any) => {
+        const dayPlans = (Array.isArray(p.dayPlans) && p.dayPlans.length > 0 ? p.dayPlans : [{ meals: p.meals }])
+          .map((d: any, i: number) => ({ day: i + 1, meals: Array.isArray(d?.meals) ? d.meals : [] }));
+        return { diet: p.diet, days: dayPlans.length, dayPlans, meals: dayPlans[0].meals };
+      }),
       visibleToPatient: !!visibleToPatient,
       status: visibleToPatient ? "active" : "draft",
+      // When the patient first got this plan — Day 1 of a day-wise plan is
+      // counted from here (startDate is when the draft was first saved, which
+      // can be well before it's shared). Kept across re-saves while active.
+      activatedAt: visibleToPatient ? (existing?.status === "active" && existing?.activatedAt ? existing.activatedAt : now) : null,
       startDate: existing?.startDate ?? now,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

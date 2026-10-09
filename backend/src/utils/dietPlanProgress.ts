@@ -21,6 +21,21 @@ export async function computeDietPlanProgress(patientId: string, planId: string)
   ).fetchAll();
 
   const mealsPerDay = Array.isArray(plan.meals) ? plan.meals.length : 0;
+
+  // Day-wise plans (phases[].dayPlans) prescribe a different number of meals
+  // on each day: look a logged date up by its day number, counted from when
+  // the plan was shared (Day 1 = activatedAt's date). Dates past the last
+  // prescribed day fall back to the final day's count.
+  const dayMealCounts: number[] = Array.isArray(plan.phases)
+    ? plan.phases.flatMap((p: any) => (Array.isArray(p.dayPlans) ? p.dayPlans : [{ meals: p.meals }]).map((d: any) => d.meals?.length ?? 0))
+    : [];
+  const day1 = (plan.activatedAt ?? plan.startDate ?? "").slice(0, 10);
+  const mealsPlannedOn = (date: string) => {
+    if (dayMealCounts.length === 0 || !day1) return mealsPerDay;
+    const index = Math.round((Date.parse(date) - Date.parse(day1)) / 86_400_000);
+    return dayMealCounts[Math.min(Math.max(index, 0), dayMealCounts.length - 1)];
+  };
+
   const byDate = new Map<string, any[]>();
   for (const entry of logs) {
     const list = byDate.get(entry.date) ?? [];
@@ -31,12 +46,14 @@ export async function computeDietPlanProgress(patientId: string, planId: string)
   const days = Array.from(byDate.entries()).map(([date, entries]) => ({
     date,
     mealsLogged: entries.length,
-    mealsPlanned: mealsPerDay,
+    mealsPlanned: mealsPlannedOn(date),
     calories: entries.reduce((sum, e) => sum + (e.calories ?? 0), 0),
   }));
 
   const totalMealsLogged = logs.length;
-  const totalMealsPlanned = mealsPerDay * Math.max(days.length, 1);
+  const totalMealsPlanned = days.length > 0
+    ? days.reduce((sum, d) => sum + d.mealsPlanned, 0)
+    : mealsPerDay;
   const adherencePercent = totalMealsPlanned > 0
     ? Math.min(100, Math.round((totalMealsLogged / totalMealsPlanned) * 100))
     : 0;
