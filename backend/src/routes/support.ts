@@ -4,7 +4,9 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
-import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer } from "../config/cosmos";
+import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer, notificationsContainer } from "../config/cosmos";
+import { sendPushToUser } from "../utils/pushNotifications";
+import { resolveOrgId } from "../utils/orgScope";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 
 const router = Router();
@@ -30,6 +32,37 @@ function sanitizeFileName(name: string): string {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+// A conversation pasted in from the assistant. Bounded so a long chat can't
+// bloat the ticket; the end of the conversation is what matters most.
+const MAX_TRANSCRIPT = 6000;
+
+// Tells a patient their ticket has an answer. Before this, a reply from
+// support was only visible if the patient happened to reopen Help and
+// Support — so a hand-off from the assistant could sit answered and unseen.
+// Best-effort: a failed notification must never fail the reply itself.
+async function notifyPatientOfReply(ticket: any): Promise<void> {
+  const role = ticket.submitterRole ?? "patient";
+  if (role !== "patient") return; // doctors/clinics/pharmacies read replies in their portals
+  try {
+    const title = "Support replied";
+    const body = `We've replied to your request: ${ticket.subject}`;
+    await notificationsContainer.items.create({
+      id: `notif_${uuidv4()}`,
+      patientId: ticket.patientId,
+      profileId: ticket.patientId,
+      title,
+      body,
+      type: "support_reply",
+      referenceId: ticket.id,
+      isRead: false,
+      sentAt: new Date().toISOString(),
+    });
+    await sendPushToUser(ticket.patientId, title, body, { type: "support_reply", referenceId: ticket.id });
+  } catch (err) {
+    console.error(`[support] notifying patient of reply on ${ticket.id} failed:`, err);
+  }
+}
 
 async function requireRole(req: SessionRequest, res: Response, role: string): Promise<boolean> {
   const session = req.session!;
@@ -90,7 +123,7 @@ async function getClinicName(clinicId: string): Promise<string> {
 router.post("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
   const userId = session.getUserId();
-  const { subject, description, category, role } = req.body;
+  const { subject, description, category, role, source, transcript } = req.body;
 
   if (!subject || !description) {
     return res.status(400).json({ error: "subject and description are required" });
@@ -109,7 +142,29 @@ router.post("/", verifySession(), async (req: SessionRequest, res: Response) => 
     adminReply: null as string | null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  } as Record<string, unknown>;
+
+  // Raised from the assistant ("Talk to our team"). The conversation is only
+  // present if the patient ticked to include it.
+  if (source === "assistant") {
+    ticket.source = "assistant";
+    if (typeof transcript === "string" && transcript.trim()) {
+      const t = transcript.trim();
+      ticket.transcript = t.length > MAX_TRANSCRIPT ? `…${t.slice(-MAX_TRANSCRIPT)}` : t;
+    }
+  }
+
+  // Which brand the patient belongs to, so support can tell one brand's
+  // tickets from another's. Patients only: resolveOrgId has no lookup for
+  // doctors and would stamp them with the default brand.
+  if (submitterRole === "patient") {
+    try {
+      ticket.orgId = await resolveOrgId(req);
+    } catch (err) {
+      console.warn("[support] could not resolve brand for new ticket:", err);
+    }
+  }
+
 
   await supportContainer.items.create(ticket);
   return res.status(201).json(ticket);
@@ -249,7 +304,7 @@ router.post(
 router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Response) => {
   if (!(await requireRole(req, res, "admin"))) return;
 
-  const { status, category, submitterRole } = req.query;
+  const { status, category, submitterRole, orgId, source } = req.query;
   let query = "SELECT * FROM c";
   const params: any[] = [];
   const conditions: string[] = [];
@@ -265,6 +320,13 @@ router.get("/admin/all", verifySession(), async (req: SessionRequest, res: Respo
   if (submitterRole) {
     conditions.push("c.submitterRole = @submitterRole");
     params.push({ name: "@submitterRole", value: submitterRole });
+  }
+  if (orgId) {
+    conditions.push("c.orgId = @orgId");
+    params.push({ name: "@orgId", value: orgId });
+  }
+  if (source === "assistant") {
+    conditions.push("c.source = 'assistant'");
   }
   if (conditions.length) query += " WHERE " + conditions.join(" AND ");
   query += " ORDER BY c.createdAt DESC";
@@ -337,6 +399,7 @@ router.patch("/admin/:ticketId/reply", verifySession(), async (req: SessionReque
   ticket.updatedAt = new Date().toISOString();
 
   await supportContainer.items.upsert(ticket);
+  await notifyPatientOfReply(ticket);
   return res.json(ticket);
 });
 
@@ -372,6 +435,7 @@ router.post("/admin/:ticketId/comments", verifySession(), async (req: SessionReq
   ticket.updatedAt = comment.createdAt;
 
   await supportContainer.items.upsert(ticket);
+  await notifyPatientOfReply(ticket);
   return res.status(201).json(ticket);
 });
 

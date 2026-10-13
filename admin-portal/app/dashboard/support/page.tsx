@@ -48,6 +48,21 @@ const ROLE_BADGE_COLOR: Record<string, string> = {
 function roleLabel(role?: string) { return ROLE_LABEL[role ?? "patient"] ?? "Patient"; }
 function roleBadgeColor(role?: string) { return ROLE_BADGE_COLOR[role ?? "patient"] ?? ROLE_BADGE_COLOR.patient; }
 
+// Where a ticket came from: handed off from the assistant, and which brand.
+// Renders nothing for an ordinary ticket raised before brands were recorded.
+function TicketOriginTags({ ticket, orgNames }: { ticket: { source?: string; orgId?: string }; orgNames: Record<string, string> }) {
+  const brand = ticket.orgId ? orgNames[ticket.orgId] : undefined;
+  if (ticket.source !== "assistant" && !brand) return null;
+  return (
+    <span className="inline-flex flex-wrap gap-1.5 mt-1">
+      {ticket.source === "assistant" && (
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700">From assistant</span>
+      )}
+      {brand && <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">{brand}</span>}
+    </span>
+  );
+}
+
 interface Ticket {
   id: string;
   patientId: string;
@@ -61,6 +76,12 @@ interface Ticket {
   adminReply?: string | null;
   comments?: TicketComment[];
   attachments?: TicketAttachment[];
+  /** The patient's brand. Absent on tickets raised before brands were recorded. */
+  orgId?: string;
+  /** "assistant" when handed off from the chat assistant. */
+  source?: string;
+  /** The assistant conversation, if the patient chose to include it. */
+  transcript?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,11 +120,24 @@ function SupportPageInner() {
   const [roleFilter, setRoleFilter] = useState<SubmitterRole>("all");
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [orgNames, setOrgNames] = useState<Record<string, string>>({});
+  const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [assistantOnly, setAssistantOnly] = useState(false);
+
+  // Brand names for the labels and the brand filter.
+  useEffect(() => {
+    apiFetch("/api/admin/organizations")
+      .then((r) => (r.ok ? r.json() : { organizations: [] }))
+      .then((d) => setOrgNames(Object.fromEntries((d.organizations ?? []).map((o: { id: string; name: string }) => [o.id, o.name]))))
+      .catch(() => { /* labels just won't show a brand name */ });
+  }, []);
 
   const fetchTickets = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (roleFilter !== "all") params.set("submitterRole", roleFilter);
+      if (brandFilter !== "all") params.set("orgId", brandFilter);
+      if (assistantOnly) params.set("source", "assistant");
       const res = await apiFetch(`/api/support/admin/all?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -117,7 +151,7 @@ function SupportPageInner() {
     } finally {
       setLoading(false);
     }
-  }, [roleFilter, targetId]);
+  }, [roleFilter, brandFilter, assistantOnly, targetId]);
 
   useEffect(() => {
     setLoading(true);
@@ -253,6 +287,24 @@ function SupportPageInner() {
                     {s === "all" ? "All" : s}
                   </button>
                 ))}
+                <select
+                  id="support-brand-filter"
+                  value={brandFilter}
+                  onChange={(e) => setBrandFilter(e.target.value)}
+                  className="px-4 py-2 rounded-full text-[13px] font-semibold bg-white text-slate-600 border border-slate-100"
+                  aria-label="Filter by brand"
+                >
+                  <option value="all">All brands</option>
+                  {Object.entries(orgNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+                <button
+                  onClick={() => setAssistantOnly((v) => !v)}
+                  className={`px-5 py-2 rounded-full text-[13px] font-semibold transition-all ${
+                    assistantOnly ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
+                  }`}
+                >
+                  From assistant
+                </button>
               </div>
               <button onClick={fetchTickets} className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 shadow-sm border border-slate-100 transition-all hover:bg-slate-50" title="Refresh">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -311,6 +363,7 @@ function SupportPageInner() {
                               <td className="py-4 pl-2">
                                 <p className="text-[13px] font-semibold text-slate-800 leading-tight">{t.subject}</p>
                                 <p className="text-[11px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
+                                <TicketOriginTags ticket={t} orgNames={orgNames} />
                               </td>
                               <td className={`py-4 text-[12px] font-semibold ${priorityColor[priority]}`}>{priority}</td>
                               <td className="py-4 text-[12px] text-slate-500 font-medium capitalize">{(t.category || "").replace(/_/g, " ")}</td>
@@ -357,6 +410,7 @@ function SupportPageInner() {
                             <div className="min-w-0 flex-1 pr-2">
                               <p className="text-[14px] font-semibold text-slate-800 truncate mb-0.5">{t.subject}</p>
                               <p className="text-[12px] text-slate-400 font-medium">ID: {t.id.slice(0, 8).toUpperCase()}</p>
+                              <TicketOriginTags ticket={t} orgNames={orgNames} />
                             </div>
                             <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full text-[10px] font-semibold ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
                               {t.status}
@@ -427,6 +481,7 @@ function SupportPageInner() {
                 <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-semibold ${roleBadgeColor(selected.submitterRole)}`}>
                   {roleLabel(selected.submitterRole)} Request
                 </span>
+                <TicketOriginTags ticket={selected} orgNames={orgNames} />
               </div>
 
               {/* Status toggle */}
@@ -485,6 +540,14 @@ function SupportPageInner() {
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4">
                   {selected.description}
                 </p>
+                {selected.transcript && (
+                  <div className="mt-3">
+                    <p className="text-[12.5px] font-semibold text-slate-800 mb-2">Conversation with the assistant</p>
+                    <p className="text-[12px] text-slate-500 font-medium leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap max-h-72 overflow-y-auto">
+                      {selected.transcript}
+                    </p>
+                  </div>
+                )}
                 {selected.attachments && selected.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selected.attachments.map((att) => (
