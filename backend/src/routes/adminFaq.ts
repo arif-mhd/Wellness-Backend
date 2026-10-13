@@ -227,6 +227,12 @@ router.put("/entries/:id", async (req: SessionRequest, res: Response) => {
     if (!fields) return;
 
     const updated: FaqEntryDoc = { ...existing, ...fields, updatedAt: new Date().toISOString() };
+    // A draft flagged for review states policy nobody has confirmed yet. It
+    // can't be published until someone has read it and marked it reviewed.
+    if (updated.isActive && updated.reviewNote) {
+      res.status(400).json({ error: "Mark this answer as reviewed before making it visible to patients." });
+      return;
+    }
     await faqsContainer.items.upsert(updated);
     invalidateFaqCache(orgId);
     res.json({ entry: updated });

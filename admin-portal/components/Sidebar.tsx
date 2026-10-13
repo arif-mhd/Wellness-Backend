@@ -110,6 +110,17 @@ const navItems = [
     ),
   },
   {
+    href: "/dashboard/chatbot-faq",
+    label: "Chatbot FAQ",
+    icon: (active: boolean) => (
+      <svg className="w-[1.1rem] h-[1.1rem]" fill="none" stroke={active ? "white" : "currentColor"} viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+        <path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.9c0 1.6-2.4 2.1-2.4 3.4" />
+        <path d="M12 16.6h.01" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/vaccine-catalog",
     label: "Vaccine Catalog",
     icon: (active: boolean) => (
