@@ -14,6 +14,10 @@ export interface AssessmentQuestion {
   min?: number;        // for scale type
   max?: number;
   options?: AssessmentOption[];
+  /** Only ask this question when an earlier answer meets the threshold —
+   *  e.g. the safety follow-up after a positive self-harm item. Clients must
+   *  filter on this; computeResult ignores answers whose condition is unmet. */
+  showIf?: { questionId: string; minScore: number };
 }
 
 export interface ScoreRange {
@@ -39,7 +43,25 @@ export interface AssessmentDefinition {
   scoreRanges: ScoreRange[];
   /** Optional per-exact-score overrides. Key is the integer score as a string. */
   scoreSummaries?: Record<string, ScoreDetail>;
+  /** "sum" (default): add every answer, higher = better. "phq9-gad2": the
+   *  standard clinical scoring for mental-health-screening, higher = worse,
+   *  with a self-harm safety check — see computeMentalHealthScreening. */
+  scoring?: "sum" | "phq9-gad2";
 }
+
+/** Self-harm risk derived from PHQ-9 item 9 and its safety follow-up.
+ *  "passive": item 9 endorsed but no current intent/plan.
+ *  "active":  current thoughts of ending their life, or a plan. */
+export type SelfHarmRisk = "none" | "passive" | "active";
+
+// Standard PHQ/GAD response scale (0–3), shared by every item of
+// mental-health-screening below.
+const PHQ_FREQUENCY_OPTIONS: AssessmentOption[] = [
+  { label: "Not at all",              subtext: "0 days",     score: 0 },
+  { label: "Several days",            subtext: "1–6 days",   score: 1 },
+  { label: "More than half the days", subtext: "7–11 days",  score: 2 },
+  { label: "Nearly every day",        subtext: "12–14 days", score: 3 },
+];
 
 // ─── Assessment Definitions ───────────────────────────────────────────────────
 
@@ -555,6 +577,70 @@ const ASSESSMENTS: AssessmentDefinition[] = [
     },
   },
 
+  // 5b ── Mental Health Screening (PHQ-9 + GAD-2) ─────────────────────────────
+  // Validated, public-domain instruments (Kroenke, Spitzer & Williams), used
+  // by both the in-chat check-in and the standalone Mental Health tile.
+  // Unlike every other assessment here, items score 0–3 and HIGHER is WORSE —
+  // scored by computeMentalHealthScreening, not the generic sum path.
+  // q9 is the PHQ-9 self-harm item; "safety" is only asked when q9 >= 1.
+  {
+    id: "mental-health-screening",
+    title: "Mental Health Check-in",
+    category: "Mental Health",
+    description: "A confidential 2-minute check-in on mood and anxiety (PHQ-9 & GAD-2).",
+    scoring: "phq9-gad2",
+    questions: [
+      { id: "q1", type: "choice", text: "Over the last 2 weeks, how often have you had little interest or pleasure in doing things?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q2", type: "choice", text: "Over the last 2 weeks, how often have you felt down, depressed, or hopeless?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q3", type: "choice", text: "Over the last 2 weeks, how often have you had trouble falling or staying asleep, or sleeping too much?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q4", type: "choice", text: "Over the last 2 weeks, how often have you felt tired or had little energy?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q5", type: "choice", text: "Over the last 2 weeks, how often have you had a poor appetite or been overeating?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q6", type: "choice", text: "Over the last 2 weeks, how often have you felt bad about yourself — or that you are a failure or have let yourself or your family down?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q7", type: "choice", text: "Over the last 2 weeks, how often have you had trouble concentrating on things, such as reading or watching TV?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q8", type: "choice", text: "Over the last 2 weeks, how often have you been moving or speaking so slowly that others could notice — or so fidgety or restless that you've been moving around a lot more than usual?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "q9", type: "choice", text: "Over the last 2 weeks, how often have you had thoughts that you would be better off dead, or of hurting yourself in some way?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "safety", type: "choice", showIf: { questionId: "q9", minScore: 1 },
+        text: "Thank you for sharing that. Right now, are you having thoughts of ending your life, or have you made any plans to?",
+        options: [
+          { label: "No",  subtext: "Not right now, and no plans.",        score: 0 },
+          { label: "Yes", subtext: "I'm having these thoughts or plans.", score: 1 },
+        ]
+      },
+      { id: "gad1", type: "choice", text: "Over the last 2 weeks, how often have you felt nervous, anxious, or on edge?",
+        options: PHQ_FREQUENCY_OPTIONS },
+      { id: "gad2", type: "choice", text: "Over the last 2 weeks, how often have you not been able to stop or control worrying?",
+        options: PHQ_FREQUENCY_OPTIONS },
+    ],
+    // Bands on the PHQ-9 total (0–27). Item 9 / safety overrides are applied
+    // on top of these in computeMentalHealthScreening.
+    scoreRanges: [
+      { min: 0, max: 4, risk: "Low", title: "Minimal Depression Symptoms",
+        summary: "Your answers suggest minimal symptoms of depression. Keep looking after the habits that support your wellbeing.",
+        recommendations: ["Keep up activities that bring you joy and connection", "Protect a regular sleep routine", "Check in with yourself again in a few weeks"] },
+      { min: 5, max: 9, risk: "Moderate", title: "Mild Depression Symptoms",
+        summary: "Your answers suggest mild symptoms of depression. These are common and often improve with support and small daily changes.",
+        recommendations: ["Build in daily movement, daylight, and regular meals", "Talk to someone you trust about how you've been feeling", "Try a short daily relaxation or mindfulness practice", "Repeat this check-in in 2 weeks — see a doctor if symptoms persist"] },
+      { min: 10, max: 14, risk: "Moderate", title: "Moderate Depression Symptoms",
+        summary: "Your answers suggest moderate symptoms of depression. Speaking with a doctor or mental health professional is recommended.",
+        recommendations: ["Book an appointment with a doctor or psychiatrist to talk this through", "Share how you've been feeling with someone close to you", "Keep a simple daily routine for sleep, meals, and activity", "Avoid alcohol and other substances as a way of coping"] },
+      { min: 15, max: 19, risk: "High", title: "Moderately Severe Depression Symptoms",
+        summary: "Your answers suggest moderately severe symptoms of depression. Please speak with a mental health professional soon — effective help is available.",
+        recommendations: ["Book an appointment with a psychiatrist or doctor this week", "Let a trusted friend or family member know you're struggling", "Avoid making major decisions while you're feeling this way", "If things get worse, reach out to a support line at any time"] },
+      { min: 20, max: 27, risk: "High", title: "Severe Depression Symptoms",
+        summary: "Your answers suggest severe symptoms of depression. Please reach out to a mental health professional as soon as possible — you don't have to go through this alone.",
+        recommendations: ["Contact a psychiatrist or doctor as soon as possible", "Reach out to someone you trust today and tell them how you're feeling", "Use a support line whenever you need to talk", "If you feel unsafe at any point, call emergency services"] },
+    ],
+  },
+
   // 6 ── Cognitive Health ────────────────────────────────────────────────────
   {
     id: "cognitive-health",
@@ -873,6 +959,8 @@ export function getAssessmentById(id: string): AssessmentDefinition | undefined 
  * Returns { totalScore, risk, title, summary, recommendations, bmi? }
  */
 export function computeResult(assessment: AssessmentDefinition, answers: Record<string, number>) {
+  if (assessment.scoring === "phq9-gad2") return computeMentalHealthScreening(assessment, answers);
+
   if (assessment.id === "bmi-calculator") {
     const height = answers["q1"];
     const weight = answers["q2"];
@@ -904,5 +992,88 @@ export function computeResult(assessment: AssessmentDefinition, answers: Record<
     title: range.title,
     summary: detail?.summary ?? range.summary,
     recommendations: detail?.recommendations ?? range.recommendations,
+  };
+}
+
+const PHQ9_ITEMS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"];
+const GAD2_ITEMS = ["gad1", "gad2"];
+
+function phqSeverity(total: number): "minimal" | "mild" | "moderate" | "moderately severe" | "severe" {
+  if (total <= 4) return "minimal";
+  if (total <= 9) return "mild";
+  if (total <= 14) return "moderate";
+  if (total <= 19) return "moderately severe";
+  return "severe";
+}
+
+/**
+ * PHQ-9 + GAD-2 scoring for mental-health-screening.
+ *
+ * - totalScore is the PHQ-9 total (0–27, higher = worse), banded via scoreRanges.
+ * - All nine PHQ-9 items are required. GAD-2 is optional so a check-in cut
+ *   short by a crisis (the chat stops asking once "safety" is Yes) can still
+ *   be saved — anxiety is then reported as null, not 0.
+ * - Any positive item 9 forces risk "High" regardless of the total and puts
+ *   urgent-help recommendations first. "Yes" on the safety follow-up marks
+ *   selfHarmRisk "active".
+ * - Returns null for invalid answers so the submit route answers 400.
+ */
+function computeMentalHealthScreening(assessment: AssessmentDefinition, answers: Record<string, number>) {
+  const valid = (v: unknown, max: number) => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= max;
+  if (!PHQ9_ITEMS.every((id) => valid(answers[id], 3))) return null;
+
+  const phq9 = PHQ9_ITEMS.reduce((s, id) => s + answers[id], 0);
+  const gadAnswered = GAD2_ITEMS.every((id) => valid(answers[id], 3));
+  const gad2 = gadAnswered ? GAD2_ITEMS.reduce((s, id) => s + answers[id], 0) : null;
+  const anxietyPositive = gad2 !== null && gad2 >= 3;
+
+  const selfHarmRisk: SelfHarmRisk =
+    answers["q9"] === 0 ? "none" : answers["safety"] === 1 ? "active" : "passive";
+
+  const range = assessment.scoreRanges.find((r) => phq9 >= r.min && phq9 <= r.max)
+    ?? assessment.scoreRanges[assessment.scoreRanges.length - 1];
+
+  let risk = range.risk;
+  let title = range.title;
+  let summary = range.summary;
+  let recommendations = [...range.recommendations];
+
+  if (anxietyPositive) {
+    if (risk === "Low") risk = "Moderate";
+    summary += " Your answers also suggest significant anxiety, which is worth discussing with a professional.";
+    recommendations.push("Mention the anxiety symptoms you noticed when you speak with a doctor");
+  }
+
+  if (selfHarmRisk === "active") {
+    risk = "High";
+    title = "Please Reach Out for Support Now";
+    summary = "You told us you're having thoughts of ending your life. You deserve support right now — please call a support line or emergency services, or go to the nearest emergency department. You don't have to face this alone.";
+    recommendations = [
+      "Call emergency services or a crisis support line now",
+      "Stay with someone you trust, or let them know how you're feeling right away",
+      "Move away from anything you could use to hurt yourself",
+      "Book an urgent appointment with a psychiatrist",
+    ];
+  } else if (selfHarmRisk === "passive") {
+    risk = "High";
+    title = "Extra Support Recommended";
+    summary += " You also mentioned thoughts of being better off dead or of hurting yourself. Please talk to a mental health professional about this soon — and if those thoughts get stronger, reach out to a support line straight away.";
+    recommendations = [
+      "Talk to a psychiatrist or doctor soon about the thoughts you've been having",
+      "If the thoughts become stronger or you feel unsafe, call a support line or emergency services",
+      "Tell someone you trust how you've been feeling",
+      ...recommendations.slice(0, 2),
+    ];
+  }
+
+  return {
+    totalScore: phq9,
+    risk,
+    title,
+    summary,
+    recommendations,
+    scores: { phq9, gad2 },
+    severity: phqSeverity(phq9),
+    safety: { selfHarmRisk },
   };
 }

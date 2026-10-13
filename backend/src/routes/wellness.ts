@@ -2,7 +2,9 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { requireFeature } from "../middleware/requireFeature";
-import { resolveOrgId, getOrgBrandName, getOrgPersonaName } from "../utils/orgScope";
+import { resolveOrgId, getOrgBrandName, getOrgPersonaName, getCountryConfigForOrgId } from "../utils/orgScope";
+import { getCountryConfig, CrisisSupportConfig } from "../config/countries";
+import { CrisisLevel, detectCrisisLanguage, buildCrisisReply, crisisPayload, SCREENING_REQUEST_PATTERN } from "../utils/crisisDetection";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
@@ -492,8 +494,10 @@ export const WELLNESS_CHAT_RESPONSE_SCHEMA = {
         required: ["drugName", "dosageInstructions", "reason"],
       },
     },
+    riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
+    suggestScreening: { type: "BOOLEAN" },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions"],
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions", "riskLevel", "suggestScreening"],
 };
 
 // Used instead of the schema above only when the brand has FAQ content, so a
@@ -527,6 +531,7 @@ APP HELP:
 - If no entry answers it, set appHelp=true and faqIds=[], and reply that you don't have that information and that the patient can raise an issue from Profile → Help and Support.
 - If a message contains both a health complaint and an app question, handle the health complaint first (symptom intake as usual, appHelp=false); the app question can be answered on a later turn.
 - For every message that is not an app question, set appHelp=false and faqIds=[].
+- Safety always comes first: if riskLevel is "concern" or "imminent", follow MENTAL HEALTH & SAFETY instead and set appHelp=false and faqIds=[].
 
 FAQ entries:
 ${list.trim()}`;
@@ -580,6 +585,12 @@ MEDICINE SUGGESTIONS (independent of booking — a turn can set either, both, or
 - Leave "medicineSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins with no product fit, or whenever you are still asking clarifying questions and nothing resembling a usable remedy has been established yet.
 - This never replaces your "never diagnose or prescribe" rule above — dosageInstructions is general product-usage guidance, not a personalized prescription, and "reply" should still recommend seeing a doctor for anything beyond minor, self-limiting symptoms.
 
+MENTAL HEALTH & SAFETY (overrides everything above):
+- Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
+- If riskLevel is "concern" or "imminent": respond with warmth and without judgement, thank them for telling you, say clearly that they deserve support and are not alone, and encourage them to contact a crisis line or emergency services (the app shows the numbers — do not invent phone numbers). Never minimise, argue, lecture, or give information about methods or doses. Do NOT continue symptom triage on that turn: leave readyForRecommendation=false, suggestBooking=false, suggestScreening=false.
+- When the patient talks about low mood, sadness, feeling empty, loss of interest, anxiety, constant worry, stress, burnout, or sleep problems tied to how they feel — or asks to check their mental health — and riskLevel is "none": acknowledge how they feel, give one brief supportive tip, and offer a short confidential in-app mental health check-in by setting suggestScreening=true (the app will show a "Start check-in" button — mention it in "reply"). Don't run a symptom-triage interview for purely emotional concerns, and don't offer the check-in again if it already appears in the conversation history.
+- If the patient asks for a mental health professional, use recommendedSpecialty "Psychiatrist".
+
 Valid values for recommendedSpecialty (choose the closest match; use "General Physician" if unclear):
 ${SPECIALTIES.join(", ")}
 
@@ -627,9 +638,22 @@ function sanitizeMedicineSuggestions(raw: any): MedicineSuggestionInput[] {
     }));
 }
 
+// Never lets an org-lookup failure block a crisis response — falls back to
+// the platform default country's numbers instead.
+async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSupportConfig> {
+  try {
+    const orgId = await resolveOrgId(req);
+    return (await getCountryConfigForOrgId(orgId)).crisisSupport;
+  } catch (err: any) {
+    console.error("[wellness-chat] crisis support lookup failed, using default:", err?.message);
+    return getCountryConfig(null).crisisSupport;
+  }
+}
+
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
-// Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking, suggestedMedicines }
+// Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking,
+//            appHelp, faqIds, suggestedMedicines, suggestScreening, crisis: { level, emergencyNumber, lines } | null }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
@@ -638,6 +662,25 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
   }
 
   const intakeSoFarForFilter = sanitizeIntake(intake ?? EMPTY_INTAKE);
+
+  // Crisis check runs before everything else — see "Crisis layer" above.
+  const patternCrisis = detectCrisisLanguage(message);
+  if (patternCrisis) {
+    const support = await getCrisisSupportForRequest(req);
+    console.warn(`[wellness-chat] crisis language detected level=${patternCrisis} source=pattern`);
+    res.json({
+      reply: buildCrisisReply(patternCrisis, support),
+      offTopic: false,
+      intake: intakeSoFarForFilter,
+      readyForRecommendation: false,
+      suggestBooking: false,
+      recommendedSpecialty: null,
+      suggestScreening: false,
+      crisis: crisisPayload(patternCrisis, support),
+    });
+    return;
+  }
+
   if (isObviouslyOffTopic(message)) {
     res.json({
       reply: OFF_TOPIC_REPLY,
@@ -647,6 +690,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestBooking: false,
       recommendedSpecialty: null,
       suggestedMedicines: [],
+      suggestScreening: false,
+      crisis: null,
     });
     return;
   }
@@ -742,6 +787,29 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       throw new Error(`All models failed: ${lastError?.message}`);
     }
 
+    // Model-flagged risk (second crisis layer) — checked before offTopic so a
+    // crisis message the model also mislabels as off-topic still gets support.
+    // "imminent" swaps in the fixed safe reply; "concern" keeps the model's
+    // own (prompted-to-be-supportive) reply and attaches the support card.
+    const modelCrisis: CrisisLevel | null =
+      parsed.riskLevel === "imminent" || parsed.riskLevel === "concern" ? parsed.riskLevel : null;
+    if (modelCrisis) {
+      const support = await getCrisisSupportForRequest(req);
+      console.warn(`[wellness-chat] crisis language detected level=${modelCrisis} source=model`);
+      const modelReply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+      res.json({
+        reply: modelCrisis === "imminent" || !modelReply ? buildCrisisReply(modelCrisis, support) : modelReply,
+        offTopic: false,
+        intake: intakeSoFar,
+        readyForRecommendation: false,
+        suggestBooking: false,
+        recommendedSpecialty: null,
+        suggestScreening: false,
+        crisis: crisisPayload(modelCrisis, support),
+      });
+      return;
+    }
+
     if (parsed.offTopic === true) {
       res.json({
         reply: parsed.reply || OFF_TOPIC_REPLY,
@@ -751,6 +819,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         suggestBooking: false,
         recommendedSpecialty: null,
         suggestedMedicines: [],
+        suggestScreening: false,
+        crisis: null,
       });
       return;
     }
@@ -820,6 +890,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       console.warn("[wellness-chat] medicine suggestion resolution failed:", err?.message);
     }
 
+    const suggestScreening = parsed.suggestScreening === true || SCREENING_REQUEST_PATTERN.test(message);
+
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
       offTopic: false,
@@ -831,6 +903,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       appHelp,
       faqIds,
       suggestedMedicines,
+      suggestScreening,
+      crisis: null,
     });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
@@ -1422,12 +1496,13 @@ router.get("/assessments/:assessmentId", (req: SessionRequest, res: Response) =>
 });
 
 // ── POST /api/wellness/assessments/submit ────────────────────────────────────
-// Body: { assessmentId, answers: { [questionId]: number } }
+// Body: { assessmentId, answers: { [questionId]: number }, source?: "assessment" | "ai_chat" }
 // Computes result, saves to Cosmos, returns the result.
 router.post("/assessments/submit", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
     const { assessmentId, answers, profileId } = req.body;
+    const source = req.body.source === "ai_chat" ? "ai_chat" : "assessment";
     if (!assessmentId || !answers) {
       res.status(400).json({ error: "assessmentId and answers are required" }); return;
     }
@@ -1446,10 +1521,14 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
       category: assessment.category,
       answers,
       ...computed,
+      source,
       takenAt: new Date().toISOString(),
     };
 
     await assessmentResultsContainer.items.upsert(resultDoc);
+    if ("safety" in computed && computed.safety.selfHarmRisk !== "none") {
+      console.warn(`[assessments] self-harm risk flagged risk=${computed.safety.selfHarmRisk} source=${source} result=${resultDoc.id}`);
+    }
     res.json({ result: resultDoc });
   } catch (err) {
     console.error("Assessment submit error:", err);
