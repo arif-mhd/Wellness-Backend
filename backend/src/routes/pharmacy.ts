@@ -12,6 +12,7 @@ import { computeAggregateOrderStatus } from "../utils/pharmacyOrders";
 import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForOrg, getCountryConfigForOrgId } from "../utils/orgScope";
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { buildInClause } from "../utils/clinicScope";
+import { mapProductToMedicine, fetchPharmacyNameMap } from "../utils/pharmacyCatalogue";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -131,42 +132,14 @@ router.get("/catalogue", async (req: Request, res: Response) => {
     // the display name lives on the pharmacy doc itself, so this is a bulk
     // lookup rather than something already denormalized onto the product.
     const pharmacyIds = [...new Set(resources.map((p: any) => p.pharmacyId).filter(Boolean))];
-    const pharmacyNameMap: Record<string, string> = {};
-    if (pharmacyIds.length) {
-      const { resources: pharmacyDocs } = await pharmaciesContainer.items.query({
-        query: "SELECT c.id, c.pharmacyName FROM c WHERE ARRAY_CONTAINS(@ids, c.id)",
-        parameters: [{ name: "@ids", value: pharmacyIds }],
-      }).fetchAll();
-      pharmacyDocs.forEach((d: any) => { pharmacyNameMap[d.id] = d.pharmacyName; });
-    }
+    const pharmacyNameMap = await fetchPharmacyNameMap(pharmacyIds);
 
     // Adapt to the Medicine shape the patient app expects
     const medicines: any[] = resources
       .slice(parseInt(skip), parseInt(skip) + parseInt(limit))
       .map((p: any) => ({
-        id:                   p.id,
-        name:                 p.name,
-        generic_name:         p.description ?? null,
-        category:             p.category,
-        form:                 p.category,
-        strength:             p.strength ?? null,
-        manufacturer:         p.manufacturer ?? pharmacyNameMap[p.pharmacyId] ?? null,
-        description:          p.description ?? null,
-        price:                p.price,
-        in_stock:             p.inStock !== false,
-        requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
-        image_url:            p.imageUrl ?? null,
-        is_active:            p.inStock !== false,
-        numberOfTablets:      p.numberOfTablets ?? null,
-        productSummary:       p.productSummary ?? null,
-        recommendedFor:       p.recommendedFor ?? null,
-        benefits:             p.benefits ?? null,
-        sideEffects:          p.sideEffects ?? null,
-        howToUse:             p.howToUse ?? null,
-        pharmacyRating:       getAverage(p.pharmacyId),
-        pharmacyId:           p.pharmacyId ?? null,
-        pharmacyName:         pharmacyNameMap[p.pharmacyId] ?? null,
-        source:               "pharmacy" as const,
+        ...mapProductToMedicine(p, pharmacyNameMap),
+        pharmacyRating: getAverage(p.pharmacyId),
       }));
 
     // Opt-in widening beyond pharmacy stock — used by the doctor-portal prescription
@@ -229,28 +202,9 @@ router.get("/catalogue/:productId", async (req: Request, res: Response) => {
     if (!resources.length) { res.status(404).json({ error: "Product not found" }); return; }
     const p = resources[0] as any;
 
-    let pharmacyName: string | null = null;
-    if (p.pharmacyId) {
-      const { resource: pharmacyDoc } = await pharmaciesContainer.item(p.pharmacyId, p.pharmacyId).read();
-      pharmacyName = pharmacyDoc?.pharmacyName ?? null;
-    }
+    const pharmacyNameMap = await fetchPharmacyNameMap(p.pharmacyId ? [p.pharmacyId] : []);
 
-    res.json({
-      id: p.id, name: p.name, generic_name: p.description ?? null,
-      category: p.category, form: p.category, strength: p.strength ?? null,
-      manufacturer: p.manufacturer ?? pharmacyName ?? null, description: p.description ?? null,
-      price: p.price, in_stock: p.inStock !== false,
-      requires_prescription: p.requiresPrescription ?? (p.category === "Prescription"),
-      image_url: p.imageUrl ?? null, is_active: p.inStock !== false,
-      numberOfTablets: p.numberOfTablets ?? null,
-      productSummary: p.productSummary ?? null,
-      recommendedFor: p.recommendedFor ?? null,
-      benefits: p.benefits ?? null,
-      sideEffects: p.sideEffects ?? null,
-      howToUse: p.howToUse ?? null,
-      pharmacyId: p.pharmacyId ?? null,
-      pharmacyName,
-    });
+    res.json(mapProductToMedicine(p, pharmacyNameMap));
   } catch (err) {
     console.error("Catalogue single fetch error:", err);
     res.status(500).json({ error: "Internal server error" });
