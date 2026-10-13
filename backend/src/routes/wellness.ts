@@ -10,6 +10,7 @@ import { getAllAssessments, getAssessmentById, computeResult } from "../data/ass
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
 import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
+import { resolveMedicineSuggestions, MedicineSuggestionInput } from "../utils/pharmacyCatalogue";
 
 const router = Router();
 
@@ -478,8 +479,20 @@ const WELLNESS_CHAT_RESPONSE_SCHEMA = {
     readyForRecommendation: { type: "BOOLEAN" },
     recommendedSpecialty: { type: "STRING", nullable: true },
     suggestBooking: { type: "BOOLEAN" },
+    medicineSuggestions: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          drugName: { type: "STRING" },
+          dosageInstructions: { type: "STRING" },
+          reason: { type: "STRING" },
+        },
+        required: ["drugName", "dosageInstructions", "reason"],
+      },
+    },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking"],
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions"],
 };
 
 const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
@@ -518,6 +531,12 @@ SYMPTOM INTAKE (this is the core of your job):
 - Only set readyForRecommendation=true once you have primaryReason PLUS at least two more concrete details (from onset/location/severity/duration/additionalNotes) — including at least one symptom-specific detail from the guide above, not just a generic timeframe. Until then, keep asking; readyForRecommendation stays false and recommendedSpecialty stays null. Once ready, set recommendedSpecialty to the best match and suggestBooking=true, and let "reply" summarize everything you understood (a short recap) and offer to show relevant doctors.
 - If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors.
 
+MEDICINE SUGGESTIONS (independent of booking — a turn can set either, both, or neither):
+- Whenever the patient names a specific medicine they want ("do you have paracetamol?", "I want to buy something for allergies") OR describes a symptom that has a common over-the-counter remedy, populate "medicineSuggestions" with 1-3 entries: a real generic or common brand drug name (drugName), brief general adult dosage/usage guidance (dosageInstructions, e.g. "500mg every 6-8 hours as needed, max 4 doses in 24 hours"), and a one-line reason it's being suggested (reason, e.g. "Commonly used to reduce fever and relieve mild pain").
+- You do not know this platform's real pharmacy inventory or which drugs are prescription-only here — just name sensible candidates. The server independently checks each name against the real catalogue and its real prescription-requirement flag, so never claim in "reply" whether something needs a prescription or is in stock; let the app's own product cards convey that.
+- Leave "medicineSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins with no product fit, or whenever you are still asking clarifying questions and nothing resembling a usable remedy has been established yet.
+- This never replaces your "never diagnose or prescribe" rule above — dosageInstructions is general product-usage guidance, not a personalized prescription, and "reply" should still recommend seeing a doctor for anything beyond minor, self-limiting symptoms.
+
 Valid values for recommendedSpecialty (choose the closest match; use "General Physician" if unclear):
 ${SPECIALTIES.join(", ")}
 
@@ -554,9 +573,20 @@ function isObviouslyOffTopic(message: string): boolean {
 const OFF_TOPIC_REPLY =
   "I'm your wellness assistant and can only help with health and wellness questions. Feel free to ask me about symptoms, nutrition, fitness, or I can help you book a doctor!";
 
+function sanitizeMedicineSuggestions(raw: any): MedicineSuggestionInput[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s: any) => typeof s?.drugName === "string" && s.drugName.trim())
+    .map((s: any) => ({
+      drugName: s.drugName.trim(),
+      dosageInstructions: typeof s.dosageInstructions === "string" ? s.dosageInstructions.trim() : "",
+      reason: typeof s.reason === "string" ? s.reason.trim() : "",
+    }));
+}
+
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
-// Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking }
+// Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking, suggestedMedicines }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
@@ -573,6 +603,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       readyForRecommendation: false,
       suggestBooking: false,
       recommendedSpecialty: null,
+      suggestedMedicines: [],
     });
     return;
   }
@@ -667,6 +698,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         readyForRecommendation: false,
         suggestBooking: false,
         recommendedSpecialty: null,
+        suggestedMedicines: [],
       });
       return;
     }
@@ -702,6 +734,21 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       recommendedSpecialty = null;
     }
 
+    // Resolve the model's drug-name ideas against the real, approved
+    // pharmacy catalogue — only real orderable products are ever offered to
+    // buy. A Cosmos hiccup here degrades to no suggestions rather than
+    // failing the whole chat turn, since the reply/intake above is still
+    // perfectly usable on its own.
+    let suggestedMedicines: any[] = [];
+    try {
+      const rawSuggestions = sanitizeMedicineSuggestions(parsed.medicineSuggestions);
+      if (rawSuggestions.length) {
+        suggestedMedicines = await resolveMedicineSuggestions(orgId, rawSuggestions);
+      }
+    } catch (err: any) {
+      console.warn("[wellness-chat] medicine suggestion resolution failed:", err?.message);
+    }
+
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
       offTopic: false,
@@ -709,6 +756,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       readyForRecommendation,
       recommendedSpecialty,
       suggestBooking,
+      suggestedMedicines,
     });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
