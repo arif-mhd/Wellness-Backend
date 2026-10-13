@@ -10,6 +10,7 @@ import { getAllAssessments, getAssessmentById, computeResult } from "../data/ass
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
 import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
+import { getFaqForAssistant, PublicFaqEntry } from "../utils/faq";
 
 const router = Router();
 
@@ -454,7 +455,7 @@ function sanitizeIntake(raw: any): WellnessIntake {
 }
 
 // Gemini structured-output schema (Gemini "OpenAPI subset" schema format).
-const WELLNESS_CHAT_RESPONSE_SCHEMA = {
+export const WELLNESS_CHAT_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
     offTopic: { type: "BOOLEAN" },
@@ -482,18 +483,60 @@ const WELLNESS_CHAT_RESPONSE_SCHEMA = {
   required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking"],
 };
 
+// Used instead of the schema above only when the brand has FAQ content, so a
+// brand without any keeps sending exactly today's request. appHelp/faqIds are
+// optional: the model sets them only for questions about using the app.
+export const WELLNESS_CHAT_RESPONSE_SCHEMA_WITH_HELP = {
+  ...WELLNESS_CHAT_RESPONSE_SCHEMA,
+  properties: {
+    ...WELLNESS_CHAT_RESPONSE_SCHEMA.properties,
+    appHelp: { type: "BOOLEAN" },
+    faqIds: { type: "ARRAY", items: { type: "STRING" } },
+  },
+};
+
+// Keeps the prompt to a sensible size however much an admin writes.
+const MAX_FAQ_PROMPT_CHARS = 24_000;
+
+function buildAppHelpSection(faq: PublicFaqEntry[]): string {
+  let list = "";
+  for (const e of faq) {
+    const line = `[${e.id}] Q: ${e.question}\nA: ${e.answer}\n\n`;
+    if (list.length + line.length > MAX_FAQ_PROMPT_CHARS) break;
+    list += line;
+  }
+  return `
+
+APP HELP:
+- When the patient asks how to do something in this app, or how the app works, answer ONLY from the FAQ entries listed below. Never invent screens, steps, prices, fees, policies, timelines or features that are not written in an entry.
+- A request to book an appointment (e.g. "I want to book a doctor") is NOT an app question — keep using the booking behaviour above. Only a question about how the app works (e.g. "how do I cancel my appointment?") is.
+- For an app question: set appHelp=true and faqIds to the ids of the 1-3 entries you used, most relevant first. In "reply", give the answer in your own words, concisely (2-4 sentences); you may combine entries. Return the "intake so far" unchanged, with readyForRecommendation=false, suggestBooking=false and recommendedSpecialty=null.
+- If no entry answers it, set appHelp=true and faqIds=[], and reply that you don't have that information and that the patient can raise an issue from Profile → Help and Support.
+- If a message contains both a health complaint and an app question, handle the health complaint first (symptom intake as usual, appHelp=false); the app question can be answered on a later turn.
+- For every message that is not an app question, set appHelp=false and faqIds=[].
+
+FAQ entries:
+${list.trim()}`;
+}
+
 const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
   .map((h) => `  - ${h.symptoms} → ${h.specialty}`)
   .join("\n");
 
-function buildWellnessSystemPrompt(brandName: string, personaName: string): string {
+export function buildWellnessSystemPrompt(brandName: string, personaName: string, faq: PublicFaqEntry[] = []): string {
+  // Both inserts are empty strings without FAQ content, so the prompt is then
+  // byte-for-byte what it was before app help existed.
+  const appHelpRule = faq.length
+    ? `- EXCEPTION: questions about using this app itself (accounts, sign-in, booking, appointments, payments, orders, family profiles, records, settings, support) are on-topic — never set offTopic=true for them; handle them as described under APP HELP below.\n`
+    : "";
+  const appHelpSection = faq.length ? buildAppHelpSection(faq) : "";
   return `You are a helpful wellness assistant for ${brandName}, a healthcare platform. Your name is ${personaName}.
 
 You MUST respond with ONLY a single JSON object matching the supplied response schema — no prose outside the JSON.
 
 RULES:
 - Only discuss: health, wellness, nutrition, fitness, mental health, symptoms, medications, medical conditions, sleep, stress, hydration, vitamins, diet, exercise, pregnancy, or women's health. If the patient's message is unrelated (coding, politics, sports, entertainment, math, etc.), set offTopic=true and reply with a short redirect back to health topics; leave every other field at its default (empty/false/null).
-- Keep "reply" concise: 2-4 sentences max, friendly and empathetic.
+${appHelpRule}- Keep "reply" concise: 2-4 sentences max, friendly and empathetic.
 - Never diagnose or prescribe. Always recommend consulting a doctor for anything beyond general wellness advice.
 - For greetings like "hi" or "hello" with no symptom mentioned, respond warmly, ask how you can help, and leave intake/booking fields at their defaults.
 
@@ -522,7 +565,7 @@ Valid values for recommendedSpecialty (choose the closest match; use "General Ph
 ${SPECIALTIES.join(", ")}
 
 Example symptom → specialty reasoning:
-${SPECIALTY_HINTS_TEXT}`;
+${SPECIALTY_HINTS_TEXT}${appHelpSection}`;
 }
 
 // ── Deterministic off-topic pre-filter ───────────────────────────────────────
@@ -588,7 +631,16 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
     getOrgBrandName(orgId),
     getOrgPersonaName(orgId),
   ]);
-  const systemPrompt = buildWellnessSystemPrompt(brandName, personaName);
+  // The brand's FAQ lets the assistant answer "how do I…" questions about the
+  // app. Any failure here just means no app help this turn — never a broken chat.
+  let faq: PublicFaqEntry[] = [];
+  try {
+    faq = await getFaqForAssistant(orgId);
+  } catch (err: any) {
+    console.warn("[wellness-chat] FAQ unavailable, continuing without app help:", err?.message);
+  }
+  const systemPrompt = buildWellnessSystemPrompt(brandName, personaName, faq);
+  const responseSchema = faq.length ? WELLNESS_CHAT_RESPONSE_SCHEMA_WITH_HELP : WELLNESS_CHAT_RESPONSE_SCHEMA;
   const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
 
   try {
@@ -631,7 +683,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
               maxOutputTokens: 800,
               temperature: 0.7,
               responseMimeType: "application/json",
-              responseSchema: WELLNESS_CHAT_RESPONSE_SCHEMA,
+              responseSchema,
             },
           }),
         });
@@ -702,13 +754,33 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       recommendedSpecialty = null;
     }
 
+    // App help is honoured only when the model claims it AND nothing in the
+    // same answer points at booking or a new symptom — triage and booking
+    // always win, so a misjudged app-help flag can never swallow a patient
+    // who needed a doctor. faqIds are kept only if they name real, visible
+    // entries; the reply was written from those same entries.
+    const knownFaqIds = new Set(faq.map((e) => e.id));
+    const newSymptom = !!mergedIntake.primaryReason && mergedIntake.primaryReason !== intakeSoFar.primaryReason;
+    const appHelp =
+      faq.length > 0 &&
+      parsed.appHelp === true &&
+      !readyForRecommendation &&
+      !suggestBooking &&
+      !newSymptom;
+    const faqIds = appHelp && Array.isArray(parsed.faqIds)
+      ? [...new Set(parsed.faqIds as unknown[])].filter((id): id is string => typeof id === "string" && knownFaqIds.has(id)).slice(0, 3)
+      : [];
+
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
       offTopic: false,
-      intake: mergedIntake,
+      // An app question must not edit the symptom intake gathered so far.
+      intake: appHelp ? intakeSoFar : mergedIntake,
       readyForRecommendation,
       recommendedSpecialty,
       suggestBooking,
+      appHelp,
+      faqIds,
     });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);

@@ -159,6 +159,11 @@ export const pushTokensContainer: Container = db.container("pushTokens");
  *  src/data/dietFoodCatalogs.ts and src/scripts/seedDietFoods.ts) */
 export const dietFoodsContainer: Container = db.container("dietFoods");
 
+/** Help-and-FAQ content per brand — partition key: /orgId. Two doc types:
+ *  docType "category" and docType "entry"; see src/utils/faq.ts. One brand's
+ *  whole FAQ lives in one partition, so every read is a single-partition query. */
+export const faqsContainer: Container = db.container("faqs");
+
 // ─── Container provisioning ──────────────────────────────────────────────────
 
 /**
@@ -210,6 +215,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "withdrawalRequests",     partitionKey: { paths: ["/orgId"] } },
     { id: "pushTokens",             partitionKey: { paths: ["/userId"] } },
     { id: "dietFoods",              partitionKey: { paths: ["/catalogId"] } },
+    { id: "faqs",                   partitionKey: { paths: ["/orgId"] } },
   ];
 
   for (const spec of required) {
