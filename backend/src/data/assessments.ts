@@ -18,6 +18,12 @@ export interface AssessmentQuestion {
    *  e.g. the safety follow-up after a positive self-harm item. Clients must
    *  filter on this; computeResult ignores answers whose condition is unmet. */
   showIf?: { questionId: string; minScore: number };
+  /** Risk / self-harm key question. Any answer scoring >= 1 triggers the
+   *  crisis layer: the questionnaire STOPS — only this question's own
+   *  follow-ups (questions whose showIf points at it) are still asked — and
+   *  the client routes to crisis resources. computeResult ignores any answers
+   *  to questions after a triggered risk item. */
+  crisisTrigger?: boolean;
 }
 
 export interface ScoreRange {
@@ -582,7 +588,9 @@ const ASSESSMENTS: AssessmentDefinition[] = [
   // by both the in-chat check-in and the standalone Mental Health tile.
   // Unlike every other assessment here, items score 0–3 and HIGHER is WORSE —
   // scored by computeMentalHealthScreening, not the generic sum path.
-  // q9 is the PHQ-9 self-harm item; "safety" is only asked when q9 >= 1.
+  // q9 is the PHQ-9 self-harm item (crisisTrigger). Any positive answer stops
+  // the questionnaire: only the "safety" follow-up is asked, then the patient
+  // is routed to crisis resources — GAD-2 is never reached.
   {
     id: "mental-health-screening",
     title: "Mental Health Check-in",
@@ -606,7 +614,7 @@ const ASSESSMENTS: AssessmentDefinition[] = [
         options: PHQ_FREQUENCY_OPTIONS },
       { id: "q8", type: "choice", text: "Over the last 2 weeks, how often have you been moving or speaking so slowly that others could notice — or so fidgety or restless that you've been moving around a lot more than usual?",
         options: PHQ_FREQUENCY_OPTIONS },
-      { id: "q9", type: "choice", text: "Over the last 2 weeks, how often have you had thoughts that you would be better off dead, or of hurting yourself in some way?",
+      { id: "q9", type: "choice", crisisTrigger: true, text: "Over the last 2 weeks, how often have you had thoughts that you would be better off dead, or of hurting yourself in some way?",
         options: PHQ_FREQUENCY_OPTIONS },
       { id: "safety", type: "choice", showIf: { questionId: "q9", minScore: 1 },
         text: "Thank you for sharing that. Right now, are you having thoughts of ending your life, or have you made any plans to?",
@@ -1010,9 +1018,10 @@ function phqSeverity(total: number): "minimal" | "mild" | "moderate" | "moderate
  * PHQ-9 + GAD-2 scoring for mental-health-screening.
  *
  * - totalScore is the PHQ-9 total (0–27, higher = worse), banded via scoreRanges.
- * - All nine PHQ-9 items are required. GAD-2 is optional so a check-in cut
- *   short by a crisis (the chat stops asking once "safety" is Yes) can still
- *   be saved — anxiety is then reported as null, not 0.
+ * - All nine PHQ-9 items are required. GAD-2 is only scored when item 9 is
+ *   "Not at all": a positive item 9 is a crisis trigger that stops the
+ *   questionnaire, so any GAD-2 answers sent anyway are ignored and anxiety
+ *   is reported as null, not 0.
  * - Any positive item 9 forces risk "High" regardless of the total and puts
  *   urgent-help recommendations first. "Yes" on the safety follow-up marks
  *   selfHarmRisk "active".
@@ -1023,12 +1032,13 @@ function computeMentalHealthScreening(assessment: AssessmentDefinition, answers:
   if (!PHQ9_ITEMS.every((id) => valid(answers[id], 3))) return null;
 
   const phq9 = PHQ9_ITEMS.reduce((s, id) => s + answers[id], 0);
-  const gadAnswered = GAD2_ITEMS.every((id) => valid(answers[id], 3));
+  const crisisTriggered = answers["q9"] >= 1;
+  const gadAnswered = !crisisTriggered && GAD2_ITEMS.every((id) => valid(answers[id], 3));
   const gad2 = gadAnswered ? GAD2_ITEMS.reduce((s, id) => s + answers[id], 0) : null;
   const anxietyPositive = gad2 !== null && gad2 >= 3;
 
   const selfHarmRisk: SelfHarmRisk =
-    answers["q9"] === 0 ? "none" : answers["safety"] === 1 ? "active" : "passive";
+    !crisisTriggered ? "none" : answers["safety"] === 1 ? "active" : "passive";
 
   const range = assessment.scoreRanges.find((r) => phq9 >= r.min && phq9 <= r.max)
     ?? assessment.scoreRanges[assessment.scoreRanges.length - 1];
@@ -1074,6 +1084,8 @@ function computeMentalHealthScreening(assessment: AssessmentDefinition, answers:
     recommendations,
     scores: { phq9, gad2 },
     severity: phqSeverity(phq9),
-    safety: { selfHarmRisk },
+    // crisisRouted: the questionnaire was stopped at a risk item and the
+    // patient was sent to crisis resources (clients show them first).
+    safety: { selfHarmRisk, crisisRouted: crisisTriggered },
   };
 }

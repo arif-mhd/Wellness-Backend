@@ -455,6 +455,45 @@ function sanitizeIntake(raw: any): WellnessIntake {
   };
 }
 
+// ── "For whom?" subject ──────────────────────────────────────────────────────
+// The chat can be about the account holder or one of their family members —
+// the app sends whoever was picked in its "For whom?" picker. It only shapes
+// how the model phrases things (third person, age-appropriate questions); it
+// grants no data access, so it is sanitized as untrusted display text.
+interface ChatSubject {
+  name: string;
+  relationship: string; // "Self" for the account holder
+  isSelf: boolean;
+  age: number | null;
+  gender: string | null;
+}
+
+function cleanText(v: unknown, max: number): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
+  return t || null;
+}
+
+function sanitizeSubject(raw: any): ChatSubject | null {
+  const name = cleanText(raw?.name, 60);
+  if (!name) return null;
+  const age = typeof raw?.age === "number" && raw.age >= 0 && raw.age < 130 ? Math.floor(raw.age) : null;
+  return {
+    name,
+    relationship: cleanText(raw?.relationship, 30) ?? "Family member",
+    isSelf: raw?.isSelf === true,
+    age,
+    gender: cleanText(raw?.gender, 20),
+  };
+}
+
+function describeSubject(subject: ChatSubject | null): string {
+  if (!subject) return "Not chosen yet — assume the patient is talking about themselves unless they say otherwise.";
+  if (subject.isSelf) return `The account holder themselves (${subject.name}).`;
+  const details = [subject.age !== null ? `${subject.age} years old` : null, subject.gender].filter(Boolean).join(", ");
+  return `${subject.name} — the account holder's ${subject.relationship.toLowerCase()}${details ? ` (${details})` : ""}. The person typing is the account holder asking on their behalf.`;
+}
+
 // Gemini structured-output schema (Gemini "OpenAPI subset" schema format).
 const WELLNESS_CHAT_RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -482,6 +521,7 @@ const WELLNESS_CHAT_RESPONSE_SCHEMA = {
     suggestBooking: { type: "BOOLEAN" },
     riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
     suggestScreening: { type: "BOOLEAN" },
+    subjectRelation: { type: "STRING", nullable: true },
   },
   required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "riskLevel", "suggestScreening"],
 };
@@ -521,6 +561,10 @@ SYMPTOM INTAKE (this is the core of your job):
 - ALWAYS return the full merged intake object — carry forward every field you already knew from "intake so far" plus whatever new information this turn added, including specifics from the guide above folded into "additionalNotes" or "symptoms". Never null out something you already learned.
 - Only set readyForRecommendation=true once you have primaryReason PLUS at least two more concrete details (from onset/location/severity/duration/additionalNotes) — including at least one symptom-specific detail from the guide above, not just a generic timeframe. Until then, keep asking; readyForRecommendation stays false and recommendedSpecialty stays null. Once ready, set recommendedSpecialty to the best match and suggestBooking=true, and let "reply" summarize everything you understood (a short recap) and offer to show relevant doctors.
 - If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors.
+
+WHO THE CONVERSATION IS ABOUT ("For whom?"):
+- Each turn tells you who the conversation is about. When it is a family member, address the account holder but ask about the family member in the third person using their name ("How high has Sara's temperature been?"), and adapt questions to their age (e.g. for a young child ask about feeding, irritability and wet nappies rather than self-reported pain scores). The intake describes the family member.
+- subjectRelation: if THIS message says the concern is about someone other than the person typing, set it to that person's relation in one lowercase English word (e.g. "son", "daughter", "mother", "father", "wife", "husband", "brother", "sister", "grandmother", "child", "parent"); if the message makes clear it is about the person typing, set "self"; otherwise null. The app uses this to offer its family picker.
 
 MENTAL HEALTH & SAFETY (overrides everything above):
 - Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
@@ -577,11 +621,13 @@ async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSu
 }
 
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
-// Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
+// Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake,
+//         subject?: { name, relationship, isSelf, age?, gender? } }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking,
-//            suggestScreening, crisis: { level, emergencyNumber, lines } | null }
+//            suggestScreening, subjectRelation, crisis: { level, emergencyNumber, lines } | null }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
+  const subject = sanitizeSubject(req.body.subject);
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
     return;
@@ -654,7 +700,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         })),
       {
         role: "user",
-        parts: [{ text: `Intake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}` }],
+        parts: [{ text: `Conversation is about: ${describeSubject(subject)}\n\nIntake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}` }],
       },
     ];
 
@@ -781,6 +827,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       recommendedSpecialty,
       suggestBooking,
       suggestScreening,
+      subjectRelation: cleanText(parsed.subjectRelation, 20)?.toLowerCase() ?? null,
       crisis: null,
     });
   } catch (err: any) {
@@ -1388,6 +1435,14 @@ router.post("/assessments/submit", async (req: SessionRequest, res: Response) =>
 
     const computed = computeResult(assessment, answers);
     if (!computed) { res.status(400).json({ error: "Could not compute result" }); return; }
+
+    // profileId is set when the chat's "For whom?" picker chose a family
+    // member — only accept the account holder or one of their own members.
+    if (profileId && profileId !== patientId) {
+      const { resource: patient } = await patientsContainer.item(patientId, patientId).read();
+      const isOwnMember = ((patient?.familyMembers as any[]) ?? []).some((m: any) => m?.id === profileId);
+      if (!isOwnMember) { res.status(403).json({ error: "Unknown family member" }); return; }
+    }
 
     const resultDoc = {
       id: crypto.randomUUID(),
