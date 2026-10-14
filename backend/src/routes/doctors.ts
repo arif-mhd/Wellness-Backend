@@ -11,7 +11,8 @@ import { notifyClinic } from "./clinicPayments";
 import { loadOrgDocForClinicId } from "./clinicInsurance";
 import { resolveOrgIdFromHeader, getClinicIdsForOrg } from "../utils/orgScope";
 import { buildInClause } from "../utils/clinicScope";
-import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor } from "../utils/timezone";
+import { resolveTimezoneForDoctor } from "../utils/timezone";
+import { availableTimes, isAvailableNow, nextFreeSlot } from "../utils/doctorAvailability";
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { resolveCountryConfigForDoctor } from "../utils/orgScope";
 
@@ -538,89 +539,10 @@ router.get("/:id/available-slots", async (req: Request, res: Response) => {
       return;
     }
 
+    // Schedule, leave, already-started and booked slots are all worked out
+    // in the clinic's own timezone — see utils/doctorAvailability.
     const timezone = await resolveTimezoneForDoctor(doctor);
-    const slots: any[] = doctor.slots ?? [];
-    // Noon anchor avoids DST-transition edge cases when computing which
-    // calendar day-of-week this date is, in the clinic's own timezone —
-    // not the server's (Cloud Run runs in UTC, which silently matched by
-    // coincidence for AE/IN before, since noon UTC is unambiguous).
-    const dayOfWeek = utcToZonedTime(zonedTimeToUtc(date, "12:00", timezone), timezone).getDay();
-    const activeDaySlots = slots.filter((s: any) => s.dayOfWeek === dayOfWeek && s.isActive);
-
-    if (activeDaySlots.length === 0) {
-      res.json({ available: [], slotDurationMins: 30 });
-      return;
-    }
-
-    const intervals: string[] = [];
-    let duration = 30;
-
-    for (const daySlot of activeDaySlots) {
-      duration = daySlot.slotDurationMins ?? 30;
-      if (!daySlot.startTime || !daySlot.endTime) continue;
-      const [startH, startM] = daySlot.startTime.split(":").map(Number);
-      const [endH, endM] = daySlot.endTime.split(":").map(Number);
-      let cursor = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
-
-      while (cursor + duration <= endMinutes) {
-        const h = Math.floor(cursor / 60).toString().padStart(2, "0");
-        const m = (cursor % 60).toString().padStart(2, "0");
-
-        // Check if slot falls in any scheduled absences. slotStart is a real
-        // UTC instant, matching abs.startDate/abs.endDate which are already
-        // true UTC ISO strings.
-        const slotStart = zonedTimeToUtc(date, `${h}:${m}`, timezone);
-        const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
-        const absences = doctor.absences ?? [];
-        const isAbsent = absences.some((abs: any) => {
-          const absStart = new Date(abs.startDate);
-          const absEnd = new Date(abs.endDate);
-          return slotStart < absEnd && slotEnd > absStart;
-        });
-
-        // Skip slots that have already started — relevant when the
-        // requested date is today; a no-op for future dates since
-        // slotStart is always ahead of "now" for those.
-        const isPast = slotStart <= new Date();
-
-        if (!isAbsent && !isPast) {
-          intervals.push(`${h}:${m}`);
-        }
-        cursor += duration;
-      }
-    }
-
-    const uniqueIntervals = Array.from(new Set(intervals)).sort();
-
-    // Find booked slots for this date — bounds are the CLINIC's local day,
-    // converted to true UTC instants (not the calendar-UTC day, which would
-    // be wrong by the clinic's offset).
-    const dayStart = startOfClinicDayUtc(date, timezone).toISOString();
-    const dayEnd = new Date(zonedTimeToUtc(date, "23:59", timezone).getTime() + 59_999).toISOString();
-
-    const booked = await queryDocuments<any>(appointmentsContainer, {
-      query: `SELECT c.scheduledAt FROM c
-              WHERE c.doctorId = @doctorId
-                AND c.scheduledAt >= @dayStart
-                AND c.scheduledAt <= @dayEnd
-                AND c.status != 'cancelled'`,
-      parameters: [
-        { name: "@doctorId", value: id },
-        { name: "@dayStart", value: dayStart },
-        { name: "@dayEnd", value: dayEnd },
-      ],
-    });
-
-    const bookedSet = new Set(
-      booked.map((b: any) => {
-        const local = utcToZonedTime(new Date(b.scheduledAt), timezone);
-        return `${local.getHours().toString().padStart(2, "0")}:${local.getMinutes().toString().padStart(2, "0")}`;
-      })
-    );
-
-    const available = uniqueIntervals.filter((t) => !bookedSet.has(t));
-    res.json({ available, slotDurationMins: duration });
+    res.json(await availableTimes(doctor, date, timezone));
   } catch (err) {
     console.error("Available slots error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -801,7 +723,7 @@ router.patch("/networking-status", requireRole("doctor"), async (req: SessionReq
 // directory actually needs — excludes Emirates ID, DOB, bank details,
 // address, and other identity/financial fields that have no business being
 // visible to an unauthenticated caller browsing the doctor list.
-function toPublicDoctor(doc: any) {
+function toPublicDoctor(doc: any, availableNow = false) {
   return {
     id: doc.id,
     fullName: doc.fullName,
@@ -816,6 +738,9 @@ function toPublicDoctor(doc: any) {
     clinicId: doc.clinicId ?? null,
     clinicName: doc.clinicName ?? null,
     isOnline: doc.isOnline,
+    // Working right now by their own schedule (utils/doctorAvailability) —
+    // `isOnline` is only refreshed while the doctor has the portal open.
+    availableNow,
     status: doc.status,
     consultationTimeLimitMins: doc.consultationTimeLimitMins,
   };
@@ -863,6 +788,51 @@ function specialtyMatches(doctorSpecialty: string, wanted: string): boolean {
   return stemA === stemB || stemA.includes(stemB) || stemB.includes(stemA);
 }
 
+// Timezone per clinic, looked up once per request — every doctor in a
+// clinic shares its org's timezone.
+function timezoneLookup() {
+  const byClinic = new Map<string, Promise<string>>();
+  return (doc: any) => {
+    const key = doc.clinicId ?? "";
+    if (!byClinic.has(key)) byClinic.set(key, resolveTimezoneForDoctor(doc));
+    return byClinic.get(key)!;
+  };
+}
+
+// Approved doctors of the calling brand's org (X-Org-Slug), optionally one
+// clinic's and/or one specialty's — the roster both GET / and
+// GET /next-free-slot work from.
+async function orgDoctors(req: Request): Promise<any[]> {
+  const clinicId = typeof req.query.clinicId === "string" ? req.query.clinicId : null;
+  const specialization = typeof req.query.specialization === "string"
+    ? req.query.specialization
+    : typeof req.query.specialty === "string"
+      ? req.query.specialty
+      : null;
+  const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
+  const orgId = await resolveOrgIdFromHeader(orgSlug);
+  const orgClinicIds = await getClinicIdsForOrg(orgId);
+
+  // clinicId (if given) must itself belong to this org — an org's
+  // Clinic Profile screen should never be able to leak another org's
+  // roster by passing an arbitrary clinicId.
+  const scopedClinicIds = clinicId
+    ? (orgClinicIds.includes(clinicId) ? [clinicId] : [])
+    : orgClinicIds;
+
+  if (scopedClinicIds.length === 0) return [];
+
+  const { clause, parameters: inParams } = buildInClause("c.clinicId", scopedClinicIds);
+  const query = `SELECT * FROM c WHERE c.status = @status AND ${clause} ORDER BY c.approvedAt DESC`;
+  const parameters = [{ name: "@status", value: "approved" }, ...inParams];
+
+  const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
+
+  return specialization
+    ? resources.filter((doc: any) => specialtyMatches(doc.specialty ?? "", specialization))
+    : resources;
+}
+
 // ─── GET /api/doctors ───────────────────────────────────────────────────────
 // Public or Patient endpoint to list all approved doctors, scoped to the
 // calling brand's own org — every doctor belongs to exactly one clinic,
@@ -878,42 +848,40 @@ function specialtyMatches(doctorSpecialty: string, wanted: string): boolean {
 // by the Dr. Wellness chatbot's doctor recommendations. See specialtyMatches
 // above for why this isn't a plain equality check.
 router.get("/", async (req: Request, res: Response) => {
-  const clinicId = typeof req.query.clinicId === "string" ? req.query.clinicId : null;
-  const specialization = typeof req.query.specialization === "string"
-    ? req.query.specialization
-    : typeof req.query.specialty === "string"
-      ? req.query.specialty
-      : null;
   try {
-    const orgSlug = typeof req.headers["x-org-slug"] === "string" ? req.headers["x-org-slug"] : undefined;
-    const orgId = await resolveOrgIdFromHeader(orgSlug);
-    const orgClinicIds = await getClinicIdsForOrg(orgId);
-
-    // clinicId (if given) must itself belong to this org — an org's
-    // Clinic Profile screen should never be able to leak another org's
-    // roster by passing an arbitrary clinicId.
-    const scopedClinicIds = clinicId
-      ? (orgClinicIds.includes(clinicId) ? [clinicId] : [])
-      : orgClinicIds;
-
-    if (scopedClinicIds.length === 0) {
-      res.json({ doctors: [] });
-      return;
-    }
-
-    const { clause, parameters: inParams } = buildInClause("c.clinicId", scopedClinicIds);
-    const query = `SELECT * FROM c WHERE c.status = @status AND ${clause} ORDER BY c.approvedAt DESC`;
-    const parameters = [{ name: "@status", value: "approved" }, ...inParams];
-
-    const { resources } = await doctorsContainer.items.query({ query, parameters }).fetchAll();
-
-    const filtered = specialization
-      ? resources.filter((doc: any) => specialtyMatches(doc.specialty ?? "", specialization))
-      : resources;
-
-    res.json({ doctors: filtered.map(toPublicDoctor) });
+    const doctors = await orgDoctors(req);
+    const timezoneOf = timezoneLookup();
+    const now = new Date();
+    const shaped = await Promise.all(
+      doctors.map(async (doc: any) => toPublicDoctor(doc, isAvailableNow(doc, await timezoneOf(doc), now))),
+    );
+    res.json({ doctors: shaped });
   } catch (err) {
     console.error("Fetch approved doctors error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /api/doctors/next-free-slot ────────────────────────────────────────
+// Public endpoint — the earliest bookable slot in the next 14 days among the
+// brand's approved doctors, scoped and filtered exactly like GET / above
+// (X-Org-Slug, ?clinicId=, ?specialization=). The chatbot offers it when no
+// doctor of the wanted specialty is working right now.
+// Returns { slot: null } when nobody has a free slot in that window.
+router.get("/next-free-slot", async (req: Request, res: Response) => {
+  try {
+    const doctors = await orgDoctors(req);
+    const timezoneOf = timezoneLookup();
+    const withZones = await Promise.all(doctors.map(async (doctor: any) => ({ doctor, timezone: await timezoneOf(doctor) })));
+    const slot = await nextFreeSlot(withZones);
+    if (!slot) {
+      res.json({ slot: null });
+      return;
+    }
+    const doctor = doctors.find((d: any) => d.id === slot.doctorId);
+    res.json({ slot: { ...slot, doctor: toPublicDoctor(doctor, isAvailableNow(doctor, slot.timezone)) } });
+  } catch (err) {
+    console.error("Next free slot error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
