@@ -14,6 +14,7 @@ import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/ex
 import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
 import { getFaqForAssistant, PublicFaqEntry } from "../utils/faq";
 import { resolveMedicineSuggestions, MedicineSuggestionInput } from "../utils/pharmacyCatalogue";
+import { resolveLabTestSuggestions, LabTestSuggestionInput } from "../utils/labCatalogue";
 
 const router = Router();
 
@@ -494,10 +495,21 @@ export const WELLNESS_CHAT_RESPONSE_SCHEMA = {
         required: ["drugName", "dosageInstructions", "reason"],
       },
     },
+    labTestSuggestions: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          testName: { type: "STRING" },
+          reason: { type: "STRING" },
+        },
+        required: ["testName", "reason"],
+      },
+    },
     riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
     suggestScreening: { type: "BOOLEAN" },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions", "riskLevel", "suggestScreening"],
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions", "labTestSuggestions", "riskLevel", "suggestScreening"],
 };
 
 // Used instead of the schema above only when the brand has FAQ content, so a
@@ -527,7 +539,7 @@ function buildAppHelpSection(faq: PublicFaqEntry[]): string {
 APP HELP:
 - When the patient asks how to do something in this app, or how the app works, answer ONLY from the FAQ entries listed below. Never invent screens, steps, prices, fees, policies, timelines or features that are not written in an entry.
 - A request to book an appointment (e.g. "I want to book a doctor") is NOT an app question — keep using the booking behaviour above. Only a question about how the app works (e.g. "how do I cancel my appointment?") is.
-- For an app question: set appHelp=true and faqIds to the ids of the 1-3 entries you used, most relevant first. In "reply", give the answer in your own words, concisely (2-4 sentences); you may combine entries. Return the "intake so far" unchanged, with readyForRecommendation=false, suggestBooking=false, recommendedSpecialty=null and medicineSuggestions=[].
+- For an app question: set appHelp=true and faqIds to the ids of the 1-3 entries you used, most relevant first. In "reply", give the answer in your own words, concisely (2-4 sentences); you may combine entries. Return the "intake so far" unchanged, with readyForRecommendation=false, suggestBooking=false, recommendedSpecialty=null, medicineSuggestions=[] and labTestSuggestions=[].
 - If no entry answers it, set appHelp=true and faqIds=[], and reply that you don't have that information and that the patient can raise an issue from Profile → Help and Support.
 - If a message contains both a health complaint and an app question, handle the health complaint first (symptom intake as usual, appHelp=false); the app question can be answered on a later turn.
 - For every message that is not an app question, set appHelp=false and faqIds=[].
@@ -585,6 +597,12 @@ MEDICINE SUGGESTIONS (independent of booking — a turn can set either, both, or
 - Leave "medicineSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins with no product fit, or whenever you are still asking clarifying questions and nothing resembling a usable remedy has been established yet.
 - This never replaces your "never diagnose or prescribe" rule above — dosageInstructions is general product-usage guidance, not a personalized prescription, and "reply" should still recommend seeing a doctor for anything beyond minor, self-limiting symptoms.
 
+LAB TEST SUGGESTIONS (independent of booking and of medicine suggestions — a turn can set any combination of them, or none):
+- Whenever the patient asks about a specific test or exam ("do you have an X-ray?", "what blood tests should I get?") OR describes a symptom with an obvious diagnostic correlate (e.g. joint/limb pain → an X-ray, suspected infection or fatigue → a blood test/CBC), populate "labTestSuggestions" with 1-2 entries: a real-world test/exam name (testName, e.g. "X-Ray", "Complete Blood Count") and a one-line reason it's being suggested (reason, e.g. "Can help check for a fracture or joint issue").
+- You do not know this platform's real lab catalogue or which tests need prior doctor approval here — just name sensible candidates. The server independently checks each name against the real catalogue and its real approval-requirement flag, so never claim in "reply" whether a test is available, its price, or whether it needs approval; let the app's own test cards convey that.
+- Leave "labTestSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins, or whenever you are still asking clarifying questions and nothing resembling a usable diagnostic test has been established yet.
+- This never replaces your "never diagnose" rule — suggesting a relevant test is not a diagnosis, and "reply" should still recommend seeing a doctor for anything beyond a minor, self-limiting complaint.
+
 MENTAL HEALTH & SAFETY (overrides everything above):
 - Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
 - If riskLevel is "concern" or "imminent": respond with warmth and without judgement, thank them for telling you, say clearly that they deserve support and are not alone, and encourage them to contact a crisis line or emergency services (the app shows the numbers — do not invent phone numbers). Never minimise, argue, lecture, or give information about methods or doses. Do NOT continue symptom triage on that turn: leave readyForRecommendation=false, suggestBooking=false, suggestScreening=false.
@@ -638,6 +656,16 @@ function sanitizeMedicineSuggestions(raw: any): MedicineSuggestionInput[] {
     }));
 }
 
+function sanitizeLabTestSuggestions(raw: any): LabTestSuggestionInput[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s: any) => typeof s?.testName === "string" && s.testName.trim())
+    .map((s: any) => ({
+      testName: s.testName.trim(),
+      reason: typeof s.reason === "string" ? s.reason.trim() : "",
+    }));
+}
+
 // Never lets an org-lookup failure block a crisis response — falls back to
 // the platform default country's numbers instead.
 async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSupportConfig> {
@@ -653,7 +681,7 @@ async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSu
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking,
-//            appHelp, faqIds, suggestedMedicines, suggestScreening, crisis: { level, emergencyNumber, lines } | null }
+//            appHelp, faqIds, suggestedMedicines, suggestedLabTests, suggestScreening, crisis: { level, emergencyNumber, lines } | null }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
@@ -690,6 +718,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestBooking: false,
       recommendedSpecialty: null,
       suggestedMedicines: [],
+      suggestedLabTests: [],
       suggestScreening: false,
       crisis: null,
     });
@@ -819,6 +848,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         suggestBooking: false,
         recommendedSpecialty: null,
         suggestedMedicines: [],
+        suggestedLabTests: [],
         suggestScreening: false,
         crisis: null,
       });
@@ -890,6 +920,19 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       console.warn("[wellness-chat] medicine suggestion resolution failed:", err?.message);
     }
 
+    // Same idea as medicines — resolve the model's test/exam ideas against
+    // the real, approved lab catalogue, degrading to no suggestions rather
+    // than failing the whole turn on a Cosmos hiccup.
+    let suggestedLabTests: any[] = [];
+    try {
+      const rawTestSuggestions = sanitizeLabTestSuggestions(parsed.labTestSuggestions);
+      if (rawTestSuggestions.length && !appHelp) {
+        suggestedLabTests = await resolveLabTestSuggestions(orgId, rawTestSuggestions);
+      }
+    } catch (err: any) {
+      console.warn("[wellness-chat] lab test suggestion resolution failed:", err?.message);
+    }
+
     const suggestScreening = parsed.suggestScreening === true || SCREENING_REQUEST_PATTERN.test(message);
 
     res.json({
@@ -903,6 +946,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       appHelp,
       faqIds,
       suggestedMedicines,
+      suggestedLabTests,
       suggestScreening,
       crisis: null,
     });
