@@ -7,6 +7,7 @@ import { getCountryConfig, CrisisSupportConfig } from "../config/countries";
 import { CrisisLevel, detectCrisisLanguage, buildCrisisReply, crisisPayload, SCREENING_REQUEST_PATTERN } from "../utils/crisisDetection";
 import { foodLogsContainer, workoutLogsContainer, weightLogsContainer, routinesContainer, assessmentResultsContainer, patientsContainer, dietPlansContainer } from "../config/cosmos";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
+import { resolveOwnedProfileId } from "../utils/profile";
 import { DISCOVERY_ROUTINES, getDiscoveryRoutineById } from "../data/routines";
 import { getAllAssessments, getAssessmentById, computeResult } from "../data/assessments";
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
@@ -912,7 +913,8 @@ router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
 router.get("/diet-plan", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+    const profileId = await resolveOwnedProfileId(patientId, req.query.profileId);
+    if (!profileId) { res.status(403).json({ error: "Not authorized." }); return; }
 
     const { resources } = await dietPlansContainer.items.query(
       {
@@ -933,7 +935,8 @@ router.get("/diet-plan", async (req: SessionRequest, res: Response) => {
 router.get("/diet-plan/history", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+    const profileId = await resolveOwnedProfileId(patientId, req.query.profileId);
+    if (!profileId) { res.status(403).json({ error: "Not authorized." }); return; }
 
     const { resources } = await dietPlansContainer.items.query(
       {
@@ -954,7 +957,8 @@ router.get("/diet-plan/history", async (req: SessionRequest, res: Response) => {
 router.get("/diet-plan/:id/progress", async (req: SessionRequest, res: Response) => {
   try {
     const patientId = req.session!.getUserId();
-    const profileId = typeof req.query.profileId === "string" ? req.query.profileId : patientId;
+    const profileId = await resolveOwnedProfileId(patientId, req.query.profileId);
+    if (!profileId) { res.status(403).json({ error: "Not authorized." }); return; }
 
     const progress = await computeDietPlanProgress(profileId, req.params.id);
     if (!progress.plan) { res.status(404).json({ error: "Diet plan not found" }); return; }

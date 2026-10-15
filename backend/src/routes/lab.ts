@@ -15,6 +15,7 @@ import { resolveClinicName } from "./clinicInsurance";
 import { resolveOrgId, resolveOrgIdForRegistration, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/orgScope";
 import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
 import { buildInClause } from "../utils/clinicScope";
+import { getOwnedProfileIds } from "../utils/profile";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -657,6 +658,15 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
       return;
     }
 
+    // Every item must be for the patient themself or one of their own family
+    // members — never a profile id belonging to another account.
+    const ownedProfileIds = await getOwnedProfileIds(patientId);
+    const targetFor = (item: { forPatientId?: string }) => item.forPatientId || profileId || patientId;
+    if (items.some((item: any) => !ownedProfileIds.has(targetFor(item)))) {
+      res.status(403).json({ error: "You can only book lab tests for yourself or your family members." });
+      return;
+    }
+
     // Tests the doctor already recommended during this consultation don't need
     // a second doctor's sign-off. The appointment is loaded and checked here
     // (never trusted from the client): it must be this patient's, and only
@@ -700,7 +710,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
         labId:         test.labId,
         labName:       test.labName,
         price:         test.price,
-        forPatientId:  item.forPatientId ?? profileId ?? patientId,
+        forPatientId:  targetFor(item),
         visitMode:     item.visitMode ?? "Laboratory",
         scheduledAt:   item.scheduledAt ?? null,
         recommendedByDoctorId: recommendedBy.get(test.id) ?? null,

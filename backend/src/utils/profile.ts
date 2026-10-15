@@ -3,6 +3,30 @@
 // doctor/admin portals. profileId === patientId means "the account owner's
 // own profile"; any other value must match a patient.familyMembers[].id.
 
+import { patientsContainer } from "../config/cosmos";
+
+// Every profile id the signed-in patient may act on: their own account id
+// plus each of their familyMembers[].id. Client-supplied profile ids must be
+// checked against this — never trusted — so a patient can't read or write
+// records belonging to another account's profile.
+export async function getOwnedProfileIds(patientId: string): Promise<Set<string>> {
+  const { resource: patient } = await patientsContainer.item(patientId, patientId).read().catch(() => ({ resource: undefined as any }));
+  const ids = new Set<string>([patientId]);
+  for (const m of (patient?.familyMembers as any[] | undefined) ?? []) {
+    if (m?.id) ids.add(m.id);
+  }
+  return ids;
+}
+
+// Resolves a requested profile id to one the patient owns. Absent/empty
+// means "self". Returns null for a profile the patient doesn't own (caller
+// responds 403).
+export async function resolveOwnedProfileId(patientId: string, requested: unknown): Promise<string | null> {
+  if (typeof requested !== "string" || !requested || requested === patientId) return patientId;
+  const owned = await getOwnedProfileIds(patientId);
+  return owned.has(requested) ? requested : null;
+}
+
 export interface ResolvedProfile {
   profileId: string;
   fullName: string;
