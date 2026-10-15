@@ -12,9 +12,10 @@ import { getAllAssessments, getAssessmentById, computeResult } from "../data/ass
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
 import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
-import { getFaqForAssistant, PublicFaqEntry } from "../utils/faq";
+import { getFaqForAssistant, PublicFaqEntry, FAQ_DEEP_LINKS, isKnownDeepLink } from "../utils/faq";
 import { resolveMedicineSuggestions, MedicineSuggestionInput } from "../utils/pharmacyCatalogue";
 import { resolveLabTestSuggestions, LabTestSuggestionInput } from "../utils/labCatalogue";
+import { resolveMostRecentOrderStatus, OrderStatusKind } from "../utils/recentRecordStatus";
 
 const router = Router();
 
@@ -508,8 +509,10 @@ export const WELLNESS_CHAT_RESPONSE_SCHEMA = {
     },
     riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
     suggestScreening: { type: "BOOLEAN" },
+    navigationTarget: { type: "STRING", nullable: true },
+    orderStatusQuery: { type: "STRING", format: "enum", enum: ["none", "pharmacy", "lab", "appointment"] },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions", "labTestSuggestions", "riskLevel", "suggestScreening"],
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "medicineSuggestions", "labTestSuggestions", "riskLevel", "suggestScreening", "navigationTarget", "orderStatusQuery"],
 };
 
 // Used instead of the schema above only when the brand has FAQ content, so a
@@ -539,7 +542,7 @@ function buildAppHelpSection(faq: PublicFaqEntry[]): string {
 APP HELP:
 - When the patient asks how to do something in this app, or how the app works, answer ONLY from the FAQ entries listed below. Never invent screens, steps, prices, fees, policies, timelines or features that are not written in an entry.
 - A request to book an appointment (e.g. "I want to book a doctor") is NOT an app question — keep using the booking behaviour above. Only a question about how the app works (e.g. "how do I cancel my appointment?") is.
-- For an app question: set appHelp=true and faqIds to the ids of the 1-3 entries you used, most relevant first. In "reply", give the answer in your own words, concisely (2-4 sentences); you may combine entries. Return the "intake so far" unchanged, with readyForRecommendation=false, suggestBooking=false, recommendedSpecialty=null, medicineSuggestions=[] and labTestSuggestions=[].
+- For an app question: set appHelp=true and faqIds to the ids of the 1-3 entries you used, most relevant first. In "reply", give the answer in your own words, concisely (2-4 sentences); you may combine entries. Return the "intake so far" unchanged, with readyForRecommendation=false, suggestBooking=false, recommendedSpecialty=null, medicineSuggestions=[], labTestSuggestions=[] and navigationTarget=null (the FAQ answer's own deep link is used instead, so navigation stays null here to avoid showing two "take me there" buttons).
 - If no entry answers it, set appHelp=true and faqIds=[], and reply that you don't have that information and that the patient can raise an issue from Profile → Help and Support.
 - If a message contains both a health complaint and an app question, handle the health complaint first (symptom intake as usual, appHelp=false); the app question can be answered on a later turn.
 - For every message that is not an app question, set appHelp=false and faqIds=[].
@@ -551,6 +554,14 @@ ${list.trim()}`;
 
 const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
   .map((h) => `  - ${h.symptoms} → ${h.specialty}`)
+  .join("\n");
+
+// Keys the app knows how to open — same registry FAQ answers' "Take me
+// there" button uses (backend/src/utils/faq.ts). Reusing it here means any
+// screen added for FAQ deep-linking is automatically available to general
+// chat navigation too, with no separate list to keep in sync.
+const NAVIGATION_TARGETS_TEXT = Object.entries(FAQ_DEEP_LINKS)
+  .map(([key, { label }]) => `  - ${key} — ${label}`)
   .join("\n");
 
 export function buildWellnessSystemPrompt(brandName: string, personaName: string, faq: PublicFaqEntry[] = []): string {
@@ -602,6 +613,15 @@ LAB TEST SUGGESTIONS (independent of booking and of medicine suggestions — a t
 - You do not know this platform's real lab catalogue or which tests need prior doctor approval here — just name sensible candidates. The server independently checks each name against the real catalogue and its real approval-requirement flag, so never claim in "reply" whether a test is available, its price, or whether it needs approval; let the app's own test cards convey that.
 - Leave "labTestSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins, or whenever you are still asking clarifying questions and nothing resembling a usable diagnostic test has been established yet.
 - This never replaces your "never diagnose" rule — suggesting a relevant test is not a diagnosis, and "reply" should still recommend seeing a doctor for anything beyond a minor, self-limiting complaint.
+
+NAVIGATION (independent of everything above — distinct from APP HELP, which only answers "how do I…" questions from FAQ text):
+- When the patient literally asks to see, open, or go to a specific part of the app ("show me my orders", "take me to my medication records", "where's my profile"), set "navigationTarget" to the single closest matching key from this list, or null if nothing matches well:
+${NAVIGATION_TARGETS_TEXT}
+- A request to DO something that happens to involve one of these areas (e.g. "book a consultation", "I want to buy paracetamol") is handled by the booking/medicine/lab-test behaviour above, not navigation — only set navigationTarget for a request to simply go look at a screen. Leave it null for every other kind of message, including greetings and symptom talk.
+
+ORDER / BOOKING / APPOINTMENT STATUS:
+- When the patient asks about the status of something they already have (e.g. "where's my medicine order", "has my lab test been approved", "when's my appointment"), set "orderStatusQuery" to "pharmacy" (a medicine order), "lab" (a lab test booking), or "appointment" (a doctor consultation) — whichever they're asking about. Otherwise leave it "none".
+- You do NOT know their actual order/booking/appointment or its real status — the app looks it up and shows it separately. Never state or guess a specific status in "reply"; just acknowledge the request conversationally (e.g. "Let me check that for you!").
 
 MENTAL HEALTH & SAFETY (overrides everything above):
 - Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
@@ -666,6 +686,12 @@ function sanitizeLabTestSuggestions(raw: any): LabTestSuggestionInput[] {
     }));
 }
 
+const ORDER_STATUS_KINDS = new Set(["pharmacy", "lab", "appointment"]);
+
+function sanitizeOrderStatusQuery(raw: any): OrderStatusKind | "none" {
+  return ORDER_STATUS_KINDS.has(raw) ? (raw as OrderStatusKind) : "none";
+}
+
 // Never lets an org-lookup failure block a crisis response — falls back to
 // the platform default country's numbers instead.
 async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSupportConfig> {
@@ -681,7 +707,8 @@ async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSu
 // ── POST /api/wellness/chat ──────────────────────────────────────────────────
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking,
-//            appHelp, faqIds, suggestedMedicines, suggestedLabTests, suggestScreening, crisis: { level, emergencyNumber, lines } | null }
+//            appHelp, faqIds, suggestedMedicines, suggestedLabTests, suggestScreening, navigationTarget,
+//            orderStatus: { type, id, status } | null, crisis: { level, emergencyNumber, lines } | null }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   if (!message?.trim()) {
@@ -720,6 +747,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestedMedicines: [],
       suggestedLabTests: [],
       suggestScreening: false,
+      navigationTarget: null,
+      orderStatus: null,
       crisis: null,
     });
     return;
@@ -850,6 +879,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         suggestedMedicines: [],
         suggestedLabTests: [],
         suggestScreening: false,
+        navigationTarget: null,
+        orderStatus: null,
         crisis: null,
       });
       return;
@@ -935,6 +966,27 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
 
     const suggestScreening = parsed.suggestScreening === true || SCREENING_REQUEST_PATTERN.test(message);
 
+    // appHelp already carries its own FAQ-entry deep link — never show a
+    // second, independently-decided "take me there" button on top of it.
+    const navigationTarget = !appHelp && isKnownDeepLink(parsed.navigationTarget) ? parsed.navigationTarget : null;
+
+    // Same "model proposes, server resolves" shape as the medicine/lab-test
+    // suggestions — the model only names which kind of record it thinks the
+    // patient is asking about; the actual status always comes from a fresh
+    // database lookup, degrading to null (treated as "nothing yet" by the
+    // frontend) rather than failing the whole turn on a Cosmos hiccup.
+    const orderStatusQuery = sanitizeOrderStatusQuery(parsed.orderStatusQuery);
+    let orderStatus: { type: OrderStatusKind; id: string | null; status: string | null } | null = null;
+    if (orderStatusQuery !== "none") {
+      try {
+        const patientId = req.session!.getUserId();
+        const resolved = await resolveMostRecentOrderStatus(patientId, orderStatusQuery);
+        orderStatus = { type: orderStatusQuery, id: resolved?.id ?? null, status: resolved?.status ?? null };
+      } catch (err: any) {
+        console.warn("[wellness-chat] order status resolution failed:", err?.message);
+      }
+    }
+
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
       offTopic: false,
@@ -948,6 +1000,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestedMedicines,
       suggestedLabTests,
       suggestScreening,
+      navigationTarget,
+      orderStatus,
       crisis: null,
     });
   } catch (err: any) {

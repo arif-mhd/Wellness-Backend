@@ -60,6 +60,8 @@ export const FAQ_DEEP_LINKS: Record<string, { label: string; feature?: string }>
   language:            { label: "Language" },
   notifications:       { label: "Notification settings" },
   raise_issue:         { label: "Raise an issue" },
+  my_medications:      { label: "My medications" },
+  profile_details:     { label: "My profile" },
 };
 
 export const isKnownDeepLink = (key: unknown): key is string =>
