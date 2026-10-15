@@ -487,6 +487,25 @@ function sanitizeSubject(raw: any): ChatSubject | null {
   };
 }
 
+// Model-suggested answer chips — trimmed, de-duplicated and capped so a
+// misbehaving model can't flood the UI with long or repeated buttons.
+const MAX_QUICK_REPLIES = 5;
+const MAX_QUICK_REPLY_LENGTH = 40;
+
+function sanitizeQuickReplies(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const text = cleanText(item, MAX_QUICK_REPLY_LENGTH);
+    if (!text || seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    out.push(text);
+    if (out.length === MAX_QUICK_REPLIES) break;
+  }
+  return out;
+}
+
 function describeSubject(subject: ChatSubject | null): string {
   if (!subject) return "Not chosen yet — assume the patient is talking about themselves unless they say otherwise.";
   if (subject.isSelf) return `The account holder themselves (${subject.name}).`;
@@ -522,8 +541,10 @@ const WELLNESS_CHAT_RESPONSE_SCHEMA = {
     riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
     suggestScreening: { type: "BOOLEAN" },
     subjectRelation: { type: "STRING", nullable: true },
+    quickReplies: { type: "ARRAY", items: { type: "STRING" } },
+    careUrgency: { type: "STRING", format: "enum", enum: ["routine", "soon", "emergency"] },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "riskLevel", "suggestScreening"],
+  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "riskLevel", "suggestScreening", "quickReplies", "careUrgency"],
 };
 
 const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
@@ -565,6 +586,13 @@ SYMPTOM INTAKE (this is the core of your job):
 WHO THE CONVERSATION IS ABOUT ("For whom?"):
 - Each turn tells you who the conversation is about. When it is a family member, address the account holder but ask about the family member in the third person using their name ("How high has Sara's temperature been?"), and adapt questions to their age (e.g. for a young child ask about feeding, irritability and wet nappies rather than self-reported pain scores). The intake describes the family member.
 - subjectRelation: if THIS message says the concern is about someone other than the person typing, set it to that person's relation in one lowercase English word (e.g. "son", "daughter", "mother", "father", "wife", "husband", "brother", "sister", "grandmother", "child", "parent"); if the message makes clear it is about the person typing, set "self"; otherwise null. The app uses this to offer its family picker.
+
+CARE URGENCY (shown on the triage result card):
+- Set careUrgency on every turn; it only matters once readyForRecommendation is true. "emergency" = red-flag features needing emergency care now (e.g. chest pain with sweating, breathlessness or pain spreading to the arm/jaw; sudden face drooping, arm weakness or slurred speech; severe difficulty breathing; heavy bleeding; fainting; seizure; a stiff neck with fever and rash; fever in a baby under 3 months; severe abdominal pain with a rigid belly; heavy bleeding in pregnancy). "soon" = should see a doctor within 24-48 hours (e.g. high or persistent fever, worsening pain, symptoms lasting over a week, a child who is unusually drowsy or not drinking). Otherwise "routine". When unsure between two levels, choose the more urgent one. Never name a diagnosis.
+
+QUICK REPLIES (tappable answer chips):
+- Whenever "reply" ends with a question the patient can answer briefly, set quickReplies to 2-5 short answer options for THAT question (each under 25 characters, same language as "reply"), so triage becomes taps instead of typing. Make them specific and mutually exclusive, e.g. "Which side is the pain on?" → ["Left side", "Right side", "Both sides"]; "How long has this been going on?" → ["Since today", "2-3 days", "About a week", "Longer than a week"]; "How severe is it?" → ["Mild", "Moderate", "Severe"]; a yes/no question → ["Yes", "No", "Not sure"]. Do not add an "Other" option — the patient can always type.
+- Leave quickReplies EMPTY when the reply asks no question or an open-ended one, when readyForRecommendation, suggestBooking or suggestScreening is true (the app shows its own buttons then), when offTopic is true, and always when riskLevel is not "none".
 
 MENTAL HEALTH & SAFETY (overrides everything above):
 - Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
@@ -624,7 +652,9 @@ async function getCrisisSupportForRequest(req: SessionRequest): Promise<CrisisSu
 // Body: { message: string, history?: { role: "user"|"model", text: string }[], intake?: WellnessIntake,
 //         subject?: { name, relationship, isSelf, age?, gender? } }
 // Returns: { reply, offTopic, intake, readyForRecommendation, recommendedSpecialty, suggestBooking,
-//            suggestScreening, subjectRelation, crisis: { level, emergencyNumber, lines } | null }
+//            suggestScreening, subjectRelation, quickReplies: string[],
+//            careUrgency: "routine" | "soon" | "emergency" | null,
+//            crisis: { level, emergencyNumber, lines } | null }
 router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res: Response) => {
   const { message, history = [], intake } = req.body;
   const subject = sanitizeSubject(req.body.subject);
@@ -648,6 +678,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestBooking: false,
       recommendedSpecialty: null,
       suggestScreening: false,
+      quickReplies: [],
       crisis: crisisPayload(patternCrisis, support),
     });
     return;
@@ -662,6 +693,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestBooking: false,
       recommendedSpecialty: null,
       suggestScreening: false,
+      quickReplies: [],
       crisis: null,
     });
     return;
@@ -767,6 +799,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         suggestBooking: false,
         recommendedSpecialty: null,
         suggestScreening: false,
+        quickReplies: [],
         crisis: crisisPayload(modelCrisis, support),
       });
       return;
@@ -781,6 +814,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
         suggestBooking: false,
         recommendedSpecialty: null,
         suggestScreening: false,
+        quickReplies: [],
         crisis: null,
       });
       return;
@@ -818,6 +852,18 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
     }
 
     const suggestScreening = parsed.suggestScreening === true || SCREENING_REQUEST_PATTERN.test(message);
+    // Urgency only means something on the triage result (a symptom-driven
+    // recommendation); anything unrecognised is treated as routine.
+    const careUrgency = readyForRecommendation && isSymptomDriven
+      ? (["routine", "soon", "emergency"].includes(parsed.careUrgency) ? parsed.careUrgency : "routine")
+      : null;
+    if (careUrgency === "emergency") console.warn("[wellness-chat] triage flagged emergency care");
+
+    // Enforced here, not just in the prompt: the app shows its own buttons
+    // (doctor list / check-in offer) on those turns, so chips would compete.
+    const quickReplies = readyForRecommendation || suggestBooking || suggestScreening
+      ? []
+      : sanitizeQuickReplies(parsed.quickReplies);
 
     res.json({
       reply: typeof parsed.reply === "string" ? parsed.reply : "",
@@ -828,6 +874,8 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
       suggestBooking,
       suggestScreening,
       subjectRelation: cleanText(parsed.subjectRelation, 20)?.toLowerCase() ?? null,
+      quickReplies,
+      careUrgency,
       crisis: null,
     });
   } catch (err: any) {
