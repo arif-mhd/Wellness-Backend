@@ -36,6 +36,16 @@ export interface CurrencyConfig {
   position: "prefix" | "suffix";
 }
 
+// Crisis / mental-health support numbers surfaced by the AI chat's crisis
+// layer and the mental-health screening result (see routes/wellness.ts and
+// data/assessments.ts). `emergencyNumber` is what to dial for immediate
+// danger; `lines` are free, confidential support lines. Shown to patients
+// verbatim — verify against the official source before changing.
+export interface CrisisSupportConfig {
+  emergencyNumber: string;
+  lines: { label: string; number: string }[];
+}
+
 export interface CountryConfig {
   code: string; // ISO 3166-1 alpha-2, e.g. "AE" | "IN"
   name: string;
@@ -55,6 +65,7 @@ export interface CountryConfig {
   licenseAuthorities: string[];
   consultationFeeMode: "flat" | "per-region";
   feeRegions: FeeRegionDef[];
+  crisisSupport: CrisisSupportConfig;
 }
 
 export const COUNTRY_CONFIGS: CountryConfig[] = [
@@ -95,6 +106,13 @@ export const COUNTRY_CONFIGS: CountryConfig[] = [
       { key: "rasAlKhaimah", label: "Ras Al Khaimah" },
       { key: "fujairah", label: "Fujairah" },
     ],
+    crisisSupport: {
+      emergencyNumber: "999",
+      lines: [
+        { label: "National Mental Health Support Line (800 HOPE)", number: "8004673" },
+        { label: "Ambulance", number: "998" },
+      ],
+    },
   },
   {
     code: "IN",
@@ -125,6 +143,12 @@ export const COUNTRY_CONFIGS: CountryConfig[] = [
     licenseAuthorities: ["State Medical Council"],
     consultationFeeMode: "flat",
     feeRegions: [{ key: "flat", label: "Consultation Fee" }],
+    crisisSupport: {
+      emergencyNumber: "112",
+      lines: [
+        { label: "Tele-MANAS Mental Health Helpline", number: "14416" },
+      ],
+    },
   },
 ];
 
