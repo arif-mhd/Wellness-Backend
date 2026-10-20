@@ -150,9 +150,9 @@ function useDietFoodCatalog(): DietFoodCatalog | null {
   return catalog;
 }
 
-// Food-name input that suggests every catalogue food as the doctor types,
-// while still accepting any custom name. Foods from the current phase's diet
-// are listed first, then foods served at the selected meal.
+// Food-name input that suggests catalogue foods as the doctor types, while
+// still accepting any custom name. When the phase has a diet, only that
+// diet's foods are suggested; foods served at the selected meal come first.
 function FoodPicker({
   catalog,
   value,
@@ -171,8 +171,11 @@ function FoodPicker({
 
   const query = value.trim().toLowerCase();
   const suggestions = useMemo(() => {
-    const rank = (f: DietCatalogFood) => (diet && f.diets.includes(diet) ? 0 : 2) + (f.meals.includes(mealType) ? 0 : 1);
-    return catalog.foods
+    const dietFoods = diet ? catalog.foods.filter((f) => f.diets.includes(diet)) : [];
+    // A diet with no catalogue foods falls back to the whole catalogue.
+    const pool = dietFoods.length > 0 ? dietFoods : catalog.foods;
+    const rank = (f: DietCatalogFood) => (f.meals.includes(mealType) ? 0 : 1);
+    return pool
       .filter((f) => !query || f.name.toLowerCase().includes(query))
       .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
       .slice(0, MAX_SUGGESTIONS);
@@ -227,10 +230,9 @@ function FoodPicker({
               // onMouseDown (not onClick) so the pick lands before the input's blur closes the list.
               onMouseDown={(e) => { e.preventDefault(); pick(f.name); }}
               onMouseEnter={() => setHighlight(i)}
-              className={`px-3 py-2 cursor-pointer flex items-center justify-between gap-2 ${highlight === i ? "bg-[#E8F1FF]" : ""}`}
+              className={`px-3 py-2 cursor-pointer ${highlight === i ? "bg-[#E8F1FF]" : ""}`}
             >
-              <span className="text-[12px] font-semibold text-[#383F45] truncate">{f.name}</span>
-              <span className="text-[10px] text-[#838B95] shrink-0">{f.diets.join(", ")}</span>
+              <span className="block text-[12px] font-semibold text-[#383F45] truncate">{f.name}</span>
             </li>
           ))}
           {showCustom && (
@@ -414,6 +416,14 @@ function cloneMeals(meals: DietMeal[]): DietMeal[] {
 // One phase of a diet-type plan: heading, day tabs, and the selected day's
 // meals. Day numbers run on across phases (dayOffset), so in Snehapanam →
 // Purgation the Purgation days follow on from the last Snehapanam day.
+const MAX_PLAN_DAYS = 90;
+
+// A day anywhere in the plan, addressed by its phase and its index within it.
+interface DayRef {
+  phase: number;
+  day: number;
+}
+
 function PhaseSection({
   phase,
   index,
@@ -421,6 +431,8 @@ function PhaseSection({
   dayOffset,
   catalog,
   onChange,
+  allDays,
+  onCopyTo,
 }: {
   phase: DietPhase;
   index: number;
@@ -428,10 +440,63 @@ function PhaseSection({
   dayOffset: number;
   catalog: DietFoodCatalog | null;
   onChange: (phase: DietPhase) => void;
+  // Every day in the plan (all phases), in order — the copy targets.
+  allDays: (DayRef & { label: string; hasMeals: boolean })[];
+  // Replaces each target day's meals with a copy of the given day's meals.
+  onCopyTo: (from: DayRef, targets: DayRef[]) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(0);
   const day = Math.min(selectedDay, phase.dayPlans.length - 1);
+  const [dayCountDraft, setDayCountDraft] = useState(String(phase.dayPlans.length));
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<Set<string>>(new Set());
+
+  useEffect(() => { setDayCountDraft(String(phase.dayPlans.length)); }, [phase.dayPlans.length]);
+  useEffect(() => { setCopyOpen(false); setCopyTargets(new Set()); }, [day]);
+
+  // Sets the stage's total number of days up front: adds empty days, or
+  // drops days from the end (asking first if any of them have meals).
+  const applyDayCount = () => {
+    const n = parseInt(dayCountDraft, 10);
+    const current = phase.dayPlans.length;
+    if (!Number.isFinite(n) || n < 1 || n > MAX_PLAN_DAYS || n === current) {
+      setDayCountDraft(String(current));
+      return;
+    }
+    if (n < current) {
+      const dropped = phase.dayPlans.slice(n).map((m, i) => ({ m, label: dayOffset + n + i + 1 })).filter((d) => d.m.length > 0);
+      if (dropped.length && !window.confirm(`Day ${dropped.map((d) => d.label).join(", ")} ha${dropped.length === 1 ? "s" : "ve"} meals that will be removed. Continue?`)) {
+        setDayCountDraft(String(current));
+        return;
+      }
+      onChange({ ...phase, dayPlans: phase.dayPlans.slice(0, n) });
+      if (day >= n) setSelectedDay(n - 1);
+    } else {
+      onChange({ ...phase, dayPlans: [...phase.dayPlans, ...Array.from({ length: n - current }, () => [] as DietMeal[])] });
+    }
+  };
+
+  const refKey = (r: DayRef) => `${r.phase}:${r.day}`;
+  const otherDays = allDays.filter((d) => !(d.phase === index && d.day === day));
+  const toggleTarget = (r: DayRef) => {
+    setCopyTargets((prev) => {
+      const next = new Set(prev);
+      const k = refKey(r);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  };
+
+  const copyToSelected = () => {
+    const targets = otherDays.filter((d) => copyTargets.has(refKey(d)));
+    if (targets.length === 0) return;
+    const overwritten = targets.filter((d) => d.hasMeals);
+    if (overwritten.length && !window.confirm(`${overwritten.map((d) => d.label).join(", ")} already ha${overwritten.length === 1 ? "s" : "ve"} meals. Replace them with Day ${dayOffset + day + 1}'s meals?`)) return;
+    onCopyTo({ phase: index, day }, targets.map(({ phase, day }) => ({ phase, day })));
+    setCopyOpen(false);
+    setCopyTargets(new Set());
+  };
 
   const setDayMeals = (meals: DietMeal[]) => {
     onChange({ ...phase, dayPlans: phase.dayPlans.map((m, i) => (i === day ? meals : m)) });
@@ -467,6 +532,21 @@ function PhaseSection({
         <AddButton onClick={() => setAddOpen((v) => !v)} />
       </div>
 
+      <div className="flex items-center gap-2">
+        <label className="text-[12px] font-semibold text-[#676E76]" htmlFor={`day-count-${index}`}>Number of days</label>
+        <input
+          id={`day-count-${index}`}
+          type="number"
+          min={1}
+          max={MAX_PLAN_DAYS}
+          value={dayCountDraft}
+          onChange={(e) => setDayCountDraft(e.target.value)}
+          onBlur={applyDayCount}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyDayCount(); } }}
+          className="w-20 h-8 px-3 rounded-lg bg-white border border-[#EBEEF5] text-xs font-semibold text-[#383F45] outline-none focus:ring-1 focus:ring-[#5476FC]"
+        />
+      </div>
+
       <div className="flex flex-wrap items-center gap-1.5">
         {phase.dayPlans.map((meals, i) => (
           <button
@@ -497,6 +577,19 @@ function PhaseSection({
         >
           Copy Day {dayOffset + day + 1}
         </button>
+        {otherDays.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCopyOpen((v) => !v)}
+            disabled={phase.dayPlans[day].length === 0}
+            className={`h-8 px-3 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40 ${
+              copyOpen ? "bg-[#5476FC] text-white" : "text-[#5476FC] bg-white border border-[#E8F1FF] hover:border-[#5476FC]"
+            }`}
+            title="Copy this day's meals onto any other days of the plan"
+          >
+            Copy to days…
+          </button>
+        )}
         {dayCount > 1 && (
           <button
             type="button"
@@ -507,6 +600,47 @@ function PhaseSection({
           </button>
         )}
       </div>
+
+      {copyOpen && (
+        <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-white border border-[#EBEEF5]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold text-[#676E76]">Copy Day {dayOffset + day + 1}&apos;s meals to:</span>
+            <button
+              type="button"
+              onClick={() => setCopyTargets(copyTargets.size === otherDays.length ? new Set() : new Set(otherDays.map(refKey)))}
+              className="text-[11px] font-bold text-[#5476FC] hover:underline"
+            >
+              {copyTargets.size === otherDays.length ? "Clear all" : "Select all"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {otherDays.map((d) => {
+              const on = copyTargets.has(refKey(d));
+              return (
+                <button
+                  key={refKey(d)}
+                  type="button"
+                  onClick={() => toggleTarget(d)}
+                  className={`h-8 px-3 rounded-lg text-[11px] font-bold transition-all ${
+                    on ? "bg-[#5476FC] text-white" : "bg-[#F5F6FA] border border-[#EBEEF5] text-[#676E76] hover:border-[#5476FC]"
+                  }`}
+                  title={d.hasMeals ? "Already has meals — they'll be replaced" : undefined}
+                >
+                  {d.label}{d.hasMeals ? " •" : ""}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={copyToSelected}
+            disabled={copyTargets.size === 0}
+            className="h-8 px-5 rounded-lg bg-[#5476FC] text-white text-[11px] font-bold self-end hover:bg-[#3B5BFC] disabled:opacity-40 transition-all"
+          >
+            {copyTargets.size === 0 ? "Copy" : `Copy to ${copyTargets.size} day${copyTargets.size === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      )}
 
       <MealsEditor
         key={day}
@@ -568,6 +702,26 @@ export default function AddDietPlan({ plan, onChange, visibleToPatient, onToggle
 
   const updatePhase = (index: number, phase: DietPhase) => {
     onChange({ ...plan, phases: plan.phases.map((p, i) => (i === index ? phase : p)) });
+  };
+
+  // Day labels run on across phases, matching PhaseSection's day tabs.
+  const allDays = plan.phases.flatMap((p, pi) => {
+    const offset = plan.phases.slice(0, pi).reduce((sum, q) => sum + q.dayPlans.length, 0);
+    return p.dayPlans.map((meals, di) => ({ phase: pi, day: di, label: `Day ${offset + di + 1}`, hasMeals: meals.length > 0 }));
+  });
+
+  const copyDayTo = (from: DayRef, targets: DayRef[]) => {
+    const source = plan.phases[from.phase]?.dayPlans[from.day];
+    if (!source) return;
+    onChange({
+      ...plan,
+      phases: plan.phases.map((p, pi) => ({
+        ...p,
+        dayPlans: p.dayPlans.map((meals, di) =>
+          targets.some((t) => t.phase === pi && t.day === di) ? cloneMeals(source) : meals
+        ),
+      })),
+    });
   };
 
   return (
@@ -648,6 +802,8 @@ export default function AddDietPlan({ plan, onChange, visibleToPatient, onToggle
             dayOffset={plan.phases.slice(0, i).reduce((sum, p) => sum + p.dayPlans.length, 0)}
             catalog={catalog}
             onChange={(p) => updatePhase(i, p)}
+            allDays={allDays}
+            onCopyTo={copyDayTo}
           />
         ))
       ) : (

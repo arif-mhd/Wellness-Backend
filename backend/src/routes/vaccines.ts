@@ -9,6 +9,7 @@ import { resolveOrgId, resolveOrgIdFromHeader, getLabIdsForOrg } from "../utils/
 import { buildInClause } from "../utils/clinicScope";
 import { getAssignedLabIds } from "./lab";
 import { resolveCurrencyForOrgId, formatCurrencyText } from "../utils/currency";
+import { getOwnedProfileIds } from "../utils/profile";
 
 const router = Router();
 
@@ -157,6 +158,15 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
       return;
     }
 
+    // Every item must be for the patient themself or one of their own family
+    // members — never a profile id belonging to another account.
+    const ownedProfileIds = await getOwnedProfileIds(patientId);
+    const targetFor = (item: { forPatientId?: string }) => item.forPatientId || profileId || patientId;
+    if (items.some((item) => !ownedProfileIds.has(targetFor(item)))) {
+      res.status(403).json({ error: "You can only book vaccinations for yourself or your family members." });
+      return;
+    }
+
     const now = new Date().toISOString();
     const bookingId = uuidv4();
 
@@ -189,7 +199,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("vaccination"), 
         catalogVaccineId: vaccine.catalogVaccineId ?? null,
         doses_required: vaccine.doses_required ?? 1,
         price: vaccine.price,
-        forPatientId: item.forPatientId ?? profileId ?? patientId,
+        forPatientId: targetFor(item),
         visitMode: item.visitMode ?? "Laboratory",
         scheduledAt: item.scheduledAt ?? null,
       });
