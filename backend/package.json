@@ -17,6 +17,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@azure/cosmos": "^4.9.3",
     "@azure/storage-blob": "^12.31.0",
     "@google/genai": "^2.10.0",

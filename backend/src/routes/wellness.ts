@@ -13,6 +13,8 @@ import { getAllAssessments, getAssessmentById, computeResult } from "../data/ass
 import { Food, searchFoods, getFoodById, calcNutrition } from "../data/foods";
 import { searchExercises, getExerciseById, calcCaloriesBurned } from "../data/exercises";
 import { SPECIALTIES, SYMPTOM_SPECIALTY_HINTS } from "../constants/specialties";
+import Anthropic from "@anthropic-ai/sdk";
+import { generateJson, isClaudeConfigured, ClaudeDeclinedError } from "../utils/claude";
 
 const router = Router();
 
@@ -23,8 +25,45 @@ router.use(requireRole("patient"));
 // Body: { imageBase64: string, mimeType: string }
 // Returns: { foodName, confidence, per100g: { calories, protein, fat, carbs, fiber }, description }
 //
-// Uses Gemini API key (?key= param) — set GEMINI_API_KEY in Cloud Run env vars.
-// Create the key at: GCP Console → APIs & Services → Credentials → Create API Key
+// Uses Claude (utils/claude.ts) — needs ANTHROPIC_API_KEY in Cloud Run env vars.
+
+// Claude accepts JPEG, PNG, GIF and WebP only. The app's reported mimeType can
+// disagree with the bytes it sends (a picker re-encodes on crop/compress), so
+// trust the file's own signature and fall back to the reported type.
+const CLAUDE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+type ClaudeImageType = (typeof CLAUDE_IMAGE_TYPES)[number];
+
+function detectImageType(base64: string, reported: unknown): ClaudeImageType | null {
+  if (base64.startsWith("/9j/")) return "image/jpeg";
+  if (base64.startsWith("iVBORw0KGgo")) return "image/png";
+  if (base64.startsWith("R0lGOD")) return "image/gif";
+  if (base64.startsWith("UklGR")) return "image/webp";
+  return CLAUDE_IMAGE_TYPES.find((t) => t === reported) ?? null;
+}
+
+const FOOD_IMAGE_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    foodName: { type: "string" },
+    confidence: { type: "string", enum: ["high", "medium", "low"] },
+    description: { type: "string" },
+    per100g: {
+      type: "object",
+      properties: {
+        calories: { type: "number" },
+        protein: { type: "number" },
+        fat: { type: "number" },
+        carbs: { type: "number" },
+        fiber: { type: "number" },
+      },
+      required: ["calories", "protein", "fat", "carbs", "fiber"],
+      additionalProperties: false,
+    },
+  },
+  required: ["foodName", "confidence", "description", "per100g"],
+  additionalProperties: false,
+};
+
 router.post("/analyze-food-image", requireFeature("nutrition_ai"), async (req: SessionRequest, res: Response) => {
   const { imageBase64, mimeType } = req.body;
   if (!imageBase64) {
@@ -32,14 +71,18 @@ router.post("/analyze-food-image", requireFeature("nutrition_ai"), async (req: S
     return;
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!apiKey) {
-    console.error("[analyze-food-image] GEMINI_API_KEY is not set");
+  if (!isClaudeConfigured()) {
+    console.error("[analyze-food-image] ANTHROPIC_API_KEY is not set");
     res.status(500).json({ error: "Food image analysis is not configured. Please contact support." });
     return;
   }
 
-  const safeMime = mimeType || "image/jpeg";
+  const imageData = String(imageBase64).replace(/^data:[^;]+;base64,/, "");
+  const mediaType = detectImageType(imageData, mimeType);
+  if (!mediaType) {
+    res.status(415).json({ error: "Please use a JPEG or PNG photo." });
+    return;
+  }
 
   const prompt = `You are a nutrition expert. Analyze this food image and respond ONLY with a valid JSON object in exactly this format (no markdown, no extra text):
 {
@@ -61,64 +104,25 @@ Rules:
 - All nutrition values must be realistic per 100 grams
 - If you cannot identify any food in the image, still return the JSON with foodName="Unknown food" and confidence="low"`;
 
-  const geminiBody = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: safeMime, data: imageBase64 } }] }],
-  });
-
-  async function callGemini(model: string): Promise<string> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: geminiBody,
-    });
-    if (!r.ok) {
-      const body = (await r.text()).replace(/\s+/g, " ").trim();
-      throw new Error(`HTTP ${r.status}: ${body}`);
-    }
-    const data = await r.json() as any;
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("No text in Gemini response");
-    return text;
-  }
-
   try {
-    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-
-    let responseText: string | null = null;
-    let lastError: any = null;
-
-    for (const model of models) {
-      try {
-        responseText = await callGemini(model);
-        console.log(`[analyze-food-image] ✓ model=${model}`);
-        break;
-      } catch (err: any) {
-        console.warn(`[analyze-food-image] ${model} failed:`, err?.message);
-        lastError = err;
-      }
-    }
-
-    if (!responseText) {
-      throw new Error(`All models failed. Last error: ${lastError?.message}`);
-    }
-
-    const jsonText = responseText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-
-    let parsed: {
+    const { data: parsed } = await generateJson<{
       foodName:    string;
       confidence:  "high" | "medium" | "low";
       description: string;
       per100g:     { calories: number; protein: number; fat: number; carbs: number; fiber: number };
-    };
-
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      console.error("[analyze-food-image] Failed to parse response:", responseText);
-      res.status(500).json({ error: "AI returned an unexpected response. Please try again." });
-      return;
-    }
+    }>({
+      label: "analyze-food-image",
+      system: prompt,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imageData } },
+          { type: "text", text: "Analyze this food image." },
+        ],
+      }],
+      schema: FOOD_IMAGE_RESPONSE_SCHEMA,
+      maxTokens: 2000,
+    });
 
     const clean = (v: any, fallback: number) => (typeof v === "number" && !isNaN(v) ? Math.round(v * 10) / 10 : fallback);
     res.json({
@@ -139,31 +143,39 @@ Rules:
   }
 });
 
-// Gemini structured-output schema for POST /parse-exercise-voice.
+// Claude structured outputs take standard JSON Schema: lowercase types,
+// "nullable" spelled as anyOf-with-null, and additionalProperties: false on
+// every object.
+const NULLABLE_STRING = { anyOf: [{ type: "string" }, { type: "null" }] };
+const NULLABLE_NUMBER = { anyOf: [{ type: "number" }, { type: "null" }] };
+
+// Structured-output schema for POST /parse-exercise-voice.
 // Mirrors the patient app's VoiceExerciseParseResult/VoiceExerciseSet contract
 // (services/wellnessService.ts in the Wellness patient app repo).
 const VOICE_EXERCISE_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    matchedName: { type: "STRING", nullable: true },
-    name: { type: "STRING" },
-    type: { type: "STRING", nullable: true },
+    matchedName: NULLABLE_STRING,
+    name: { type: "string" },
+    type: NULLABLE_STRING,
     sets: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "OBJECT",
+        type: "object",
         properties: {
-          weight: { type: "NUMBER", nullable: true },
-          reps: { type: "NUMBER", nullable: true },
-          durationMin: { type: "NUMBER", nullable: true },
-          distanceKm: { type: "NUMBER", nullable: true },
+          weight: NULLABLE_NUMBER,
+          reps: NULLABLE_NUMBER,
+          durationMin: NULLABLE_NUMBER,
+          distanceKm: NULLABLE_NUMBER,
         },
         required: ["weight", "reps", "durationMin", "distanceKm"],
+        additionalProperties: false,
       },
     },
-    confidence: { type: "STRING" },
+    confidence: { type: "string" },
   },
   required: ["matchedName", "name", "type", "sets", "confidence"],
+  additionalProperties: false,
 };
 
 function buildVoiceExerciseSystemPrompt(knownExerciseNames: string[]): string {
@@ -207,9 +219,8 @@ router.post("/parse-exercise-voice", requireFeature("fitness"), async (req: Sess
     ? knownExerciseNames.filter((n: any) => typeof n === "string" && n.trim()).slice(0, 300)
     : [];
 
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!apiKey) {
-    console.error("[parse-exercise-voice] GEMINI_API_KEY is not set");
+  if (!isClaudeConfigured()) {
+    console.error("[parse-exercise-voice] ANTHROPIC_API_KEY is not set");
     res.status(500).json({ error: "Voice exercise logging is not configured. Please contact support." });
     return;
   }
@@ -217,50 +228,13 @@ router.post("/parse-exercise-voice", requireFeature("fitness"), async (req: Sess
   const systemPrompt = buildVoiceExerciseSystemPrompt(names);
 
   try {
-    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-    let parsed: any = null;
-    let lastError: any = null;
-
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: `Transcript: ${transcript}` }] }],
-            generationConfig: {
-              maxOutputTokens: 400,
-              temperature: 0.2,
-              responseMimeType: "application/json",
-              responseSchema: VOICE_EXERCISE_RESPONSE_SCHEMA,
-            },
-          }),
-        });
-        if (!r.ok) {
-          const body = (await r.text()).replace(/\s+/g, " ").trim();
-          throw new Error(`HTTP ${r.status}: ${body}`);
-        }
-        const data = await r.json() as any;
-        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        if (!responseText) throw new Error("Empty response");
-
-        const candidate = tryParseWellnessJson(responseText);
-        if (!candidate) throw new Error("Model returned malformed JSON");
-
-        parsed = candidate;
-        console.log(`[parse-exercise-voice] ✓ model=${model}`);
-        break;
-      } catch (err: any) {
-        console.warn(`[parse-exercise-voice] ${model} failed:`, err?.message);
-        lastError = err;
-      }
-    }
-
-    if (!parsed) {
-      throw new Error(`All models failed: ${lastError?.message}`);
-    }
+    const { data: parsed } = await generateJson({
+      label: "parse-exercise-voice",
+      system: systemPrompt,
+      messages: [{ role: "user", content: `Transcript: ${transcript}` }],
+      schema: VOICE_EXERCISE_RESPONSE_SCHEMA,
+      maxTokens: 2000,
+    });
 
     // Resolve the model's name match against the real catalog server-side —
     // try an exact (case-insensitive) match on the known-names list first,
@@ -414,33 +388,6 @@ const EMPTY_INTAKE: WellnessIntake = {
   additionalNotes: null,
 };
 
-// Gemini's JSON mode occasionally still wraps its output in a ```json fence
-// or adds stray whitespace/prose around the object despite responseSchema —
-// try a plain parse first, then fall back to stripping a fence, then to
-// grabbing the first {...} block, before giving up.
-function tryParseWellnessJson(text: string): any | null {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch { /* fall through */ }
-
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  if (fenced) {
-    try {
-      return JSON.parse(fenced[1]);
-    } catch { /* fall through */ }
-  }
-
-  const braced = trimmed.match(/\{[\s\S]*\}/);
-  if (braced) {
-    try {
-      return JSON.parse(braced[0]);
-    } catch { /* fall through */ }
-  }
-
-  return null;
-}
-
 function sanitizeIntake(raw: any): WellnessIntake {
   return {
     primaryReason: typeof raw?.primaryReason === "string" ? raw.primaryReason : null,
@@ -456,35 +403,45 @@ function sanitizeIntake(raw: any): WellnessIntake {
   };
 }
 
-// Gemini structured-output schema (Gemini "OpenAPI subset" schema format).
+// Structured-output schema for POST /chat. Fields Gemini could leave out are
+// required-but-nullable here — sanitizeIntake and the route treat null and
+// missing alike.
 const WELLNESS_CHAT_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    offTopic: { type: "BOOLEAN" },
-    reply: { type: "STRING" },
+    offTopic: { type: "boolean" },
+    reply: { type: "string" },
     intake: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        primaryReason: { type: "STRING", nullable: true },
-        symptoms: { type: "ARRAY", items: { type: "STRING" } },
-        onset: { type: "STRING", nullable: true },
-        location: { type: "STRING", nullable: true },
-        severity: { type: "STRING", nullable: true },
-        duration: { type: "STRING", nullable: true },
-        conditions: { type: "STRING", nullable: true },
-        medications: { type: "STRING", nullable: true },
-        allergies: { type: "STRING", nullable: true },
-        additionalNotes: { type: "STRING", nullable: true },
+        primaryReason: NULLABLE_STRING,
+        symptoms: { type: "array", items: { type: "string" } },
+        onset: NULLABLE_STRING,
+        location: NULLABLE_STRING,
+        severity: NULLABLE_STRING,
+        duration: NULLABLE_STRING,
+        conditions: NULLABLE_STRING,
+        medications: NULLABLE_STRING,
+        allergies: NULLABLE_STRING,
+        additionalNotes: NULLABLE_STRING,
       },
-      required: ["primaryReason", "symptoms", "onset", "location", "severity", "duration"],
+      required: [
+        "primaryReason", "symptoms", "onset", "location", "severity", "duration",
+        "conditions", "medications", "allergies", "additionalNotes",
+      ],
+      additionalProperties: false,
     },
-    readyForRecommendation: { type: "BOOLEAN" },
-    recommendedSpecialty: { type: "STRING", nullable: true },
-    suggestBooking: { type: "BOOLEAN" },
-    riskLevel: { type: "STRING", format: "enum", enum: ["none", "concern", "imminent"] },
-    suggestScreening: { type: "BOOLEAN" },
+    readyForRecommendation: { type: "boolean" },
+    recommendedSpecialty: NULLABLE_STRING,
+    suggestBooking: { type: "boolean" },
+    riskLevel: { type: "string", enum: ["none", "concern", "imminent"] },
+    suggestScreening: { type: "boolean" },
   },
-  required: ["offTopic", "reply", "intake", "readyForRecommendation", "suggestBooking", "riskLevel", "suggestScreening"],
+  required: [
+    "offTopic", "reply", "intake", "readyForRecommendation", "recommendedSpecialty",
+    "suggestBooking", "riskLevel", "suggestScreening",
+  ],
+  additionalProperties: false,
 };
 
 const SPECIALTY_HINTS_TEXT = SYMPTOM_SPECIALTY_HINTS
@@ -521,7 +478,7 @@ SYMPTOM INTAKE (this is the core of your job):
   Do not interrogate with a rigid checklist and do not ask about fields the patient has no reason to know or hasn't implied are relevant (e.g. don't force a "conditions" question if nothing suggests it matters) — but do keep asking real clinical follow-ups (aim for at least 2-3 exchanges gathering specifics) before concluding, rather than settling for the first vague answer.
 - ALWAYS return the full merged intake object — carry forward every field you already knew from "intake so far" plus whatever new information this turn added, including specifics from the guide above folded into "additionalNotes" or "symptoms". Never null out something you already learned.
 - Only set readyForRecommendation=true once you have primaryReason PLUS at least two more concrete details (from onset/location/severity/duration/additionalNotes) — including at least one symptom-specific detail from the guide above, not just a generic timeframe. Until then, keep asking; readyForRecommendation stays false and recommendedSpecialty stays null. Once ready, set recommendedSpecialty to the best match and suggestBooking=true, and let "reply" summarize everything you understood (a short recap) and offer to show relevant doctors.
-- If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors.
+- If the patient makes a direct, generic booking request with no symptom described (e.g. "I want to book an appointment"), leave intake fields null/empty, set suggestBooking=true, recommendedSpecialty=null, readyForRecommendation=true, and reply offering to show doctors. If the request names a kind of doctor (e.g. "book a dermatologist", "I need a dentist"), do the same but set recommendedSpecialty to the closest valid value below.
 
 MENTAL HEALTH & SAFETY (overrides everything above):
 - Set riskLevel on EVERY turn. "imminent" = the patient expresses intent, a plan, means, or a timeframe to end their life or seriously harm themselves, or says they are in immediate danger. "concern" = any thoughts of suicide, death wishes, self-harm, or hopelessness about living — including indirect phrasing ("I can't do this anymore", "everyone would be better off without me", "I just want to disappear", "what's a lethal dose of…"). Otherwise "none". When unsure between two levels, choose the higher one.
@@ -538,8 +495,8 @@ ${SPECIALTY_HINTS_TEXT}`;
 
 // ── Deterministic off-topic pre-filter ───────────────────────────────────────
 // The prompt instructs the model to set offTopic=true for unrelated requests,
-// but that's self-reported and the weaker fallback models (gemini-2.5-flash,
-// gemini-2.0-flash) don't always honor it — e.g. answering a coding question
+// but that's self-reported and models don't always honor it (the old Gemini
+// fallbacks were the worst offenders) — e.g. answering a coding question
 // outright instead of redirecting. These patterns catch the most unambiguous
 // non-health requests *before* spending a model call on them, so those cases
 // are redirected deterministically instead of depending on model compliance.
@@ -622,8 +579,7 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
     return;
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!apiKey) {
+  if (!isClaudeConfigured()) {
     res.status(500).json({ error: "AI chat is not configured." });
     return;
   }
@@ -637,72 +593,32 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
   const intakeSoFar = sanitizeIntake(intake ?? EMPTY_INTAKE);
 
   try {
-    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-    let parsed: any = null;
-    let lastError: any = null;
-
     // Historical model turns are re-sent as minimal JSON envelopes (not the
     // raw plain-language reply) so the model keeps seeing its own past turns
-    // in the same JSON-only format the system prompt demands — mixing in
-    // plain-text history was found to make the model drift into replying in
-    // plain text itself as the conversation grew, which then failed to parse.
-    const contents = [
+    // in the same JSON-only format the system prompt demands.
+    const messages: Anthropic.MessageParam[] = [
       ...(Array.isArray(history) ? history : [])
         .filter((h: any) => h?.text && (h.role === "user" || h.role === "model"))
-        .map((h: any) => ({
-          role: h.role,
-          parts: [{ text: h.role === "model" ? JSON.stringify({ reply: h.text }) : h.text }],
+        .map((h: any): Anthropic.MessageParam => ({
+          role: h.role === "model" ? "assistant" : "user",
+          content: h.role === "model" ? JSON.stringify({ reply: h.text }) : h.text,
         })),
       {
         role: "user",
-        parts: [{ text: `Intake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}` }],
+        content: `Intake so far (JSON): ${JSON.stringify(intakeSoFar)}\n\nPatient message: ${message}`,
       },
     ];
+    // Claude needs the conversation to open on a patient turn; the app's
+    // history can start with the assistant's greeting.
+    while (messages[0]?.role === "assistant") messages.shift();
 
-    // Try every fallback model until one returns a response that actually
-    // parses as valid JSON — previously a single model returning malformed
-    // JSON aborted the whole request instead of falling back, which is what
-    // caused the intermittent "having trouble connecting" errors mid-chat.
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents,
-            generationConfig: {
-              maxOutputTokens: 800,
-              temperature: 0.7,
-              responseMimeType: "application/json",
-              responseSchema: WELLNESS_CHAT_RESPONSE_SCHEMA,
-            },
-          }),
-        });
-        if (!r.ok) {
-          const body = (await r.text()).replace(/\s+/g, " ").trim();
-          throw new Error(`HTTP ${r.status}: ${body}`);
-        }
-        const data = await r.json() as any;
-        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        if (!responseText) throw new Error("Empty response");
-
-        const candidate = tryParseWellnessJson(responseText);
-        if (!candidate) throw new Error("Model returned malformed JSON");
-
-        parsed = candidate;
-        console.log(`[wellness-chat] ✓ model=${model}`);
-        break;
-      } catch (err: any) {
-        console.warn(`[wellness-chat] ${model} failed:`, err?.message);
-        lastError = err;
-      }
-    }
-
-    if (!parsed) {
-      throw new Error(`All models failed: ${lastError?.message}`);
-    }
+    const { data: parsed } = await generateJson({
+      label: "wellness-chat",
+      system: systemPrompt,
+      messages,
+      schema: WELLNESS_CHAT_RESPONSE_SCHEMA,
+      maxTokens: 4000,
+    });
 
     // Model-flagged risk (second crisis layer) — checked before offTopic so a
     // crisis message the model also mislabels as off-topic still gets support.
@@ -745,9 +661,9 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
 
     // The model is instructed to only recommend a specialty once it has
     // primaryReason plus at least two more concrete details, but that rule
-    // lives in the prompt only — weaker fallback models (gemini-2.5-flash,
-    // gemini-2.0-flash) don't reliably honor it and will jump straight to a
-    // recommendation after a single vague message. Re-check it here so the
+    // lives in the prompt only — models don't reliably honor it (the old Gemini
+    // fallbacks would jump straight to a recommendation after a single vague
+    // message). Re-check it here so the
     // chat behaves consistently regardless of which model answered. Direct,
     // symptom-less booking requests (primaryReason left null on purpose) are
     // exempt — that's the model's intended fast path, not premature triage.
@@ -786,17 +702,35 @@ router.post("/chat", requireFeature("ai_chat"), async (req: SessionRequest, res:
     });
   } catch (err: any) {
     console.error("[wellness-chat] error:", err?.message);
+    // Claude's safety checks declined the message on every model. Answer
+    // rather than show a connection error — the patient may be describing
+    // something serious — but don't assume what it was about.
+    if (err instanceof ClaudeDeclinedError) {
+      const support = await getCrisisSupportForRequest(req);
+      res.json({
+        reply: `I'm not able to help with that one here. If it's about your health, one of our doctors can help, and I can find one for you. If you or someone else is in danger, please call ${support.emergencyNumber} now.`,
+        offTopic: false,
+        intake: intakeSoFar,
+        readyForRecommendation: false,
+        suggestBooking: false,
+        recommendedSpecialty: null,
+        suggestScreening: false,
+        crisis: null,
+      });
+      return;
+    }
     res.status(500).json({ error: "Chat is temporarily unavailable. Please try again." });
   }
 });
 
-// Gemini structured-output schema for POST /visit-summary.
+// Structured-output schema for POST /visit-summary.
 const VISIT_SUMMARY_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    summary: { type: "STRING" },
+    summary: { type: "string" },
   },
   required: ["summary"],
+  additionalProperties: false,
 };
 
 function buildVisitSummarySystemPrompt(personaName: string): string {
@@ -829,8 +763,7 @@ router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
     return;
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!apiKey) {
+  if (!isClaudeConfigured()) {
     res.status(500).json({ error: "AI chat is not configured." });
     return;
   }
@@ -847,57 +780,16 @@ router.post("/visit-summary", async (req: SessionRequest, res: Response) => {
     .join("\n");
 
   try {
-    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-    let parsed: any = null;
-    let lastError: any = null;
-
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [
-              {
-                role: "user",
-                parts: [{
-                  text: `Conversation transcript:\n${transcriptText}\n\nStructured intake (JSON): ${JSON.stringify(intakeSoFar)}`,
-                }],
-              },
-            ],
-            generationConfig: {
-              maxOutputTokens: 400,
-              temperature: 0.4,
-              responseMimeType: "application/json",
-              responseSchema: VISIT_SUMMARY_RESPONSE_SCHEMA,
-            },
-          }),
-        });
-        if (!r.ok) {
-          const body = (await r.text()).replace(/\s+/g, " ").trim();
-          throw new Error(`HTTP ${r.status}: ${body}`);
-        }
-        const data = await r.json() as any;
-        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        if (!responseText) throw new Error("Empty response");
-
-        const candidate = tryParseWellnessJson(responseText);
-        if (!candidate) throw new Error("Model returned malformed JSON");
-
-        parsed = candidate;
-        console.log(`[wellness-visit-summary] ✓ model=${model}`);
-        break;
-      } catch (err: any) {
-        console.warn(`[wellness-visit-summary] ${model} failed:`, err?.message);
-        lastError = err;
-      }
-    }
-
-    if (!parsed) {
-      throw new Error(`All models failed: ${lastError?.message}`);
-    }
+    const { data: parsed } = await generateJson({
+      label: "wellness-visit-summary",
+      system: systemPrompt,
+      messages: [{
+        role: "user",
+        content: `Conversation transcript:\n${transcriptText}\n\nStructured intake (JSON): ${JSON.stringify(intakeSoFar)}`,
+      }],
+      schema: VISIT_SUMMARY_RESPONSE_SCHEMA,
+      maxTokens: 2000,
+    });
 
     res.json({ summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "" });
   } catch (err: any) {
