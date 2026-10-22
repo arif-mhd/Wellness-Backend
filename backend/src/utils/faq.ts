@@ -60,10 +60,24 @@ export const FAQ_DEEP_LINKS: Record<string, { label: string; feature?: string }>
   language:            { label: "Language" },
   notifications:       { label: "Notification settings" },
   raise_issue:         { label: "Raise an issue" },
+  my_medications:      { label: "My medications" },
+  profile_details:     { label: "My profile" },
 };
 
 export const isKnownDeepLink = (key: unknown): key is string =>
   typeof key === "string" && Object.prototype.hasOwnProperty.call(FAQ_DEEP_LINKS, key);
+
+// A known key is still only usable by an org that actually has the screen it
+// points to — FAQ answers' own "Take me there" chip already hides itself for
+// a disabled feature client-side (FaqAnswerActions' hasFeature check), but
+// the assistant's general chat navigation has no such per-answer gate, so it
+// must be filtered at the source instead of relying on the client to hide a
+// dead-end reply after the fact.
+export function isNavigationTargetAllowed(key: string, enabledFeatureKeys: Set<string>): boolean {
+  if (!isKnownDeepLink(key)) return false;
+  const feature = FAQ_DEEP_LINKS[key].feature;
+  return !feature || enabledFeatureKeys.has(feature);
+}
 
 // ── Reading ──────────────────────────────────────────────────────────────────
 
