@@ -1,4 +1,6 @@
 import { pharmacyProductsContainer, pharmaciesContainer } from "../config/cosmos";
+import { getPharmacyIdsForOrg } from "./orgScope";
+import { buildInClause } from "./clinicScope";
 
 export interface OrderItemInput {
   medicine_id: string;
@@ -32,20 +34,32 @@ export type ValidateItemsResult =
 // consultation flow (POST /api/appointments/:id/order-medicines) so both
 // enforce identical availability/price rules from one place.
 //
+// orgId scopes the lookup to the caller's own brand's pharmacies, exactly
+// like GET /api/pharmacy/catalogue already does — without it, a patient
+// could place a real order against another brand's pharmacy stock just by
+// knowing (or guessing) a product id, bypassing the brand-isolation every
+// browse/search endpoint already enforces.
+//
 // Pharmacies flag availability with a plain in-stock/out-of-stock toggle
 // (inStock) rather than tracking exact counts, so there's no quantity-vs-
 // stock comparison here — an order is only ever rejected for being
 // completely out of stock, never for "not enough left."
-export async function validateOrderItems(items: OrderItemInput[]): Promise<ValidateItemsResult> {
+export async function validateOrderItems(items: OrderItemInput[], orgId: string): Promise<ValidateItemsResult> {
   let total_amount = 0;
   const validatedItems: ValidatedOrderItem[] = [];
   const pharmacyNameCache: Record<string, string | null> = {};
 
+  const orgPharmacyIds = await getPharmacyIdsForOrg(orgId);
+  if (!orgPharmacyIds.length) {
+    return { ok: false, error: "No pharmacy available for this account." };
+  }
+  const { clause: orgClause, parameters: orgParams } = buildInClause("c.pharmacyId", orgPharmacyIds);
+
   for (const item of items) {
     const { resources } = await pharmacyProductsContainer.items.query({
-      query: "SELECT * FROM c WHERE c.id = @id AND c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false)",
-      parameters: [{ name: "@id", value: item.medicine_id }],
-    }).fetchAll();
+      query: `SELECT * FROM c WHERE c.id = @id AND c.status = 'approved' AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false) AND ${orgClause}`,
+      parameters: [{ name: "@id", value: item.medicine_id }, ...orgParams],
+    } as any).fetchAll();
 
     if (!resources.length) {
       return { ok: false, error: `Product ${item.medicine_id} not found or unavailable` };

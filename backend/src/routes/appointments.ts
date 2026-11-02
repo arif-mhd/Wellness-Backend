@@ -31,6 +31,7 @@ import { FhirError } from "../services/fhirClient";
 import { getFhirEncounters, getFhirNotes, getFhirObservations, getFhirContext } from "../services/fhirService";
 import { computeDietPlanProgress } from "../utils/dietPlanProgress";
 import { validateOrderItems, resolvePackQuantity, OrderItemInput } from "../utils/pharmacyOrders";
+import { resolveOrgId } from "../utils/orgScope";
 import PDFDocument from "pdfkit";
 import { drawPrescriptionPdf } from "../utils/prescriptionPdf";
 import { updateAppointmentWithRetry, AppointmentWriteNotAuthorizedError } from "../utils/appointmentWrite";
@@ -1943,7 +1944,8 @@ router.post("/:id/order-medicines", requireRole("patient"), requireFeature("phar
         quantity: await resolvePackQuantity(m.productId, m.quantity),
       }))
     );
-    const validation = await validateOrderItems(items);
+    const orgId = await resolveOrgId(req);
+    const validation = await validateOrderItems(items, orgId);
     if (!validation.ok) {
       res.status(400).json({ error: validation.error });
       return;

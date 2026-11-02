@@ -687,15 +687,28 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
     const now = new Date().toISOString();
     const bookingId = uuidv4();
 
+    // Scopes the lookup to the caller's own brand's labs, exactly like GET
+    // /api/lab/tests already does — without this, a patient could book a
+    // real test against another brand's lab stock just by knowing (or
+    // guessing) a test id, bypassing the brand-isolation every browse/search
+    // endpoint already enforces.
+    const orgId = await resolveOrgId(req);
+    const orgLabIds = await getLabIdsForOrg(orgId);
+    if (!orgLabIds.length) {
+      res.status(400).json({ error: "No lab available for this account." });
+      return;
+    }
+    const { clause: orgClause, parameters: orgParams } = buildInClause("c.labId", orgLabIds);
+
     // Validate all test IDs exist and compute total
     let total_amount = 0;
     const validatedItems: any[] = [];
 
     for (const item of items) {
       const { resources } = await labTestsContainer.items.query({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved')",
-        parameters: [{ name: "@id", value: item.testId }],
-      }).fetchAll();
+        query: `SELECT * FROM c WHERE c.id = @id AND c.is_active = true AND (NOT IS_DEFINED(c.status) OR c.status = 'approved') AND ${orgClause}`,
+        parameters: [{ name: "@id", value: item.testId }, ...orgParams],
+      } as any).fetchAll();
 
       if (!resources.length) {
         res.status(400).json({ error: `Test ${item.testId} not found or inactive` });
@@ -744,7 +757,7 @@ router.post("/bookings", requireRole("patient"), requireFeature("lab_booking"), 
     await labBookingsContainer.items.upsert(booking);
 
     const testNames = validatedItems.map((i: any) => i.testName).join(", ");
-    const labCurrency = await resolveCurrencyForOrgId(await resolveOrgId(req));
+    const labCurrency = await resolveCurrencyForOrgId(orgId);
     logActivity({
       source: "patient",
       action: "Lab Test Booked",

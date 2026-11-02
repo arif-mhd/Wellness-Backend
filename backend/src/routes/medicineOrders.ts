@@ -40,7 +40,8 @@ router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async
     }
 
     // Validate each item and calculate total
-    const validation = await validateOrderItems(items);
+    const orgId = await resolveOrgId(req);
+    const validation = await validateOrderItems(items, orgId);
     if (!validation.ok) {
       res.status(400).json({ error: validation.error });
       return;
