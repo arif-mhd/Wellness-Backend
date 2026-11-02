@@ -33,6 +33,11 @@ export async function resolveLabTestSuggestions(
   const { clause: orgClause, parameters: orgParams } = buildInClause("c.labId", orgLabIds);
 
   const seenIds = new Set<string>();
+  // Defends against duplicate catalogue rows (e.g. a lab's test re-seeded or
+  // re-created with a different id but identical name+price+lab) showing up
+  // as two visually-identical cards — a real id is the correct identity for
+  // ordering, but not for "is this the same test being offered twice".
+  const seenNameLabPrice = new Set<string>();
   const matched: ResolvedLabTestSuggestion[] = [];
 
   for (const suggestion of cleaned) {
@@ -47,7 +52,10 @@ export async function resolveLabTestSuggestions(
 
     for (const test of resources as any[]) {
       if (seenIds.has(test.id)) continue;
+      const dedupeKey = `${(test.name ?? "").trim().toLowerCase()}|${test.labId ?? ""}|${test.price ?? ""}`;
+      if (seenNameLabPrice.has(dedupeKey)) continue;
       seenIds.add(test.id);
+      seenNameLabPrice.add(dedupeKey);
       matched.push({ ...test, reason: suggestion.reason });
     }
   }
