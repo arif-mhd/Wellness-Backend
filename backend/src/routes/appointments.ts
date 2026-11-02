@@ -210,6 +210,16 @@ router.post("/", requireRole("patient"), requireFeature("appointments"), async (
       scheduledAt = legacyScheduledAt;
     }
 
+    // GET /available-slots already excludes times that have passed, but a
+    // client can hold a stale list open indefinitely (e.g. a chat card from
+    // earlier in the conversation) and still submit it later — this is the
+    // server-side backstop that actually prevents a past-dated appointment,
+    // rather than just relying on the client not to offer one.
+    if (new Date(scheduledAt).getTime() <= Date.now()) {
+      res.status(400).json({ error: "This time slot has already passed. Please choose another slot." });
+      return;
+    }
+
     // Fetched up front (rather than after creation, as before) because the
     // insurance branch below needs the patient's own on-file policy to
     // validate against — never trust a client-supplied snapshot.
