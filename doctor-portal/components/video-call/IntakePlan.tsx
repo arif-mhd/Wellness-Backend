@@ -124,7 +124,7 @@ function TagPicker({
   );
 }
 
-function VisitInformationTab({
+export function VisitInformationTab({
   visitInfo,
   onChange,
 }: {
@@ -228,7 +228,7 @@ function VisitInformationTab({
 // shown as-is, not editable here (edited by the doctor's own notes in the
 // other tabs instead). Mirrors PreVisitFormModal's field set.
 
-interface PreVisitFormData {
+export interface PreVisitFormData {
   primaryReason?: string | null;
   symptoms?: string[] | string | null;
   onset?: string | null;
@@ -243,7 +243,7 @@ interface PreVisitFormData {
   source?: "ai_chat" | "manual" | null;
 }
 
-function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
+export function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
   if (!data) {
     return (
       <div className="flex flex-col gap-3">
@@ -303,7 +303,7 @@ function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
   );
 }
 
-function hasPreVisitContent(data: PreVisitFormData | null): boolean {
+export function hasPreVisitContent(data: PreVisitFormData | null): boolean {
   if (!data) return false;
   return !!(
     data.primaryReason || data.onset || data.location || data.severity || data.duration ||
@@ -314,15 +314,15 @@ function hasPreVisitContent(data: PreVisitFormData | null): boolean {
 
 // ── Left-nav tab definitions ────────────────────────────────────────────────────
 
-type TabKey = "visitInformation" | "preVisitForm" | keyof EmrSections;
+export type TabKey = "visitInformation" | "preVisitForm" | keyof EmrSections;
 
-interface SubField {
+export interface SubField {
   label: string;
   placeholder: string;
   rows?: number;
 }
 
-interface TabDef {
+export interface TabDef {
   key: TabKey;
   title: string;
   /** Single free-text tabs (legacy/simple) provide placeholder+rows directly. */
@@ -334,7 +334,7 @@ interface TabDef {
   subFields?: SubField[];
 }
 
-const TABS: TabDef[] = [
+export const TABS: TabDef[] = [
   { key: "preVisitForm", title: "Pre-visit form" },
   {
     key: "reasonForVisit",
@@ -437,7 +437,7 @@ const TABS: TabDef[] = [
 // Format: "## Label\ntext\n\n## Label2\ntext2" — kept human-readable so the
 // existing read-only displays (EhrPanel, PatientProfileModal, ConsultationRoom)
 // continue to show something sensible even without re-parsing it.
-function serializeSubFields(values: Record<string, string>, subFields: SubField[]): string {
+export function serializeSubFields(values: Record<string, string>, subFields: SubField[]): string {
   return subFields
     .map((f) => ({ f, v: (values[f.label] ?? "").trim() }))
     .filter(({ v }) => v.length > 0)
@@ -445,7 +445,7 @@ function serializeSubFields(values: Record<string, string>, subFields: SubField[
     .join("\n\n");
 }
 
-function parseSubFields(text: string, subFields: SubField[]): Record<string, string> {
+export function parseSubFields(text: string, subFields: SubField[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const f of subFields) result[f.label] = "";
   if (!text) return result;
@@ -518,7 +518,7 @@ function fmtAllergies(allergies?: any[]): string {
   return parts.length > 0 ? parts.join("; ") : "None";
 }
 
-function hasVisitInfoContent(v: VisitInfo): boolean {
+export function hasVisitInfoContent(v: VisitInfo): boolean {
   return !!(v.visitType || v.accompaniedBy || v.sourceOfHistory || v.referralSource || v.historyLimitation);
 }
 

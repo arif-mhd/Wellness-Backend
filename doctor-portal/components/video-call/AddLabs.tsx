@@ -31,11 +31,14 @@ interface AddLabsProps {
   currentDoctorId?: string;
   /** The doctor's own clinicId — scopes the catalogue search to that clinic's affiliated lab, if any */
   clinicId?: string;
+  /** "compact" = in-call EMR panel look (small section header, compact cards) */
+  variant?: "default" | "compact";
 }
 
 const cachedTests: Record<string, CatalogueTest[]> = {};
 
-export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: AddLabsProps) {
+export default function AddLabs({ labs, onChange, currentDoctorId, clinicId, variant = "default" }: AddLabsProps) {
+  const compact = variant === "compact";
   const [showAddForm, setShowAddForm] = useState(false);
   const [labName, setLabName] = useState("");
   const [selectedTest, setSelectedTest] = useState<CatalogueTest | null>(null);
@@ -121,13 +124,15 @@ export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: A
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className={`flex flex-col w-full ${compact ? "gap-2" : "gap-4"}`}>
       <div className="flex items-center justify-between">
-        <span className="text-[#24292E] text-sm font-bold tracking-tight">Add/ Recommend Labs</span>
+        <span className={compact ? "text-[#24292E] text-[11px] font-semibold" : "text-[#24292E] text-sm font-bold tracking-tight"}>Add/ Recommend Labs</span>
         <button
           onClick={() => setShowAddForm((v) => !v)}
           title="Add lab test"
-          className="w-8 h-8 rounded-full bg-[#E8F1FF] text-[#5476FC] flex items-center justify-center hover:bg-[#5476FC] hover:text-white transition-all duration-200"
+          className={compact
+            ? "w-8 h-6 rounded-full bg-[#E3E9FF] text-[#3D5AFE] flex items-center justify-center hover:bg-[#5476FC] hover:text-white transition-all duration-200"
+            : "w-8 h-8 rounded-full bg-[#E8F1FF] text-[#5476FC] flex items-center justify-center hover:bg-[#5476FC] hover:text-white transition-all duration-200"}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -217,9 +222,11 @@ export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: A
         </div>
       )}
 
-      <div className="flex flex-col gap-3 w-full">
+      <div className={`flex flex-col w-full ${compact ? "gap-2" : "gap-3"}`}>
         {labs.length === 0 ? (
-          <div className="text-center text-xs font-medium text-slate-400 py-8 border border-dashed border-[#EBEEF5] rounded-xl bg-white w-full">
+          <div className={compact
+            ? "text-center text-[11px] text-slate-400 py-5 rounded-xl bg-white w-full"
+            : "text-center text-xs font-medium text-slate-400 py-8 border border-dashed border-[#EBEEF5] rounded-xl bg-white w-full"}>
             No recommended labs yet.
           </div>
         ) : (
@@ -228,6 +235,31 @@ export default function AddLabs({ labs, onChange, currentDoctorId, clinicId }: A
               !currentDoctorId ||
               !lab.contributorDoctorId ||
               lab.contributorDoctorId === currentDoctorId;
+
+            if (compact) {
+              return (
+                <div key={lab.id} className={`flex items-start gap-3 px-4 py-3 rounded-xl w-full min-w-0 ${isOwn ? "bg-white" : "bg-blue-50/60 ring-1 ring-[#E8F1FF]"}`}>
+                  <div className="flex-1 flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-[18px] h-[18px] rounded-full bg-[#7B93FD] flex items-center justify-center shrink-0">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3" /></svg>
+                      </span>
+                      <span className="text-[#24292E] text-[12px] font-medium truncate">{lab.name}</span>
+                    </div>
+                    <p className="text-[#676E76] text-[11px] leading-relaxed">{lab.notes}</p>
+                    {lab.contributorName && !isOwn && (
+                      <span className="text-[10px] text-[#5476FC] font-semibold italic">Added by Dr. {lab.contributorName}</span>
+                    )}
+                  </div>
+                  {isOwn && (
+                    <button onClick={() => handleDelete(lab.id)} title="Remove lab recommendation"
+                      className="p-1 rounded-md text-[#E84949] opacity-80 hover:opacity-100 hover:bg-red-50 transition-all shrink-0">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" /></svg>
+                    </button>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <div

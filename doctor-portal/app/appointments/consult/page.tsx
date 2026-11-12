@@ -9,7 +9,8 @@ import {
   LocalTrackPublication, Participant,
 } from "livekit-client";
 import { apiFetch } from "@/lib/apiFetch";
-import IntakePlan, { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
+import { EmrSections, EMPTY_EMR_SECTIONS, VisitInfo, EMPTY_VISIT_INFO } from "@/components/video-call/IntakePlan";
+import EmrNoteEditor from "@/components/video-call/EmrNoteEditor";
 import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN, fromSavedDietPlan, hasDietPlanContent, toDietPlanPayload } from "@/components/video-call/AddDietPlan";
@@ -1312,7 +1313,7 @@ function ConsultRoom() {
         <div className="flex-1 overflow-hidden flex flex-col border-l border-gray-100">
 
           {/* Tab bar */}
-          <div className="flex items-center border-b border-gray-100 flex-shrink-0 px-2">
+          <div className="flex items-center gap-1 flex-shrink-0 px-4 pt-3 pb-1">
             {([
               { key: "chat" as const, label: "Chat" },
               { key: "emr" as const, label: "EMR" },
@@ -1325,15 +1326,12 @@ function ConsultRoom() {
                   if (key === "chat") setUnread(0);
                   if (key === "specialist") fetchAvailableDoctors();
                 }}
-                className={`relative px-4 py-3 text-xs font-semibold transition-colors ${rightTab === key ? "text-[#5476fc]" : "text-gray-400 hover:text-gray-600"
+                className={`relative h-8 px-4 rounded-full text-xs font-medium transition-colors ${rightTab === key ? "bg-[#2B3247] text-white" : "text-[#383F45] hover:bg-gray-100"
                   }`}
               >
                 {label}
                 {key === "chat" && unread > 0 && rightTab !== "chat" && (
                   <span className="ml-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[9px] text-white inline-flex items-center justify-center px-1">{unread}</span>
-                )}
-                {rightTab === key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5476fc] rounded-t-full" />
                 )}
               </button>
             ))}
@@ -1390,40 +1388,88 @@ function ConsultRoom() {
                     <div className="w-6 h-6 border-2 border-[#5476fc] border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
-                  <div className="px-4 md:px-6 py-4 flex flex-col gap-5">
-                    <IntakePlan
-                      sections={emrSections}
-                      onChange={setEmrSections}
-                      openSection={expandedSection}
-                      onToggleSection={setExpandedSection}
-                      visitInfo={visitInfo}
-                      onVisitInfoChange={setVisitInfo}
-                      onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
-                      preVisitData={preVisitData}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <AddMedicines medicines={medicines} onChange={setMedicines} clinicId={clinicId ?? undefined} />
-                      <AddLabs labs={labs} onChange={setLabs} clinicId={clinicId ?? undefined} />
+                  <div className="mx-3 md:mx-4 my-3 rounded-2xl bg-[#F4F5F9] flex flex-col">
+                    {/* View Detailed EHR + Intake Plan summary */}
+                    <div className="px-4 pt-4 pb-4 flex flex-col gap-3 border-b border-white">
+                      <button onClick={openEhrPanel}
+                        className="self-start flex items-center gap-2 h-8 px-4 rounded-full bg-[#E3E9FF] text-[#24292E] text-[11px] font-semibold hover:bg-[#D6DEFF] transition-colors">
+                        View Detailed EHR
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+                      </button>
+                      <div className="flex flex-col gap-1.5 px-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-[#24292E]">Intake Plan</span>
+                          {preVisitData && (
+                            <button onClick={() => setExpandedSection("preVisitForm")}
+                              className="text-[10px] font-semibold text-[#5476FC] hover:underline">
+                              View pre-visit form
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#838B95] leading-[17px] whitespace-pre-line line-clamp-6">
+                          {preVisitData?.visitSummary?.trim()
+                            || [
+                              preVisitData?.primaryReason,
+                              Array.isArray(preVisitData?.symptoms) ? preVisitData.symptoms.join(", ") : preVisitData?.symptoms,
+                              preVisitData?.duration ? `Duration: ${preVisitData.duration}` : null,
+                              preVisitData?.severity ? `Severity: ${preVisitData.severity}` : null,
+                            ].filter(Boolean).join(" · ")
+                            || emrSections.reasonForVisit.trim()
+                            || "No intake information submitted for this appointment yet."}
+                        </p>
+                      </div>
                     </div>
-                    <AddDietPlan
-                      plan={dietPlan}
-                      onChange={setDietPlan}
-                      visibleToPatient={dietPlanVisible}
-                      onToggleVisible={toggleDietPlanVisible}
-                      togglingVisible={togglingDietPlanVisible}
-                    />
+
+                    {/* Note editor */}
+                    <div className="px-4 py-4 border-b border-white">
+                      <EmrNoteEditor
+                        sections={emrSections}
+                        onChange={setEmrSections}
+                        activeSection={expandedSection}
+                        onSelectSection={setExpandedSection}
+                        visitInfo={visitInfo}
+                        onVisitInfoChange={setVisitInfo}
+                        onScheduleFollowUp={() => { setShowFollowUpModal(true); setFollowUpStatus("idle"); }}
+                        preVisitData={preVisitData}
+                      />
+                    </div>
+
+                    {/* Medicines */}
+                    <div className="px-4 py-4 border-b border-white">
+                      <AddMedicines variant="compact" medicines={medicines} onChange={setMedicines} clinicId={clinicId ?? undefined} />
+                    </div>
+
+                    {/* Labs */}
+                    <div className="px-4 py-4 border-b border-white">
+                      <AddLabs variant="compact" labs={labs} onChange={setLabs} clinicId={clinicId ?? undefined} />
+                    </div>
+
+                    {/* Diet plan */}
+                    <div className="px-4 py-4">
+                      <div className="bg-white rounded-xl p-4">
+                        <AddDietPlan
+                          plan={dietPlan}
+                          onChange={setDietPlan}
+                          visibleToPatient={dietPlanVisible}
+                          onToggleVisible={toggleDietPlanVisible}
+                          togglingVisible={togglingDietPlanVisible}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-3 px-4 pt-1 pb-5">
+                      <button className="h-9 px-5 rounded-full bg-white text-[#24292E] text-xs font-semibold hover:bg-gray-50 transition-colors">Cancel</button>
+                      <button onClick={saveEmr} disabled={savingEmr}
+                        className={`h-9 min-w-[150px] px-8 rounded-full text-white text-xs font-semibold transition-all disabled:opacity-70 ${emrSaved ? "bg-green-500" : "bg-gradient-to-b from-[#8AA0FF] to-[#5476fc] shadow-[0_2px_8px_rgba(84,118,252,0.3)] hover:opacity-90"}`}>
+                        {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
+                      </button>
+                      {emrSaveError && (
+                        <p className="w-full text-xs text-red-600">{emrSaveError}</p>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
-              <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-gray-100 flex-shrink-0">
-                {emrSaveError && (
-                  <p className="text-xs text-red-600 mr-auto">{emrSaveError}</p>
-                )}
-                <button className="h-9 px-5 rounded-full border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 transition-colors">Cancel</button>
-                <button onClick={saveEmr} disabled={savingEmr}
-                  className={`h-9 px-6 rounded-xl text-white text-xs font-bold transition-all ${emrSaved ? "bg-green-500" : "bg-[#5476fc] hover:bg-[#4466ec] shadow-[0_2px_8px_rgba(84,118,252,0.3)]"}`}>
-                  {savingEmr ? "Saving…" : emrSaved ? "Saved ✓" : "Save EMR"}
-                </button>
               </div>
             </>
           )}
