@@ -9,6 +9,7 @@ import AddMedicines, { Medicine } from "@/components/video-call/AddMedicines";
 import AddLabs, { LabRecommendation } from "@/components/video-call/AddLabs";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDateTime } from "@/lib/appointmentTime";
+import PostConsultationPrescription from "@/components/appointment/PostConsultationPrescription";
 
 function CompleteEmrForm() {
   const clinicTz = useClinicTimezone();
@@ -25,6 +26,7 @@ function CompleteEmrForm() {
   const [currentDoctorId, setCurrentDoctorId] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [postVideo, setPostVideo] = useState(false);
   const [savingEmr, setSavingEmr] = useState(false);
   const [emrSaved, setEmrSaved] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>("reasonForVisit");
@@ -86,6 +88,7 @@ function CompleteEmrForm() {
 
         if (aptRes.ok) {
           const { appointment } = await aptRes.json();
+          setPostVideo(appointment?.status === "completed" && appointment?.visitType !== "offline");
           setScheduledAt(appointment?.scheduledAt ?? null);
           if (appointment?.status === "scheduled" || appointment?.status === "in_progress") {
             setMode("live");
@@ -117,7 +120,7 @@ function CompleteEmrForm() {
       await apiFetch(`/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
+        body: JSON.stringify({ sections: emrSections, visitInfo, ...(postVideo ? {} : { medicines }), labs }),
       });
       const res = await apiFetch(`/api/appointments/${appointmentId}/status`, {
         method: "PATCH",
@@ -138,7 +141,7 @@ function CompleteEmrForm() {
       await apiFetch(`/api/appointments/${appointmentId}/emr`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sections: emrSections, visitInfo, medicines, labs }),
+        body: JSON.stringify({ sections: emrSections, visitInfo, ...(postVideo ? {} : { medicines }), labs }),
       });
       setEmrSaved(true);
       setTimeout(() => setEmrSaved(false), 2500);
@@ -197,7 +200,7 @@ function CompleteEmrForm() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />
+                {postVideo ? <PostConsultationPrescription key={appointmentId} appointmentId={appointmentId} onSaved={setMedicines} /> : <AddMedicines medicines={medicines} onChange={setMedicines} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />}
                 <AddLabs labs={labs} onChange={setLabs} currentDoctorId={currentDoctorId ?? undefined} clinicId={clinicId ?? undefined} />
               </div>
             </div>

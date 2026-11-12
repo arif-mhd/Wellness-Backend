@@ -7,6 +7,7 @@ import { Patient } from "@/app/appointments/types";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDate, formatClinicTime, clinicDayKey } from "@/lib/appointmentTime";
 import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN, fromSavedDietPlan, hasDietPlanContent, toDietPlanPayload } from "@/components/video-call/AddDietPlan";
+import PostConsultationPrescription from "./PostConsultationPrescription";
 
 interface PatientProfileModalProps {
   patient: Patient;
@@ -185,7 +186,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             const bookedD = new Date(a.createdAt || a.scheduledAt);
             const scheduledD = new Date(a.scheduledAt);
             const isCompleted = a.status === 'completed' || !!a.emr;
-            const completedD = isCompleted ? new Date(a.updatedAt || a.emr?.savedAt || a.scheduledAt) : null;
+            const completedD = isCompleted ? new Date(a.completedAt || a.updatedAt || a.emr?.savedAt || a.scheduledAt) : null;
 
             const formatTime = (d: Date) => formatClinicDate(d.toISOString(), clinicTz, { day: "numeric", month: "short", year: "numeric" }) +
               ", " + formatClinicTime(d.toISOString(), clinicTz, { hour: "2-digit", minute: "2-digit", hour12: true });
@@ -242,6 +243,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             if (c.emr?.medicines) {
               c.emr.medicines.forEach((m: any) => {
                 allMeds.push({
+                  appointmentId: c.id,
                   name: m.name,
                   dose: `${m.timing} ${m.frequency ? `· ${m.frequency}` : ""}`,
                   duration: m.dosage || "As advised",
@@ -380,28 +382,6 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
       setActiveTab(initialTab);
     }
   }, [initialTab]);
-
-  const handleAddMedicine = () => {
-    const name = prompt("Enter medicine name (e.g. Aspirin 100 mg):");
-    if (!name) return;
-    const dose = prompt("Enter dose (e.g. 1x After Breakfast):", "1x After Breakfast");
-    const duration = prompt("Enter duration (e.g. 5 days):", "5 days");
-    const notes = prompt("Enter notes (e.g. Take with water):", "Take with water");
-
-    setPrescribedMedicines([
-      ...prescribedMedicines,
-      {
-        name,
-        dose: dose || "1x After Breakfast",
-        duration: duration || "3 days",
-        notes: notes || "Take with food every morning"
-      }
-    ]);
-  };
-
-  const handleDeleteMedicine = (name: string) => {
-    setPrescribedMedicines(prescribedMedicines.filter((m) => m.name !== name));
-  };
 
   const [showAddendumBox, setShowAddendumBox] = useState(false);
   const [addendumText, setAddendumText] = useState("");
@@ -782,6 +762,13 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
               {!selectedConsultation ? (
                 <div className="flex items-center justify-center py-16 text-[#9EA5AD] text-sm">Select a consultation</div>
               ) : !selectedConsultation.emr ? (
+                <div className="p-6">
+                  <PostConsultationPrescription key={selectedConsultation.id} appointmentId={selectedConsultation.id} onSaved={(medicines) => {
+                    const updated = { ...selectedConsultation, emr: { medicines } };
+                    setSelectedConsultation(updated);
+                    setConsultations(prev => prev.map(c => c.id === updated.id ? updated : c));
+                    setPrescribedMedicines(prev => [...prev.filter(m => m.appointmentId !== updated.id), ...medicines.map(m => ({ name: m.name, dose: [m.timing, m.frequency].filter(Boolean).join(" / "), duration: m.dosage || "As advised", notes: m.instructions || "", appointmentId: updated.id }))]);
+                  }} />
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9EA5AD" strokeWidth="2">
@@ -794,6 +781,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   <p className="text-[#9EA5AD] text-[11px] text-center max-w-[260px]">
                     Notes filled during the video call will appear here after the doctor saves them.
                   </p>
+                </div>
                 </div>
               ) : (
                 <div className="flex flex-col lg:flex-row gap-6 p-6 overflow-y-auto min-h-0 flex-1">
@@ -885,37 +873,14 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                       </div>
                     )}
 
-                    {/* Medicines */}
-                    {selectedConsultation.emr.medicines && selectedConsultation.emr.medicines.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">Medicines</span>
-                        <div className="bg-[#F5F6FA] rounded-[12px] px-4 py-4 flex flex-col gap-4">
-                          {selectedConsultation.emr.medicines.map((med: any, i: number) => (
-                            <React.Fragment key={med.id ?? i}>
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2">
-                                  <GradientPillIcon />
-                                  <span className="text-[#24292E] text-[12px] font-normal leading-[1.5] tracking-[-0.24px]">
-                                    {med.name}{med.dosage ? ` — ${med.dosage}` : ""}
-                                  </span>
-                                </div>
-                                <p className="text-[12px] leading-[16px]">
-                                  <span className="text-[#5476FC]">{med.timing}</span>
-                                  {med.frequency && <span className="text-[#676E76]"> · {med.frequency}</span>}
-                                </p>
-                                {med.instructions && (
-                                  <p className="text-[#676E76] text-[12px] leading-[16px]">Notes: {med.instructions}</p>
-                                )}
-                                {med.contributorName && (
-                                  <p className="text-[#5476FC] text-[11px] italic">By Dr. {med.contributorName}</p>
-                                )}
-                              </div>
-                              {i < (selectedConsultation.emr!.medicines!.length - 1) && <div className="w-full h-px bg-[#EBEEF5]" />}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+              {selectedConsultation && (
+                <PostConsultationPrescription key={selectedConsultation.id} appointmentId={selectedConsultation.id} initialMedicines={selectedConsultation.emr?.medicines ?? []} onSaved={(medicines) => {
+                  const updated = { ...selectedConsultation, emr: { ...selectedConsultation.emr, medicines } };
+                  setSelectedConsultation(updated);
+                  setConsultations(prev => prev.map(c => c.id === updated.id ? updated : c));
+                  setPrescribedMedicines(prev => [...prev.filter(m => m.appointmentId !== updated.id), ...medicines.map(m => ({ name: m.name, dose: [m.timing, m.frequency].filter(Boolean).join(" · "), duration: m.dosage || "As advised", notes: m.instructions || "", appointmentId: updated.id }))]);
+                }} />
+              )}
 
                     {/* Lab Tests */}
                     {selectedConsultation.emr.labs && selectedConsultation.emr.labs.length > 0 && (
@@ -1044,12 +1009,6 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                 <span className="text-[#24292E] font-medium text-[14px] leading-[1.2] tracking-[-0.28px]">
                   Medicines Prescribed
                 </span>
-                <button
-                  onClick={handleAddMedicine}
-                  className="flex items-center justify-center px-[13px] py-[6px] bg-[#E0E7FF] hover:bg-[#D0DBFF] rounded-[12px] text-[#182A6F] font-semibold text-[13px] transition-all"
-                >
-                  Add Medicine
-                </button>
               </div>
               {prescribedMedicines.length === 0 ? (
                 <p className="text-gray-400 text-center py-6 text-sm">No medicines prescribed.</p>
@@ -1065,15 +1024,6 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                               {med.name}
                             </span>
                           </div>
-                          <button
-                            onClick={() => handleDeleteMedicine(med.name)}
-                            className="text-[#E84949] hover:bg-red-50 p-1.5 rounded-full transition-colors flex-shrink-0"
-                            aria-label={`Delete ${med.name}`}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                              <path d="M10 3.5V10.5C10 10.7761 9.77615 11 9.5 11H2.5C2.22386 11 2 10.7761 2 10.5V3.5H1V2.5H11V3.5H10ZM3 3.5V10H9V3.5H3ZM3.5 1H8.5V2H3.5V1ZM5.5 5H6.5V8.5H5.5V5Z" fill="currentColor"/>
-                            </svg>
-                          </button>
                         </div>
                         <p className="text-[12px] leading-[16px] font-normal pl-[48px]">
                           <span className="text-[#5476FC] font-semibold">{med.dose.split(" ")[0]}</span>

@@ -26,17 +26,21 @@ export async function sendPushToUser(
   title: string,
   body: string,
   data?: Record<string, unknown>
-): Promise<void> {
+): Promise<boolean> {
   try {
     const { resource } = await pushTokensContainer
       .item(userId, userId)
       .read()
-      .catch(() => ({ resource: undefined as any }));
+      .catch((err: any) => {
+        if (err.code === 404) return { resource: undefined };
+        throw err;
+      });
     const tokens: string[] = resource?.tokens ?? [];
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) return true;
 
     const messages: ExpoPushMessage[] = tokens.map((to) => ({ to, title, body, data, sound: "default" }));
     const deadTokens: string[] = [];
+    let accepted = true;
 
     for (let i = 0; i < messages.length; i += EXPO_BATCH_SIZE) {
       const chunk = messages.slice(i, i + EXPO_BATCH_SIZE);
@@ -45,11 +49,15 @@ export async function sendPushToUser(
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(chunk),
       });
+      if (!res.ok) { accepted = false; continue; }
       const json: any = await res.json().catch(() => null);
       const tickets: any[] = json?.data ?? [];
+      if (!Array.isArray(tickets) || tickets.length !== chunk.length) { accepted = false; continue; }
       tickets.forEach((ticket, idx) => {
         if (ticket?.status === "error" && ticket?.details?.error === "DeviceNotRegistered") {
           deadTokens.push(chunk[idx].to);
+        } else if (ticket?.status !== "ok") {
+          accepted = false;
         }
       });
     }
@@ -64,7 +72,9 @@ export async function sendPushToUser(
         updatedAt: new Date().toISOString(),
       });
     }
+    return accepted;
   } catch (err) {
     console.warn("[push] Failed to send push notification:", err);
+    return false;
   }
 }

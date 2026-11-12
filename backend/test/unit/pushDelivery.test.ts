@@ -1,0 +1,12 @@
+import { beforeEach, expect, it, vi } from "vitest";
+const state = vi.hoisted(() => ({ tokens: ["device"], fetch: vi.fn(), upsert: vi.fn(), readError: 0 }));
+vi.mock("../../src/config/cosmos", () => ({ pushTokensContainer: { item: () => ({ read: async () => { if (state.readError) throw { code: state.readError }; return { resource: { tokens: state.tokens } }; } }), items: { upsert: state.upsert } } }));
+import { sendPushToUser } from "../../src/utils/pushNotifications";
+beforeEach(() => { state.tokens = ["device"]; state.readError = 0; state.fetch.mockReset(); vi.stubGlobal("fetch", state.fetch); });
+it("RX-PUSH-001: no registered device needs no retry", async () => { state.tokens = []; expect(await sendPushToUser("p", "t", "b")).toBe(true); expect(state.fetch).not.toHaveBeenCalled(); });
+it("RX-PUSH-002: accepted ticket returns success", async () => { state.fetch.mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: "ok" }] }) }); expect(await sendPushToUser("p", "t", "b")).toBe(true); });
+it("RX-PUSH-003: HTTP failure stays pending", async () => { state.fetch.mockResolvedValue({ ok: false }); expect(await sendPushToUser("p", "t", "b")).toBe(false); });
+it("RX-PUSH-004: rejected transient ticket stays pending", async () => { state.fetch.mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: "error", details: { error: "MessageRateExceeded" } }] }) }); expect(await sendPushToUser("p", "t", "b")).toBe(false); });
+it("RX-PUSH-005: permanent dead token pruned without endless retries", async () => { state.fetch.mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: "error", details: { error: "DeviceNotRegistered" } }] }) }); expect(await sendPushToUser("p", "t", "b")).toBe(true); expect(state.upsert).toHaveBeenCalledWith(expect.objectContaining({ tokens: [] })); });
+it("RX-PUSH-006: missing token document is not a delivery failure", async () => { state.readError = 404; expect(await sendPushToUser("p", "t", "b")).toBe(true); });
+it("RX-PUSH-007: token-store outage remains retryable", async () => { state.readError = 503; expect(await sendPushToUser("p", "t", "b")).toBe(false); });

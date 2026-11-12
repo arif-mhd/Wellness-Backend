@@ -34,6 +34,7 @@ import { validateOrderItems, resolvePackQuantity, OrderItemInput } from "../util
 import PDFDocument from "pdfkit";
 import { drawPrescriptionPdf } from "../utils/prescriptionPdf";
 import { updateAppointmentWithRetry, AppointmentWriteNotAuthorizedError } from "../utils/appointmentWrite";
+import { completeAppointment, guardCompletedPrescription, PrescriptionError } from "../utils/prescriptionPolicy";
 import { zonedTimeToUtc, utcToZonedTime, startOfClinicDayUtc, resolveTimezoneForDoctor, resolveTimezoneForDoctorId, formatClinicDateTimeText } from "../utils/timezone";
 import { resolveCurrencyForDoctorId, formatCurrencyText } from "../utils/currency";
 
@@ -995,6 +996,7 @@ router.patch("/:id/cancel", verifySession(), async (req: SessionRequest, res: Re
     const { isDoctor, isPatient, isClinic } = actor;
 
     const cancelledReason = isPatient ? "cancelled_by_patient" : isClinic ? "cancelled_by_clinic" : "cancelled_by_doctor";
+    if (apt.status === "completed" || apt.completedAt) { res.status(409).json({ error: "A completed appointment cannot be cancelled." }); return; }
     // `cancelledReason` (above) encodes WHO cancelled; `patientCancelReason` is
     // the free-text/preset WHY, only meaningful when the patient is the one
     // cancelling — left undefined (and thus omitted from the stored doc) for
@@ -1119,6 +1121,7 @@ router.patch("/:id/reschedule", verifySession(), async (req: SessionRequest, res
     const actor = await resolveAppointmentActor(apt, userId, res, { requireManagePermission: true });
     if (!actor) return;
     const { isDoctor: callerIsDoctor, isClinic: callerIsClinic } = actor;
+    if (apt.status === "completed" || apt.completedAt) { res.status(409).json({ error: "A completed appointment cannot be rescheduled." }); return; }
 
     const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
     if (!doctor || doctor.status !== "approved") {
@@ -1337,22 +1340,13 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
   }
 
   try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) {
-      res.status(404).json({ error: "Appointment not found." });
-      return;
-    }
-    if (apt.doctorId !== doctorId) {
-      res.status(403).json({ error: "Not authorized." });
-      return;
-    }
-
-    const updated = { ...apt, status, updatedAt: new Date().toISOString() };
-    // Same reasoning as call-presence's completion branch — a completed
-    // appointment must not leave a dangling specialistInvite behind for
-    // GET /my-invite to keep matching.
-    if (status === "completed" && updated.specialistInvite) updated.specialistInvite = null;
-    await appointmentsContainer.items.upsert(updated);
+    const updated = await updateAppointmentWithRetry(id, apt => {
+      if (apt.doctorId !== doctorId) throw new PrescriptionError(403, "Not authorized.");
+      if (apt.status === "completed" && status !== "completed") throw new PrescriptionError(409, "A completed appointment cannot be reopened.");
+      const now = new Date().toISOString();
+      return { ...(status === "completed" ? completeAppointment(apt, now) : { ...apt, status }), ...(status === "completed" ? { specialistInvite: null } : {}), updatedAt: now };
+    });
+    if (!updated) { res.status(404).json({ error: "Appointment not found." }); return; }
 
     if (status === "completed") {
       const docDoc = await doctorsContainer.item(doctorId, doctorId).read().then(r => r.resource).catch(() => null);
@@ -1369,6 +1363,7 @@ router.patch("/:id/status", requireRole("doctor"), async (req: SessionRequest, r
 
     res.json({ status: "OK", appointment: updated });
   } catch (err) {
+    if (err instanceof PrescriptionError) { res.status(err.status).json({ error: err.message }); return; }
     console.error("Update status error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
@@ -1488,7 +1483,7 @@ router.patch("/:id/call-presence", verifySession(), async (req: SessionRequest, 
         updated.status !== "cancelled"
       ) {
         if (updated.callStartedAt) {
-          updated.status = "completed";
+          updated = completeAppointment(updated, now);
           completionAction = "completed";
         } else {
           updated.status = "cancelled";
@@ -1789,6 +1784,7 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
 
     const updated = await updateAppointmentWithRetry(id, (apt) => {
       if (!isAuthorizedDoctor(apt, doctorId)) throw new AppointmentWriteNotAuthorizedError();
+      guardCompletedPrescription(apt, medicines);
 
       // Safety net: drop any incoming entries that are explicitly tagged as belonging
       // to a different doctor (the frontend should already filter these out, but we
@@ -1824,8 +1820,8 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
         (l: any) => l.contributorDoctorId !== doctorId
       );
 
-      const mergedMedicines = [...otherMedicines, ...taggedMedicines];
-      const mergedLabs      = [...otherLabs,      ...taggedLabs];
+      const mergedMedicines = medicines === undefined ? existingMedicines : [...otherMedicines, ...taggedMedicines];
+      const mergedLabs      = labs === undefined ? existingLabs : [...otherLabs, ...taggedLabs];
 
       // Merge sections: layer this doctor's section notes on top of whatever was
       // previously saved. This prevents a specialist from wiping the primary
@@ -1867,6 +1863,7 @@ router.post("/:id/emr", requireRole("doctor"), async (req: SessionRequest, res: 
     res.json({ status: "OK", emr: updated.emr });
   } catch (err) {
     if (err instanceof AppointmentWriteNotAuthorizedError) { res.status(403).json({ error: err.message }); return; }
+    if (err instanceof PrescriptionError) { res.status(err.status).json({ error: err.message }); return; }
     console.error("Save EMR error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
