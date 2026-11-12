@@ -11,8 +11,22 @@ import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { deepgramCodeForLanguage } from "../utils/languages";
 import { blobExists } from "../config/blob";
 import { updateAppointmentWithRetry } from "../utils/appointmentWrite";
+import { deliverPrescriptionNotifications } from "../utils/prescriptionAdditions";
 
 const router = Router();
+
+// Configure Cloud Scheduler to call once per minute. The pending event lives
+// in the appointment, atomically with its prescription update.
+router.post("/prescription-notifications/sweep", async (req: Request, res: Response) => {
+  const secret = process.env.INTERNAL_CRON_SECRET;
+  if (!secret) { res.status(503).json({ error: "INTERNAL_CRON_SECRET not configured" }); return; }
+  if (req.headers["x-internal-secret"] !== secret) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const { resources } = await appointmentsContainer.items.query({ query: "SELECT c.id FROM c WHERE EXISTS(SELECT VALUE e FROM e IN c.prescriptionUpdates WHERE e.notificationPending = true)" }).fetchAll();
+    for (const apt of resources) await deliverPrescriptionNotifications(apt.id);
+    res.json({ status: "OK", processed: resources.length });
+  } catch { res.status(500).json({ error: "Could not retry prescription notifications." }); }
+});
 
 // Minutes-before-appointment windows, each paired with the boolean flag that
 // ensures a stage fires at most once per appointment. Windows are a couple

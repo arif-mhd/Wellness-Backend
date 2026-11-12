@@ -7,6 +7,7 @@ import { Patient } from "@/app/appointments/types";
 import { useClinicTimezone } from "@/components/BrandingContext";
 import { formatClinicDate, formatClinicTime, clinicDayKey } from "@/lib/appointmentTime";
 import AddDietPlan, { DietPlanDraft, EMPTY_DIET_PLAN, fromSavedDietPlan, hasDietPlanContent, toDietPlanPayload } from "@/components/video-call/AddDietPlan";
+import PostConsultationPrescription from "./PostConsultationPrescription";
 
 interface PatientProfileModalProps {
   patient: Patient;
@@ -242,6 +243,7 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
             if (c.emr?.medicines) {
               c.emr.medicines.forEach((m: any) => {
                 allMeds.push({
+                  appointmentId: c.id,
                   name: m.name,
                   dose: `${m.timing} ${m.frequency ? `· ${m.frequency}` : ""}`,
                   duration: m.dosage || "As advised",
@@ -749,6 +751,14 @@ export default function PatientProfileModal({ patient, onClose, mode, initialTab
                   </div>
                 </div>
 
+              {selectedConsultation && (
+                <PostConsultationPrescription key={selectedConsultation.id} appointmentId={selectedConsultation.id} onSaved={(medicines) => {
+                  const updated = { ...selectedConsultation, emr: { ...selectedConsultation.emr, medicines } };
+                  setSelectedConsultation(updated);
+                  setConsultations(prev => prev.map(c => c.id === updated.id ? updated : c));
+                  setPrescribedMedicines(prev => [...prev.filter(m => m.appointmentId !== updated.id), ...medicines.map(m => ({ name: m.name, dose: [m.timing, m.frequency].filter(Boolean).join(" · "), duration: m.dosage || "As advised", notes: m.instructions || "", appointmentId: updated.id }))]);
+                }} />
+              )}
               {showAddendumBox && selectedConsultation && (
                 <div className="flex flex-col gap-3 bg-[#F8FAFC] border-b border-gray-100 p-6">
                   <textarea

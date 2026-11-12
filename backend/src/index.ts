@@ -36,6 +36,7 @@ import adminPatientsRouter from "./routes/adminPatients";
 import adminAppointmentsRouter from "./routes/adminAppointments";
 import adminInsuranceVerificationsRouter from "./routes/adminInsuranceVerifications";
 import appointmentsRouter from "./routes/appointments";
+import prescriptionAdditionsRouter from "./routes/prescriptionAdditions";
 import wellnessRouter from "./routes/wellness";
 import pregnancyRouter from "./routes/pregnancy";
 import menstrualRouter from "./routes/menstrual";
@@ -180,6 +181,7 @@ app.use("/api/admin/insurance-verifications", adminInsuranceVerificationsRouter)
 
 // Appointment booking + LiveKit tokens (patient + doctor roles)
 app.use("/api/appointments", appointmentsRouter);
+app.use("/api/appointments", prescriptionAdditionsRouter);
 
 // Wellness: food logs, workout logs, food/exercise search, daily summary
 app.use("/api/wellness", wellnessRouter);
