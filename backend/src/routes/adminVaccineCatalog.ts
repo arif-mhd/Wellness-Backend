@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { vaccineCatalogContainer, vaccinesContainer } from "../config/cosmos";
+import { mergeCatalogContent, VACCINE_CONTENT_FIELDS } from "../utils/catalogContent";
 
 // Mirrors adminLabCatalog.ts: admins keep one unpriced entry per vaccine, and
 // each lab picks from it and sets only its own price (POST /api/lab/vaccines
@@ -15,23 +16,17 @@ router.use(requireRole("admin"));
 // same vaccine shows the same name and clinical details. Manufacturer and
 // price are deliberately not here — each lab sets those for its own offering.
 //
-// The description is the one exception: the admin's wording wins whenever the
-// catalog has one, but when the catalog vaccine has no description the lab may
-// write its own — so an existing lab vaccine's text is kept, not blanked out.
+// The content fields (description, age range, recommended for, how it's
+// administered, side effects, instructions) follow one rule: the admin's
+// wording wins and is locked whenever the catalog has it; where the catalog is
+// empty the lab may write its own, and an existing lab value is kept rather
+// than blanked out. See utils/catalogContent.ts.
 export function catalogOwnedVaccineFields(catalog: any, existing?: any) {
-  const catalogHasDescription = typeof catalog.description === "string" && catalog.description.trim() !== "";
   return {
     name: catalog.name,
     category: catalog.category,
-    description: catalogHasDescription ? catalog.description : (existing?.description ?? ""),
-    // True when the admin wrote the description (lab can't change it); false when the lab did.
-    descriptionFromCatalog: catalogHasDescription,
-    ageRange: catalog.ageRange ?? "",
     doses_required: Number(catalog.doses_required ?? 1),
-    recommendedFor: catalog.recommendedFor ?? "",
-    howAdministered: catalog.howAdministered ?? "",
-    sideEffects: catalog.sideEffects ?? "",
-    patientInstructions: catalog.patientInstructions ?? "",
+    ...mergeCatalogContent(catalog, existing, VACCINE_CONTENT_FIELDS),
   };
 }
 

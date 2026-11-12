@@ -8,6 +8,7 @@ import { requireFeature } from "../middleware/requireFeature";
 import { labServicesContainer, labTestsContainer, labBookingsContainer, vaccinesContainer, vaccineCatalogContainer, vaccinationBookingsContainer, doctorsContainer, patientsContainer, labTestCatalogContainer, appointmentsContainer } from "../config/cosmos";
 import { uploadBlob, deleteBlob, generateShortLivedSasUrl } from "../config/blob";
 import { catalogOwnedFields } from "./adminLabCatalog";
+import { catalogLocks, mergeCatalogContent, TEST_CONTENT_FIELDS, VACCINE_CONTENT_FIELDS } from "../utils/catalogContent";
 import { updateLabBookingWithRetry, LabBookingWriteNotAuthorizedError, LabBookingAlreadyHandledError } from "../utils/labBookingWrite";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
@@ -499,11 +500,13 @@ router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req:
       howItsDone:                howItsDone ?? null,
       recommendedFrequency:     recommendedFrequency ?? null,
       patientInstructions:      patientInstructions ?? null,
-      ...(catalog ? catalogOwnedFields(catalog) : {}),
-      // A catalog test with no description of its own: the lab writes it.
-      ...(catalog && !String(catalog.description ?? "").trim() && {
-        description: typeof description === "string" ? description.trim() : "",
-      }),
+      // A catalog test's content fields come from the admin where filled in;
+      // where the admin left one empty, the lab's own value is kept.
+      ...(catalog ? catalogOwnedFields(catalog, {
+        description, recommendedFor, ageRange, howItsDone, recommendedFrequency, patientInstructions,
+        targetGroups: Array.isArray(targetGroups) ? targetGroups : [],
+        normalValues: Array.isArray(normalValues) ? normalValues : [],
+      }) : {}),
       status:                   isOnboarded ? "approved" : "pending_approval",
       flagged:                  false,
       flaggedAt:                null,
@@ -547,12 +550,12 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
     const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
     const isOnboarded = labDoc?.status === "approved";
 
-    // For a catalog-linked test, the admin's description is authoritative; only
-    // when the catalog entry has none may the lab write its own.
-    let catalogDescription = "";
+    // For a catalog-linked test, whatever the admin filled in is authoritative;
+    // only the fields the catalog leaves empty may be written by the lab.
+    let locks: { values: Record<string, any>; locked: string[] } = { values: {}, locked: [] };
     if (existing.catalogTestId) {
       const { resource: cat } = await labTestCatalogContainer.item(existing.catalogTestId, existing.catalogTestId).read();
-      catalogDescription = String(cat?.description ?? "").trim() ? cat.description : "";
+      locks = catalogLocks(cat, TEST_CONTENT_FIELDS);
     }
 
     const updated = {
@@ -573,18 +576,14 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
       ...(recommendedFrequency !== undefined && { recommendedFrequency }),
       ...(patientInstructions !== undefined && { patientInstructions }),
       ...(is_active !== undefined && { is_active: is_active === "true" || is_active === true }),
-      // Tests linked to a catalog test keep the catalog's wording and its
-      // approval/fasting flags — only price, turnaround, home visit and
-      // is_active are the lab's to change.
+      // Tests linked to a catalog test keep the catalog's name, category and
+      // approval flag, and every content field the admin filled in.
       ...(existing.catalogTestId && {
         name: existing.name,
         category: existing.category,
-        description: catalogDescription || (description !== undefined ? String(description).trim() : (existing.description ?? "")),
-        descriptionFromCatalog: !!catalogDescription,
         requires_doctor_approval: existing.requires_doctor_approval,
-        recommendedFor: existing.recommendedFor,
-        howItsDone: existing.howItsDone,
-        patientInstructions: existing.patientInstructions,
+        ...locks.values,
+        catalogLockedFields: locks.locked,
       }),
       status: isOnboarded ? "approved" : "pending_approval",
       rejectedAt: null,
@@ -1310,16 +1309,20 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
       manufacturer: manufacturer ?? null,
       vaccineType: vaccineType ?? null,
       category: catalogDoc?.category ?? category ?? null,
-      // The admin's description when the catalog has one; otherwise the lab's own.
-      description: String(catalogDoc?.description ?? "").trim() ? catalogDoc.description : (typeof description === "string" && description.trim() ? description.trim() : null),
-      descriptionFromCatalog: !!String(catalogDoc?.description ?? "").trim(),
-      recommendedFor: catalogDoc?.recommendedFor || recommendedFor || null,
-      ageRange: catalogDoc?.ageRange ?? ageRange ?? null,
+      // Content fields: the admin's wording where the catalogue has it (locked),
+      // otherwise the lab's own text.
+      ...(catalogDoc
+        ? mergeCatalogContent(catalogDoc, { description, ageRange, recommendedFor, howAdministered, sideEffects, patientInstructions }, VACCINE_CONTENT_FIELDS)
+        : {
+            description: description ?? null,
+            recommendedFor: recommendedFor ?? null,
+            ageRange: ageRange ?? null,
+            howAdministered: howAdministered ?? null,
+            sideEffects: sideEffects ?? null,
+            patientInstructions: patientInstructions ?? null,
+          }),
       targetGroups: Array.isArray(targetGroups) ? targetGroups : [],
       doseSchedule: doseSchedule ?? null,
-      howAdministered: catalogDoc?.howAdministered || howAdministered || null,
-      sideEffects: catalogDoc?.sideEffects || sideEffects || null,
-      patientInstructions: catalogDoc?.patientInstructions || patientInstructions || null,
       price: priceNum,
       originalPrice: originalPrice ? Number(originalPrice) : null,
       doses_required: Number(doses_required ?? catalogDoc?.doses_required ?? 1),
@@ -1382,12 +1385,12 @@ router.patch("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequ
     const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
     const isOnboarded = labDoc?.status === "approved";
 
-    // A catalog vaccine's description belongs to the admin; the lab may only
-    // write it when the catalog entry has none.
-    let descriptionLocked = false;
+    // A catalog vaccine's content belongs to the admin wherever they filled it
+    // in; the lab may only write the fields the catalog entry leaves empty.
+    let locks: { values: Record<string, any>; locked: string[] } = { values: {}, locked: [] };
     if (existing.catalogVaccineId) {
       const { resource: cat } = await vaccineCatalogContainer.item(existing.catalogVaccineId, existing.catalogVaccineId).read();
-      descriptionLocked = !!String(cat?.description ?? "").trim();
+      locks = catalogLocks(cat, VACCINE_CONTENT_FIELDS);
     }
 
     const updated = {
@@ -1396,8 +1399,7 @@ router.patch("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequ
       ...(manufacturer !== undefined && { manufacturer }),
       ...(vaccineType !== undefined && { vaccineType }),
       ...(category !== undefined && { category }),
-      ...(description !== undefined && !descriptionLocked && { description }),
-      ...(existing.catalogVaccineId && { descriptionFromCatalog: descriptionLocked }),
+      ...(description !== undefined && { description }),
       ...(recommendedFor !== undefined && { recommendedFor }),
       ...(ageRange !== undefined && { ageRange }),
       ...(targetGroups !== undefined && { targetGroups: Array.isArray(targetGroups) ? targetGroups : [] }),
@@ -1410,6 +1412,8 @@ router.patch("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequ
       ...(doses_required !== undefined && { doses_required: Number(doses_required) }),
       ...(age_group !== undefined && { age_group }),
       ...(is_active !== undefined && { is_active: is_active === "true" || is_active === true }),
+      // Whatever the admin filled in on the catalogue entry stays theirs.
+      ...(existing.catalogVaccineId && { ...locks.values, catalogLockedFields: locks.locked }),
       // An edit re-enters review for a lab that isn't onboarded yet, same as
       // PATCH /my-tests does.
       status: isOnboarded ? "approved" : "pending_approval",

@@ -41,7 +41,23 @@ interface CatalogVaccine {
   description?: string | null;
   ageRange?: string | null;
   doses_required?: number;
+  recommendedFor?: string | null;
+  howAdministered?: string | null;
+  sideEffects?: string | null;
+  patientInstructions?: string | null;
 }
+
+// Text fields a lab may write itself when the platform admin left them empty
+// on the catalogue vaccine. Whatever the admin filled in is theirs and locked.
+const FILLABLE_VACCINE_FIELDS: { key: "description" | "ageRange" | "recommendedFor" | "howAdministered" | "sideEffects" | "patientInstructions"; label: string; multiline: boolean; placeholder: string }[] = [
+  { key: "description", label: "Description", multiline: true, placeholder: "What this vaccine protects against, and anything the patient should know" },
+  { key: "ageRange", label: "Age range", multiline: false, placeholder: "e.g. 6 months+" },
+  { key: "recommendedFor", label: "Recommended for", multiline: false, placeholder: "e.g. Children, Travellers" },
+  { key: "howAdministered", label: "How it's administered", multiline: true, placeholder: "e.g. Intramuscular injection in the upper arm" },
+  { key: "sideEffects", label: "Side effects", multiline: true, placeholder: "Common side effects patients may notice" },
+  { key: "patientInstructions", label: "Patient instructions", multiline: true, placeholder: "What to do before and after the vaccine" },
+];
+const hasText = (v: unknown) => typeof v === "string" && v.trim() !== "";
 
 const EMPTY_VACCINE_FORM = {
   name: "",
@@ -52,6 +68,10 @@ const EMPTY_VACCINE_FORM = {
   doses_required: "1",
   price: "",
   description: "",
+  recommendedFor: "",
+  howAdministered: "",
+  sideEffects: "",
+  patientInstructions: "",
 };
 type VaccineForm = typeof EMPTY_VACCINE_FORM;
 
@@ -138,8 +158,12 @@ export default function VaccinationsPage() {
             catalogVaccineId: selectedCatalog.id,
             price,
             manufacturer: form.manufacturer.trim() || null,
-            // Only used by the server when the catalogue vaccine has no description.
-            ...(!selectedCatalog.description?.trim() && form.description.trim() ? { description: form.description.trim() } : {}),
+            // Only used by the server for fields the catalogue vaccine leaves empty.
+            ...Object.fromEntries(
+              FILLABLE_VACCINE_FIELDS
+                .filter((f) => !hasText(selectedCatalog[f.key]) && form[f.key].trim())
+                .map((f) => [f.key, form[f.key].trim()]),
+            ),
           }
         : {
             name: form.name.trim(),
@@ -339,31 +363,41 @@ export default function VaccinationsPage() {
 
               {selectedCatalog ? (
                 <>
-                  <div className="col-span-2 rounded-xl bg-[#F8FAFC] border border-[#EBEEF5] px-4 py-3">
-                    <p className="text-[12px] text-[#24292E] font-medium mb-1">{selectedCatalog.name}</p>
-                    {selectedCatalog.description && (
-                      <p className="text-[11px] text-[#676E76] leading-relaxed">{selectedCatalog.description}</p>
-                    )}
-                    <p className="text-[10px] text-[#A0A8B0] mt-2">
-                      {[selectedCatalog.ageRange, `${selectedCatalog.doses_required ?? 1} dose${(selectedCatalog.doses_required ?? 1) !== 1 ? "s" : ""}`]
-                        .filter(Boolean).join(" · ")}
-                      {" · details come from the Wellness catalogue"}
+                  <div className="col-span-2 rounded-xl bg-[#F8FAFC] border border-[#EBEEF5] px-4 py-3 flex flex-col gap-2.5">
+                    <p className="text-[12px] text-[#24292E] font-medium">{selectedCatalog.name}</p>
+                    <p className="text-[10px] font-semibold text-[#24292E] uppercase tracking-wide">Details set by the platform admin</p>
+                    {FILLABLE_VACCINE_FIELDS.filter((f) => hasText(selectedCatalog[f.key])).map((f) => (
+                      <div key={f.key}>
+                        <p className="text-[10px] font-semibold text-[#24292E]">{f.label}</p>
+                        <p className="text-[11px] text-[#676E76] leading-relaxed whitespace-pre-line">{selectedCatalog[f.key]}</p>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-[#A0A8B0]">
+                      {(selectedCatalog.doses_required ?? 1) + " dose" + ((selectedCatalog.doses_required ?? 1) !== 1 ? "s" : "")}
+                      {" · shown to patients as-is"}
                     </p>
+                    {FILLABLE_VACCINE_FIELDS.every((f) => !hasText(selectedCatalog[f.key])) && (
+                      <p className="text-[10px] text-[#A0A8B0]">The platform hasn&apos;t added any details for this vaccine yet. You can add your own below.</p>
+                    )}
                   </div>
                   <Field label="Manufacturer" value={form.manufacturer} onChange={(v) => setField("manufacturer", v)} placeholder="e.g. Sanofi" />
-                  <Field label={`Your price (${currency.symbol})`} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
-                  {/* The platform has no description for this vaccine yet — the lab writes its own. */}
-                  {!selectedCatalog.description?.trim() && (
-                    <div className="col-span-2 flex flex-col gap-1.5">
-                      <label className="text-[11px] font-medium text-[#676E76]">Description</label>
-                      <textarea
-                        value={form.description}
-                        onChange={(e) => setField("description", e.target.value)}
-                        rows={3}
-                        placeholder="The platform hasn't added a description for this vaccine yet. Describe what it protects against and anything the patient should know"
-                        className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-3 text-sm text-[#24292E] outline-none focus:border-[#5476FC] resize-none"
-                      />
-                    </div>
+                  <Field label={"Your price (" + currency.symbol + ")"} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
+                  {/* Fields the platform admin left empty — the lab writes its own. */}
+                  {FILLABLE_VACCINE_FIELDS.filter((f) => !hasText(selectedCatalog[f.key])).map((f) =>
+                    f.multiline ? (
+                      <div key={f.key} className="col-span-2 flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-[#676E76]">{f.label}</label>
+                        <textarea
+                          value={form[f.key]}
+                          onChange={(e) => setField(f.key, e.target.value)}
+                          rows={3}
+                          placeholder={f.placeholder}
+                          className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-3 text-sm text-[#24292E] outline-none focus:border-[#5476FC] resize-none"
+                        />
+                      </div>
+                    ) : (
+                      <Field key={f.key} label={f.label} value={form[f.key]} onChange={(v) => setField(f.key, v)} placeholder={f.placeholder} span2 />
+                    ),
                   )}
                 </>
               ) : (

@@ -52,8 +52,8 @@ interface LabTest {
   labId: string;
   name: string;
   description?: string;
-  /** True when the admin wrote the description, so the lab can't change it. */
-  descriptionFromCatalog?: boolean;
+  /** Fields the platform admin filled in on the catalog test; the lab can't change those. */
+  catalogLockedFields?: string[];
   category: string;
   price: number;
   imageUrl?: string;
@@ -69,6 +69,8 @@ interface LabTest {
   recommendedFor?: string;
   howItsDone?: string;
   recommendedFrequency?: string;
+  ageRange?: string;
+  targetGroups?: string[];
   patientInstructions?: string;
   flagged?: boolean;
   flagReason?: string | null;
@@ -106,6 +108,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const [editing, setEditing]       = useState<Product | null>(null);
   const [editingTest, setEditingTest] = useState<LabTest | null>(null);
+  const isLocked = (k: string) => !!editingTest?.catalogLockedFields?.includes(k);
+  const lockedCls = (k: string) => (isLocked(k) ? " opacity-70 cursor-not-allowed" : "");
   const [deleting, setDeleting]     = useState<string | null>(null);
   const [saving, setSaving]         = useState(false);
   const [editError, setEditError]   = useState("");
@@ -446,6 +450,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   />
                   <DetailRow label="Recommended For" value={test?.recommendedFor} />
                   <DetailRow label="Recommended Frequency" value={test?.recommendedFrequency} />
+                  <DetailRow label="Age Range" value={test?.ageRange} />
+                  <DetailRow label="Target Groups" value={(test?.targetGroups ?? []).join(", ")} />
                 </div>
                 {test?.description && (
                   <div className="py-4 mt-2">
@@ -743,19 +749,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Description</label>
                 <textarea value={editingTest.description ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                  readOnly={!!editingTest.descriptionFromCatalog}
-                  rows={3} className={`w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none ${editingTest.descriptionFromCatalog ? "opacity-70 cursor-not-allowed" : ""}`} />
-                {editingTest.descriptionFromCatalog && (
-                  <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>
-                )}
+                  readOnly={isLocked("description")}
+                  rows={3} className={"w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none " + lockedCls("description")} />
+                {isLocked("description") && <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Recommended For (Tags)</label>
                   <input value={editingTest.recommendedFor ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, recommendedFor: e.target.value } : prev)}
-                    placeholder="e.g. Adults, Diabetics"
-                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
+                    placeholder="e.g. Adults, Diabetics" readOnly={isLocked("recommendedFor")}
+                    className={"w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" + lockedCls("recommendedFor")} />
+                  {isLocked("recommendedFor") && <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Turnaround Time (hours)</label>
@@ -768,20 +773,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">How It's Done</label>
                 <textarea value={editingTest.howItsDone ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, howItsDone: e.target.value } : prev)}
-                  rows={2} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
+                  readOnly={isLocked("howItsDone")}
+                  rows={2} className={"w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" + lockedCls("howItsDone")} />
+                {isLocked("howItsDone") && <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Recommended Frequency</label>
                 <input value={editingTest.recommendedFrequency ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, recommendedFrequency: e.target.value } : prev)}
-                  placeholder="e.g. Once every 6 months"
-                  className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
+                  placeholder="e.g. Once every 6 months" readOnly={isLocked("recommendedFrequency")}
+                  className={"w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" + lockedCls("recommendedFrequency")} />
+                {isLocked("recommendedFrequency") && <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Patient Instructions</label>
                 <textarea value={editingTest.patientInstructions ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, patientInstructions: e.target.value } : prev)}
-                  rows={2} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
+                  readOnly={isLocked("patientInstructions")}
+                  rows={2} className={"w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" + lockedCls("patientInstructions")} />
+                {isLocked("patientInstructions") && <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>}
               </div>
 
               <div>

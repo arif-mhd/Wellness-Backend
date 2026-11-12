@@ -13,6 +13,8 @@ async function adminFetch(path: string, options?: RequestInit) {
   });
 }
 
+interface NormalValue { title: string; value: string; description: string }
+
 interface CatalogTest {
   id: string;
   name: string;
@@ -20,7 +22,11 @@ interface CatalogTest {
   description?: string;
   requires_doctor_approval: boolean;
   recommendedFor?: string;
+  ageRange?: string;
+  targetGroups?: string[];
+  normalValues?: NormalValue[];
   howItsDone?: string;
+  recommendedFrequency?: string;
   patientInstructions?: string;
   is_active: boolean;
   labCount?: number;
@@ -36,7 +42,8 @@ interface UnlinkedTest {
 }
 
 const EMPTY = {
-  name: "", category: "", description: "", recommendedFor: "", howItsDone: "", patientInstructions: "",
+  name: "", category: "", description: "", recommendedFor: "", ageRange: "", targetGroupsText: "",
+  normalValues: [] as NormalValue[], howItsDone: "", recommendedFrequency: "", patientInstructions: "",
   requires_doctor_approval: false,
 };
 
@@ -76,7 +83,10 @@ export default function LabCatalogPage() {
   const openEdit = (t: CatalogTest) => {
     setForm({
       name: t.name, category: t.category, description: t.description ?? "", recommendedFor: t.recommendedFor ?? "",
-      howItsDone: t.howItsDone ?? "", patientInstructions: t.patientInstructions ?? "",
+      ageRange: t.ageRange ?? "", targetGroupsText: (t.targetGroups ?? []).join(", "),
+      normalValues: (t.normalValues ?? []).map((n) => ({ ...n })),
+      howItsDone: t.howItsDone ?? "", recommendedFrequency: t.recommendedFrequency ?? "",
+      patientInstructions: t.patientInstructions ?? "",
       requires_doctor_approval: t.requires_doctor_approval,
     });
     setEditingId(t.id); setError(""); setShowForm(true);
@@ -89,7 +99,10 @@ export default function LabCatalogPage() {
     try {
       const res = await adminFetch(editingId ? `/api/admin/lab-catalog/${editingId}` : "/api/admin/lab-catalog", {
         method: editingId ? "PATCH" : "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          targetGroups: form.targetGroupsText.split(",").map((g) => g.trim()).filter(Boolean),
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -247,10 +260,40 @@ export default function LabCatalogPage() {
               <input required placeholder="Test name (e.g. Complete Blood Count)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
               <input required placeholder="Category (e.g. Blood Tests)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls} />
               <textarea placeholder="Description (shown to patients on every lab's listing of this test)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} rows={2} />
-              <p className="text-[11px] text-slate-400 -mt-1">If you leave this empty, each lab can write its own description for this test. Once you add one, it replaces the labs&apos; own and cannot be edited by them.</p>
-              <textarea placeholder="Recommended for" value={form.recommendedFor} onChange={(e) => setForm({ ...form, recommendedFor: e.target.value })} className={inputCls} rows={2} />
+              <p className="text-[11px] text-slate-400 -mt-1">If you leave this empty, each lab can write its own. Once you add one, it replaces the labs&apos; own and they can no longer edit it.</p>
+              <p className="text-[11px] text-slate-400 -mt-1">The same rule applies to every field below: whatever you fill in is shown to patients on every lab&apos;s listing and is locked for labs; any field you leave empty can be written by each lab itself.</p>
+              <input placeholder="Recommended for (e.g. Adults, Diabetics)" value={form.recommendedFor} onChange={(e) => setForm({ ...form, recommendedFor: e.target.value })} className={inputCls} />
+              <div className="grid grid-cols-2 gap-3">
+                <input placeholder="Age range (e.g. 18+ years)" value={form.ageRange} onChange={(e) => setForm({ ...form, ageRange: e.target.value })} className={inputCls} />
+                <input placeholder="Target groups, comma-separated" value={form.targetGroupsText} onChange={(e) => setForm({ ...form, targetGroupsText: e.target.value })} className={inputCls} />
+              </div>
               <textarea placeholder="How it's done" value={form.howItsDone} onChange={(e) => setForm({ ...form, howItsDone: e.target.value })} className={inputCls} rows={2} />
+              <input placeholder="Recommended frequency (e.g. Once every 6 months)" value={form.recommendedFrequency} onChange={(e) => setForm({ ...form, recommendedFrequency: e.target.value })} className={inputCls} />
               <textarea placeholder="Patient instructions" value={form.patientInstructions} onChange={(e) => setForm({ ...form, patientInstructions: e.target.value })} className={inputCls} rows={2} />
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-slate-700">Normal values</span>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, normalValues: [...form.normalValues, { title: "", value: "", description: "" }] })}
+                    className="text-[12px] font-medium text-[#5476FC] hover:underline"
+                  >
+                    + Add value
+                  </button>
+                </div>
+                {form.normalValues.length === 0 && (
+                  <p className="text-[11px] text-slate-400">Reference ranges shown to patients on the test page, e.g. Normal · 70-99 mg/dL.</p>
+                )}
+                {form.normalValues.map((n, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start border border-slate-100 rounded-xl p-2.5 bg-slate-50/50">
+                    <input placeholder="Title (e.g. Normal)" value={n.title} onChange={(e) => setForm({ ...form, normalValues: form.normalValues.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} className={inputCls} />
+                    <input placeholder="Value (e.g. 70-99 mg/dL)" value={n.value} onChange={(e) => setForm({ ...form, normalValues: form.normalValues.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)) })} className={inputCls} />
+                    <button type="button" onClick={() => setForm({ ...form, normalValues: form.normalValues.filter((_, j) => j !== i) })} className="text-[12px] text-red-500 hover:underline px-1 py-2.5">Remove</button>
+                    <input placeholder="Note (optional)" value={n.description} onChange={(e) => setForm({ ...form, normalValues: form.normalValues.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)) })} className={inputCls + " col-span-3"} />
+                  </div>
+                ))}
+              </div>
               <label className="flex items-center gap-2 text-[13px] text-slate-700">
                 <input type="checkbox" checked={form.requires_doctor_approval} onChange={(e) => setForm({ ...form, requires_doctor_approval: e.target.checked })} />
                 Requires doctor approval before it's confirmed

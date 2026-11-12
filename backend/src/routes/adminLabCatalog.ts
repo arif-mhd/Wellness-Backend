@@ -3,39 +3,62 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { labTestCatalogContainer, labTestsContainer } from "../config/cosmos";
+import { mergeCatalogContent, TEST_CONTENT_FIELDS } from "../utils/catalogContent";
 
 const router = Router();
 router.use(requireRole("admin"));
 
-// The fields a catalog test owns. A lab test linked to a catalog test takes
-// these from the catalog (never from the lab), so every lab offering the same
-// test shows the same name/category and — importantly — the same
-// requires_doctor_approval decision, which only an admin gets to make. Fasting
-// is deliberately not here — each lab decides that for its own offering.
+// The fields a catalog test owns. A lab test linked to a catalog test shows the
+// same name/category and — importantly — the same requires_doctor_approval
+// decision, which only an admin gets to make. Fasting is deliberately not
+// here — each lab decides that for its own offering.
 //
-// The description is the one exception: the admin's wording wins whenever the
-// catalog has one, but when the catalog test has no description the lab is
-// allowed to write its own — so an existing lab test's text is kept instead of
-// being blanked out.
+// The content fields (description, recommended for, age range, target groups,
+// normal values, how it's done, frequency, instructions) follow one rule: the
+// admin's wording wins and is locked whenever the catalog has it; where the
+// catalog is empty the lab may write its own, and an existing lab value is
+// kept rather than blanked out. See utils/catalogContent.ts.
 export function catalogOwnedFields(catalog: any, existing?: any) {
-  const catalogHasDescription = typeof catalog.description === "string" && catalog.description.trim() !== "";
   return {
     name: catalog.name,
     category: catalog.category,
-    description: catalogHasDescription ? catalog.description : (existing?.description ?? ""),
-    // True when the admin wrote the description (lab can't change it); false when the lab did.
-    descriptionFromCatalog: catalogHasDescription,
     requires_doctor_approval: !!catalog.requires_doctor_approval,
-    recommendedFor: catalog.recommendedFor ?? "",
-    howItsDone: catalog.howItsDone ?? "",
-    patientInstructions: catalog.patientInstructions ?? "",
+    ...mergeCatalogContent(catalog, existing, TEST_CONTENT_FIELDS),
   };
+}
+
+const str = (v: unknown, max = 4000) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+// Tags arrive as an array or a comma-separated string.
+function cleanTags(v: unknown): string[] {
+  const raw = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
+  return Array.from(new Set(raw.map((x) => str(x, 60)).filter(Boolean))).slice(0, 20);
+}
+
+// Reference values shown to patients, e.g. { title: "Normal", value: "70-99 mg/dL", description: "…" }.
+function cleanNormalValues(v: unknown): { title: string; value: string; description: string }[] {
+  if (!Array.isArray(v)) return [];
+  return (v as any[])
+    .map((n) => ({ title: str(n?.title, 80), value: str(n?.value, 120), description: str(n?.description, 500) }))
+    .filter((n) => n.title || n.value)
+    .slice(0, 20);
+}
+
+// The editable catalog fields, sanitised. Only keys present in the body are returned.
+function cleanTestFields(body: any) {
+  const out: Record<string, any> = {};
+  for (const k of ["description", "recommendedFor", "ageRange", "howItsDone", "recommendedFrequency", "patientInstructions"]) {
+    if (body[k] !== undefined) out[k] = str(body[k]);
+  }
+  if (body.targetGroups !== undefined) out.targetGroups = cleanTags(body.targetGroups);
+  if (body.normalValues !== undefined) out.normalValues = cleanNormalValues(body.normalValues);
+  return out;
 }
 
 // ─── POST /api/admin/lab-catalog ──────────────────────────────────────────────
 router.post("/", async (req: SessionRequest, res: Response) => {
   try {
-    const { name, category, description, requires_doctor_approval, recommendedFor, howItsDone, patientInstructions } = req.body;
+    const { name, category, requires_doctor_approval } = req.body;
     if (!name || !category) {
       res.status(400).json({ error: "name and category are required" });
       return;
@@ -45,11 +68,16 @@ router.post("/", async (req: SessionRequest, res: Response) => {
       id: uuidv4(),
       name: String(name).trim(),
       category: String(category).trim(),
-      description: description ?? "",
       requires_doctor_approval: !!requires_doctor_approval,
-      recommendedFor: recommendedFor ?? "",
-      howItsDone: howItsDone ?? "",
-      patientInstructions: patientInstructions ?? "",
+      description: "",
+      recommendedFor: "",
+      ageRange: "",
+      targetGroups: [] as string[],
+      normalValues: [] as { title: string; value: string; description: string }[],
+      howItsDone: "",
+      recommendedFrequency: "",
+      patientInstructions: "",
+      ...cleanTestFields(req.body),
       is_active: true,
       createdAt: now,
       updatedAt: now,
@@ -155,9 +183,10 @@ router.patch("/:id", async (req: SessionRequest, res: Response) => {
     const { resource } = await labTestCatalogContainer.item(id, id).read();
     if (!resource) { res.status(404).json({ error: "Catalog test not found" }); return; }
 
-    const allowed = ["name", "category", "description", "requires_doctor_approval", "recommendedFor", "howItsDone", "patientInstructions"];
-    const patch: any = {};
-    for (const k of allowed) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    const patch: any = { ...cleanTestFields(req.body) };
+    if (req.body.name !== undefined) patch.name = String(req.body.name).trim();
+    if (req.body.category !== undefined) patch.category = String(req.body.category).trim();
+    if (req.body.requires_doctor_approval !== undefined) patch.requires_doctor_approval = !!req.body.requires_doctor_approval;
     const updated = { ...resource, ...patch, updatedAt: new Date().toISOString() };
     await labTestCatalogContainer.items.upsert(updated);
 

@@ -262,7 +262,7 @@ export default function VaccineCatalogPage() {
                 <input type="number" min={1} step={1} placeholder="Doses" value={form.doses_required} onChange={(e) => setForm({ ...form, doses_required: e.target.value })} className={inputCls} />
               </div>
               <textarea placeholder="Description (shown to patients on every lab's listing of this vaccine)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} rows={2} />
-              <p className="text-[11px] text-slate-400 -mt-1">If you leave this empty, each lab can write its own description for this vaccine. Once you add one, it replaces the labs&apos; own and cannot be edited by them.</p>
+              <p className="text-[11px] text-slate-400 -mt-1">The same rule applies to every detail field here: whatever you fill in is shown to patients on every lab&apos;s listing and is locked for labs; any field you leave empty can be written by each lab itself.</p>
               <textarea placeholder="Recommended for" value={form.recommendedFor} onChange={(e) => setForm({ ...form, recommendedFor: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="How it's administered" value={form.howAdministered} onChange={(e) => setForm({ ...form, howAdministered: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="Side effects" value={form.sideEffects} onChange={(e) => setForm({ ...form, sideEffects: e.target.value })} className={inputCls} rows={2} />

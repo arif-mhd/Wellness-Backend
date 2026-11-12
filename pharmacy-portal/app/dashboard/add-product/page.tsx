@@ -12,12 +12,39 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const CATEGORIES = ["OTC", "Prescription", "Supplement", "Medical Device", "Personal Care", "Baby & Mother"];
 const LAB_CATEGORIES = ["Blood Test", "Imaging", "Body Checkup", "Screening Package", "Vitamin Panel", "Hormone Panel", "Allergy Test", "Genetic Test"];
 
+interface CatalogTest {
+  id: string;
+  name: string;
+  category: string;
+  requires_fasting?: boolean;
+  requires_doctor_approval: boolean;
+  description?: string;
+  recommendedFor?: string;
+  ageRange?: string;
+  targetGroups?: string[];
+  normalValues?: { title: string; value: string; description?: string }[];
+  howItsDone?: string;
+  recommendedFrequency?: string;
+  patientInstructions?: string;
+}
+
 export default function AddProductPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const { role } = useAccountRole();
   const { currency } = useCountryConfig();
   const isLab = role === "lab";
+
+  const hasText = (v: unknown) => (typeof v === "string" ? v.trim() !== "" : Array.isArray(v) ? v.length > 0 : false);
+
+  // Text fields a lab may write itself when the admin left them empty.
+  const FILLABLE_FIELDS: { key: "description" | "recommendedFor" | "howItsDone" | "recommendedFrequency" | "patientInstructions"; label: string; multiline: boolean; placeholder: string }[] = [
+    { key: "description", label: "Description", multiline: true, placeholder: "What this test measures and when it's needed…" },
+    { key: "recommendedFor", label: "Recommended For", multiline: false, placeholder: "e.g. Adults, Diabetics" },
+    { key: "howItsDone", label: "How It's Done", multiline: true, placeholder: "Sample collection method, procedure…" },
+    { key: "recommendedFrequency", label: "Recommended Frequency", multiline: false, placeholder: "e.g. Once every 6 months" },
+    { key: "patientInstructions", label: "Patient Instructions", multiline: true, placeholder: "Instructions patients should follow before/after the test…" },
+  ];
 
   // ── Shared fields ──────────────────────────────────────────────────────
   const [name, setName]               = useState("");
@@ -58,9 +85,12 @@ export default function AddProductPage() {
   // A lab can offer a test from the admin catalog (only price/turnaround/home
   // visit are the lab's to set — name, category, fasting and doctor-approval
   // come from the catalog) or add a custom test not in it.
-  const [catalogTests, setCatalogTests] = useState<{ id: string; name: string; category: string; description?: string; requires_fasting: boolean; requires_doctor_approval: boolean }[]>([]);
+  const [catalogTests, setCatalogTests] = useState<CatalogTest[]>([]);
   const [catalogTestId, setCatalogTestId] = useState("");
   const selectedCatalog = catalogTests.find(c => c.id === catalogTestId) ?? null;
+  // The admin owns every catalog field they filled in; the lab can write only
+  // the text fields the admin left empty (see FILLABLE_FIELDS below).
+  const adminSet = (k: keyof CatalogTest) => hasText(selectedCatalog?.[k]);
 
   useEffect(() => {
     if (!isLab) return;
@@ -98,8 +128,11 @@ export default function AddProductPage() {
         if (turnaroundHours) form.append("turnaround_hours", turnaroundHours);
         form.append("homeVisitAvailable", String(homeVisitAvailable));
         form.append("requires_fasting", String(requiresFasting));
-        // Only used by the server when the catalog test has no description.
-        if (description.trim() && !selectedCatalog.description?.trim()) form.append("description", description.trim());
+        // Only used by the server for fields the catalog test leaves empty.
+        const own = { description, recommendedFor, howItsDone, recommendedFrequency, patientInstructions };
+        for (const f of FILLABLE_FIELDS) {
+          if (!adminSet(f.key) && own[f.key].trim()) form.append(f.key, own[f.key].trim());
+        }
         const res = await fetch(`${API_URL}/api/lab/my-tests`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token ?? ""}` },
@@ -261,12 +294,41 @@ export default function AddProductPage() {
                   <p>{selectedCatalog.category}</p>
                   <p>Doctor approval: {selectedCatalog.requires_doctor_approval ? "Required" : "Not required"}</p>
                   <p className="text-[11px] text-[#A0A8B0]">Doctor approval is set by the platform admin for every lab offering this test.</p>
-                  {selectedCatalog.description && (
-                    <>
-                      <p className="pt-1 text-[11px] font-semibold text-[#24292E]">Description</p>
-                      <p>{selectedCatalog.description}</p>
-                      <p className="text-[11px] text-[#A0A8B0]">Written by the platform admin and shown to patients as-is.</p>
-                    </>
+                </div>
+              )}
+
+              {/* Everything the platform admin has written for this test — read-only, shown to patients as-is. */}
+              {selectedCatalog && (
+                <div className="border border-[#EBEEF5] rounded-xl px-4 py-3 text-xs text-[#676E76] space-y-3">
+                  <p className="text-[11px] font-semibold text-[#24292E] uppercase tracking-wide">Details set by the platform admin</p>
+                  {([
+                    ["Description", selectedCatalog.description],
+                    ["Recommended For", selectedCatalog.recommendedFor],
+                    ["Age Range", selectedCatalog.ageRange],
+                    ["Target Groups", (selectedCatalog.targetGroups ?? []).join(", ")],
+                    ["How It's Done", selectedCatalog.howItsDone],
+                    ["Recommended Frequency", selectedCatalog.recommendedFrequency],
+                    ["Patient Instructions", selectedCatalog.patientInstructions],
+                  ] as [string, string | undefined][])
+                    .filter(([, v]) => hasText(v))
+                    .map(([label, v]) => (
+                      <div key={label}>
+                        <p className="text-[11px] font-semibold text-[#24292E]">{label}</p>
+                        <p className="whitespace-pre-line leading-relaxed">{v}</p>
+                      </div>
+                    ))}
+                  {(selectedCatalog.normalValues ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-[#24292E]">Normal Values</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {selectedCatalog.normalValues!.map((n, i) => (
+                          <li key={i}><span className="font-medium text-[#383F45]">{n.title}</span>{n.value ? " · " + n.value : ""}{n.description ? " — " + n.description : ""}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {!["description", "recommendedFor", "ageRange", "targetGroups", "howItsDone", "recommendedFrequency", "patientInstructions", "normalValues"].some((k) => adminSet(k as keyof CatalogTest)) && (
+                    <p className="text-[#A0A8B0]">The platform hasn&apos;t added any details for this test yet. You can add your own below.</p>
                   )}
                 </div>
               )}
@@ -285,15 +347,28 @@ export default function AddProductPage() {
                     <input type="number" min="0" value={turnaroundHours} onChange={e => setTurnaroundHours(e.target.value)} placeholder="e.g. 24" className={inputCls} />
                   </div>
                 </div>
-                {/* The platform has no description for this test yet — the lab writes its own. */}
-                {!selectedCatalog.description?.trim() && (
-                  <div>
-                    <label className={labelCls}>Description</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)}
-                      placeholder="The platform hasn't added a description for this test yet. Describe what it measures and when it's needed…"
-                      rows={3} className={textareaCls} />
-                  </div>
-                )}
+              </div>
+            )}
+
+            {/* Fields the platform admin left empty — the lab writes its own. */}
+            {selectedCatalog && FILLABLE_FIELDS.some((f) => !adminSet(f.key)) && (
+              <div className="bg-white rounded-xl border border-[#EBEEF5] shadow-sm p-6 space-y-5 transition-all hover:border-gray-300">
+                <h2 className="text-[#24292E] font-semibold text-[18px] tracking-[-0.36px] mb-2 border-b border-[#EBEEF5] pb-3">Add Your Own Details</h2>
+                <p className="text-[11px] text-[#A0A8B0] -mt-2">The platform admin hasn&apos;t filled these in for this test. What you write is shown to patients on your listing.</p>
+                {FILLABLE_FIELDS.filter((f) => !adminSet(f.key)).map((f) => {
+                  const value = { description, recommendedFor, howItsDone, recommendedFrequency, patientInstructions }[f.key];
+                  const setValue = { description: setDescription, recommendedFor: setRecommendedFor, howItsDone: setHowItsDone, recommendedFrequency: setRecommendedFrequency, patientInstructions: setPatientInstructions }[f.key];
+                  return (
+                    <div key={f.key}>
+                      <label className={labelCls}>{f.label}</label>
+                      {f.multiline ? (
+                        <textarea value={value} onChange={e => setValue(e.target.value)} placeholder={f.placeholder} rows={3} className={textareaCls} />
+                      ) : (
+                        <input value={value} onChange={e => setValue(e.target.value)} placeholder={f.placeholder} className={inputCls} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
