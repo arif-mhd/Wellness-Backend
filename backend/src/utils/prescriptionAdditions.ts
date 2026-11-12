@@ -6,6 +6,11 @@ import { PrescriptionError } from "./prescriptionPolicy";
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const LEASE_MS = 120_000;
+// Legacy entries have no persisted IDs. Bind their removal token to content
+// and position so a stale screen cannot accidentally delete another entry.
+export function prescriptionMedicineId(medicine: any, index: number): string {
+  return medicine.id || `legacy_${createHash("sha256").update(JSON.stringify([index, medicine])).digest("hex")}`;
+}
 export function getPrescriptionAdditionEligibility(apt: any) {
   const completed = typeof apt.completedAt === "string" ? Date.parse(apt.completedAt) : NaN;
   const deadline = Number.isFinite(completed) ? new Date(completed + WINDOW_MS).toISOString() : null;
@@ -45,8 +50,11 @@ function normalizeMedicines(value: unknown): Record<string, any>[] {
 export async function addPrescriptionMedicines(id: string, doctorId: string, body: any) {
   const requestId = body?.requestId;
   if (typeof requestId !== "string" || !/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) throw new PrescriptionError(400, "A requestId (8-100 letters, digits, underscores or hyphens) is required.");
-  const medicines = normalizeMedicines(body?.medicines);
-  const hash = createHash("sha256").update(JSON.stringify(medicines)).digest("hex");
+  const removeMedicineIds = body?.removeMedicineIds === undefined ? [] : body.removeMedicineIds;
+  if (!Array.isArray(removeMedicineIds) || removeMedicineIds.length > 500 || removeMedicineIds.some((v: any) => typeof v !== "string" || !v.trim() || v.length > 200) || new Set(removeMedicineIds).size !== removeMedicineIds.length) throw new PrescriptionError(400, "Invalid medicine removal list.");
+  const medicines = removeMedicineIds.length && (body?.medicines === undefined || (Array.isArray(body.medicines) && body.medicines.length === 0)) ? [] : normalizeMedicines(body?.medicines);
+  // Preserve the original addition-only hash for retries from older clients.
+  const hash = createHash("sha256").update(JSON.stringify(removeMedicineIds.length ? { medicines, removeMedicineIds: [...removeMedicineIds].sort() } : medicines)).digest("hex");
   const eventId = `rx_${createHash("sha256").update(`${id}:${requestId}`).digest("hex")}`;
   const doctor = await doctorsContainer.item(doctorId, doctorId).read();
   const contributorName = doctor.resource?.fullName ?? "Doctor";
@@ -61,11 +69,15 @@ export async function addPrescriptionMedicines(id: string, doctorId: string, bod
       }
       const eligibility = getPrescriptionAdditionEligibility(apt);
       if (!eligibility.eligible) throw new PrescriptionError(409, eligibility.reason);
-      if ((apt.prescriptionUpdates?.length ?? 0) >= 100 || (apt.emr?.medicines?.length ?? 0) + medicines.length > 500) throw new PrescriptionError(409, "Prescription addition limit reached.");
+      const existing = apt.emr?.medicines ?? [];
+      const removedMedicines = existing.filter((m: any, i: number) => removeMedicineIds.includes(prescriptionMedicineId(m, i)));
+      if (removedMedicines.length !== removeMedicineIds.length) throw new PrescriptionError(409, "The prescription changed. Reload before removing medicines.");
+      const retained = existing.filter((m: any, i: number) => !removeMedicineIds.includes(prescriptionMedicineId(m, i)));
+      if ((apt.prescriptionUpdates?.length ?? 0) >= 100 || retained.length + medicines.length > 500) throw new PrescriptionError(409, "Prescription change limit reached.");
       const now = new Date(Date.now()).toISOString();
       const added = medicines.map((m, i) => ({ ...m, id: `${eventId}_${i}`, contributorDoctorId: doctorId, contributorName, addedAt: now, prescriptionUpdateId: eventId }));
       // The update and durable notification intent are a single conditional write.
-      return { ...apt, emr: { ...apt.emr, medicines: [...(apt.emr?.medicines ?? []), ...added], savedAt: now }, prescriptionUpdates: [...(apt.prescriptionUpdates ?? []), { id: eventId, hash, doctorId, doctorName: contributorName, addedAt: now, medicineIds: added.map(m => m.id), notificationPending: true }], updatedAt: now };
+      return { ...apt, emr: { ...apt.emr, medicines: [...retained, ...added], savedAt: now }, prescriptionUpdates: [...(apt.prescriptionUpdates ?? []), { id: eventId, hash, doctorId, doctorName: contributorName, addedAt: now, medicineIds: added.map(m => m.id), removedMedicines, notificationPending: true }], updatedAt: now };
     });
   } catch (err) {
     if (err instanceof AlreadySaved) updated = err.appointment;
@@ -75,7 +87,7 @@ export async function addPrescriptionMedicines(id: string, doctorId: string, bod
   await deliverPrescriptionNotifications(id);
   // Read the saved delivery state; delivery failure never rolls back the prescription.
   const { resource: current } = await appointmentsContainer.item(id, id).read().catch(() => ({ resource: updated }));
-  return { status: "OK", medicines: (current ?? updated).emr.medicines, notificationPending: Boolean((current ?? updated).prescriptionUpdates?.find((e: any) => e.id === eventId)?.notificationPending) };
+  return { status: "OK", medicines: (current ?? updated).emr.medicines.map((m: any, i: number) => ({ ...m, id: prescriptionMedicineId(m, i) })), notificationPending: Boolean((current ?? updated).prescriptionUpdates?.find((e: any) => e.id === eventId)?.notificationPending) };
 }
 
 class AlreadySaved extends Error { constructor(public appointment: any) { super("Already saved"); } }
@@ -96,7 +108,7 @@ export async function deliverPrescriptionNotifications(id: string): Promise<void
         return { ...apt, prescriptionUpdates: apt.prescriptionUpdates.map((e: any) => e.id === pending.id ? { ...e, lease, leaseUntil: Date.now() + LEASE_MS } : e) };
       });
       if (!claimed) continue;
-      const notification = { id: pending.id, patientId: claimed.patientId, profileId: claimed.familyMemberId || claimed.patientId, title: "Prescription updated", body: "Your doctor has added medicines to your prescription. Open the appointment to review it.", type: "prescription_updated", referenceId: id, isRead: false, sentAt: pending.addedAt };
+      const notification = { id: pending.id, patientId: claimed.patientId, profileId: claimed.familyMemberId || claimed.patientId, title: "Prescription updated", body: "Your doctor has updated your prescription. Open the appointment to review it.", type: "prescription_updated", referenceId: id, isRead: false, sentAt: pending.addedAt };
       try { await notificationsContainer.items.create(notification); } catch (err: any) { if (err.code !== 409) throw err; }
       const delivered = await sendPushToUser(claimed.patientId, notification.title, notification.body, { type: notification.type, referenceId: id, profileId: notification.profileId, notificationId: notification.id });
       if (!delivered) throw new Error("Push delivery was not accepted");

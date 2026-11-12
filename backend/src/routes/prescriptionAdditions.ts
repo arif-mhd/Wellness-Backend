@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { requireRole } from "../middleware/requireRole";
 import { appointmentsContainer } from "../config/cosmos";
-import { addPrescriptionMedicines, getPrescriptionAdditionEligibility } from "../utils/prescriptionAdditions";
+import { addPrescriptionMedicines, getPrescriptionAdditionEligibility, prescriptionMedicineId } from "../utils/prescriptionAdditions";
 import { PrescriptionError } from "../utils/prescriptionPolicy";
 
 const router = Router();
@@ -11,7 +11,7 @@ router.get("/:id/prescription-additions", requireRole("doctor"), async (req: Ses
     const { resource: apt } = await appointmentsContainer.item(req.params.id, req.params.id).read();
     if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
     if (apt.doctorId !== req.session!.getUserId()) { res.status(403).json({ error: "Not authorized." }); return; }
-    res.json({ ...getPrescriptionAdditionEligibility(apt), medicines: apt.emr?.medicines ?? [], clinicId: apt.clinicId ?? null });
+    res.json({ ...getPrescriptionAdditionEligibility(apt), medicines: (apt.emr?.medicines ?? []).map((m: any, i: number) => ({ ...m, id: prescriptionMedicineId(m, i) })), clinicId: apt.clinicId ?? null });
   } catch { res.status(500).json({ error: "Could not load prescription." }); }
 });
 router.post("/:id/prescription-additions", requireRole("doctor"), async (req: SessionRequest, res: Response) => {

@@ -10,6 +10,6 @@ export function completeAppointment(appointment: any, now: string): any {
 
 export function guardCompletedPrescription(appointment: any, medicines: unknown): void {
   if ((appointment.status === "completed" || appointment.completedAt) && appointment.visitType !== "offline" && medicines !== undefined) {
-    throw new PrescriptionError(409, "Use prescription additions for a completed video appointment. Existing medicines cannot be replaced.");
+    throw new PrescriptionError(409, "Use consultation prescription changes for a completed video appointment. Direct medicine-list replacement is not allowed.");
   }
 }

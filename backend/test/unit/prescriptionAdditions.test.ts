@@ -27,6 +27,47 @@ beforeEach(() => {
   state.apt = { id: "apt-1", patientId: "patient-1", doctorId: "doctor-1", status: "completed", visitType: "online", completedAt: "2026-11-11T11:00:00Z", recordingBlobPath: "keep", _etag: "1", emr: { medicines: [{ id: "old", name: "Existing", contributorDoctorId: "specialist-1" }], labs: [{ id: "lab" }], sections: { plan: "Keep notes" }, addenda: [] } };
 });
 describe("post-consultation prescription additions", () => {
+  it("RX-REMOVE-001: primary doctor removes specialist medicine and retains audit and orders", async () => {
+    state.apt.orders = [{ id: "order-1", medicineId: "old" }];
+    await add({ requestId: "remove-001", removeMedicineIds: ["old"] });
+    expect(state.apt.emr.medicines).toEqual([]);
+    expect(state.apt.orders).toEqual([{ id: "order-1", medicineId: "old" }]);
+    expect(state.apt.prescriptionUpdates[0].removedMedicines).toEqual([expect.objectContaining({ id: "old", contributorDoctorId: "specialist-1" })]);
+    expect([...state.notifications.values()][0].body).toContain("updated");
+    await add({ requestId: "remove-001", removeMedicineIds: ["old"] });
+    expect(state.notifications.size).toBe(1);
+  });
+  it("RX-REMOVE-002: additions and removals commit atomically", async () => {
+    await add({ ...payload(), removeMedicineIds: ["old"] });
+    expect(state.apt.emr.medicines).toHaveLength(1);
+    expect(state.apt.emr.medicines[0].name).toBe(medicine.name);
+  });
+  it("RX-REMOVE-003: missing medicine rejects the whole change", async () => {
+    await expect(add({ ...payload(), removeMedicineIds: ["missing"] })).rejects.toMatchObject({ status: 409 });
+    expect(state.apt.emr.medicines).toHaveLength(1);
+  });
+  it("RX-REMOVE-004: removal is blocked at the deadline", async () => {
+    state.apt.completedAt = new Date(now - 86400000).toISOString();
+    await expect(add({ requestId: "remove-001", removeMedicineIds: ["old"] })).rejects.toMatchObject({ status: 409 });
+  });
+  it.each([null, "old", [""], ["old", "old"], [1]])("RX-REMOVE-005: invalid removal list %#", async removeMedicineIds => {
+    await expect(add({ ...payload(), removeMedicineIds })).rejects.toMatchObject({ status: 400 });
+  });
+  it("RX-REMOVE-006: another doctor cannot remove medicines", async () => {
+    await expect(add({ requestId: "remove-001", removeMedicineIds: ["old"] }, "other")).rejects.toMatchObject({ status: 403 });
+  });
+  it("RX-REMOVE-007: legacy medicines receive safe removal tokens without rewriting stored entries", async () => {
+    delete state.apt.emr.medicines[0].id;
+    const r = await request(server).get("/api/appointments/apt-1/prescription-additions").set("x-role", "doctor").expect(200);
+    expect(r.body.medicines[0].id).toMatch(/^legacy_/);
+    expect(state.apt.emr.medicines[0].id).toBeUndefined();
+    await request(server).post("/api/appointments/apt-1/prescription-additions").set("x-role", "doctor").send({ requestId: "remove-legacy", removeMedicineIds: [r.body.medicines[0].id] }).expect(200);
+    expect(state.apt.emr.medicines).toEqual([]);
+  });
+  it("RX-REMOVE-008: reused removal request with different targets conflicts", async () => {
+    await add({ requestId: "remove-001", removeMedicineIds: ["old"] });
+    await expect(add({ requestId: "remove-001", removeMedicineIds: ["other"] })).rejects.toMatchObject({ status: 409 });
+  });
   it("RX-001: appends audited medicines without altering existing clinical data", async () => { await add(); expect(state.apt.emr.medicines).toHaveLength(2); expect(state.apt.emr.medicines[1]).toMatchObject({ name: medicine.name, contributorDoctorId: "doctor-1", addedAt: new Date(now).toISOString() }); expect(state.apt).toMatchObject({ status: "completed", recordingBlobPath: "keep", completedAt: "2026-11-11T11:00:00Z", emr: { labs: [{ id: "lab" }], sections: { plan: "Keep notes" } } }); expect(state.apt.prescriptionUpdates).toHaveLength(1); });
   it("RX-002: primary doctor only, even when a specialist participated", async () => { state.apt.specialistInvite = { doctorId: "specialist-1" }; await expect(add(payload(), "specialist-1")).rejects.toMatchObject({ status: 403 }); });
   it.each(["scheduled", "in_progress", "cancelled"])("RX-003: rejects %s appointment", async status => { state.apt.status = status; await expect(add()).rejects.toMatchObject({ status: 409 }); });

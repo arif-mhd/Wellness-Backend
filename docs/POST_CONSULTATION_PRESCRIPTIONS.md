@@ -1,24 +1,24 @@
-# Post-consultation prescription additions
+# Post-consultation prescription changes
 
 Branch: `feature/post-consultation-prescription-additions`, based on main `717573c`.
 
 ## Behavior
 
-- Only the appointment's primary doctor can append medicines to a completed online/video appointment.
+- Only the appointment's primary doctor can add or remove medicines for that specific completed online/video appointment. Removal includes medicines contributed by a specialist.
 - Eligibility lasts strictly less than 24 hours after `completedAt`; at exactly 24 hours the endpoint returns 409. All calculations use UTC instants, not calendar dates or appointment scheduling time.
 - Both explicit completion and the existing both-participants-left call flow record `completedAt`. Repeat completion does not reset it. Legacy completed appointments without a reliable timestamp are intentionally ineligible; `updatedAt` is never used as a guess.
 - An absent legacy visitType is treated as online, consistent with the application's existing visit-type behavior. An explicitly offline appointment is ineligible.
-- Existing medicines cannot be edited/removed through this feature. The general EMR endpoint rejects medicine-list submissions for completed video appointments, while notes-only saves preserve existing medicines and labs.
+- Existing medicines can be removed through explicit removal IDs; removed entries and the acting doctor/time are retained in the audit. The general EMR endpoint rejects direct medicine-list submissions for completed video appointments, while notes-only saves preserve existing medicines and labs.
 - Completed appointments cannot be reopened, cancelled or rescheduled through the normal action routes to bypass the prescription rules.
-- Additions preserve existing EMR, other doctors' medicines, recording metadata, appointment status and existing orders. No new pharmacy order or charge is automatically created.
+- Changes preserve notes, labs, recording metadata, appointment status, existing orders and all medicines not explicitly removed. No new pharmacy order or charge is automatically created.
 - Medicines are appended to `appointment.emr.medicines`, so existing prescription reads, medicine ordering selection and newly generated PDFs see the latest list. Previously downloaded PDFs remain unchanged.
 - Each addition carries a server-generated ID, contributor identity, timestamp and update ID. `appointment.prescriptionUpdates` retains the append audit and notification delivery state.
 
 ## Doctor UI
 
-Open patient profile -> Consultations -> select the completed appointment -> Prescription additions. The same panel is available on the completed video appointment's Complete EMR screen.
+Open patient profile -> Consultations -> select the completed appointment -> Medicines. Add Medicine appears beside the Medicines heading, and Remove/Undo appears on each existing medicine card. The Medications tab is read-only. The same editor is available on the completed video appointment's Complete EMR screen.
 
-The existing prescription is read-only. Use the existing medicine-entry form to prepare new medicines, then select **Save additions & notify patient**. Failed saves preserve the draft. An ambiguous network/5xx result locks the draft for a retry with the exact same request ID and payload, rather than risking a second addition.
+Use Add Medicine to prepare new medicines and Remove/Undo to stage removals, then select **Save changes & notify patient**. No change is applied before saving. Failed saves preserve the draft. An ambiguous network/5xx result locks the draft for a retry with the exact same request ID and payload. Removing medicines never changes, cancels, refunds or recreates existing pharmacy orders.
 
 ## API
 
@@ -42,6 +42,8 @@ The existing prescription is read-only. Use the existing medicine-entry form to 
 The requestId is 8-100 ASCII letters/digits/underscores/hyphens. Use a new UUID for a new batch and reuse the same ID and payload for retries. A replay returns success without another addition; reusing the ID with different normalized medicine content returns 409. An already-saved request can be replayed after the window closes.
 
 Required medicine text: name, dosage, timing and frequency. Instructions may be empty. Optional productId/manufacturer and positive integer durationDays/quantity are supported. Client contributor identity, timestamps and medicine IDs are not trusted. A batch is limited to 20 medicines; an appointment to 100 addition events and 500 medicines.
+
+The same POST endpoint also accepts `removeMedicineIds: ["existing-medicine-id"]`. For removal-only saves, `medicines` may be omitted or an empty array. At least one addition or removal is required. GET returns removal IDs for legacy medicines too; clients must use these IDs rather than names or array indexes. Unknown/stale IDs reject the whole batch with 409. Additions, removals, audit and notification intent commit atomically. Addition-only idempotency hashes remain compatible with the original client.
 
 ## Notification delivery and rollout
 
@@ -71,7 +73,7 @@ Patient notification payload:
 }
 ```
 
-The notification-list API exposes `reference_id` and `profile_id`. **Patient-client follow-up:** recognize `prescription_updated`, select the correct profile, navigate to the appointment's prescription, and refresh it. The patient app source is not in this repository; notification tap behavior and real-device delivery have not been implemented or verified here.
+The notification-list API exposes `reference_id` and `profile_id`. Patient notification routing was implemented in the separate `D:\Wellness` repository on `feature/post-consultation-prescription-notifications`. It opens the latest prescription for the correct profile; removal of all medicines displays an empty updated prescription. Real-device delivery remains to be verified.
 
 ## Test-first record and results
 
@@ -79,11 +81,11 @@ The initial backend contract tests and UI tests were written before implementati
 
 | File | Tests | Result |
 |---|---:|---|
-| `backend/test/unit/prescriptionAdditions.test.ts` | 40 | Passed |
+| `backend/test/unit/prescriptionAdditions.test.ts` | 52 | Passed |
 | `backend/test/unit/pushDelivery.test.ts` | 7 | Passed |
 | `backend/test/integration/prescriptionFlow.test.ts` | 8 | Passed |
-| `doctor-portal/test/integration/post-consultation-prescription.test.tsx` | 7 | Passed |
-| Total | 62 | Passed |
+| `doctor-portal/test/integration/post-consultation-prescription.test.tsx` | 9 | Passed |
+| Total | 76 | Passed |
 
 Coverage includes the exact deadline and just-before boundary, missing/future/invalid completion timestamps, non-completed/offline appointments, authorization, malformed medicines, audit fields, sequential/concurrent duplicate requests, competing additions, ETag retries, account/family notification routing, notification failures/retries, push ticket rejection, dead devices, legacy EMR replacement protection, completion paths, patient PDF data and UI errors/double-click prevention.
 

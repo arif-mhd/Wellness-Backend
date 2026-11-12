@@ -3,14 +3,48 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock("@/lib/apiFetch", () => ({ apiFetch }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/components/BrandingContext", () => ({ useClinicTimezone: () => "Asia/Kolkata" }));
 vi.mock("@/components/video-call/AddMedicines", () => ({ default: ({ onChange }: any) => <button onClick={() => onChange([{ name: "Medicine A", dosage: "10 mg", timing: "After food", frequency: "Once Daily", instructions: "" }])}>Add draft medicine</button> }));
 import PostConsultationPrescription from "@/components/appointment/PostConsultationPrescription";
+import PatientProfileModal from "@/components/appointment/PatientProfileModal";
 const response = (data: any, ok = true) => ({ ok, json: async () => data });
 beforeEach(() => { apiFetch.mockReset(); apiFetch.mockResolvedValue(response({ eligible: true, deadline: "2099-01-01T00:00:00Z", medicines: [{ id: "old", name: "Existing" }] })); });
-it("RX-UI-001: saves only new medicines and shows successful notification status", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByText("Add draft medicine")); fireEvent.click(screen.getByRole("button", { name: "Save additions & notify patient" })); await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/appointments/apt-1/prescription-additions", expect.objectContaining({ method: "POST" }))); const body = JSON.parse(apiFetch.mock.calls.find((c: any[]) => c[1]?.method === "POST")![1].body); expect(body.medicines).toHaveLength(1); expect(body.requestId).toBeTruthy(); expect(await screen.findByRole("status")).toHaveTextContent(/saved/i); });
+it("RX-UI-008: removes an existing consultation medicine with an explicit save", async () => {
+  render(<PostConsultationPrescription appointmentId="apt-1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Remove Existing" }));
+  apiFetch.mockResolvedValueOnce(response({ medicines: [] }));
+  fireEvent.click(screen.getByRole("button", { name: "Save changes & notify patient" }));
+  await waitFor(() => expect(apiFetch.mock.calls.some((c: any[]) => c[1]?.method === "POST")).toBe(true));
+  const body = JSON.parse(apiFetch.mock.calls.find((c: any[]) => c[1]?.method === "POST")![1].body);
+  expect(body.removeMedicineIds).toEqual(["old"]);
+  expect(body.medicines).toEqual([]);
+});
+it("RX-UI-009: controls belong to the selected consultation, and Medications is read-only", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/api/appointments/doctor") return response({ appointments: [
+      { id: "apt-1", patientId: "patient-1", status: "completed", scheduledAt: "2026-11-12T08:00:00Z", emr: { medicines: [{ id: "old", name: "Existing" }] } },
+      { id: "apt-2", patientId: "patient-1", status: "completed", scheduledAt: "2026-11-11T08:00:00Z", emr: null },
+    ] });
+    if (path.includes("prescription-additions")) return response({ eligible: true, medicines: [{ id: "old", name: path.includes("apt-1") ? "Existing" : "Other medicine" }] });
+    if (path.includes("my-results")) return response([]);
+    return response({});
+  });
+  render(<PatientProfileModal patient={{ id: "patient-1", name: "Patient" } as any} onClose={() => {}} />);
+  expect(await screen.findByRole("button", { name: "Add Medicine" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Remove Existing" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Medications" }));
+  expect(screen.queryByRole("button", { name: "Add Medicine" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Remove Existing/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Consultations" }));
+  fireEvent.click(screen.getByRole("button", { name: /Consultation_20261111/ }));
+  expect(await screen.findByRole("button", { name: "Remove Other medicine" })).toBeInTheDocument();
+  expect(apiFetch).toHaveBeenCalledWith("/api/appointments/apt-2/prescription-additions");
+});
+it("RX-UI-001: saves only new medicines and shows successful notification status", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByRole("button", { name: "Add Medicine" })); fireEvent.click(await screen.findByText("Add draft medicine")); fireEvent.click(screen.getByRole("button", { name: "Save changes & notify patient" })); await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/appointments/apt-1/prescription-additions", expect.objectContaining({ method: "POST" }))); const body = JSON.parse(apiFetch.mock.calls.find((c: any[]) => c[1]?.method === "POST")![1].body); expect(body.medicines).toHaveLength(1); expect(body.requestId).toBeTruthy(); expect(await screen.findByRole("status")).toHaveTextContent(/saved/i); });
 it("RX-UI-002: expired window does not expose medicine editor", async () => { apiFetch.mockResolvedValue(response({ eligible: false, reason: "The 24-hour window has ended.", medicines: [] })); render(<PostConsultationPrescription appointmentId="apt-1" />); expect(await screen.findByText(/24-hour window has ended/)).toBeInTheDocument(); expect(screen.queryByText("Add draft medicine")).not.toBeInTheDocument(); });
 it("RX-UI-003: denies unauthorized doctor", async () => { apiFetch.mockResolvedValue(response({ error: "Not authorized." }, false)); render(<PostConsultationPrescription appointmentId="apt-1" />); expect(await screen.findByRole("alert")).toHaveTextContent("Not authorized."); expect(screen.queryByText("Add draft medicine")).not.toBeInTheDocument(); });
-it("RX-UI-004: failed save retains draft and reuses request id on retry", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockRejectedValueOnce(new Error("Network error")); fireEvent.click(screen.getByRole("button", { name: "Save additions & notify patient" })); await screen.findByRole("alert"); apiFetch.mockResolvedValue(response({ notificationPending: false })); fireEvent.click(screen.getByRole("button", { name: /Retry saving/i })); await waitFor(() => expect(apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST")).toHaveLength(2)); const saves = apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST"); expect(saves[0][1].body).toBe(saves[1][1].body); });
-it("RX-UI-005: double click submits a single request", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockImplementationOnce(() => new Promise(() => {})); const button = screen.getByRole("button", { name: "Save additions & notify patient" }); fireEvent.click(button); fireEvent.click(button); expect(apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST")).toHaveLength(1); });
-it("RX-UI-006: save at deadline rejected by server preserves draft and shows error", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockResolvedValueOnce({ ...response({ error: "The 24-hour window has ended." }, false), status: 409 }); fireEvent.click(screen.getByRole("button", { name: "Save additions & notify patient" })); expect(await screen.findByRole("alert")).toHaveTextContent("24-hour window has ended"); });
-it("RX-UI-007: pending delivery does not claim successful push delivery", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockResolvedValueOnce(response({ notificationPending: true })); fireEvent.click(screen.getByRole("button", { name: "Save additions & notify patient" })); expect(await screen.findByRole("status")).toHaveTextContent("queued for retry"); });
+it("RX-UI-004: failed save retains draft and reuses request id on retry", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByRole("button", { name: "Add Medicine" })); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockRejectedValueOnce(new Error("Network error")); fireEvent.click(screen.getByRole("button", { name: "Save changes & notify patient" })); await screen.findByRole("alert"); apiFetch.mockResolvedValue(response({ notificationPending: false })); fireEvent.click(screen.getByRole("button", { name: /Retry saving/i })); await waitFor(() => expect(apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST")).toHaveLength(2)); const saves = apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST"); expect(saves[0][1].body).toBe(saves[1][1].body); });
+it("RX-UI-005: double click submits a single request", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByRole("button", { name: "Add Medicine" })); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockImplementationOnce(() => new Promise(() => {})); const button = screen.getByRole("button", { name: "Save changes & notify patient" }); fireEvent.click(button); fireEvent.click(button); expect(apiFetch.mock.calls.filter((c: any[]) => c[1]?.method === "POST")).toHaveLength(1); });
+it("RX-UI-006: save at deadline rejected by server preserves draft and shows error", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByRole("button", { name: "Add Medicine" })); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockResolvedValueOnce({ ...response({ error: "The 24-hour window has ended." }, false), status: 409 }); fireEvent.click(screen.getByRole("button", { name: "Save changes & notify patient" })); expect(await screen.findByRole("alert")).toHaveTextContent("24-hour window has ended"); });
+it("RX-UI-007: pending delivery does not claim successful push delivery", async () => { render(<PostConsultationPrescription appointmentId="apt-1" />); fireEvent.click(await screen.findByRole("button", { name: "Add Medicine" })); fireEvent.click(await screen.findByText("Add draft medicine")); apiFetch.mockResolvedValueOnce(response({ notificationPending: true })); fireEvent.click(screen.getByRole("button", { name: "Save changes & notify patient" })); expect(await screen.findByRole("status")).toHaveTextContent("queued for retry"); });
