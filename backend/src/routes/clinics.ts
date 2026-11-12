@@ -64,6 +64,126 @@ router.post(
   }
 );
 
+// ─── POST /api/clinics/extract-license ───────────────────────────────────────
+// Multipart: field "license" (PDF / JPG / PNG), optional "secondaryLabel"
+// (the country's regulator license name, e.g. "DOH License" or "Clinical
+// Establishment License"). Reads the uploaded license document with Gemini and
+// returns the details it could find so the Company Info form can prefill them.
+// Nothing is stored — the clinic still reviews/edits every value before saving.
+const LICENSE_MIME = new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
+
+const LICENSE_EXTRACT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    isLicenseDocument:   { type: "BOOLEAN" },
+    licenseNumber:       { type: "STRING", nullable: true },
+    secondaryLicense:    { type: "STRING", nullable: true },
+    clinicName:          { type: "STRING", nullable: true },
+    address:             { type: "STRING", nullable: true },
+    issuingAuthority:    { type: "STRING", nullable: true },
+    issueDate:           { type: "STRING", nullable: true },
+    expiryDate:          { type: "STRING", nullable: true },
+  },
+  required: ["isLicenseDocument"],
+};
+
+router.post(
+  "/extract-license",
+  requireRole("clinic_pending", "clinic"),
+  upload.single("license"),
+  async (req: SessionRequest, res: Response) => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "Please upload a license document." });
+      return;
+    }
+    if (!LICENSE_MIME.has(file.mimetype)) {
+      res.status(400).json({ error: "License must be a PDF, JPG or PNG file." });
+      return;
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+    if (!apiKey) {
+      console.error("[extract-license] GEMINI_API_KEY is not set");
+      res.status(500).json({ error: "License reading is not configured. Please fill in the details manually." });
+      return;
+    }
+
+    const secondaryLabel = typeof req.body?.secondaryLabel === "string" && req.body.secondaryLabel.trim()
+      ? req.body.secondaryLabel.trim().slice(0, 80)
+      : "DOH / health-authority facility license";
+
+    const prompt = `You are reading a healthcare facility (clinic) license or registration certificate.
+Extract the following and respond with JSON only:
+- isLicenseDocument: true if this is a clinic/healthcare facility license, trade license or registration certificate; false otherwise.
+- licenseNumber: the main license / registration / trade license number.
+- secondaryLicense: the "${secondaryLabel}" number if it is shown separately from the main license number. If the document only has one license number and it is issued by a health authority, put it here as well.
+- clinicName: the registered facility / establishment name.
+- address: the full facility address as one line.
+- issuingAuthority: the authority that issued the license.
+- issueDate and expiryDate: in YYYY-MM-DD format.
+Copy numbers exactly as printed (keep letters, dashes and slashes). Use null for anything not clearly visible — never guess.`;
+
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: file.mimetype === "image/jpg" ? "image/jpeg" : file.mimetype, data: file.buffer.toString("base64") } }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: LICENSE_EXTRACT_SCHEMA, temperature: 0 },
+    });
+
+    let responseText: string | null = null;
+    let lastError: any = null;
+    for (const model of ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body,
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).replace(/\s+/g, " ").trim()}`);
+        const data = await r.json() as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("No text in Gemini response");
+        responseText = text;
+        break;
+      } catch (err: any) {
+        console.warn(`[extract-license] ${model} failed:`, err?.message);
+        lastError = err;
+      }
+    }
+
+    if (!responseText) {
+      console.error("[extract-license] all models failed:", lastError?.message);
+      res.status(502).json({ error: "Couldn't read the license right now. Please fill in the details manually." });
+      return;
+    }
+
+    let parsed: any = null;
+    const trimmed = responseText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      const braced = trimmed.match(/\{[\s\S]*\}/);
+      try { parsed = braced ? JSON.parse(braced[0]) : null; } catch { parsed = null; }
+    }
+    if (!parsed) {
+      console.error("[extract-license] unparseable response:", responseText);
+      res.status(502).json({ error: "Couldn't read the license. Please fill in the details manually." });
+      return;
+    }
+
+    const str = (v: any) => (typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null" ? v.trim() : null);
+    res.json({
+      isLicenseDocument: parsed.isLicenseDocument !== false,
+      licenseNumber:     str(parsed.licenseNumber),
+      secondaryLicense:  str(parsed.secondaryLicense),
+      clinicName:        str(parsed.clinicName),
+      address:           str(parsed.address),
+      issuingAuthority:  str(parsed.issuingAuthority),
+      issueDate:         str(parsed.issueDate),
+      expiryDate:        str(parsed.expiryDate),
+    });
+  }
+);
+
 // ─── GET /api/clinics/me ─────────────────────────────────────────────────────
 // Returns the currently logged-in clinic's own profile. A branch user's own
 // doc only carries their personal details (name, phone, email...) — the
