@@ -14,7 +14,6 @@ interface Appointment {
   clinicId: string | null;
   visitType: "online" | "offline";
   scheduledAt: string;
-  reason: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   patientWaitingSince?: string | null;
   patientName: string;
@@ -26,19 +25,9 @@ interface Appointment {
   doctorAvatarUrl: string | null;
   doctorSpecialty: string;
   doctorIsOnline: boolean;
-  primaryDiagnosis: string;
-  emr?: any;
-  preVisitData?: {
-    primaryReason: string | null;
-    symptoms: string[];
-    severity: string;
-    duration: string;
-    conditions: string;
-    medications: string;
-    allergies: string;
-    additionalNotes: string;
-    submittedAt: string;
-  } | null;
+  // Whether the doctor has written up the consultation. The notes themselves
+  // are never sent to clinic accounts.
+  hasEmr: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -77,14 +66,14 @@ const STATUS_COLOR: Record<Appointment["status"], string> = {
 function statusLabel(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "Waiting";
   if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) return "Done";
-  if (apt.status === "completed" && !apt.emr) return "EMR Pending";
+  if (apt.status === "completed" && !apt.hasEmr) return "EMR Pending";
   return STATUS_LABEL[apt.status];
 }
 
 function statusColor(apt: Appointment) {
   if (apt.status === "scheduled" && apt.patientWaitingSince) return "text-[#D92D20]";
   if (apt.status === "scheduled" && new Date(apt.scheduledAt).getTime() < Date.now()) return "text-[#179353]";
-  if (apt.status === "completed" && !apt.emr) return "text-[#F59E0B]";
+  if (apt.status === "completed" && !apt.hasEmr) return "text-[#F59E0B]";
   return STATUS_COLOR[apt.status];
 }
 
@@ -123,7 +112,6 @@ function ClinicAppointmentsContent() {
   const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
-  const [showPreVisitModal, setShowPreVisitModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [actionError, setActionError] = useState("");
@@ -132,15 +120,6 @@ function ClinicAppointmentsContent() {
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const { can } = useClinicPermissions();
   const canManage = can("manage_appointments");
-
-  // Call recording + transcript — fetched fresh per selected appointment
-  // (the SAS URL is short-lived, so caching it across selections would just
-  // go stale) and only for completed appointments, since that's the only
-  // time a recording could exist.
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<{ speaker: string; text: string; startedAt: string; endedAt: string }[]>([]);
-  const [recordingLoading, setRecordingLoading] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/clinics/branches")
@@ -216,22 +195,6 @@ function ClinicAppointmentsContent() {
   const selectedAppt = appointments.find((a) => a.id === selectedId) ?? filtered[0] ?? null;
 
   useEffect(() => {
-    setRecordingUrl(null);
-    setTranscript([]);
-    setShowTranscript(false);
-    if (!selectedAppt || selectedAppt.status !== "completed") return;
-    setRecordingLoading(true);
-    apiFetch(`/api/clinics/appointments/${selectedAppt.id}/recording`)
-      .then((r) => r.json())
-      .then((data) => {
-        setRecordingUrl(data.recordingUrl ?? null);
-        setTranscript(Array.isArray(data.transcript) ? data.transcript : []);
-      })
-      .catch(() => { setRecordingUrl(null); setTranscript([]); })
-      .finally(() => setRecordingLoading(false));
-  }, [selectedAppt?.id, selectedAppt?.status]);
-
-  useEffect(() => {
     if (!selectedId && filtered.length > 0) setSelectedId(filtered[0].id);
   }, [filtered, selectedId]);
 
@@ -299,7 +262,7 @@ function ClinicAppointmentsContent() {
         {/* Desktop grid layout */}
         <div
           className="hidden md:grid items-center px-4 py-3"
-          style={{ gridTemplateColumns: "2.5fr 0.5fr 1.2fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
+          style={{ gridTemplateColumns: "2.5fr 0.5fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
         >
           {/* Name */}
           <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -311,15 +274,15 @@ function ClinicAppointmentsContent() {
           </div>
           {/* Age */}
           <div className="text-[#24292E] text-[13px]">{appt.patientAge ?? "—"}</div>
-          {/* Reason */}
-          <div className="text-[#24292E] text-[13px] truncate pr-2">{appt.reason}</div>
           {/* Dept */}
           <div className="text-[#24292E] text-[13px] truncate pr-2">{appt.doctorSpecialty}</div>
-          {/* Time/Diag */}
+          {/* Date/Time */}
           <div className="flex flex-col text-left min-w-0 pr-2">
-            <span className="text-[#24292E] text-[12px] font-medium truncate" title={appt.primaryDiagnosis}>{appt.primaryDiagnosis}</span>
+            <span className="text-[#24292E] text-[12px] font-medium">
+              {formatClinicDate(scheduledIso, clinicTz, { month: "short", day: "numeric" })}
+            </span>
             <span className="text-[#676E76] text-[11px]">
-              {formatClinicDate(scheduledIso, clinicTz, { month: "short", day: "numeric" })} · {formatClinicTime(scheduledIso, clinicTz, { hour: "numeric", minute: "2-digit" })}
+              {formatClinicTime(scheduledIso, clinicTz, { hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
           {/* Status */}
@@ -348,17 +311,12 @@ function ClinicAppointmentsContent() {
               <span className="text-[#24292E] text-[13px]">{appt.patientAge ?? "—"}</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
-              <span className="text-[#24292E] text-[13px] truncate">{appt.reason}</span>
-            </div>
-            <div className="flex flex-col min-w-0">
               <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Dept</span>
               <span className="text-[#24292E] text-[13px] truncate">{appt.doctorSpecialty}</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Time/Diag</span>
+              <span className="text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Date</span>
               <div className="flex flex-col text-left">
-                <span className="text-[#24292E] text-[12px] font-medium truncate">{appt.primaryDiagnosis}</span>
                 <span className="text-[#676E76] text-[11px]">{formatClinicDate(scheduledIso, clinicTz, { month: "short", day: "numeric" })}</span>
               </div>
             </div>
@@ -468,13 +426,12 @@ function ClinicAppointmentsContent() {
               {/* Table Header */}
               <div
                 className="hidden md:grid items-center px-4 py-2 text-[12px] font-medium text-[#9EA5AD] border-b border-[#EBEEF5]"
-                style={{ gridTemplateColumns: "2.5fr 0.5fr 1.2fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
+                style={{ gridTemplateColumns: "2.5fr 0.5fr 1fr 1.5fr 1fr 1.5fr", gap: "12px" }}
               >
                 <div className="text-left pl-[44px]">Name</div>
                 <div className="text-left">Age</div>
-                <div className="text-left">Reason For Visit</div>
                 <div className="text-left">Department</div>
-                <div className="text-left">Primary Diagnosis</div>
+                <div className="text-left">Date &amp; Time</div>
                 <div className="text-left">Status</div>
                 <div className="text-left pl-[34px]">Doctor</div>
               </div>
@@ -611,67 +568,6 @@ function ClinicAppointmentsContent() {
                 </div>
               </div>
 
-              <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
-
-              {/* Reason for visit */}
-              <div className="flex flex-col gap-1 xl:mt-0 mt-2">
-                <span className="text-[#24292E] text-[12px] font-semibold">Reason for visit</span>
-                <p className="text-[#9EA5AD] text-[11px] leading-relaxed">{selectedAppt.reason}</p>
-              </div>
-
-              {/* Pre-visit */}
-              <div className="flex flex-col gap-1 xl:mt-0 mt-2">
-                <span className="text-[#24292E] text-[12px] font-semibold">Pre-visit form</span>
-                <p className="text-[11px] mt-0.5">
-                  {selectedAppt.preVisitData ? (
-                    <span onClick={() => setShowPreVisitModal(true)} className="text-[#5476FC] underline cursor-pointer font-medium hover:text-[#3B59DF] transition-colors">
-                      View Pre-Visit Form
-                    </span>
-                  ) : (
-                    <span className="text-[#9EA5AD]">Not filled by patient yet</span>
-                  )}
-                </p>
-              </div>
-
-              {/* Call recording + transcript — only ever present for a
-                  completed video consultation; audio only, no video, per the
-                  recording feature's scope. */}
-              {selectedAppt.status === "completed" && (
-                <>
-                  <div className="h-px bg-[#EBEEF5] xl:my-0 my-2" />
-                  <div className="flex flex-col gap-2 xl:mt-0 mt-2">
-                    <span className="text-[#24292E] text-[12px] font-semibold">Call Recording</span>
-                    {recordingLoading ? (
-                      <p className="text-[#9EA5AD] text-[11px]">Loading...</p>
-                    ) : recordingUrl ? (
-                      <audio controls src={recordingUrl} className="w-full h-9" style={{ maxWidth: "100%" }} />
-                    ) : (
-                      <p className="text-[#9EA5AD] text-[11px]">No recording available.</p>
-                    )}
-                    {transcript.length > 0 && (
-                      <>
-                        <span
-                          onClick={() => setShowTranscript((v) => !v)}
-                          className="text-[#5476FC] underline cursor-pointer font-medium text-[11px] hover:text-[#3B59DF] transition-colors"
-                        >
-                          {showTranscript ? "Hide Transcript" : "View Transcript"}
-                        </span>
-                        {showTranscript && (
-                          <div className="max-h-52 overflow-y-auto flex flex-col gap-1.5 bg-[#F9FAFB] rounded-lg p-2.5 border border-[#EBEEF5]">
-                            {transcript.map((line, i) => (
-                              <p key={i} className="text-[11px] leading-snug">
-                                <span className="font-semibold text-[#24292E]">{line.speaker}: </span>
-                                <span className="text-[#676E76]">{line.text}</span>
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-
               {actionError && <p className="text-[11px] text-red-600">{actionError}</p>}
 
               {/* Reschedule + Cancel */}
@@ -698,40 +594,6 @@ function ClinicAppointmentsContent() {
         )}
 
       </div>
-
-      {/* Pre-Visit Form Modal */}
-      {showPreVisitModal && selectedAppt?.preVisitData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1E1E1E]/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-[#E4E8F0] w-full max-w-[540px] rounded-xl p-6 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
-            <h2 className="text-[#111827] text-[13px] font-bold tracking-wide uppercase">Pre-Visit Form</h2>
-
-            <div className="bg-white rounded-lg p-5 flex flex-col gap-5 shadow-sm">
-              {[
-                { label: "Primary Reason", value: selectedAppt.preVisitData.primaryReason || "—" },
-                { label: "Symptoms", value: selectedAppt.preVisitData.symptoms.length > 0 ? selectedAppt.preVisitData.symptoms.join(", ") : "—" },
-                { label: "Severity", value: selectedAppt.preVisitData.severity || "—" },
-                { label: "Duration", value: selectedAppt.preVisitData.duration || "—" },
-                { label: "Existing Conditions", value: selectedAppt.preVisitData.conditions || "—" },
-                { label: "Current Medications", value: selectedAppt.preVisitData.medications || "—" },
-                { label: "Allergies", value: selectedAppt.preVisitData.allergies || "—" },
-                { label: "Additional Notes", value: selectedAppt.preVisitData.additionalNotes || "—" },
-              ].map((f) => (
-                <div key={f.label} className="flex flex-col gap-1">
-                  <h3 className="text-[#111827] text-[13px] font-semibold">{f.label}</h3>
-                  <p className="text-[#676E76] text-[13px] leading-relaxed">{f.value}</p>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowPreVisitModal(false)}
-              className="w-full bg-[#0A56D9] text-white text-[13px] font-medium py-2.5 rounded-lg shadow-md hover:bg-[#094BBF] transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Reschedule Modal */}
       {showRescheduleModal && selectedAppt && (

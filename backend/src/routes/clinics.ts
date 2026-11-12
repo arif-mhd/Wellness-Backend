@@ -615,7 +615,6 @@ async function computeClinicDashboard(scope: ClinicScope) {
       patientId: a.patientId,
       patientName: patientById[a.patientId]?.fullName ?? "Patient",
       patientEmail: patientById[a.patientId]?.email ?? "",
-      reason: a.reason ?? "General Consultation",
       doctorId: a.doctorId,
       doctorName: doctorNameById[a.doctorId] ?? "Doctor",
       scheduledAt: a.scheduledAt,

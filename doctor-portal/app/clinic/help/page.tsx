@@ -421,7 +421,7 @@ export default function ClinicHelpSupportPage() {
                 Choose a category
               </span>
               <div className="flex flex-col gap-3">
-                {["Technical Problems", "Billing Inquiries", "Service-Related", "Others"].map((cat) => {
+                {["Technical Problems", "Billing Inquiries", "Service-Related", "Doctor Related", "Others"].map((cat) => {
                   const isChecked = selectedCategory === cat;
                   return (
                     <label key={cat} className="flex items-center gap-3.5 cursor-pointer group">

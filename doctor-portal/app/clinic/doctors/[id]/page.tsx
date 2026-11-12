@@ -65,13 +65,10 @@ interface Consultation {
   patientEmail: string;
   patientAvatarUrl: string | null;
   patientAge: number | null;
-  reason: string;
-  primaryDiagnosis: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   scheduledAt: string;
   patientWaitingSince: string | null;
   hasReport: boolean;
-  preVisitData: any;
 }
 
 interface Review {
@@ -919,7 +916,6 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                           </div>
                         </div>
                         <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
-                        <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                         <div className="flex flex-col gap-0.5 shrink-0">
                           <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{formatClinicTime(c.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit" })}</span></span>
                           <span className="text-[11px] text-[#676E76]">{formatClinicDate(c.scheduledAt, clinicTz, { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
@@ -949,7 +945,6 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
                         </div>
                       </div>
                       <span className="text-[12px] font-medium text-[#24292E] shrink-0">{c.patientAge ?? "—"}</span>
-                      <span className="text-[11px] font-medium text-[#676E76] w-full md:w-[120px] truncate md:shrink-0" title={c.primaryDiagnosis}>{c.primaryDiagnosis}</span>
                       <div className="flex flex-col gap-0.5 shrink-0">
                         <span className="text-[11px] font-medium text-[#24292E]">Time - <span className="text-[#5476FC]">{formatClinicTime(c.scheduledAt, clinicTz, { hour: "numeric", minute: "2-digit" })}</span></span>
                         <span className="text-[11px] text-[#676E76]">{formatClinicDate(c.scheduledAt, clinicTz, { month: "2-digit", day: "2-digit", year: "numeric" })}</span>
@@ -980,21 +975,6 @@ function DoctorProfileContent({ params }: { params: Promise<{ id: string }> }) {
               <Link href={`/clinic/patients/${selectedConsult.patientId}${qs}`} className="w-full text-center bg-gradient-to-b from-[#8AA0FF] to-[#5476FC] text-white text-[13px] font-medium py-2.5 rounded-xl shadow-[0_4px_10px_rgba(84,118,252,0.2)] hover:shadow-[0_6px_14px_rgba(84,118,252,0.3)] transition-all">
                 View Profile
               </Link>
-              <div className="h-px bg-[#EBEEF5]" />
-              <div className="flex flex-col gap-1">
-                <span className="text-[#24292E] text-[12px] font-semibold">Reason for visit</span>
-                <p className="text-[#9EA5AD] text-[11px] leading-relaxed">{selectedConsult.reason}</p>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[#24292E] text-[12px] font-semibold">Pre-visit form</span>
-                <p className="text-[11px] mt-0.5">
-                  {selectedConsult.preVisitData ? (
-                    <span className="text-[#5476FC] font-medium">Filled by patient</span>
-                  ) : (
-                    <span className="text-[#D92D20] font-medium">Didn&apos;t Check</span>
-                  )}
-                </p>
-              </div>
             </div>
           )}
         </div>

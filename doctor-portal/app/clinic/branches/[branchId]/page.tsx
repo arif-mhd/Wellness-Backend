@@ -83,7 +83,6 @@ interface Doctor {
 interface Appointment {
   id: string;
   patientName: string;
-  reason: string;
   doctorName: string;
   status: string;
   scheduledAt: string;
@@ -946,7 +945,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ branchI
                     <Avatar name={a.patientName} size="w-9 h-9" />
                     <div className="flex flex-col">
                       <span className="text-[#24292E] text-[13px] font-medium">{a.patientName}</span>
-                      <span className="text-[#A0A8B0] text-[11px]">{a.reason} · Dr. {a.doctorName}</span>
+                      <span className="text-[#A0A8B0] text-[11px]">Dr. {a.doctorName}</span>
                     </div>
                   </div>
                   <span className="text-[12px] text-[#676E76]">

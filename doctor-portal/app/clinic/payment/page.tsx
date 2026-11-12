@@ -34,7 +34,7 @@ interface DoctorRow { id: string; fullName: string; specialty?: string | null; a
 interface DoctorSummary { id: string; fullName: string; avatarUrl?: string | null; fees?: string | null; totalEarnings: number; cashEarnings: number; insuranceEarnings: number; }
 interface HistoryRow {
   id: string; patientName: string; patientAge: number | null; patientEmail: string;
-  diagnosis: string; date: string; earning: number; status: string; doctorId: string;
+  reason: string; date: string; earning: number; status: string; doctorId: string;
   paymentMethod: "cash" | "insurance" | "pay_at_clinic"; paymentStatus?: string;
 }
 
@@ -45,12 +45,6 @@ const HISTORY_FILTERS: { key: string; label: string }[] = [
   { key: "diagnostics-commissions", label: "Diagnostics/Commissions" },
   { key: "cancelled", label: "Canceled" },
 ];
-
-const DIAGNOSIS_COLORS: Record<string, string> = {
-  Cough: "bg-[#E2EAFE] text-[#213159]",
-  Asthma: "bg-[#FDEFE2] text-[#7A3E12]",
-  Fever: "bg-[#FCE4E4] text-[#7A1212]",
-};
 
 function fmtMoney(n: number, currency: CurrencyConfig): string {
   return formatCurrency(n, currency);
@@ -202,7 +196,7 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
       <div className="bg-white rounded-2xl border border-[#EBEEF5] shadow-sm overflow-hidden">
         <div className="hidden md:grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-4 px-6 py-3 border-b border-[#EBEEF5] text-[11px] font-semibold text-[#9EA5AD] uppercase tracking-wide">
           <span>Name</span>
-          <span>Diagnosis</span>
+          <span>Reason for visit</span>
           <span>Date and Time</span>
           <span className="text-right">Earnings</span>
         </div>
@@ -226,8 +220,8 @@ function HistoryList({ branchId, doctorId }: { branchId: string | null; doctorId
                 </div>
               </div>
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-medium shrink-0 ${DIAGNOSIS_COLORS[row.diagnosis] ?? "bg-[#F1F3F7] text-[#676E76]"}`}>
-                  {row.diagnosis}
+                <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-medium shrink-0 bg-[#F1F3F7] text-[#676E76]`}>
+                  {row.reason}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
                   row.paymentMethod === "insurance" ? "bg-[#E9F6EE] text-[#179353]" :

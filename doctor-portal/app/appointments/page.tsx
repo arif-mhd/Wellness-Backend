@@ -44,6 +44,7 @@ function mapToPatient(apt: any, index: number, currency: CurrencyConfig, clinicT
     drinks: apt.preVisitData.additionalNotes || "None",
     visitSummary: apt.preVisitData.visitSummary || "",
     source: apt.preVisitData.source,
+    answers: apt.preVisitData.answers,
   } : {
     isQuestionnaire: false,
     chronicIllnesses: apt.patientChronicIllnesses || "None reported",

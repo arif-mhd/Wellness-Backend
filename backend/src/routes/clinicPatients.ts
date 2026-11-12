@@ -101,7 +101,6 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
 
       const sorted = [...appts].sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
       const latest = sorted[0];
-      const latestCompleted = sorted.find((a) => a.status === "completed");
 
       const uniqueDoctorIds = Array.from(new Set(appts.map((a) => a.doctorId)));
       const doctors = uniqueDoctorIds.map((id) => ({
@@ -125,11 +124,11 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
         email: identity.email,
         avatarUrl: identity.avatarUrl,
         age: calcAge(identity.dob),
-        diagnosis: latestCompleted?.emr?.sections?.impressionAndPlan?.trim() || "—",
-        summary: latest?.reason ?? "—",
+        // Clinic staff only get identity + booking details. Diagnosis, visit
+        // reason and other clinical data stay with the consulting doctor.
         lastConsult: latest?.scheduledAt ?? null,
         doctors,
-        consultations: sorted.map((a) => ({ reason: a.reason, date: a.scheduledAt, status: a.status })),
+        consultations: sorted.map((a) => ({ date: a.scheduledAt, status: a.status })),
         nextAppointmentId: nextUpcoming?.id ?? null,
         isNew,
       };
@@ -201,7 +200,6 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
       doctorName: doctorById[a.doctorId]?.fullName ?? "Doctor",
       doctorSpecialty: doctorById[a.doctorId]?.specialty ?? "General Medicine",
       age,
-      reason: a.reason ?? "General Consultation",
       scheduledAt: a.scheduledAt,
       status: a.status,
     }));
@@ -213,9 +211,6 @@ router.get("/:patientId", requireRole("clinic"), async (req: SessionRequest, res
         avatarUrl: identity.avatarUrl,
         gender: identity.gender,
         dob: identity.dob,
-        bloodGroup: identity.bloodGroup,
-        height: identity.height,
-        weight: identity.weight,
         age,
       },
       consultations,

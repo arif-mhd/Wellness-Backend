@@ -274,7 +274,8 @@ router.get("/history", requireRole("clinic"), async (req: SessionRequest, res: R
         patientName: patient?.fullName ?? "Unknown Patient",
         patientAge: patient?.dateOfBirth ? Math.max(0, new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear()) : null,
         patientEmail: patient?.email ?? "",
-        diagnosis: a.emr?.sections?.impressionAndPlan?.trim() || a.reason || "—",
+        // Visit reason only (needed for insurance); never the doctor's diagnosis.
+        reason: a.reason || "—",
         date: a.scheduledAt,
         earning,
         status: a.status,

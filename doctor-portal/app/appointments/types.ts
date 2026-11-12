@@ -14,6 +14,8 @@ export interface PreVisitForm {
   visitSummary?: string;
   /** 'ai_chat' = gathered by the Dr. Wellness chatbot; 'manual' = patient filled the form directly. */
   source?: 'ai_chat' | 'manual';
+  /** The patient's answers to the reason-specific questions they were shown. Each carries its own question text. When present, these replace the fixed question list. */
+  answers?: { questionId?: string; label: string; type?: string; answer: string | string[] }[];
 }
 
 export interface Patient {

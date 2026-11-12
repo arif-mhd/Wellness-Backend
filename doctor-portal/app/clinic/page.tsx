@@ -32,7 +32,6 @@ interface RecentAppointment {
   patientId: string;
   patientName: string;
   patientEmail: string;
-  reason: string;
   doctorId: string;
   doctorName: string;
   scheduledAt: string;
@@ -392,11 +391,6 @@ function ClinicHomeContent() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <div className="px-2.5 py-1 rounded-full bg-[#E2EAFE] flex items-center justify-center">
-                        <span className="text-[#213159] font-light text-[12px] leading-none tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                          {a.reason}
-                        </span>
-                      </div>
                       <div className="px-2.5 py-1 rounded-full bg-[#F0F2F2] flex items-center justify-center">
                         <span className="text-[#213159] font-light text-[12px] leading-none tracking-[-0.24px]" style={{ fontFamily: "Outfit, sans-serif" }}>
                           Doctor: {a.doctorName}

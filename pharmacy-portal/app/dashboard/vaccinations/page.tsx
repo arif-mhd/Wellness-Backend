@@ -134,7 +134,13 @@ export default function VaccinationsPage() {
     setFormError(null);
     try {
       const body = selectedCatalog
-        ? { catalogVaccineId: selectedCatalog.id, price, manufacturer: form.manufacturer.trim() || null }
+        ? {
+            catalogVaccineId: selectedCatalog.id,
+            price,
+            manufacturer: form.manufacturer.trim() || null,
+            // Only used by the server when the catalogue vaccine has no description.
+            ...(!selectedCatalog.description?.trim() && form.description.trim() ? { description: form.description.trim() } : {}),
+          }
         : {
             name: form.name.trim(),
             manufacturer: form.manufacturer.trim() || null,
@@ -346,6 +352,19 @@ export default function VaccinationsPage() {
                   </div>
                   <Field label="Manufacturer" value={form.manufacturer} onChange={(v) => setField("manufacturer", v)} placeholder="e.g. Sanofi" />
                   <Field label={`Your price (${currency.symbol})`} required type="number" value={form.price} onChange={(v) => setField("price", v)} placeholder="0.00" />
+                  {/* The platform has no description for this vaccine yet — the lab writes its own. */}
+                  {!selectedCatalog.description?.trim() && (
+                    <div className="col-span-2 flex flex-col gap-1.5">
+                      <label className="text-[11px] font-medium text-[#676E76]">Description</label>
+                      <textarea
+                        value={form.description}
+                        onChange={(e) => setField("description", e.target.value)}
+                        rows={3}
+                        placeholder="The platform hasn't added a description for this vaccine yet. Describe what it protects against and anything the patient should know"
+                        className="w-full rounded-xl border border-[#EBEEF5] bg-[#F8FAFC] px-4 py-3 text-sm text-[#24292E] outline-none focus:border-[#5476FC] resize-none"
+                      />
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

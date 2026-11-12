@@ -1011,13 +1011,13 @@ router.get("/:id/consultations", requireRole("clinic"), async (req: SessionReque
         patientEmail: patient?.email ?? "",
         patientAvatarUrl: patient?.avatarUrl ?? null,
         patientAge: age,
-        reason: a.reason ?? "General Consultation",
-        primaryDiagnosis: a.status === "completed" ? (a.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded") : "Pending",
+        // Booking details only: no visit reason, diagnosis or pre-visit form.
+        // `hasReport` says whether the doctor has written the notes up, not
+        // what they say.
         status: a.status,
         scheduledAt: a.scheduledAt,
         patientWaitingSince: a.patientWaitingSince ?? null,
         hasReport: !!a.emr?.savedAt,
-        preVisitData: a.preVisitData ?? null,
       };
     });
 

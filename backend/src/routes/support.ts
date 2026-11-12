@@ -4,7 +4,7 @@ import { verifySession } from "supertokens-node/recipe/session/framework/express
 import { SessionRequest } from "supertokens-node/framework/express";
 import UserRoles from "supertokens-node/recipe/userroles";
 import { v4 as uuidv4 } from "uuid";
-import { supportContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer, notificationsContainer } from "../config/cosmos";
+import { supportContainer, appointmentsContainer, medicineOrdersContainer, patientsContainer, doctorsContainer, pharmaciesContainer, clinicsContainer, notificationsContainer } from "../config/cosmos";
 import { sendPushToUser } from "../utils/pushNotifications";
 import { resolveOrgId } from "../utils/orgScope";
 import { uploadBlob, generateSasUrl } from "../config/blob";
@@ -32,6 +32,10 @@ function sanitizeFileName(name: string): string {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+// Categories a patient can raise about something other than the app itself.
+// Each is tied to an appointment (doctor/clinic) or an order (expired product).
+const COMPLAINT_CATEGORIES = new Set(["doctor_complaint", "clinic_complaint", "expired_product"]);
 
 // A conversation pasted in from the assistant. Bounded so a long chat can't
 // bloat the ticket; the end of the conversation is what matters most.
@@ -123,13 +127,70 @@ async function getClinicName(clinicId: string): Promise<string> {
 router.post("/", verifySession(), async (req: SessionRequest, res: Response) => {
   const session = req.session!;
   const userId = session.getUserId();
-  const { subject, description, category, role, source, transcript } = req.body;
+  const { subject, description, category, role, source, transcript, appointmentId, orderId, medicineIds } = req.body;
 
   if (!subject || !description) {
     return res.status(400).json({ error: "subject and description are required" });
   }
 
   const submitterRole = role === "doctor" ? "doctor" : role === "pharmacy" ? "pharmacy" : role === "clinic" ? "clinic" : "patient";
+
+  // Complaints about a doctor, a clinic or an expired product must point at the
+  // appointment / order they are about, and that record must belong to this
+  // patient. The details are copied onto the ticket server-side so the client
+  // can't make up a doctor or pharmacy.
+  let complaint: Record<string, unknown> | undefined;
+  if (COMPLAINT_CATEGORIES.has(category)) {
+    if (submitterRole !== "patient") {
+      return res.status(400).json({ error: `${category} can only be raised by a patient` });
+    }
+    if (category === "expired_product") {
+      if (!orderId) return res.status(400).json({ error: "orderId is required for an expired product complaint" });
+      try {
+        const { resource: order } = await medicineOrdersContainer.item(orderId, userId).read();
+        if (!order || order.patientId !== userId) {
+          return res.status(404).json({ error: "Order not found" });
+        }
+        const wanted = Array.isArray(medicineIds) ? new Set(medicineIds as string[]) : null;
+        const items = ((order.items ?? []) as any[])
+          .filter((i) => !wanted || wanted.has(i.medicine_id))
+          .map((i) => ({
+            medicineId: i.medicine_id,
+            name: i.name,
+            pharmacyId: i.pharmacyId ?? null,
+            pharmacyName: i.pharmacyName ?? null,
+          }));
+        if (!items.length) return res.status(400).json({ error: "None of the selected products are in this order" });
+        complaint = { type: "expired_product", orderId, items, orderedAt: order.createdAt };
+      } catch (err) {
+        console.error("[support] expired product lookup failed:", err);
+        return res.status(404).json({ error: "Order not found" });
+      }
+    } else {
+      if (!appointmentId) return res.status(400).json({ error: "appointmentId is required for a doctor or clinic complaint" });
+      try {
+        const { resource: apt } = await appointmentsContainer.item(appointmentId, appointmentId).read();
+        if (!apt || apt.patientId !== userId) {
+          return res.status(404).json({ error: "Appointment not found" });
+        }
+        const doctorName = await getDoctorName(apt.doctorId);
+        let clinicName: string | null = apt.clinicName ?? null;
+        if (apt.clinicId) clinicName = await getClinicName(apt.clinicId);
+        complaint = {
+          type: category === "doctor_complaint" ? "doctor" : "clinic",
+          appointmentId,
+          doctorId: apt.doctorId,
+          doctorName,
+          clinicId: apt.clinicId ?? null,
+          clinicName,
+          scheduledAt: apt.scheduledAt,
+        };
+      } catch (err) {
+        console.error("[support] appointment lookup failed:", err);
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+    }
+  }
 
   const ticket = {
     id: uuidv4(),
@@ -143,6 +204,7 @@ router.post("/", verifySession(), async (req: SessionRequest, res: Response) => 
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   } as Record<string, unknown>;
+  if (complaint) ticket.complaint = complaint;
 
   // Raised from the assistant ("Talk to our team"). The conversation is only
   // present if the patient ticked to include it.

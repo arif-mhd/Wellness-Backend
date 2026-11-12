@@ -241,6 +241,7 @@ export default function WaitingRoom({ onClose }: WaitingRoomProps) {
       drinks: apt.preVisitData.additionalNotes || "None",
       visitSummary: apt.preVisitData.visitSummary || "",
       source: apt.preVisitData.source,
+      answers: apt.preVisitData.answers,
     } : {
       isQuestionnaire: false,
       chronicIllnesses: apt.patientChronicIllnesses,

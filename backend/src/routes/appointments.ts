@@ -24,6 +24,7 @@ import { getActorClinicIds, mainBranchFrom, branchAsPublicClinic, buildInClause 
 import { resolveAppointmentActor } from "../utils/appointmentAuth";
 import { sendPushToUser } from "../utils/pushNotifications";
 import { insuranceNamesMatch, loadOrgDocForClinicId } from "./clinicInsurance";
+import { sanitizeAnswers } from "../utils/previsitTemplates";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
 import { livekitApiKey, livekitApiSecret } from "../config/livekit";
 import { devFallbackOrThrow } from "../utils/env";
@@ -965,6 +966,15 @@ router.get("/:id", verifySession(), async (req: SessionRequest, res: Response) =
     // must not leak them via a plain spread.
     const { transcript, transcriptSavedAt, recordingBlobPath, recordingEgressId, ...safeApt } = apt as any;
 
+    // A caller who is neither the patient nor the consulting doctor can only be
+    // clinic staff. They get booking details, never clinical data (the doctor's
+    // EMR notes, the pre-visit form, or the reason for the visit).
+    if (apt.patientId !== userId && apt.doctorId !== userId) {
+      delete safeApt.emr;
+      delete safeApt.preVisitData;
+      delete safeApt.reason;
+    }
+
     let enriched: any = safeApt;
     try {
       const { resource: doctor } = await doctorsContainer.item(apt.doctorId, apt.doctorId).read();
@@ -1666,6 +1676,7 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
     const {
       primaryReason, symptoms, severity, duration, onset, location,
       conditions, medications, allergies, additionalNotes, source, visitSummary,
+      answers, templateId, templateName,
     } = req.body;
 
     // Only preVisitData/updatedAt are ours to set — everything else on the
@@ -1693,6 +1704,12 @@ router.post("/:id/pre-visit", requireRole("patient"), async (req: SessionRequest
           // not a replacement for them. Empty for manual (non-chat) bookings.
           visitSummary:     typeof visitSummary === "string" ? visitSummary : "",
           source:           source === "ai_chat" ? "ai_chat" : "manual",
+          // The answers to the reason-specific form the patient was shown
+          // (see GET /api/previsit/form): each carries its own question text,
+          // so the doctor reads them back without needing the template.
+          answers:          sanitizeAnswers(answers),
+          templateId:       typeof templateId === "string" ? templateId.slice(0, 64) : null,
+          templateName:     typeof templateName === "string" ? templateName.slice(0, 80) : null,
           submittedAt:      new Date().toISOString(),
         },
         updatedAt: new Date().toISOString(),

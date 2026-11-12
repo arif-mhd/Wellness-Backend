@@ -111,6 +111,11 @@ export const vaccinationBookingsContainer: Container = db.container("vaccination
 /** Support tickets — partition key: /patientId */
 export const supportContainer: Container = db.container("support");
 
+/** Pre-visit question templates (admin-owned) — partition key: /id.
+ *  The reason a patient gives when booking is matched to one of these to pick
+ *  the questions on their pre-visit form. */
+export const previsitTemplatesContainer: Container = db.container("previsitTemplates");
+
 /** Reminders — partition key: /patientId */
 export const remindersContainer: Container = db.container("reminders");
 
@@ -201,6 +206,7 @@ export async function initCosmosContainers(): Promise<void> {
     { id: "vaccineCatalog",         partitionKey: { paths: ["/id"] } },
     { id: "vaccinationBookings",    partitionKey: { paths: ["/patientId"] } },
     { id: "support",                partitionKey: { paths: ["/patientId"] } },
+    { id: "previsitTemplates",      partitionKey: { paths: ["/id"] } },
     { id: "reminders",              partitionKey: { paths: ["/patientId"] } },
     { id: "feedback",               partitionKey: { paths: ["/id"] } },
     { id: "notifications",          partitionKey: { paths: ["/patientId"] } },

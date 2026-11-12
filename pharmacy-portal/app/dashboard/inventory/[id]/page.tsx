@@ -52,6 +52,8 @@ interface LabTest {
   labId: string;
   name: string;
   description?: string;
+  /** True when the admin wrote the description, so the lab can't change it. */
+  descriptionFromCatalog?: boolean;
   category: string;
   price: number;
   imageUrl?: string;
@@ -741,7 +743,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Description</label>
                 <textarea value={editingTest.description ?? ""} onChange={e => setEditingTest(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                  rows={3} className="w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none" />
+                  readOnly={!!editingTest.descriptionFromCatalog}
+                  rows={3} className={`w-full px-4 py-3 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all resize-none ${editingTest.descriptionFromCatalog ? "opacity-70 cursor-not-allowed" : ""}`} />
+                {editingTest.descriptionFromCatalog && (
+                  <p className="text-[11px] text-[#A0A8B0] mt-1">Set by the platform admin for every lab offering this test.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

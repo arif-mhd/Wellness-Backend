@@ -18,6 +18,21 @@ function apiFetch(path: string, init?: RequestInit) {
 type Priority = "High" | "Medium" | "Low";
 type Status = "Open" | "Closed";
 type SubmitterRole = "all" | "patient" | "doctor" | "clinic";
+// Tabs: the submitter roles plus two views by what the ticket is about.
+type TabKey = SubmitterRole | "complaints" | "expired";
+
+const COMPLAINT_CATEGORIES = ["doctor_complaint", "clinic_complaint"];
+
+interface TicketComplaint {
+  type: "doctor" | "clinic" | "expired_product";
+  appointmentId?: string;
+  doctorName?: string;
+  clinicName?: string | null;
+  scheduledAt?: string;
+  orderId?: string;
+  orderedAt?: string;
+  items?: { medicineId: string; name: string; pharmacyName?: string | null }[];
+}
 
 interface TicketComment {
   id: string;
@@ -82,12 +97,15 @@ interface Ticket {
   source?: string;
   /** The assistant conversation, if the patient chose to include it. */
   transcript?: string;
+  /** What a doctor / clinic / expired-product complaint is about. */
+  complaint?: TicketComplaint;
   createdAt: string;
   updatedAt: string;
 }
 
 function getPriority(category: string): Priority {
-  if (category === "billing_inquiries") return "High";
+  if (category === "billing_inquiries" || category === "expired_product") return "High";
+  if (category === "doctor_complaint" || category === "clinic_complaint") return "Medium";
   if (category === "technical_problems") return "Medium";
   return "Low";
 }
@@ -117,7 +135,9 @@ function SupportPageInner() {
   const [savingReply, setSavingReply] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-  const [roleFilter, setRoleFilter] = useState<SubmitterRole>("all");
+  const [tab, setTab] = useState<TabKey>("all");
+  // Only real submitter roles are sent to the server; the complaint tabs filter by category here.
+  const roleFilter: SubmitterRole = tab === "complaints" || tab === "expired" ? "patient" : tab;
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [orgNames, setOrgNames] = useState<Record<string, string>>({});
@@ -218,12 +238,19 @@ function SupportPageInner() {
     }
   };
 
-  const filtered = statusFilter === "all" ? tickets : tickets.filter(t => t.status === statusFilter);
+  const byTab = tab === "complaints"
+    ? tickets.filter(t => COMPLAINT_CATEGORIES.includes(t.category))
+    : tab === "expired"
+    ? tickets.filter(t => t.category === "expired_product")
+    : tickets;
+  const filtered = statusFilter === "all" ? byTab : byTab.filter(t => t.status === statusFilter);
 
   // Compute open counts per role (from all currently loaded tickets regardless of status filter)
   const patientOpenCount = tickets.filter(t => (t.submitterRole === "patient" || !t.submitterRole) && t.status === "Open").length;
   const doctorOpenCount = tickets.filter(t => t.submitterRole === "doctor" && t.status === "Open").length;
   const clinicOpenCount = tickets.filter(t => t.submitterRole === "clinic" && t.status === "Open").length;
+  const complaintOpenCount = tickets.filter(t => COMPLAINT_CATEGORIES.includes(t.category) && t.status === "Open").length;
+  const expiredOpenCount = tickets.filter(t => t.category === "expired_product" && t.status === "Open").length;
 
   function formatDate(iso: string) {
     try {
@@ -255,17 +282,19 @@ function SupportPageInner() {
                 { key: "patient", label: "Patient Requests", count: patientOpenCount },
                 { key: "doctor", label: "Doctor Requests", count: doctorOpenCount },
                 { key: "clinic", label: "Clinic Requests", count: clinicOpenCount },
-              ] as { key: SubmitterRole; label: string; count?: number }[]).map(({ key, label, count }) => (
+                { key: "complaints", label: "Doctor & Clinic Complaints", count: complaintOpenCount },
+                { key: "expired", label: "Expired Products", count: expiredOpenCount },
+              ] as { key: TabKey; label: string; count?: number }[]).map(({ key, label, count }) => (
                 <button
                   key={key}
-                  onClick={() => setRoleFilter(key)}
+                  onClick={() => setTab(key)}
                   className={`px-5 py-2 rounded-full text-[13px] font-semibold transition-all flex items-center gap-2 ${
-                    roleFilter === key ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
+                    tab === key ? "bg-[#1E293B] text-white shadow-md" : "bg-white text-slate-500 hover:text-slate-800 border border-slate-100"
                   }`}
                 >
                   {label}
                   {count !== undefined && count > 0 && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleFilter === key ? "bg-white/20 text-white" : "bg-rose-50 text-rose-500"}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tab === key ? "bg-white/20 text-white" : "bg-rose-50 text-rose-500"}`}>
                       {count} open
                     </span>
                   )}
@@ -533,6 +562,46 @@ function SupportPageInner() {
                   <span className="text-[11px] text-slate-800 font-semibold text-right">{formatDate(selected.updatedAt)}</span>
                 </div>
               </div>
+
+              {/* What the complaint is about */}
+              {selected.complaint && (
+                <div className="bg-amber-50/60 rounded-[1.25rem] p-5 space-y-3 border border-amber-100">
+                  <p className="text-[12.5px] font-semibold text-slate-800">
+                    {selected.complaint.type === "expired_product" ? "Expired product" : selected.complaint.type === "doctor" ? "Complaint about doctor" : "Complaint about clinic"}
+                  </p>
+                  {selected.complaint.type === "expired_product" ? (
+                    <>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-[11px] text-slate-400 font-semibold shrink-0">Order</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">#{(selected.complaint.orderId ?? "").slice(0, 8).toUpperCase()}</span>
+                      </div>
+                      {(selected.complaint.items ?? []).map((i) => (
+                        <div key={i.medicineId} className="flex items-start justify-between gap-4">
+                          <span className="text-[11px] text-slate-800 font-semibold">{i.name}</span>
+                          <span className="text-[11px] text-slate-500 font-medium text-right">{i.pharmacyName ?? "Unknown pharmacy"}</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-[11px] text-slate-400 font-semibold shrink-0">Doctor</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selected.complaint.doctorName}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-[11px] text-slate-400 font-semibold shrink-0">Clinic</span>
+                        <span className="text-[11px] text-slate-800 font-semibold text-right">{selected.complaint.clinicName ?? "—"}</span>
+                      </div>
+                      {selected.complaint.scheduledAt && (
+                        <div className="flex items-start justify-between gap-4">
+                          <span className="text-[11px] text-slate-400 font-semibold shrink-0">Appointment</span>
+                          <span className="text-[11px] text-slate-800 font-semibold text-right">{formatDate(selected.complaint.scheduledAt)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Description */}
               <div>

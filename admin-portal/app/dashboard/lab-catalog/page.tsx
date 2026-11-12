@@ -246,7 +246,8 @@ export default function LabCatalogPage() {
               {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs text-center">{error}</div>}
               <input required placeholder="Test name (e.g. Complete Blood Count)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
               <input required placeholder="Category (e.g. Blood Tests)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls} />
-              <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} rows={2} />
+              <textarea placeholder="Description (shown to patients on every lab's listing of this test)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} rows={2} />
+              <p className="text-[11px] text-slate-400 -mt-1">If you leave this empty, each lab can write its own description for this test. Once you add one, it replaces the labs&apos; own and cannot be edited by them.</p>
               <textarea placeholder="Recommended for" value={form.recommendedFor} onChange={(e) => setForm({ ...form, recommendedFor: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="How it's done" value={form.howItsDone} onChange={(e) => setForm({ ...form, howItsDone: e.target.value })} className={inputCls} rows={2} />
               <textarea placeholder="Patient instructions" value={form.patientInstructions} onChange={(e) => setForm({ ...form, patientInstructions: e.target.value })} className={inputCls} rows={2} />

@@ -500,6 +500,10 @@ router.post("/my-tests", requireRole("lab"), upload.single("image"), async (req:
       recommendedFrequency:     recommendedFrequency ?? null,
       patientInstructions:      patientInstructions ?? null,
       ...(catalog ? catalogOwnedFields(catalog) : {}),
+      // A catalog test with no description of its own: the lab writes it.
+      ...(catalog && !String(catalog.description ?? "").trim() && {
+        description: typeof description === "string" ? description.trim() : "",
+      }),
       status:                   isOnboarded ? "approved" : "pending_approval",
       flagged:                  false,
       flaggedAt:                null,
@@ -543,6 +547,14 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
     const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
     const isOnboarded = labDoc?.status === "approved";
 
+    // For a catalog-linked test, the admin's description is authoritative; only
+    // when the catalog entry has none may the lab write its own.
+    let catalogDescription = "";
+    if (existing.catalogTestId) {
+      const { resource: cat } = await labTestCatalogContainer.item(existing.catalogTestId, existing.catalogTestId).read();
+      catalogDescription = String(cat?.description ?? "").trim() ? cat.description : "";
+    }
+
     const updated = {
       ...existing,
       ...(name !== undefined && { name }),
@@ -567,7 +579,8 @@ router.put("/my-tests/:testId", requireRole("lab"), upload.single("image"), asyn
       ...(existing.catalogTestId && {
         name: existing.name,
         category: existing.category,
-        description: existing.description,
+        description: catalogDescription || (description !== undefined ? String(description).trim() : (existing.description ?? "")),
+        descriptionFromCatalog: !!catalogDescription,
         requires_doctor_approval: existing.requires_doctor_approval,
         recommendedFor: existing.recommendedFor,
         howItsDone: existing.howItsDone,
@@ -1297,7 +1310,9 @@ router.post("/vaccines", requireRole("lab"), async (req: SessionRequest, res: Re
       manufacturer: manufacturer ?? null,
       vaccineType: vaccineType ?? null,
       category: catalogDoc?.category ?? category ?? null,
-      description: catalogDoc?.description ?? description ?? null,
+      // The admin's description when the catalog has one; otherwise the lab's own.
+      description: String(catalogDoc?.description ?? "").trim() ? catalogDoc.description : (typeof description === "string" && description.trim() ? description.trim() : null),
+      descriptionFromCatalog: !!String(catalogDoc?.description ?? "").trim(),
       recommendedFor: catalogDoc?.recommendedFor || recommendedFor || null,
       ageRange: catalogDoc?.ageRange ?? ageRange ?? null,
       targetGroups: Array.isArray(targetGroups) ? targetGroups : [],
@@ -1367,13 +1382,22 @@ router.patch("/vaccines/:vaccineId", requireRole("lab"), async (req: SessionRequ
     const { resource: labDoc } = await labServicesContainer.item(labId, labId).read();
     const isOnboarded = labDoc?.status === "approved";
 
+    // A catalog vaccine's description belongs to the admin; the lab may only
+    // write it when the catalog entry has none.
+    let descriptionLocked = false;
+    if (existing.catalogVaccineId) {
+      const { resource: cat } = await vaccineCatalogContainer.item(existing.catalogVaccineId, existing.catalogVaccineId).read();
+      descriptionLocked = !!String(cat?.description ?? "").trim();
+    }
+
     const updated = {
       ...existing,
       ...(name !== undefined && { name }),
       ...(manufacturer !== undefined && { manufacturer }),
       ...(vaccineType !== undefined && { vaccineType }),
       ...(category !== undefined && { category }),
-      ...(description !== undefined && { description }),
+      ...(description !== undefined && !descriptionLocked && { description }),
+      ...(existing.catalogVaccineId && { descriptionFromCatalog: descriptionLocked }),
       ...(recommendedFor !== undefined && { recommendedFor }),
       ...(ageRange !== undefined && { ageRange }),
       ...(targetGroups !== undefined && { targetGroups: Array.isArray(targetGroups) ? targetGroups : [] }),

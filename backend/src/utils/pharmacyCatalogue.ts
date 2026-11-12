@@ -126,9 +126,19 @@ export async function resolveMedicineSuggestions(
   const pharmacyIds = [...new Set(matched.map((m) => m.product.pharmacyId).filter(Boolean))];
   const pharmacyNameMap = await fetchPharmacyNameMap(pharmacyIds);
 
-  return matched.map(({ product, suggestion }) => ({
-    ...mapProductToMedicine(product, pharmacyNameMap),
-    dosageInstructions: suggestion.dosageInstructions,
-    reason: suggestion.reason,
-  }));
+  return matched.map(({ product, suggestion }) => {
+    const medicine = mapProductToMedicine(product, pharmacyNameMap);
+    return {
+      ...medicine,
+      // The model's free-text dosing guidance is fine for an OTC product
+      // (that's normal label-level advice), but for anything prescription-only
+      // it would be the model prescribing a dose on its own — never trust
+      // model text here regardless of what the prompt asked for; the actual
+      // dose must come from whoever writes the prescription, not the chatbot.
+      dosageInstructions: medicine.requires_prescription
+        ? "Dosage is set by your prescription — follow your doctor's instructions."
+        : suggestion.dosageInstructions,
+      reason: suggestion.reason,
+    };
+  });
 }

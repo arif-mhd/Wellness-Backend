@@ -79,6 +79,7 @@ function PatientDetailsContent() {
                 drinks: match.preVisitData.additionalNotes || "None",
                 visitSummary: match.preVisitData.visitSummary || "",
                 source: match.preVisitData.source,
+                answers: match.preVisitData.answers,
               } : {
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",
                 currentMedications: match.patientCurrentMedications || "None",

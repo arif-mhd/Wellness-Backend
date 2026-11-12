@@ -13,9 +13,6 @@ interface PatientDetail {
   avatarUrl: string | null;
   gender: string | null;
   dob: string | null;
-  bloodGroup: string | null;
-  height: string | null;
-  weight: string | null;
   age: number | null;
 }
 
@@ -25,7 +22,6 @@ interface Consultation {
   doctorName: string;
   doctorSpecialty: string;
   age: number | null;
-  reason: string;
   scheduledAt: string;
   status: string;
 }
@@ -137,20 +133,8 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                       <span className="text-[#24292E] text-[12px] font-bold">{patient.gender ?? "—"}</span>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <span className="text-[#676E76] text-[11px]">Height</span>
-                      <span className="text-[#24292E] text-[12px] font-bold">{patient.height ?? "—"}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
                       <span className="text-[#676E76] text-[11px]">Date of Birth</span>
                       <span className="text-[#24292E] text-[12px] font-bold">{patient.dob ? new Date(patient.dob).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[#676E76] text-[11px]">Weight</span>
-                      <span className="text-[#24292E] text-[12px] font-bold">{patient.weight ?? "—"}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[#676E76] text-[11px]">Blood Group</span>
-                      <span className="text-[#24292E] text-[12px] font-bold">{patient.bloodGroup ?? "—"}</span>
                     </div>
                   </div>
                 </div>
@@ -191,7 +175,6 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                         <div className="w-[200px] shrink-0">Doctor</div>
                         <div className="md:flex md:flex-row w-full">
                           <div className="md:w-[80px] shrink-0 text-center">Age</div>
-                          <div className="md:w-[120px] shrink-0 text-center">Reason</div>
                           <div className="md:flex-1 md:min-w-[120px] shrink-0 text-center">Department</div>
                           <div className="md:w-[140px] shrink-0 text-center">Time &amp; Date</div>
                           <div className="md:w-[100px] shrink-0 text-center">Status</div>
@@ -219,12 +202,6 @@ function PatientProfileContent({ params }: { params: Promise<{ id: string }> }) 
                               <div className="md:w-[80px] shrink-0 flex flex-col md:block justify-start">
                                 <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span>
                                 <span className="text-[#24292E] text-[13px] font-medium md:text-center block text-left">{consult.age ?? "—"}</span>
-                              </div>
-
-                              {/* Reason */}
-                              <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
-                                <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Reason</span>
-                                <span className="text-[#676E76] text-[12px] md:text-center block text-left truncate">{consult.reason}</span>
                               </div>
 
                               {/* Department */}

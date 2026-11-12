@@ -69,6 +69,7 @@ function PreVisitFormContent() {
                 severity: match.preVisitData.severity || "Not provided",
                 duration: match.preVisitData.duration || "Not provided",
                 source: match.preVisitData.source === "ai_chat" ? "ai_chat" : "manual",
+                answers: match.preVisitData.answers,
               } : {
                 isQuestionnaire: false,
                 chronicIllnesses: match.patientChronicIllnesses || "None reported",

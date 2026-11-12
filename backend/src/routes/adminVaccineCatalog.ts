@@ -14,11 +14,18 @@ router.use(requireRole("admin"));
 // takes these from the catalog (never from the lab), so every lab offering the
 // same vaccine shows the same name and clinical details. Manufacturer and
 // price are deliberately not here — each lab sets those for its own offering.
-export function catalogOwnedVaccineFields(catalog: any) {
+//
+// The description is the one exception: the admin's wording wins whenever the
+// catalog has one, but when the catalog vaccine has no description the lab may
+// write its own — so an existing lab vaccine's text is kept, not blanked out.
+export function catalogOwnedVaccineFields(catalog: any, existing?: any) {
+  const catalogHasDescription = typeof catalog.description === "string" && catalog.description.trim() !== "";
   return {
     name: catalog.name,
     category: catalog.category,
-    description: catalog.description ?? "",
+    description: catalogHasDescription ? catalog.description : (existing?.description ?? ""),
+    // True when the admin wrote the description (lab can't change it); false when the lab did.
+    descriptionFromCatalog: catalogHasDescription,
     ageRange: catalog.ageRange ?? "",
     doses_required: Number(catalog.doses_required ?? 1),
     recommendedFor: catalog.recommendedFor ?? "",
@@ -129,7 +136,7 @@ router.patch("/vaccines/:vaccineId/link", async (req: SessionRequest, res: Respo
       }).fetchAll();
       if (dupes.length) { res.status(409).json({ error: "This lab already offers that catalog vaccine." }); return; }
 
-      updated = { ...vaccine, ...catalogOwnedVaccineFields(catalog), catalogVaccineId, updatedAt: new Date().toISOString() };
+      updated = { ...vaccine, ...catalogOwnedVaccineFields(catalog, vaccine), catalogVaccineId, updatedAt: new Date().toISOString() };
     } else {
       updated = { ...vaccine, catalogVaccineId: null, updatedAt: new Date().toISOString() };
     }
@@ -179,7 +186,7 @@ router.patch("/:id", async (req: SessionRequest, res: Response) => {
       .query({ query: "SELECT * FROM c WHERE c.catalogVaccineId = @cid", parameters: [{ name: "@cid", value: id }] })
       .fetchAll();
     await Promise.all(linked.map((v: any) =>
-      vaccinesContainer.items.upsert({ ...v, ...catalogOwnedVaccineFields(updated), updatedAt: updated.updatedAt })
+      vaccinesContainer.items.upsert({ ...v, ...catalogOwnedVaccineFields(updated, v), updatedAt: updated.updatedAt })
     ));
 
     res.json(updated);

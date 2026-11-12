@@ -7,9 +7,8 @@ import {
   patientsContainer,
   queryDocuments,
 } from "../config/cosmos";
-import { resolveClinicScope, scopeToClinicIds, scopeIncludes, buildInClause, ClinicScope } from "../utils/clinicScope";
+import { resolveClinicScope, scopeToClinicIds, buildInClause, ClinicScope } from "../utils/clinicScope";
 import { autoExpireStaleAppointments } from "../utils/appointmentSweep";
-import { generateShortLivedSasUrl } from "../config/blob";
 
 const router = Router();
 
@@ -72,7 +71,6 @@ export async function getClinicAppointmentsData(scope: ClinicScope) {
       let patientEmail = patient?.email ?? "";
       let patientAvatarUrl = patient?.avatarUrl ?? null;
       let patientGender = patient?.gender ?? null;
-      let patientChronicDiseases: string[] = patient?.chronicDiseases ?? [];
 
       if (apt.familyMemberId && patient?.familyMembers) {
         const member = patient.familyMembers.find((m: any) => m.id === apt.familyMemberId);
@@ -82,36 +80,42 @@ export async function getClinicAppointmentsData(scope: ClinicScope) {
           patientAvatarUrl = member.avatarUrl ?? patientAvatarUrl;
           if (member.email) patientEmail = member.email;
           patientGender = member.gender ?? patientGender;
-          patientChronicDiseases = member.chronicDiseases ?? patientChronicDiseases;
         }
       }
 
-      const status = apt.status;
-      const primaryDiagnosis =
-        status === "completed" ? (apt.emr?.sections?.impressionAndPlan?.trim() || "No diagnosis recorded") :
-        status === "cancelled" ? "—" :
-        "Pending";
-
-      // Transcript and recording pointer are only ever exposed through
-      // GET /:id/recording below — this list must not leak them.
-      const { transcript, transcriptSavedAt, recordingBlobPath, recordingEgressId, ...safeApt } = apt as any;
-
+      // Clinic staff see identity + booking details only. This is an explicit
+      // allow-list, NOT a spread of the appointment doc, so clinical data (EMR
+      // notes, visit reason, pre-visit answers, call transcript/recording
+      // pointers, ...) can never leak by being added to the doc later.
       return {
-        ...safeApt,
-        status,
+        id: apt.id,
+        patientId: apt.patientId,
+        familyMemberId: apt.familyMemberId ?? null,
+        doctorId: apt.doctorId,
+        clinicId: apt.clinicId ?? null,
+        scheduledAt: apt.scheduledAt,
+        timezone: apt.timezone ?? null,
+        durationMins: apt.durationMins,
+        visitType: apt.visitType,
+        status: apt.status,
+        paymentAmount: apt.paymentAmount,
+        paymentStatus: apt.paymentStatus,
+        paymentMethod: apt.paymentMethod,
+        patientWaitingSince: apt.patientWaitingSince ?? null,
+        createdAt: apt.createdAt,
+        // Only whether the doctor has written notes up, never what they say.
+        hasEmr: !!apt.emr,
         patientName,
         patientEmail,
         patientDob,
         patientAge: calcAge(patientDob),
         patientAvatarUrl,
         patientGender: patientGender ?? "other",
-        patientChronicIllnesses: patientChronicDiseases.length > 0 ? patientChronicDiseases.join(", ") : "None reported",
         doctorName: doctor?.fullName ?? "Doctor",
         doctorEmail: doctor?.email ?? "",
         doctorAvatarUrl: doctor?.avatarUrl ?? null,
         doctorSpecialty: doctor?.specialty ?? "General Medicine",
         doctorIsOnline: !!doctor?.isOnline,
-        primaryDiagnosis,
       };
     });
 
@@ -126,31 +130,6 @@ router.get("/", requireRole("clinic"), async (req: SessionRequest, res: Response
     res.json(await getClinicAppointmentsData(scope));
   } catch (err) {
     console.error("Fetch clinic appointments error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /api/clinics/appointments/:id/recording ─────────────────────────────
-// Returns a short-lived (1hr) playback URL for this appointment's call
-// recording, plus its saved transcript — the only place either is exposed to
-// a clinic. Ownership-checked: only a branch this appointment belongs to can
-// see it, not just any clinic account.
-router.get("/:id/recording", requireRole("clinic"), async (req: SessionRequest, res: Response) => {
-  const scope = await resolveClinicScope(req, res, { allowAggregate: true });
-  if (!scope) return;
-  const { id } = req.params;
-
-  try {
-    const { resource: apt } = await appointmentsContainer.item(id, id).read();
-    if (!apt) { res.status(404).json({ error: "Appointment not found." }); return; }
-    if (!scopeIncludes(scope, apt.clinicId)) { res.status(403).json({ error: "Not authorized." }); return; }
-
-    res.json({
-      recordingUrl: apt.recordingBlobPath ? generateShortLivedSasUrl(apt.recordingBlobPath) : null,
-      transcript: apt.transcript ?? [],
-    });
-  } catch (err) {
-    console.error("Fetch clinic appointment recording error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

@@ -98,6 +98,8 @@ export default function AddProductPage() {
         if (turnaroundHours) form.append("turnaround_hours", turnaroundHours);
         form.append("homeVisitAvailable", String(homeVisitAvailable));
         form.append("requires_fasting", String(requiresFasting));
+        // Only used by the server when the catalog test has no description.
+        if (description.trim() && !selectedCatalog.description?.trim()) form.append("description", description.trim());
         const res = await fetch(`${API_URL}/api/lab/my-tests`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token ?? ""}` },
@@ -259,7 +261,13 @@ export default function AddProductPage() {
                   <p>{selectedCatalog.category}</p>
                   <p>Doctor approval: {selectedCatalog.requires_doctor_approval ? "Required" : "Not required"}</p>
                   <p className="text-[11px] text-[#A0A8B0]">Doctor approval is set by the platform admin for every lab offering this test.</p>
-                  {selectedCatalog.description && <p>{selectedCatalog.description}</p>}
+                  {selectedCatalog.description && (
+                    <>
+                      <p className="pt-1 text-[11px] font-semibold text-[#24292E]">Description</p>
+                      <p>{selectedCatalog.description}</p>
+                      <p className="text-[11px] text-[#A0A8B0]">Written by the platform admin and shown to patients as-is.</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -277,6 +285,15 @@ export default function AddProductPage() {
                     <input type="number" min="0" value={turnaroundHours} onChange={e => setTurnaroundHours(e.target.value)} placeholder="e.g. 24" className={inputCls} />
                   </div>
                 </div>
+                {/* The platform has no description for this test yet — the lab writes its own. */}
+                {!selectedCatalog.description?.trim() && (
+                  <div>
+                    <label className={labelCls}>Description</label>
+                    <textarea value={description} onChange={e => setDescription(e.target.value)}
+                      placeholder="The platform hasn't added a description for this test yet. Describe what it measures and when it's needed…"
+                      rows={3} className={textareaCls} />
+                  </div>
+                )}
               </div>
             )}
 

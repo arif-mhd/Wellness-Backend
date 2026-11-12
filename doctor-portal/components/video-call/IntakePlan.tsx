@@ -241,6 +241,9 @@ interface PreVisitFormData {
   additionalNotes?: string | null;
   visitSummary?: string | null;
   source?: "ai_chat" | "manual" | null;
+  /** Answers to the reason-specific questions the patient was shown. */
+  answers?: { questionId?: string; label: string; type?: string; answer: string | string[] }[] | null;
+  templateName?: string | null;
 }
 
 function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
@@ -256,18 +259,27 @@ function PreVisitFormTab({ data }: { data: PreVisitFormData | null }) {
   }
 
   const symptoms = Array.isArray(data.symptoms) ? data.symptoms.join(", ") : (data.symptoms ?? "");
-  const fields: { label: string; value?: string | null }[] = [
-    { label: "Primary reason", value: data.primaryReason },
-    { label: "Symptoms", value: symptoms },
-    { label: "When it started", value: data.onset },
-    { label: "Location / side", value: data.location },
-    { label: "Severity", value: data.severity },
-    { label: "Duration", value: data.duration },
-    { label: "Existing conditions", value: data.conditions },
-    { label: "Current medications", value: data.medications },
-    { label: "Allergies", value: data.allergies },
-    { label: "Additional notes", value: data.additionalNotes },
-  ].filter((f) => f.value && f.value.trim().length > 0);
+  // A form tailored to the visit reason carries its own questions and answers —
+  // show those as-is. Older submissions (and AI-chat intakes) use the fixed list.
+  const tailored = (data.answers ?? []).map((a) => ({
+    label: a.label,
+    value: Array.isArray(a.answer) ? a.answer.join(", ") : a.answer,
+  }));
+  const fields: { label: string; value?: string | null }[] = (tailored.length > 0
+    ? [{ label: "Reason for visit", value: data.primaryReason }, ...tailored]
+    : [
+        { label: "Primary reason", value: data.primaryReason },
+        { label: "Symptoms", value: symptoms },
+        { label: "When it started", value: data.onset },
+        { label: "Location / side", value: data.location },
+        { label: "Severity", value: data.severity },
+        { label: "Duration", value: data.duration },
+        { label: "Existing conditions", value: data.conditions },
+        { label: "Current medications", value: data.medications },
+        { label: "Allergies", value: data.allergies },
+        { label: "Additional notes", value: data.additionalNotes },
+      ]
+  ).filter((f) => f.value && f.value.trim().length > 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -308,7 +320,7 @@ function hasPreVisitContent(data: PreVisitFormData | null): boolean {
   return !!(
     data.primaryReason || data.onset || data.location || data.severity || data.duration ||
     data.conditions || data.medications || data.allergies || data.additionalNotes ||
-    data.visitSummary || (Array.isArray(data.symptoms) ? data.symptoms.length > 0 : !!data.symptoms)
+    data.visitSummary || (data.answers?.length ?? 0) > 0 || (Array.isArray(data.symptoms) ? data.symptoms.length > 0 : !!data.symptoms)
   );
 }
 

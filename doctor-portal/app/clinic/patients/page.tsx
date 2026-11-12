@@ -15,11 +15,9 @@ interface PatientRow {
   email: string;
   avatarUrl: string | null;
   age: number | null;
-  diagnosis: string;
-  summary: string;
   lastConsult: string | null;
   doctors: { id: string; name: string; isOnline: boolean }[];
-  consultations: { reason: string; date: string; status: string }[];
+  consultations: { date: string; status: string }[];
   nextAppointmentId: string | null;
   isNew: boolean;
 }
@@ -65,8 +63,6 @@ function profileHref(p: PatientRow, branchId: string | null) {
 const COL = {
   profile: "240px",
   age: "70px",
-  diagnosis: "140px",
-  summary: "140px",
   lastConsult: "120px",
 };
 
@@ -194,12 +190,6 @@ function PatientsListContent() {
           {/* Age */}
           <div className="md:w-[60px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Age</span><span className="text-[#24292E] text-[13px] font-medium block md:text-center text-left">{p.age ?? "—"}</span></div>
 
-          {/* Diagnosis */}
-          <div className="md:w-[160px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Diagnosis</span><span className="text-[#676E76] text-[12px] block md:text-center text-left truncate" title={p.diagnosis}>{p.diagnosis}</span></div>
-
-          {/* Summary */}
-          <div className="md:w-[200px] shrink-0 flex flex-col md:block justify-start"><span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Summary</span><span className="text-[#676E76] text-[12px] block md:text-center text-left truncate" title={p.summary}>{p.summary}</span></div>
-
           {/* Last Consult */}
           <div className="md:w-[120px] shrink-0 flex flex-col md:block justify-start">
             <span className="md:hidden text-[#9EA5AD] text-[10px] uppercase tracking-wider font-semibold mb-0.5">Last Consult</span>
@@ -270,8 +260,6 @@ function PatientsListContent() {
             <div className="hidden md:flex items-center px-4 pb-2 text-[12px] font-semibold text-[#676E76] border-b border-[#E4E8F0]">
               <div className="w-[220px] shrink-0">Name</div>
               <div className="w-[60px] shrink-0 text-center">Age</div>
-              <div className="w-[160px] shrink-0 text-center">Diagnosis</div>
-              <div className="w-[200px] shrink-0 text-center">Summary</div>
               <div className="w-[120px] shrink-0 text-center">Last Consult</div>
               <div className="flex-1" />
             </div>
@@ -403,7 +391,7 @@ function PatientsListContent() {
                 ) : (
                   selectedPatient.consultations.slice(0, 8).map((c, idx) => (
                     <div key={idx} className="flex items-center justify-between">
-                      <span className="text-[#676E76] text-[12px]">Reason: {c.reason}</span>
+                      <span className="text-[#676E76] text-[12px] capitalize">{c.status.replace(/_/g, " ")}</span>
                       <span className="text-[#A7AAB4] text-[11px]">{formatDate(c.date)}</span>
                     </div>
                   ))

@@ -12,11 +12,19 @@ router.use(requireRole("admin"));
 // test shows the same name/category and — importantly — the same
 // requires_doctor_approval decision, which only an admin gets to make. Fasting
 // is deliberately not here — each lab decides that for its own offering.
-export function catalogOwnedFields(catalog: any) {
+//
+// The description is the one exception: the admin's wording wins whenever the
+// catalog has one, but when the catalog test has no description the lab is
+// allowed to write its own — so an existing lab test's text is kept instead of
+// being blanked out.
+export function catalogOwnedFields(catalog: any, existing?: any) {
+  const catalogHasDescription = typeof catalog.description === "string" && catalog.description.trim() !== "";
   return {
     name: catalog.name,
     category: catalog.category,
-    description: catalog.description ?? "",
+    description: catalogHasDescription ? catalog.description : (existing?.description ?? ""),
+    // True when the admin wrote the description (lab can't change it); false when the lab did.
+    descriptionFromCatalog: catalogHasDescription,
     requires_doctor_approval: !!catalog.requires_doctor_approval,
     recommendedFor: catalog.recommendedFor ?? "",
     howItsDone: catalog.howItsDone ?? "",
@@ -111,7 +119,7 @@ router.patch("/tests/:labId/:testId/link", async (req: SessionRequest, res: Resp
       }, { partitionKey: labId }).fetchAll();
       if (dupes.length) { res.status(409).json({ error: "This lab already offers that catalog test." }); return; }
 
-      updated = { ...test, ...catalogOwnedFields(catalog), catalogTestId, updatedAt: new Date().toISOString() };
+      updated = { ...test, ...catalogOwnedFields(catalog, test), catalogTestId, updatedAt: new Date().toISOString() };
     } else {
       updated = { ...test, catalogTestId: null, updatedAt: new Date().toISOString() };
     }
@@ -157,7 +165,7 @@ router.patch("/:id", async (req: SessionRequest, res: Response) => {
       .query({ query: "SELECT * FROM c WHERE c.catalogTestId = @cid", parameters: [{ name: "@cid", value: id }] })
       .fetchAll();
     await Promise.all(linked.map((t: any) =>
-      labTestsContainer.items.upsert({ ...t, ...catalogOwnedFields(updated), updatedAt: updated.updatedAt })
+      labTestsContainer.items.upsert({ ...t, ...catalogOwnedFields(updated, t), updatedAt: updated.updatedAt })
     ));
 
     res.json(updated);

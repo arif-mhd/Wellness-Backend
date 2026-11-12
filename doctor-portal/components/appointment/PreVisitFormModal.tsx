@@ -21,7 +21,15 @@ export default function PreVisitFormModal({ patient, onClose }: PreVisitFormModa
     onClose();
   };
 
-  const fields = form?.isQuestionnaire
+  // A form tailored to the visit reason carries its own questions and answers —
+  // show those as-is. Older submissions fall back to the fixed field list.
+  const tailored = (form?.answers ?? []).map((a) => ({
+    label: a.label,
+    value: Array.isArray(a.answer) ? a.answer.join(", ") : a.answer,
+  }));
+  const fields = tailored.length > 0
+    ? [{ label: "Reason for visit", value: form?.primaryConcern || "Not provided" }, ...tailored]
+    : form?.isQuestionnaire
     ? [
         { label: "What is the primary reason for your visit today", value: form?.primaryConcern ?? "Not provided" },
         { label: "Are you experiencing any new symptoms?", value: form?.smokes ?? "None" },

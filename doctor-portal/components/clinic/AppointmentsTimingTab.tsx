@@ -12,7 +12,6 @@ interface Appointment {
   patientName: string;
   patientAge: number | null;
   patientAvatarUrl: string | null;
-  reason: string;
   scheduledAt: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
 }
@@ -165,7 +164,6 @@ export default function AppointmentsTimingTab({ qs = "" }: { qs?: string }) {
                     <span className="text-[14px] sm:text-[13px] font-semibold text-gray-800 truncate">
                       {a.patientName}{a.patientAge ? `, ${a.patientAge}` : ""}
                     </span>
-                    <span className="text-[12px] sm:text-[11px] text-gray-400 truncate">Reason: {a.reason || "—"}</span>
                     <span className="text-[12px] text-gray-500 sm:hidden mt-1 font-medium">
                       {formatClinicDate(a.scheduledAt, clinicTz, { day: "2-digit", month: "2-digit", year: "numeric" })}, {formatClinicTime(a.scheduledAt, clinicTz, { hour: "2-digit", minute: "2-digit" })}
                     </span>

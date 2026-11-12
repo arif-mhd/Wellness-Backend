@@ -776,16 +776,24 @@ function stemSpecialty(raw: string): string {
   return cleaned;
 }
 
+// Containment is intentionally prefix-anchored (startsWith), not a plain
+// substring test: a mid-string `includes` falsely matches unrelated
+// specialties that happen to share a run of letters — "Dental".includes("ent")
+// and "Neurologist".includes("urologist") are both true, which used to make
+// an ENT search return dentists and a Urologist search return neurologists.
+// A shared prefix ("Ortho" naming "Orthopedic Surgeon", "ENT" naming
+// "ENT (Otolaryngologist)") still matches; a coincidental substring starting
+// mid-word no longer does.
 function specialtyMatches(doctorSpecialty: string, wanted: string): boolean {
   const a = doctorSpecialty.trim().toLowerCase();
   const b = wanted.trim().toLowerCase();
   if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
+  if (a === b || a.startsWith(b) || b.startsWith(a)) return true;
 
   const stemA = stemSpecialty(a);
   const stemB = stemSpecialty(b);
   if (!stemA || !stemB) return false;
-  return stemA === stemB || stemA.includes(stemB) || stemB.includes(stemA);
+  return stemA === stemB || stemA.startsWith(stemB) || stemB.startsWith(stemA);
 }
 
 // Timezone per clinic, looked up once per request — every doctor in a
