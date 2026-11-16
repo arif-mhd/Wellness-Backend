@@ -5,6 +5,7 @@ import { pharmaciesContainer, pharmacyProductsContainer } from "../config/cosmos
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { logActivity } from "../utils/activityLogger";
+import { parseBrandNames } from "../utils/medicineBrands";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -72,7 +73,7 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
     const {
       name, description, category, price, inStock,
       requiresPrescription, batchNumber, expiryDate,
-      manufacturer, strength,
+      manufacturer, strength, genericName, brandNames,
     } = req.body;
 
     if (!name || !category || !price) {
@@ -114,6 +115,8 @@ router.post("/:pharmacyId/products", async (req: SessionRequest, res: Response) 
       expiryDate:          expiryDate || null,
       manufacturer:        manufacturer || null,
       strength:            strength || null,
+      genericName:         typeof genericName === "string" && genericName.trim() ? genericName.trim() : null,
+      brandNames:          parseBrandNames(brandNames),
       imageUrl:            null,
       status:              "approved" as const,    // admin-added products are live immediately
       flagged:             false,

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import EmailPassword from "supertokens-node/recipe/emailpassword";
 import UserRoles from "supertokens-node/recipe/userroles";
-import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer, feedbackContainer, otpCodesContainer, labServicesContainer } from "../config/cosmos";
+import { pharmaciesContainer, pharmacyProductsContainer, medicineOrdersContainer, notificationsContainer, feedbackContainer, otpCodesContainer, labServicesContainer, prescriptionsContainer } from "../config/cosmos";
 import { requireRole } from "../middleware/requireRole";
 import { SessionRequest } from "supertokens-node/framework/express";
 import multer from "multer";
@@ -13,6 +13,7 @@ import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getPharmacyIdsForO
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { buildInClause } from "../utils/clinicScope";
 import { mapProductToMedicine, fetchPharmacyNameMap } from "../utils/pharmacyCatalogue";
+import { expandMedicineSearchTerms, buildMedicineTermClause, parseBrandNames } from "../utils/medicineBrands";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -91,8 +92,14 @@ router.get("/catalogue", async (req: Request, res: Response) => {
       params.push({ name: "@category", value: category });
     }
     if (search) {
-      query += " AND CONTAINS(LOWER(c.name), @search)";
-      params.push({ name: "@search", value: search.toLowerCase() });
+      // Brand-aware: "Panadol" also matches a product listed as
+      // "Paracetamol", plus any brand names the pharmacy tagged it with.
+      const terms = expandMedicineSearchTerms(search);
+      if (terms.length) {
+        const { clause, parameters } = buildMedicineTermClause(terms, "@search");
+        query += ` AND ${clause}`;
+        params.push(...parameters);
+      }
     }
     query += " ORDER BY c.approvedAt DESC";
 
@@ -527,7 +534,7 @@ router.post(
       const pharmacyId = req.session!.getUserId();
       const {
         name, description, category, price, inStock, requiresPrescription,
-        batchNumber, expiryDate, manufacturer, strength,
+        batchNumber, expiryDate, manufacturer, strength, genericName, brandNames,
         numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
@@ -565,6 +572,8 @@ router.post(
         expiryDate:           expiryDate || null,
         manufacturer:         manufacturer || null,
         strength:             strength || null,
+        genericName:          typeof genericName === "string" && genericName.trim() ? genericName.trim() : null,
+        brandNames:           parseBrandNames(brandNames),
         numberOfTablets:      numberOfTablets || null,
         productSummary:       productSummary || null,
         recommendedFor:       recommendedFor || null,
@@ -606,7 +615,7 @@ router.put(
       const { productId } = req.params;
       const {
         name, description, category, price, inStock, requiresPrescription,
-        batchNumber, expiryDate, manufacturer, strength,
+        batchNumber, expiryDate, manufacturer, strength, genericName, brandNames,
         numberOfTablets, productSummary, recommendedFor, benefits, sideEffects, howToUse,
       } = req.body;
 
@@ -643,6 +652,8 @@ router.put(
         ...(expiryDate   !== undefined && { expiryDate: expiryDate || null }),
         ...(manufacturer !== undefined && { manufacturer: manufacturer || null }),
         ...(strength     !== undefined && { strength: strength || null }),
+        ...(genericName  !== undefined && { genericName: typeof genericName === "string" && genericName.trim() ? genericName.trim() : null }),
+        ...(brandNames   !== undefined && { brandNames: parseBrandNames(brandNames) }),
         ...(numberOfTablets !== undefined && { numberOfTablets: numberOfTablets || null }),
         ...(productSummary  !== undefined && { productSummary: productSummary || null }),
         ...(recommendedFor  !== undefined && { recommendedFor: recommendedFor || null }),
@@ -697,15 +708,34 @@ router.get("/orders", requireRole("pharmacy"), async (req: SessionRequest, res: 
       { maxItemCount: 100 }   // cross-partition query — no partitionKey hint
     ).fetchAll();
 
-    const scoped = resources.map((order: any) => {
+    // The uploaded prescription is shown only to a pharmacy that has to
+    // review it (it holds a prescription-only item in the order) — never to
+    // a co-seller of unrelated items.
+    const scoped = await Promise.all(resources.map(async (order: any) => {
       const myItems = (order.items ?? []).filter((i: any) => i.pharmacyId === pharmacyId);
+      const myReview = order.prescriptionReview?.[pharmacyId] ?? null;
+      let prescription: any = null;
+      if (myReview && order.prescription_id) {
+        const { resource } = await prescriptionsContainer.item(order.prescription_id, order.patientId).read().catch(() => ({ resource: undefined as any }));
+        if (resource) {
+          prescription = {
+            id: resource.id,
+            image_url: resource.image_url ?? null,
+            pdf_url: resource.pdf_url ?? null,
+            uploadedAt: resource.createdAt ?? null,
+          };
+        }
+      }
       return {
         ...order,
+        prescriptionReview: undefined,
         items: myItems,
         total_amount: myItems.reduce((sum: number, i: any) => sum + i.unit_price * i.quantity, 0),
         status: computeAggregateOrderStatus(myItems),
+        myPrescriptionReview: myReview,
+        prescription,
       };
-    });
+    }));
 
     res.json({ orders: scoped });
   } catch (err) {
@@ -754,8 +784,15 @@ router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: Ses
       return;
     }
 
+    // Nothing ships before the prescription has been reviewed.
+    if (order.items.some((i: any) => i.pharmacyId === pharmacyId && i.status === "prescription_review")) {
+      res.status(400).json({ error: "Review the patient's prescription before shipping this order." });
+      return;
+    }
+
+    // Items cancelled (e.g. after a rejected prescription) stay cancelled.
     const updatedItems = (order.items ?? []).map((i: any) =>
-      i.pharmacyId === pharmacyId ? { ...i, status } : i
+      i.pharmacyId === pharmacyId && i.status !== "cancelled" ? { ...i, status } : i
     );
     const updated = {
       ...order,
@@ -791,6 +828,129 @@ router.patch("/orders/:orderId/status", requireRole("pharmacy"), async (req: Ses
     });
   } catch (err) {
     console.error("Update pharmacy order status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/pharmacy/orders/:orderId/prescription-review ──────────────────
+// The pharmacy reviews the prescription the patient uploaded for its
+// prescription-only items. Body: { decision: "approve" | "reject", reason? }.
+//   approve → this pharmacy's held items move to "confirmed" (ready to ship).
+//   reject  → its prescription-only items are cancelled with the reason; any
+//             other items it holds in the order proceed as "confirmed".
+// The patient is notified either way.
+router.post("/orders/:orderId/prescription-review", requireRole("pharmacy"), async (req: SessionRequest, res: Response) => {
+  try {
+    const pharmacyId = req.session!.getUserId();
+    const { orderId } = req.params;
+    const { decision } = req.body ?? {};
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+
+    if (decision !== "approve" && decision !== "reject") {
+      res.status(400).json({ error: "decision must be approve or reject" });
+      return;
+    }
+    if (decision === "reject" && !reason) {
+      res.status(400).json({ error: "Please give the patient a reason for rejecting the prescription." });
+      return;
+    }
+
+    const { resources } = await medicineOrdersContainer.items.query(
+      { query: "SELECT * FROM c WHERE c.id = @id", parameters: [{ name: "@id", value: orderId }] },
+      { maxItemCount: 1 }
+    ).fetchAll();
+    const order = resources[0];
+    if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+    const myReview = order.prescriptionReview?.[pharmacyId];
+    if (!myReview) {
+      res.status(403).json({ error: "This order has no prescription for your pharmacy to review" });
+      return;
+    }
+    if (myReview.status !== "pending") {
+      res.status(400).json({ error: `This prescription has already been ${myReview.status}.` });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updatedItems = (order.items ?? []).map((i: any) => {
+      if (i.pharmacyId !== pharmacyId || i.status !== "prescription_review") return i;
+      if (decision === "reject" && i.requires_prescription) {
+        return { ...i, status: "cancelled", cancelReason: `Prescription not accepted: ${reason}` };
+      }
+      return { ...i, status: "confirmed" };
+    });
+
+    const { resource: reviewer } = await pharmaciesContainer.item(pharmacyId, pharmacyId).read().catch(() => ({ resource: undefined as any }));
+    const pName = reviewer?.pharmacyName ?? "The pharmacy";
+
+    const updated = {
+      ...order,
+      items: updatedItems,
+      prescriptionReview: {
+        ...order.prescriptionReview,
+        [pharmacyId]: {
+          status: decision === "approve" ? "approved" : "rejected",
+          reason: decision === "reject" ? reason : null,
+          reviewedAt: now,
+          reviewedBy: pharmacyId,
+          reviewerName: pName,
+        },
+      },
+      status: computeAggregateOrderStatus(updatedItems),
+      updatedAt: now,
+    };
+    await medicineOrdersContainer.items.upsert(updated);
+
+    // Reflect the outcome on the prescription itself so the patient's
+    // prescriptions list (and any attempt to reuse it) shows it.
+    if (order.prescription_id) {
+      try {
+        const { resource: rx } = await prescriptionsContainer.item(order.prescription_id, order.patientId).read();
+        if (rx) {
+          await prescriptionsContainer.items.upsert({
+            ...rx,
+            verification_status: decision === "approve" ? "verified" : "rejected",
+            reviewedAt: now,
+            reviewedBy: pharmacyId,
+            rejectionReason: decision === "reject" ? reason : null,
+          });
+        }
+      } catch (rxErr) {
+        console.warn("Failed to update prescription review status:", rxErr);
+      }
+    }
+
+    try {
+      await notificationsContainer.items.upsert({
+        id: crypto.randomUUID(),
+        patientId: order.patientId,
+        title: decision === "approve" ? "Prescription approved" : "Prescription not accepted",
+        body: decision === "approve"
+          ? `${pName} approved your prescription. Your order is being prepared.`
+          : `${pName} could not accept your prescription: ${reason}. The prescription items were removed from your order. You can upload a new prescription or book a doctor.`,
+        type: "system",
+        read: false,
+        createdAt: now,
+      });
+    } catch (notifErr) {
+      console.warn("Failed to create prescription review notification:", notifErr);
+    }
+
+    const myItems = updatedItems.filter((i: any) => i.pharmacyId === pharmacyId);
+    res.json({
+      status: "OK",
+      order: {
+        ...updated,
+        prescriptionReview: undefined,
+        myPrescriptionReview: updated.prescriptionReview[pharmacyId],
+        items: myItems,
+        total_amount: myItems.reduce((sum: number, i: any) => sum + i.unit_price * i.quantity, 0),
+        status: computeAggregateOrderStatus(myItems),
+      },
+    });
+  } catch (err) {
+    console.error("Prescription review error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

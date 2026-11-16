@@ -1,6 +1,7 @@
 import { pharmaciesContainer, pharmacyProductsContainer } from "../config/cosmos";
 import { getPharmacyIdsForOrg } from "./orgScope";
 import { buildInClause } from "./clinicScope";
+import { expandMedicineSearchTerms, buildMedicineTermClause } from "./medicineBrands";
 
 // Patient-facing Medicine shape, shared by GET /pharmacy/catalogue(/:id) and
 // the AI chat's medicine-suggestion resolver — kept in one place so the two
@@ -9,6 +10,7 @@ export interface CatalogueMedicine {
   id: string;
   name: string;
   generic_name: string | null;
+  brand_names: string[];
   category: string | null;
   form: string | null;
   strength: string | null;
@@ -34,7 +36,8 @@ export function mapProductToMedicine(p: any, pharmacyNameMap: Record<string, str
   return {
     id: p.id,
     name: p.name,
-    generic_name: p.description ?? null,
+    generic_name: p.genericName ?? p.description ?? null,
+    brand_names: Array.isArray(p.brandNames) ? p.brandNames : [],
     category: p.category,
     form: p.category,
     strength: p.strength ?? null,
@@ -72,6 +75,8 @@ export async function fetchPharmacyNameMap(pharmacyIds: string[]): Promise<Recor
 
 export interface MedicineSuggestionInput {
   drugName: string;
+  /** The brand the patient asked for, if they used one ("Panadol"). */
+  brandName?: string | null;
   dosageInstructions: string;
   reason: string;
 }
@@ -105,13 +110,20 @@ export async function resolveMedicineSuggestions(
   const matched: { product: any; suggestion: MedicineSuggestionInput }[] = [];
 
   for (const suggestion of cleaned) {
+    // Match the generic name, the brand the patient used, and any generic
+    // that brand is known to contain — so "Panadol" finds a product listed
+    // as "Paracetamol", and a product a pharmacy listed under its brand
+    // name (or tagged with brandNames) is found from the generic too.
+    const terms = expandMedicineSearchTerms(suggestion.drugName, suggestion.brandName);
+    if (!terms.length) continue;
+    const { clause: termClause, parameters: termParams } = buildMedicineTermClause(terms);
     const query =
       `SELECT TOP ${MAX_MATCHES_PER_NAME} * FROM c WHERE c.status = 'approved' ` +
       `AND (NOT IS_DEFINED(c.flagged) OR c.flagged = false) AND ${orgClause} ` +
-      `AND CONTAINS(LOWER(c.name), @term)`;
+      `AND ${termClause}`;
     const { resources } = await pharmacyProductsContainer.items.query({
       query,
-      parameters: [...orgParams, { name: "@term", value: suggestion.drugName.trim().toLowerCase() }],
+      parameters: [...orgParams, ...termParams],
     } as any).fetchAll();
 
     for (const p of resources as any[]) {

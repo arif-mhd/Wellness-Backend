@@ -28,13 +28,19 @@ router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async
 
     // If a prescription is attached, confirm it actually belongs to this patient
     // rather than trusting a client-supplied id outright.
+    let prescription: any = null;
     if (prescription_id) {
       const { resources: rxMatches } = await prescriptionsContainer.items.query({
-        query: "SELECT VALUE COUNT(1) FROM c WHERE c.id = @id AND c.patientId = @pid",
+        query: "SELECT * FROM c WHERE c.id = @id AND c.patientId = @pid",
         parameters: [{ name: "@id", value: prescription_id }, { name: "@pid", value: patientId }],
       }, { partitionKey: patientId }).fetchAll();
-      if (!rxMatches[0]) {
+      prescription = rxMatches[0] ?? null;
+      if (!prescription) {
         res.status(400).json({ error: "Invalid prescription_id" });
+        return;
+      }
+      if (prescription.verification_status === "rejected") {
+        res.status(400).json({ error: "This prescription was not accepted by the pharmacy. Please upload a new one.", code: "PRESCRIPTION_REJECTED" });
         return;
       }
     }
@@ -48,17 +54,37 @@ router.post("/orders", requireRole("patient"), requireFeature("pharmacy"), async
     }
     const { items: validatedItems, total_amount } = validation;
 
+    // Prescription-only items are decided from the real product flag, never
+    // the client's cart: they need an uploaded prescription, and the
+    // pharmacy that stocks them reviews it before anything is dispensed.
+    // Every item that pharmacy holds in this order waits with them, so one
+    // delivery never leaves half-reviewed. Other pharmacies' items in the
+    // same order proceed as normal.
+    const rxPharmacyIds = new Set(validatedItems.filter(i => i.requires_prescription).map(i => i.pharmacyId));
+    if (rxPharmacyIds.size && !prescription) {
+      res.status(400).json({ error: "A prescription is required for one or more items in this order.", code: "PRESCRIPTION_REQUIRED" });
+      return;
+    }
+    const orderItems = validatedItems.map(i =>
+      rxPharmacyIds.has(i.pharmacyId) ? { ...i, status: "prescription_review" as const } : i
+    );
+    const prescriptionReview: Record<string, { status: "pending"; reason: null; reviewedAt: null }> = {};
+    rxPharmacyIds.forEach(pid => { prescriptionReview[pid] = { status: "pending", reason: null, reviewedAt: null }; });
+
     const now = new Date().toISOString();
     const order = {
       id:               uuidv4(),
       patientId,
       patient_id:       patientId,
       profileId:        profileId ?? patientId,
-      items:            validatedItems,
+      items:            orderItems,
       delivery_address,
       prescription_id:  prescription_id ?? null,
+      // Per-pharmacy review of the uploaded prescription — only pharmacies
+      // holding a prescription-only item appear here.
+      prescriptionReview,
       notes:            notes ?? null,
-      status:           "confirmed",
+      status:           computeAggregateOrderStatus(orderItems),
       total_amount,
       payment_status:   "paid",   // payment is mocked
       payment_method:   "mock",
@@ -146,8 +172,12 @@ router.patch("/orders/:orderId/cancel", requireRole("patient"), async (req: Sess
     }, { partitionKey: patientId }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Order not found" }); return; }
     const order = resources[0];
-    if (order.status !== "confirmed") {
-      res.status(400).json({ error: "Only confirmed orders can be cancelled" });
+    // Cancellable until anything has shipped — including while a pharmacy is
+    // still reviewing the prescription.
+    const liveItems = (order.items ?? []).filter((i: any) => i.status !== "cancelled");
+    const cancellable = liveItems.length > 0 && liveItems.every((i: any) => i.status === "confirmed" || i.status === "prescription_review");
+    if (!cancellable) {
+      res.status(400).json({ error: "Only orders that haven't shipped yet can be cancelled" });
       return;
     }
     // Cancelling the whole order cancels every pharmacy's items in it —
@@ -156,6 +186,11 @@ router.patch("/orders/:orderId/cancel", requireRole("patient"), async (req: Sess
     // here since every item agrees, but goes through the same helper every
     // other write uses rather than assuming that outcome).
     const cancelledItems = (order.items ?? []).map((i: any) => ({ ...i, status: "cancelled" }));
+    if (order.prescriptionReview) {
+      for (const pid of Object.keys(order.prescriptionReview)) {
+        if (order.prescriptionReview[pid]?.status === "pending") order.prescriptionReview[pid] = { ...order.prescriptionReview[pid], status: "cancelled" };
+      }
+    }
     const updated = { ...order, items: cancelledItems, status: computeAggregateOrderStatus(cancelledItems), updatedAt: new Date().toISOString() };
     await medicineOrdersContainer.items.upsert(updated);
     res.json(updated);
@@ -269,6 +304,12 @@ router.patch("/orders/:orderId/status", requireRole("patient"), async (req: Sess
     if (!resources.length) { res.status(404).json({ error: "Order not found" }); return; }
     
     const order = resources[0];
+    // A patient can never move their own order past the pharmacy's
+    // prescription review.
+    if ((order.items ?? []).some((i: any) => i.status === "prescription_review") && status !== "cancelled") {
+      res.status(400).json({ error: "This order is waiting for the pharmacy to review your prescription." });
+      return;
+    }
     const updated = { ...order, status, updatedAt: new Date().toISOString() };
     await medicineOrdersContainer.items.upsert(updated);
     res.json(updated);

@@ -10,7 +10,12 @@ export interface OrderItemInput {
 // A shared order can span several pharmacies at once — each line item is
 // fulfilled (and its progress tracked) independently by whichever pharmacy
 // owns it, so status lives per item rather than once on the whole order.
-export type OrderItemStatus = "confirmed" | "shipped" | "delivered" | "cancelled";
+//
+// "prescription_review" — the item's pharmacy still has to review the
+// patient's uploaded prescription before anything from it is dispensed.
+// Every item a pharmacy holds in a shop order waits together when any one of
+// them is prescription-only, so a single delivery never goes out half-reviewed.
+export type OrderItemStatus = "prescription_review" | "confirmed" | "shipped" | "delivered" | "cancelled";
 
 export interface ValidatedOrderItem {
   medicine_id: string;
@@ -21,7 +26,10 @@ export interface ValidatedOrderItem {
   pharmacyName: string | null;
   image_url: string | null;
   numberOfTablets: string | null;
+  requires_prescription: boolean;
   status: OrderItemStatus;
+  /** Set when the pharmacy cancels this item after rejecting the prescription. */
+  cancelReason?: string | null;
 }
 
 export type ValidateItemsResult =
@@ -84,6 +92,8 @@ export async function validateOrderItems(items: OrderItemInput[], orgId: string)
       pharmacyName: pharmacyNameCache[product.pharmacyId],
       image_url:    product.imageUrl ?? null,
       numberOfTablets: product.numberOfTablets ?? null,
+      // Same fallback the catalogue uses for the patient-facing flag.
+      requires_prescription: product.requiresPrescription ?? (product.category === "Prescription"),
       status:       "confirmed",
     });
     total_amount += product.price * item.quantity;
@@ -98,8 +108,13 @@ export async function validateOrderItems(items: OrderItemInput[], orgId: string)
 // pharmacy ships while another hasn't). Cancelled items don't count toward
 // that agreement unless every item is cancelled — a lone cancellation
 // shouldn't mask the real progress of everything else in the order.
+//
+// Any item still awaiting prescription review holds the whole order at
+// "prescription_review" — that's the one thing the patient needs to know
+// about, ahead of whatever else is already moving.
 export function computeAggregateOrderStatus(items: { status?: string }[]): string {
   const live = items.filter(i => i.status !== "cancelled");
+  if (live.some(i => i.status === "prescription_review")) return "prescription_review";
   const pool = live.length ? live : items;
   const distinct = new Set(pool.map(i => i.status ?? "confirmed"));
   return distinct.size === 1 ? [...distinct][0] : "partial";

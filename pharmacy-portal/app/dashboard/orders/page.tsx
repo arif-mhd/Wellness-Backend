@@ -22,6 +22,15 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   pharmacyId: string;
+  requires_prescription?: boolean;
+  status?: string;
+  cancelReason?: string | null;
+}
+
+interface PrescriptionReview {
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  reason: string | null;
+  reviewedAt: string | null;
 }
 
 interface Order {
@@ -32,6 +41,26 @@ interface Order {
   status: string;
   createdAt: string;
   total_amount: number;
+  myPrescriptionReview?: PrescriptionReview | null;
+  prescription?: { id: string; image_url: string | null; pdf_url: string | null; uploadedAt: string | null } | null;
+}
+
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  prescription_review: "bg-amber-50 text-amber-700 border-amber-100",
+  confirmed: "bg-blue-50 text-blue-700 border-blue-100",
+  shipped:   "bg-indigo-50 text-indigo-700 border-indigo-100",
+  delivered: "bg-green-50 text-green-700 border-green-100",
+  cancelled: "bg-gray-100 text-gray-500 border-gray-200",
+  partial:   "bg-purple-50 text-purple-700 border-purple-100",
+};
+
+function orderStatusLabel(s: string) {
+  if (s === "prescription_review") return "Prescription Review";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function isPdfUrl(url: string) {
+  return /\.pdf(\?|$)/i.test(url);
 }
 
 interface BookingItem {
@@ -124,6 +153,13 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
+  // Prescription review modal
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
   const load = useCallback(async () => {
     try {
       if (isLab) {
@@ -163,6 +199,41 @@ export default function OrdersPage() {
       // silently fail
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const openReview = (order: Order) => {
+    setReviewOrder(order);
+    setRejecting(false);
+    setRejectReason("");
+    setReviewError("");
+  };
+
+  const submitReview = async (decision: "approve" | "reject") => {
+    if (!reviewOrder) return;
+    if (decision === "reject" && !rejectReason.trim()) {
+      setReviewError("Tell the patient why the prescription can't be accepted.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewError("");
+    try {
+      const res = await apiFetch(`/api/pharmacy/orders/${reviewOrder.id}/prescription-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, reason: decision === "reject" ? rejectReason.trim() : undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setReviewError(err.error ?? "Couldn't save the review.");
+        return;
+      }
+      setReviewOrder(null);
+      await load();
+    } catch {
+      setReviewError("Couldn't reach the server.");
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -552,18 +623,29 @@ export default function OrdersPage() {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-[#24292E]">Order #{order.id.slice(0, 8)}</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-50 text-blue-700 border-blue-100">
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${ORDER_STATUS_STYLE[order.status] ?? "bg-blue-50 text-blue-700 border-blue-100"}`}>
+                            {orderStatusLabel(order.status)}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#676E76]">Placed on {new Date(order.createdAt).toLocaleDateString()}</span>
+                        {order.myPrescriptionReview?.status === "approved" && (
+                          <span className="text-[10px] text-green-600">Prescription approved</span>
+                        )}
+                        {order.myPrescriptionReview?.status === "rejected" && (
+                          <span className="text-[10px] text-red-500">Prescription rejected: {order.myPrescriptionReview.reason}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-[#383F45]">
                       <ul className="flex flex-col gap-1">
                         {order.items.map((item, idx) => (
                           <li key={idx} className="flex items-center justify-between gap-4">
-                            <span className="text-xs">{item.quantity}x {item.name}</span>
+                            <span className={`text-xs ${item.status === "cancelled" ? "line-through text-[#A0A8B0]" : ""}`}>
+                              {item.quantity}x {item.name}
+                              {item.requires_prescription && (
+                                <span className="ml-1.5 inline-flex px-1.5 py-px rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">Rx</span>
+                              )}
+                            </span>
                             <span className="text-[11px] text-[#676E76]">{formatCurrency((item.quantity * item.unit_price).toFixed(2), currency)}</span>
                           </li>
                         ))}
@@ -576,6 +658,22 @@ export default function OrdersPage() {
                       {formatCurrency(order.total_amount.toFixed(2), currency)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
+                      {order.myPrescriptionReview?.status === "pending" && (
+                        <button
+                          onClick={() => openReview(order)}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors"
+                        >
+                          Review Prescription
+                        </button>
+                      )}
+                      {order.myPrescriptionReview && order.myPrescriptionReview.status !== "pending" && order.prescription && (
+                        <button
+                          onClick={() => openReview(order)}
+                          className="block ml-auto mb-1.5 text-[11px] text-[#5476FC] hover:underline"
+                        >
+                          View prescription
+                        </button>
+                      )}
                       {order.status === "confirmed" && (
                         <button
                           onClick={() => updateStatus(order.id, "shipped")}
@@ -602,6 +700,121 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {reviewOrder && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !reviewSubmitting && setReviewOrder(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-[#EBEEF5] flex items-center justify-between">
+              <div>
+                <h2 className="text-lg text-[#24292E] font-medium">Prescription — Order #{reviewOrder.id.slice(0, 8)}</h2>
+                <p className="text-xs text-[#676E76]">
+                  Check the prescription covers the Rx items below, is legible, signed and in date.
+                </p>
+              </div>
+              <button onClick={() => setReviewOrder(null)} disabled={reviewSubmitting} className="w-8 h-8 rounded-full hover:bg-[#F8FAFC] text-[#A0A8B0] hover:text-[#24292E]">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-5 gap-6 p-6">
+              <div className="md:col-span-3 bg-[#F8FAFC] rounded-xl border border-[#EBEEF5] min-h-[320px] flex items-center justify-center overflow-hidden">
+                {(() => {
+                  const url = reviewOrder.prescription?.pdf_url || reviewOrder.prescription?.image_url;
+                  if (!url) return <p className="text-sm text-[#A0A8B0]">The prescription file couldn&apos;t be loaded.</p>;
+                  if (isPdfUrl(url)) return <iframe src={url} title="Prescription" className="w-full h-[60vh]" />;
+                  return (
+                    <a href={url} target="_blank" rel="noreferrer" title="Open full size">
+                      <img src={url} alt="Uploaded prescription" className="max-h-[60vh] w-auto object-contain" />
+                    </a>
+                  );
+                })()}
+              </div>
+
+              <div className="md:col-span-2 flex flex-col gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-2">Items in this order</p>
+                  <ul className="flex flex-col gap-1.5">
+                    {reviewOrder.items.map((item, idx) => (
+                      <li key={idx} className="text-sm text-[#383F45] flex items-center gap-2">
+                        <span>{item.quantity}x {item.name}</span>
+                        {item.requires_prescription && (
+                          <span className="inline-flex px-1.5 py-px rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">Rx</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {reviewOrder.prescription?.uploadedAt && (
+                  <p className="text-[11px] text-[#A0A8B0]">Uploaded {new Date(reviewOrder.prescription.uploadedAt).toLocaleString()}</p>
+                )}
+
+                {reviewOrder.myPrescriptionReview?.status === "pending" ? (
+                  <>
+                    {rejecting && (
+                      <div>
+                        <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Reason for the patient *</label>
+                        <textarea
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          rows={3}
+                          placeholder="e.g. Prescription has expired / medicine not listed / image unreadable"
+                          className="w-full px-3 py-2 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white resize-none"
+                        />
+                        <p className="text-[11px] text-[#A0A8B0] mt-1">The Rx items are removed from the order; anything else in it still goes out.</p>
+                      </div>
+                    )}
+                    {reviewError && (
+                      <div className="px-3 py-2 bg-[#FEE2E2] border border-[#FCA5A5] rounded-xl text-xs text-[#F25252]">{reviewError}</div>
+                    )}
+                    <div className="mt-auto flex flex-col gap-2">
+                      {!rejecting ? (
+                        <>
+                          <button
+                            onClick={() => submitReview("approve")}
+                            disabled={reviewSubmitting}
+                            className="w-full py-2.5 text-sm font-medium text-white bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {reviewSubmitting ? "Saving..." : "Approve prescription"}
+                          </button>
+                          <button
+                            onClick={() => setRejecting(true)}
+                            disabled={reviewSubmitting}
+                            className="w-full py-2.5 text-sm font-medium text-[#F25252] border border-[#FCA5A5] rounded-xl hover:bg-[#FEF2F2] disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => submitReview("reject")}
+                            disabled={reviewSubmitting}
+                            className="w-full py-2.5 text-sm font-medium text-white bg-[#F25252] rounded-xl hover:bg-red-600 disabled:opacity-50"
+                          >
+                            {reviewSubmitting ? "Saving..." : "Confirm rejection"}
+                          </button>
+                          <button
+                            onClick={() => { setRejecting(false); setReviewError(""); }}
+                            disabled={reviewSubmitting}
+                            className="w-full py-2.5 text-sm font-medium text-[#676E76] rounded-xl hover:bg-[#F8FAFC]"
+                          >
+                            Back
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className={`text-sm ${reviewOrder.myPrescriptionReview?.status === "approved" ? "text-green-600" : "text-red-500"}`}>
+                    {reviewOrder.myPrescriptionReview?.status === "approved"
+                      ? "You approved this prescription."
+                      : `You rejected this prescription${reviewOrder.myPrescriptionReview?.reason ? `: ${reviewOrder.myPrescriptionReview.reason}` : "."}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

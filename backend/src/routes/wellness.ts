@@ -452,10 +452,11 @@ export const WELLNESS_CHAT_RESPONSE_SCHEMA = {
         type: "object",
         properties: {
           drugName: { type: "string" },
+          brandName: NULLABLE_STRING,
           dosageInstructions: { type: "string" },
           reason: { type: "string" },
         },
-        required: ["drugName", "dosageInstructions", "reason"],
+        required: ["drugName", "brandName", "dosageInstructions", "reason"],
         additionalProperties: false,
       },
     },
@@ -586,7 +587,8 @@ SYMPTOM INTAKE (this is the core of your job):
 MEDICINE SUGGESTIONS (independent of booking — a turn can set either, both, or neither):
 - ONLY populate "medicineSuggestions" when the patient explicitly asks to buy, take, or get a medicine — either by name ("do you have paracetamol?", "I need panadol") or generically ("what can I take for this?", "can you suggest a medicine?", "I want to buy something for my allergies"). A symptom description alone, even one with an obvious over-the-counter remedy (e.g. a headache, a mild fever), is NOT enough by itself — keep running the normal symptom-intake/doctor-booking behaviour above instead, and only add a medicine suggestion if the patient then asks for one. Populate 1-3 entries: a drug name (drugName), brief general adult dosage/usage guidance (dosageInstructions, e.g. "500mg every 6-8 hours as needed, max 4 doses in 24 hours"), and a one-line reason it's being suggested (reason, e.g. "Commonly used to reduce fever and relieve mild pain").
 - A direct, explicit medicine request must populate medicineSuggestions on that SAME turn — do not ask a clarifying question first and withhold the suggestion. You may still ask a brief, optional follow-up in "reply" afterward, but the suggestion itself is not conditional on getting that answer.
-- Pharmacy catalogues here are stocked under the GENERIC/active-ingredient name, not brand names — always set drugName to the generic name, even if the patient asked by brand. E.g. "Panadol", "Tylenol", or "Calpol" → drugName "Paracetamol"; "Advil", "Brufen", or "Nurofen" → "Ibuprofen"; "Claritin" → "Loratadine"; "Zyrtec" → "Cetirizine". If the patient already used the generic name, use it as given.
+- Always set drugName to the GENERIC/active-ingredient name, even if the patient asked by brand. E.g. "Panadol", "Tylenol", or "Calpol" → drugName "Paracetamol"; "Advil", "Brufen", or "Nurofen" → "Ibuprofen"; "Claritin" → "Loratadine"; "Zyrtec" → "Cetirizine"; "Norvasc" → "Amlodipine"; "Augmentin" → "Amoxicillin". If the patient asked by a brand name, ALSO set brandName to that brand exactly as they wrote it (e.g. "Panadol") — pharmacies may list a product under either name, so both are searched. If the patient used the generic name, or didn't name a specific product, set brandName=null.
+- PRESCRIPTION-ONLY MEDICINES: if the patient explicitly asks for a medicine that normally needs a prescription (e.g. antibiotics, blood-pressure, cholesterol, diabetes, or asthma-controller medicines), still populate medicineSuggestions with it exactly as for any other medicine — do NOT withhold it or only tell them a prescription is needed. The app shows the real product card and, at checkout, lets the patient upload a prescription they already have or book a doctor to get one; a pharmacist reviews the prescription before anything is dispensed. In "reply", briefly mention that it usually needs a valid prescription, which they can upload when buying, or that they can book a doctor if they don't have one. Never recommend a prescription-only medicine on your own initiative for a symptom — only when the patient explicitly asks for that medicine (by name or brand) — and never give a personal dose for it; set its dosageInstructions to "As directed by your doctor."
 - You do not know this platform's real pharmacy inventory or which drugs are prescription-only here — the server independently checks each name against the real catalogue and its real prescription-requirement flag, and a name with no real match simply shows no product card. So never claim or imply in "reply" that something is in stock, prescription-free, or "added/suggested below" — phrase the reply as general health guidance only (e.g. "Paracetamol can help with that"), and let the app's own product card confirm availability, price, and requirements if a match exists.
 - Leave "medicineSuggestions" as an empty array for greetings, off-topic turns, purely emotional/mental-health check-ins, plain symptom descriptions with no explicit medicine request, or a vague symptom turn where you are still asking clarifying questions.
 - This never replaces your "never diagnose or prescribe" rule above — dosageInstructions is general product-usage guidance, not a personalized prescription, and "reply" should still recommend seeing a doctor for anything beyond minor, self-limiting symptoms.
@@ -671,6 +673,7 @@ function sanitizeMedicineSuggestions(raw: any): MedicineSuggestionInput[] {
     .filter((s: any) => typeof s?.drugName === "string" && s.drugName.trim())
     .map((s: any) => ({
       drugName: s.drugName.trim(),
+      brandName: typeof s.brandName === "string" && s.brandName.trim() ? s.brandName.trim() : null,
       dosageInstructions: typeof s.dosageInstructions === "string" ? s.dosageInstructions.trim() : "",
       reason: typeof s.reason === "string" ? s.reason.trim() : "",
     }));

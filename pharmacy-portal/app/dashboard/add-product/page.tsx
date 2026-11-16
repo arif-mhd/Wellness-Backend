@@ -65,6 +65,8 @@ export default function AddProductPage() {
   const [expiryDate, setExpiryDate]   = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [strength, setStrength]       = useState("");
+  const [genericName, setGenericName] = useState("");
+  const [brandNames, setBrandNames]   = useState("");
   const [numberOfTablets, setNumberOfTablets] = useState("");
   const [productSummary, setProductSummary] = useState("");
   const [benefits, setBenefits] = useState("");
@@ -182,6 +184,8 @@ export default function AddProductPage() {
       if (expiryDate)   form.append("expiryDate", expiryDate);
       if (manufacturer) form.append("manufacturer", manufacturer);
       if (strength)     form.append("strength", strength);
+      if (genericName.trim()) form.append("genericName", genericName.trim());
+      if (brandNames.trim())  form.append("brandNames", brandNames);
       if (numberOfTablets) form.append("numberOfTablets", numberOfTablets);
       if (productSummary) form.append("productSummary", productSummary);
       if (recommendedFor) form.append("recommendedFor", recommendedFor);
@@ -525,6 +529,18 @@ export default function AddProductPage() {
                   <input value={strength} onChange={e => setStrength(e.target.value)} placeholder="e.g. 500mg" className={inputCls} />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Generic Name</label>
+                  <input value={genericName} onChange={e => setGenericName(e.target.value)} placeholder="e.g. Paracetamol" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Brand Names</label>
+                  <input value={brandNames} onChange={e => setBrandNames(e.target.value)} placeholder="e.g. Panadol, Adol, Calpol" className={inputCls} />
+                </div>
+              </div>
+              <p className="text-[11px] text-[#A0A8B0] -mt-2">Patients can find this product by its generic name or any of these brand names (comma-separated).</p>
 
               <div>
                 <label className={labelCls}>Description</label>

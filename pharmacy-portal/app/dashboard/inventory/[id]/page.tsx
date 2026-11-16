@@ -37,6 +37,10 @@ interface Product {
   expiryDate?: string;
   manufacturer?: string;
   strength?: string;
+  genericName?: string | null;
+  brandNames?: string[];
+  /** Edit-form only: brandNames as the comma-separated text being typed. */
+  brandNamesText?: string;
   numberOfTablets?: string;
   productSummary?: string;
   recommendedFor?: string;
@@ -184,7 +188,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setEditingTest({ ...test });
     } else {
       if (!product) return;
-      setEditing({ ...product });
+      setEditing({ ...product, brandNamesText: (product.brandNames ?? []).join(", ") });
     }
     setEditImage(null);
     setEditPreview((isLab ? test?.imageUrl : product?.imageUrl) ?? null);
@@ -251,6 +255,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       form.append("expiryDate", editing.expiryDate ?? "");
       form.append("manufacturer", editing.manufacturer ?? "");
       form.append("strength", editing.strength ?? "");
+      form.append("genericName", editing.genericName ?? "");
+      form.append("brandNames", editing.brandNamesText ?? "");
       form.append("numberOfTablets", editing.numberOfTablets ?? "");
       form.append("productSummary", editing.productSummary ?? "");
       form.append("recommendedFor", editing.recommendedFor ?? "");
@@ -585,6 +591,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Strength</label>
                   <input value={editing.strength ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, strength: e.target.value } : prev)}
                     placeholder="e.g. 500mg"
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Generic Name</label>
+                  <input value={editing.genericName ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, genericName: e.target.value } : prev)}
+                    placeholder="e.g. Paracetamol"
+                    className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#676E76] uppercase tracking-wider mb-1.5">Brand Names</label>
+                  <input value={editing.brandNamesText ?? ""} onChange={e => setEditing(prev => prev ? { ...prev, brandNamesText: e.target.value } : prev)}
+                    placeholder="e.g. Panadol, Adol, Calpol"
                     className="w-full h-11 px-4 bg-[#F5F7FB] rounded-xl text-sm text-[#24292E] border border-transparent focus:outline-none focus:border-[#5476FC]/50 focus:bg-white transition-all" />
                 </div>
               </div>
