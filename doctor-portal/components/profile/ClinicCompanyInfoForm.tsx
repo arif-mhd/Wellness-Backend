@@ -3,6 +3,18 @@
 import { useState, useRef } from "react";
 import DoctorLoginButton from "@/components/DoctorLoginButton";
 import { useBranding, useIdentityFields } from "@/components/BrandingContext";
+import { apiFetch } from "@/lib/apiFetch";
+
+interface ExtractedLicense {
+  isLicenseDocument: boolean;
+  licenseNumber: string | null;
+  secondaryLicense: string | null;
+  clinicName: string | null;
+  address: string | null;
+  issuingAuthority: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+}
 
 interface ClinicCompanyInfoFormProps {
   onSubmit: (data: any) => void;
@@ -88,8 +100,64 @@ export default function ClinicCompanyInfoForm({
 
   const [formError, setFormError] = useState("");
 
+  // License document → auto-read and prefill License Number / regulator
+  // license / Address. The clinic can still edit every field afterwards.
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [licenseReading, setLicenseReading] = useState(false);
+  const [licenseReadError, setLicenseReadError] = useState("");
+  const [licenseExtracted, setLicenseExtracted] = useState<ExtractedLicense | null>(null);
+  const [autoFilled, setAutoFilled] = useState<string[]>([]);
+
   const addressProofRef = useRef<HTMLInputElement>(null);
   const clinicImageRef = useRef<HTMLInputElement>(null);
+  const licenseFileRef = useRef<HTMLInputElement>(null);
+
+  const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file after an error
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setLicenseReadError("License file must be under 10 MB."); return; }
+
+    setLicenseFile(file);
+    setLicenseReadError("");
+    setLicenseExtracted(null);
+    setAutoFilled([]);
+    setLicenseReading(true);
+
+    try {
+      const form = new FormData();
+      form.append("license", file);
+      form.append("secondaryLabel", licenseLabel);
+      const res = await apiFetch("/api/clinics/extract-license", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Couldn't read the license. Please fill in the details manually.");
+
+      const extracted = data as ExtractedLicense;
+      if (!extracted.isLicenseDocument) {
+        setLicenseReadError("This doesn't look like a clinic license. Please check the file or fill in the details manually.");
+        return;
+      }
+
+      const filled: string[] = [];
+      if (extracted.licenseNumber) { setLicenseNumber(extracted.licenseNumber); setLicenseVerified(false); filled.push("License Number"); }
+      if (extracted.secondaryLicense) { setDohLicense(extracted.secondaryLicense); setDohVerified(false); filled.push(licenseLabel); }
+      if (extracted.address) { setAddress(extracted.address); setAddressVerified(false); filled.push("Address"); }
+
+      setLicenseExtracted(extracted);
+      setAutoFilled(filled);
+      if (filled.length === 0) {
+        setLicenseReadError("We couldn't find the license details in this file. Please fill them in manually.");
+      }
+    } catch (err: any) {
+      setLicenseReadError(err?.message || "Couldn't read the license. Please fill in the details manually.");
+    } finally {
+      setLicenseReading(false);
+    }
+  };
+
+  const licenseExpired = !!licenseExtracted?.expiryDate
+    && !isNaN(Date.parse(licenseExtracted.expiryDate))
+    && new Date(licenseExtracted.expiryDate) < new Date();
 
   const handleVerify = (setter: (v: boolean) => void, val: string, label: string) => {
     if (!val.trim()) { setFormError(`Enter the ${label} first.`); return; }
@@ -166,6 +234,52 @@ export default function ClinicCompanyInfoForm({
             />
           </div>
         )}
+
+        {/* License upload — auto-reads the details below */}
+        <div className="space-y-2">
+          <div className="text-[0.68rem] text-gray-400 font-light ml-1">Upload License</div>
+          <div
+            onClick={() => !licenseReading && licenseFileRef.current?.click()}
+            className={`border-2 border-dashed border-[#C5D3FF] bg-[#F4F7FF]/50 rounded-2xl px-5 py-4 flex items-center gap-3 transition-colors ${licenseReading ? "cursor-wait opacity-80" : "cursor-pointer hover:bg-[#EBEEFF]"}`}
+          >
+            <input type="file" ref={licenseFileRef} onChange={handleLicenseFileChange} accept=".pdf, image/jpeg, image/png, image/jpg, image/webp" className="hidden" />
+            {licenseReading ? (
+              <div className="w-5 h-5 border-2 border-indigo-200 border-t-[#5476FC] rounded-full animate-spin shrink-0" />
+            ) : (
+              <svg className="w-5 h-5 text-[#5476FC] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold text-[#5476FC] truncate">
+                {licenseReading ? "Reading license…" : licenseFile ? licenseFile.name : "Upload clinic license"}
+              </span>
+              <span className="text-[0.68rem] text-gray-400 font-light">
+                PDF, JPG or PNG — we&apos;ll fill in the license details for you.
+              </span>
+            </div>
+          </div>
+          {licenseReadError && (
+            <p className="text-xs text-amber-600 ml-1">{licenseReadError}</p>
+          )}
+          {autoFilled.length > 0 && (
+            <p className="text-xs text-emerald-600 ml-1">
+              Auto-filled {autoFilled.join(", ")} from your license. Please review before continuing.
+            </p>
+          )}
+          {licenseExtracted && (licenseExtracted.clinicName || licenseExtracted.issuingAuthority || licenseExtracted.expiryDate) && (
+            <div className="text-[0.72rem] text-gray-500 ml-1 space-y-0.5">
+              {licenseExtracted.clinicName && <div>Facility: <span className="text-gray-700">{licenseExtracted.clinicName}</span></div>}
+              {licenseExtracted.issuingAuthority && <div>Issued by: <span className="text-gray-700">{licenseExtracted.issuingAuthority}</span></div>}
+              {licenseExtracted.expiryDate && (
+                <div>
+                  Valid until: <span className={licenseExpired ? "text-red-600 font-semibold" : "text-gray-700"}>{licenseExtracted.expiryDate}</span>
+                  {licenseExpired && <span className="text-red-600"> — this license appears to be expired</span>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
