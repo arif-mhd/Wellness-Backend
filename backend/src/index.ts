@@ -69,6 +69,7 @@ import articlesRouter from "./routes/articles";
 import faqRouter from "./routes/faq";
 import adminFaqRouter from "./routes/adminFaq";
 import otpRouter from "./routes/otp";
+import familyIdVerificationRouter from "./routes/familyIdVerification";
 import sosRouter from "./routes/sos";
 import messagesRouter from "./routes/messages";
 import clinicMessagesRouter from "./routes/clinicMessages";
@@ -226,6 +227,8 @@ app.use("/api/articles", articlesRouter);
 app.use("/api/faq", faqRouter);
 app.use("/api/admin/faq", adminFaqRouter);
 app.use("/api/otp",      otpRouter);
+// Family member Emirates ID check + OTP (mock — OTP printed to this terminal)
+app.use("/api/family-id-verification", familyIdVerificationRouter);
 app.use("/api/sos", sosRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/clinic-messages", clinicMessagesRouter);

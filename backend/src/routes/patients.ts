@@ -14,6 +14,12 @@ import { uploadBlob, deleteBlob, generateSasUrl } from "../config/blob";
 import { SessionRequest } from "supertokens-node/framework/express";
 import { getAllProfiles } from "../utils/profile";
 import { v4 as uuidv4 } from "uuid";
+import {
+  isFamilyIdVerificationEnabled,
+  normalizeEmiratesId,
+  checkFamilyIdVerification,
+  consumeFamilyIdVerification,
+} from "./familyIdVerification";
 
 // Additional family members allowed per account (5 profiles total including
 // the account holder). Mirrored client-side in services/profileService.ts —
@@ -664,7 +670,9 @@ router.get("/family", requireRole("patient"), async (req: SessionRequest, res: R
 router.post("/family", requireRole("patient"), async (req: SessionRequest, res: Response) => {
   try {
     const userId = req.session!.getUserId();
-    const { idempotencyKey, ...memberFields } = req.body ?? {};
+    // emiratesIdVerification is server-written only — never taken from the client.
+    const { idempotencyKey, eidVerificationId, emiratesIdVerification: _ignoredVerification, ...memberFields } =
+      req.body ?? {};
 
     let existing: Record<string, unknown> = { id: userId, supertokensId: userId };
     try {
@@ -694,12 +702,35 @@ router.post("/family", requireRole("patient"), async (req: SessionRequest, res: 
       return;
     }
 
+    // A member saved with an Emirates ID must have had that ID verified
+    // (read + OTP for adults) via /api/family-id-verification. The DOB read
+    // from the card wins over the form's, so the age that decided whether an
+    // OTP was needed is the one that's stored.
+    let verifiedId: string | null = null;
+    if (isFamilyIdVerificationEnabled() && typeof memberFields.emiratesId === "string" && memberFields.emiratesId.trim()) {
+      const check = checkFamilyIdVerification(userId, eidVerificationId, memberFields.emiratesId);
+      if (!check.ok) {
+        res.status(400).json({ error: check.error });
+        return;
+      }
+      verifiedId = check.record.id;
+      memberFields.emiratesId = check.record.emiratesId;
+      memberFields.dob = check.record.dob;
+      memberFields.emiratesIdVerification = {
+        verifiedAt: new Date().toISOString(),
+        method: "mock",
+        isAdult: check.record.isAdult,
+        otpVerified: check.record.isAdult,
+      };
+    }
+
     // uuidv4 rather than a timestamp — Date.now() has only millisecond
     // resolution, so a burst of near-simultaneous requests (e.g. a
     // double-tapped submit button) could otherwise collide on the same id.
     const member = { ...memberFields, id: uuidv4(), ...(idempotencyKey ? { idempotencyKey } : {}) };
     const familyMembers = [...currentMembers, member];
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    if (verifiedId) consumeFamilyIdVerification(verifiedId);
     res.json({ member });
   } catch (err) {
     console.error("Add family member error:", err);
@@ -731,12 +762,59 @@ router.put("/family/:memberId", requireRole("patient"), async (req: SessionReque
     // orphaning it from everything already booked under the real one. The
     // URL's :memberId is the only legitimate source for which member (and
     // therefore which id) this request is allowed to touch.
-    const { id: _ignoredId, ...updateFields } = req.body ?? {};
+    // emiratesIdVerification is server-written only — never taken from the client.
+    const {
+      id: _ignoredId,
+      eidVerificationId,
+      emiratesIdVerification: _ignoredVerification,
+      ...updateFields
+    } = req.body ?? {};
 
-    const familyMembers = currentMembers.map((m: any) =>
-      m.id === memberId ? { ...m, ...updateFields, id: m.id } : m
-    );
+    // Emirates ID changes follow the same rule as adding a member: a new or
+    // changed ID must have been verified (read + OTP for 18+). While a
+    // verified ID stays the same, its card DOB can't be edited — otherwise an
+    // adult could be re-dated as a minor after the fact.
+    const current = currentMembers.find((m: any) => m.id === memberId);
+    const sameId = (a: unknown, b: unknown) => {
+      const norm = (v: unknown) =>
+        typeof v === "string" ? normalizeEmiratesId(v) ?? v.trim() : "";
+      return norm(a) === norm(b);
+    };
+    let verifiedId: string | null = null;
+    let clearVerification = false;
+    if (isFamilyIdVerificationEnabled()) {
+      const idProvided = Object.prototype.hasOwnProperty.call(updateFields, "emiratesId");
+      const newId = typeof updateFields.emiratesId === "string" ? updateFields.emiratesId.trim() : "";
+      if (idProvided && !newId) {
+        clearVerification = true;
+      } else if (idProvided && !sameId(newId, current?.emiratesId)) {
+        const check = checkFamilyIdVerification(userId, eidVerificationId, newId);
+        if (!check.ok) {
+          res.status(400).json({ error: check.error });
+          return;
+        }
+        verifiedId = check.record.id;
+        updateFields.emiratesId = check.record.emiratesId;
+        updateFields.dob = check.record.dob;
+        updateFields.emiratesIdVerification = {
+          verifiedAt: new Date().toISOString(),
+          method: "mock",
+          isAdult: check.record.isAdult,
+          otpVerified: check.record.isAdult,
+        };
+      } else if (current?.emiratesIdVerification) {
+        delete updateFields.dob;
+      }
+    }
+
+    const familyMembers = currentMembers.map((m: any) => {
+      if (m.id !== memberId) return m;
+      const next = { ...m, ...updateFields, id: m.id };
+      if (clearVerification) delete next.emiratesIdVerification;
+      return next;
+    });
     await patientsContainer.items.upsert({ ...existing, familyMembers, updatedAt: new Date().toISOString() });
+    if (verifiedId) consumeFamilyIdVerification(verifiedId);
     res.json({ status: "OK" });
   } catch (err) {
     console.error("Update family member error:", err);
