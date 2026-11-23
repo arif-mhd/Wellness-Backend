@@ -9,6 +9,7 @@ import { logActivity } from "../utils/activityLogger";
 import { uploadBlob, generateSasUrl } from "../config/blob";
 import { resolveOrgIdForRegistration, getCountryConfigForOrgId } from "../utils/orgScope";
 import { validateIdentityFieldPatterns } from "../config/countries";
+import { computeLicenseChecks } from "../utils/clinicLicense";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -154,9 +155,87 @@ router.get("/:id", requireRole("admin"), async (req: Request, res: Response) => 
       parameters: [{ name: "@id", value: id }],
     }).fetchAll();
     if (!resources.length) { res.status(404).json({ error: "Clinic not found." }); return; }
-    res.json({ clinic: resources[0] });
+    const clinic = resources[0];
+    // Automatic licence checks (expiry, number/name mismatch) for the admin's
+    // review — computed on read so "expiring soon" is always current.
+    res.json({
+      clinic: {
+        ...clinic,
+        licenseChecks: computeLicenseChecks(clinic, clinic.clinicName ?? clinic.fullName),
+        branches: Array.isArray(clinic.branches)
+          ? clinic.branches.map((b: any) => ({ ...b, licenseChecks: computeLicenseChecks(b, clinic.clinicName ?? clinic.fullName) }))
+          : clinic.branches,
+      },
+    });
   } catch (err) {
     console.error("Fetch clinic error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /api/admin/clinics/:id/license-verification ──────────────────────
+// Admin marks a clinic's (or one of its branches') licence as verified after
+// checking the uploaded document against the regulator's register (e.g. DOH
+// Abu Dhabi's TAMM facility licence lookup). Body:
+//   { verified: boolean, branchId?: string, note?: string }
+// Verifying is refused while the licence on file has expired. Any later change
+// to the licence number or document resets this (see licenseFieldsFor).
+router.patch("/:id/license-verification", requireRole("admin"), async (req: SessionRequest, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.session!.getUserId();
+  const { verified, branchId, note } = req.body ?? {};
+  if (typeof verified !== "boolean") {
+    res.status(400).json({ error: "verified (boolean) is required." });
+    return;
+  }
+
+  try {
+    const { resource: clinic } = await clinicsContainer.item(id, id).read();
+    if (!clinic) { res.status(404).json({ error: "Clinic not found." }); return; }
+
+    const isBranch = typeof branchId === "string" && branchId && branchId !== clinic.id;
+    const target = isBranch ? (clinic.branches ?? []).find((b: any) => b.id === branchId) : clinic;
+    if (!target) { res.status(404).json({ error: "Branch not found." }); return; }
+
+    if (verified) {
+      if (!target.licenseNumber && !target.dohLicense) {
+        res.status(400).json({ error: "There is no licence number on file to verify." });
+        return;
+      }
+      const expired = computeLicenseChecks(target, clinic.clinicName ?? clinic.fullName).find((c) => c.code === "expired");
+      if (expired) {
+        res.status(400).json({ error: `${expired.message} Ask the clinic to upload a current licence.` });
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    const fields = {
+      licenseVerified:    verified,
+      dohLicenseVerified: verified,
+      licenseVerifiedAt:  verified ? now : null,
+      licenseVerifiedBy:  verified ? adminId : null,
+      licenseVerificationNote: typeof note === "string" && note.trim() ? note.trim().slice(0, 500) : null,
+    };
+
+    const updated = isBranch
+      ? { ...clinic, branches: clinic.branches.map((b: any) => (b.id === branchId ? { ...b, ...fields } : b)), updatedAt: now }
+      : { ...clinic, ...fields, updatedAt: now };
+    await clinicsContainer.items.upsert(updated);
+
+    logActivity({
+      source: "admin",
+      action: verified ? "Clinic Licence Verified" : "Clinic Licence Unverified",
+      details: `${isBranch ? `Branch "${target.name}" of ` : ""}${clinic.clinicName ?? clinic.fullName ?? id} licence ${target.licenseNumber ?? target.dohLicense ?? ""} ${verified ? "verified" : "marked unverified"}`,
+      performedBy: "Admin",
+      performedById: adminId,
+      entityType: "clinic",
+      entityId: id,
+    });
+
+    res.json({ status: "OK", ...fields });
+  } catch (err) {
+    console.error("Clinic licence verification error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });

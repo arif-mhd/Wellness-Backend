@@ -12,13 +12,14 @@ import { resolveOrgIdForRegistration, resolveOrgIdFromHeader, getCountryConfigFo
 import { validateIdentityFieldPatterns } from "../config/countries";
 import { getClinicAppointmentsData } from "./clinicAppointments";
 import { getClinicFeedbackData } from "./clinicFeedback";
+import { LICENSE_MIME, extractLicense, LicenseReadError, daysUntil, licenseFieldsFor, expiredLicenseError } from "../utils/clinicLicense";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // ─── POST /api/clinics/upload ────────────────────────────────────────────────
 // Multipart file upload for clinic profile assets.
-// Field names: logo | addressProof | spcContract
+// Field names: logo | addressProof | spcContract | license
 // Returns a SAS URL for each uploaded file.
 router.post(
   "/upload",
@@ -27,6 +28,7 @@ router.post(
     { name: "logo", maxCount: 1 },
     { name: "addressProof", maxCount: 1 },
     { name: "spcContract", maxCount: 1 },
+    { name: "license", maxCount: 1 },
   ]),
   async (req: SessionRequest, res: Response) => {
     const clinicId = req.session!.getUserId();
@@ -35,7 +37,7 @@ router.post(
 
     const MIME_EXT: Record<string, string> = {
       "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
-      "application/pdf": "pdf",
+      "image/webp": "webp", "application/pdf": "pdf",
     };
 
     // A multi-branch registration uploads each branch's files separately
@@ -69,24 +71,8 @@ router.post(
 // (the country's regulator license name, e.g. "DOH License" or "Clinical
 // Establishment License"). Reads the uploaded license document with Gemini and
 // returns the details it could find so the Company Info form can prefill them.
-// Nothing is stored — the clinic still reviews/edits every value before saving.
-const LICENSE_MIME = new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"]);
-
-const LICENSE_EXTRACT_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    isLicenseDocument:   { type: "BOOLEAN" },
-    licenseNumber:       { type: "STRING", nullable: true },
-    secondaryLicense:    { type: "STRING", nullable: true },
-    clinicName:          { type: "STRING", nullable: true },
-    address:             { type: "STRING", nullable: true },
-    issuingAuthority:    { type: "STRING", nullable: true },
-    issueDate:           { type: "STRING", nullable: true },
-    expiryDate:          { type: "STRING", nullable: true },
-  },
-  required: ["isLicenseDocument"],
-};
-
+// Nothing is stored here — the form uploads the file via /upload and sends
+// these details back with the profile, where an admin reviews them.
 router.post(
   "/extract-license",
   requireRole("clinic_pending", "clinic"),
@@ -102,85 +88,19 @@ router.post(
       return;
     }
 
-    const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-    if (!apiKey) {
-      console.error("[extract-license] GEMINI_API_KEY is not set");
-      res.status(500).json({ error: "License reading is not configured. Please fill in the details manually." });
-      return;
-    }
-
     const secondaryLabel = typeof req.body?.secondaryLabel === "string" && req.body.secondaryLabel.trim()
       ? req.body.secondaryLabel.trim().slice(0, 80)
       : "DOH / health-authority facility license";
 
-    const prompt = `You are reading a healthcare facility (clinic) license or registration certificate.
-Extract the following and respond with JSON only:
-- isLicenseDocument: true if this is a clinic/healthcare facility license, trade license or registration certificate; false otherwise.
-- licenseNumber: the main license / registration / trade license number.
-- secondaryLicense: the "${secondaryLabel}" number if it is shown separately from the main license number. If the document only has one license number and it is issued by a health authority, put it here as well.
-- clinicName: the registered facility / establishment name.
-- address: the full facility address as one line.
-- issuingAuthority: the authority that issued the license.
-- issueDate and expiryDate: in YYYY-MM-DD format.
-Copy numbers exactly as printed (keep letters, dashes and slashes). Use null for anything not clearly visible — never guess.`;
-
-    const body = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: file.mimetype === "image/jpg" ? "image/jpeg" : file.mimetype, data: file.buffer.toString("base64") } }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: LICENSE_EXTRACT_SCHEMA, temperature: 0 },
-    });
-
-    let responseText: string | null = null;
-    let lastError: any = null;
-    for (const model of ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]) {
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body,
-        });
-        if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).replace(/\s+/g, " ").trim()}`);
-        const data = await r.json() as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error("No text in Gemini response");
-        responseText = text;
-        break;
-      } catch (err: any) {
-        console.warn(`[extract-license] ${model} failed:`, err?.message);
-        lastError = err;
-      }
-    }
-
-    if (!responseText) {
-      console.error("[extract-license] all models failed:", lastError?.message);
-      res.status(502).json({ error: "Couldn't read the license right now. Please fill in the details manually." });
-      return;
-    }
-
-    let parsed: any = null;
-    const trimmed = responseText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      const braced = trimmed.match(/\{[\s\S]*\}/);
-      try { parsed = braced ? JSON.parse(braced[0]) : null; } catch { parsed = null; }
+      const extracted = await extractLicense(file.buffer, file.mimetype, secondaryLabel);
+      const days = extracted.expiryDate ? daysUntil(extracted.expiryDate) : null;
+      res.json({ ...extracted, daysUntilExpiry: days });
+    } catch (err: any) {
+      if (err instanceof LicenseReadError) { res.status(err.status).json({ error: err.message }); return; }
+      console.error("[extract-license] error:", err);
+      res.status(500).json({ error: "Couldn't read the license. Please fill in the details manually." });
     }
-    if (!parsed) {
-      console.error("[extract-license] unparseable response:", responseText);
-      res.status(502).json({ error: "Couldn't read the license. Please fill in the details manually." });
-      return;
-    }
-
-    const str = (v: any) => (typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null" ? v.trim() : null);
-    res.json({
-      isLicenseDocument: parsed.isLicenseDocument !== false,
-      licenseNumber:     str(parsed.licenseNumber),
-      secondaryLicense:  str(parsed.secondaryLicense),
-      clinicName:        str(parsed.clinicName),
-      address:           str(parsed.address),
-      issuingAuthority:  str(parsed.issuingAuthority),
-      issueDate:         str(parsed.issueDate),
-      expiryDate:        str(parsed.expiryDate),
-    });
   }
 );
 
@@ -388,6 +308,8 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
     insurances,
     // Clinic / company information
     licenseNumber, dohLicense, address, addressProofFileUrl,
+    // Uploaded licence document + the details /extract-license read from it
+    licenseFileUrl, licenseDetails,
     description, city, postalCode, country, website, yearEstablished,
     consultationRates, paymentSettings, bio, clinicImageUrl,
     // Country-specific business identity fields with no dedicated column
@@ -404,6 +326,15 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
     const { resource: clinic } = await clinicsContainer.item(clinicId, clinicId).read();
     if (!clinic) {
       res.status(404).json({ error: "Clinic profile not found." });
+      return;
+    }
+
+    const expiredError = expiredLicenseError(licenseDetails)
+      ?? (Array.isArray(branches)
+        ? branches.map((b: any) => expiredLicenseError(b?.licenseDetails, b?.name)).find(Boolean) ?? null
+        : null);
+    if (expiredError) {
+      res.status(400).json({ error: expiredError });
       return;
     }
 
@@ -447,7 +378,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       };
       await clinicsContainer.items.upsert(updatedUser);
 
-      const branchFieldsProvided = [licenseNumber, dohLicense, identityDocuments, address, addressProofFileUrl, description, city, postalCode, country, website, yearEstablished, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
+      const branchFieldsProvided = [licenseNumber, dohLicense, licenseFileUrl, licenseDetails, identityDocuments, address, addressProofFileUrl, description, city, postalCode, country, website, yearEstablished, consultationRates, paymentSettings, bio, clinicImageUrl, slots].some((v) => v !== undefined);
       const isMainBranchUser = clinic.branchId === clinic.orgId;
       let updatedBranch: any = isMainBranchUser
         ? mainBranchFrom(org)
@@ -458,6 +389,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
         // fields live directly on the org doc itself.
         const updatedOrg = {
           ...org,
+          ...licenseFieldsFor(org, { licenseNumber, dohLicense, licenseFileUrl, licenseDetails }),
           licenseNumber:       licenseNumber       ?? org.licenseNumber,
           dohLicense:          dohLicense          ?? org.dohLicense,
           identityDocuments:   identityDocuments ? { ...org.identityDocuments, ...identityDocuments } : org.identityDocuments,
@@ -483,6 +415,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
           if (b.id !== clinic.branchId) return b;
           updatedBranch = {
             ...b,
+            ...licenseFieldsFor(b, { licenseNumber, dohLicense, licenseFileUrl, licenseDetails }),
             licenseNumber:       licenseNumber       ?? b.licenseNumber,
             dohLicense:          dohLicense          ?? b.dohLicense,
             identityDocuments:   identityDocuments ? { ...b.identityDocuments, ...identityDocuments } : b.identityDocuments,
@@ -559,6 +492,7 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       height:                height                ?? clinic.height,
       weight:                weight                ?? clinic.weight,
       insurances:            insurances            ?? clinic.insurances,
+      ...licenseFieldsFor(clinic, { licenseNumber, dohLicense, licenseFileUrl, licenseDetails }),
       licenseNumber:         licenseNumber         ?? clinic.licenseNumber,
       dohLicense:            dohLicense            ?? clinic.dohLicense,
       identityDocuments:     identityDocuments ? { ...clinic.identityDocuments, ...identityDocuments } : clinic.identityDocuments,
@@ -576,7 +510,18 @@ router.put("/profile", requireRole("clinic_pending", "clinic"), async (req: Sess
       clinicImageUrl:        clinicImageUrl        ?? clinic.clinicImageUrl,
       slots:                 slots                 ?? clinic.slots,
       isMultiBranchOrg:      isMultiBranchOrg       ?? clinic.isMultiBranchOrg,
-      branches:              branches               ?? clinic.branches,
+      branches:              Array.isArray(branches)
+        ? branches.map((b: any) => {
+            const prevBranch = (clinic.branches ?? []).find((x: any) => x?.id === b?.id);
+            return {
+              ...b,
+              ...licenseFieldsFor(prevBranch ?? {}, {
+                licenseNumber: b?.licenseNumber, dohLicense: b?.dohLicense,
+                licenseFileUrl: b?.licenseFileUrl, licenseDetails: b?.licenseDetails ?? null,
+              }),
+            };
+          })
+        : clinic.branches,
       status:                "pending_approval",
       profileCompletedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

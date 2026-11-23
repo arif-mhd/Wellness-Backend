@@ -11,10 +11,19 @@ interface ExtractedLicense {
   secondaryLicense: string | null;
   clinicName: string | null;
   address: string | null;
+  region: string | null;
   issuingAuthority: string | null;
   issueDate: string | null;
   expiryDate: string | null;
+  ownerNames: string[];
+  specialties: string[];
+  verificationUrl: string | null;
+  /** Whole days until expiry (negative = already expired), from the server. */
+  daysUntilExpiry: number | null;
 }
+
+/** Warn when the licence runs out within this many days. */
+const EXPIRY_WARNING_DAYS = 30;
 
 interface ClinicCompanyInfoFormProps {
   onSubmit: (data: any) => void;
@@ -34,19 +43,21 @@ interface ClinicCompanyInfoFormProps {
   initialAddress?: string;
   initialPaymentSettings?: string;
   initialBio?: string;
+  /** Require a licence document upload before continuing (default true). */
+  requireLicenseFile?: boolean;
 }
 
 const inputCls =
   "w-full bg-[#F7F8FC] border border-transparent rounded-xl px-5 py-3.5 text-sm focus:outline-none transition-all text-gray-800 placeholder-gray-400 font-outfit";
 
-function VerifyField({
-  placeholder, value, onChange, verified, onVerify,
+// Licence numbers are verified by an admin against the regulator's register
+// after the profile is submitted — there's no instant self-verify here.
+function LicenseField({
+  placeholder, value, onChange,
 }: {
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
-  verified: boolean;
-  onVerify: () => void;
 }) {
   return (
     <div className="relative w-full flex items-center bg-[#F7F8FC] rounded-xl px-5 py-3.5 border border-transparent">
@@ -55,22 +66,8 @@ function VerifyField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit pr-20"
+        className="w-full bg-transparent border-none p-0 text-sm focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 font-outfit"
       />
-      <div className="absolute right-5 top-1/2 -translate-y-1/2 select-none">
-        {verified ? (
-          <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-[#5476FC]">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            VERIFIED
-          </span>
-        ) : (
-          <button type="button" onClick={onVerify} className="text-[0.72rem] font-semibold text-[#5476FC] hover:text-[#3B59E3] tracking-wider transition-colors">
-            VERIFY
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -78,16 +75,14 @@ function VerifyField({
 export default function ClinicCompanyInfoForm({
   onSubmit, onGoBack, branchName, onBranchNameChange, heading,
   initialLicenseNumber = "", initialDohLicense = "", initialAddress = "",
-  initialPaymentSettings = "", initialBio = "",
+  initialPaymentSettings = "", initialBio = "", requireLicenseFile = true,
 }: ClinicCompanyInfoFormProps) {
   const [licenseNumber, setLicenseNumber] = useState(initialLicenseNumber);
-  const [licenseVerified, setLicenseVerified] = useState(false);
   // "DOH License" is a UAE regulator; India's equivalent is the Clinical
   // Establishment License. Both come from the country's clinic identity fields.
   const clinicIdentityFields = useIdentityFields("clinic");
   const licenseLabel = clinicIdentityFields.find((f) => /licen[cs]e/i.test(f.key))?.label ?? "DOH Lic";
   const [dohLicense, setDohLicense] = useState(initialDohLicense);
-  const [dohVerified, setDohVerified] = useState(false);
 
   const [address, setAddress] = useState(initialAddress);
   const [addressProofFile, setAddressProofFile] = useState<File | null>(null);
@@ -139,8 +134,10 @@ export default function ClinicCompanyInfoForm({
       }
 
       const filled: string[] = [];
-      if (extracted.licenseNumber) { setLicenseNumber(extracted.licenseNumber); setLicenseVerified(false); filled.push("License Number"); }
-      if (extracted.secondaryLicense) { setDohLicense(extracted.secondaryLicense); setDohVerified(false); filled.push(licenseLabel); }
+      if (extracted.licenseNumber) { setLicenseNumber(extracted.licenseNumber); filled.push("License Number"); }
+      if (extracted.secondaryLicense) { setDohLicense(extracted.secondaryLicense); filled.push(licenseLabel); }
+      // Only a real street address — a licence that just names the region
+      // (e.g. "Abu Dhabi") comes back with address null and doesn't overwrite.
       if (extracted.address) { setAddress(extracted.address); setAddressVerified(false); filled.push("Address"); }
 
       setLicenseExtracted(extracted);
@@ -155,9 +152,9 @@ export default function ClinicCompanyInfoForm({
     }
   };
 
-  const licenseExpired = !!licenseExtracted?.expiryDate
-    && !isNaN(Date.parse(licenseExtracted.expiryDate))
-    && new Date(licenseExtracted.expiryDate) < new Date();
+  const daysLeft = licenseExtracted?.daysUntilExpiry ?? null;
+  const licenseExpired = daysLeft !== null && daysLeft < 0;
+  const licenseExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= EXPIRY_WARNING_DAYS;
 
   const handleVerify = (setter: (v: boolean) => void, val: string, label: string) => {
     if (!val.trim()) { setFormError(`Enter the ${label} first.`); return; }
@@ -187,6 +184,9 @@ export default function ClinicCompanyInfoForm({
     e.preventDefault();
 
     if (onBranchNameChange && !branchName?.trim()) { setFormError("Branch Name is required."); return; }
+    if (requireLicenseFile && !licenseFile) { setFormError("Please upload the clinic's licence document."); return; }
+    if (licenseReading) { setFormError("Please wait — we're still reading your licence."); return; }
+    if (licenseExpired) { setFormError(`This licence expired on ${licenseExtracted?.expiryDate}. Please upload a current licence.`); return; }
     if (!licenseNumber.trim()) { setFormError("License Number is required."); return; }
     if (!dohLicense.trim()) { setFormError(`${licenseLabel} is required.`); return; }
     if (!address.trim()) { setFormError("Address is required."); return; }
@@ -196,6 +196,11 @@ export default function ClinicCompanyInfoForm({
       branchName: onBranchNameChange ? branchName : undefined,
       licenseNumber,
       dohLicense,
+      licenseFile,
+      // What was read from the licence — stored for the admin's review.
+      licenseDetails: licenseExtracted
+        ? (({ daysUntilExpiry: _days, ...details }: ExtractedLicense) => details)(licenseExtracted)
+        : null,
       address,
       addressProofFile,
       paymentSettings,
@@ -237,7 +242,7 @@ export default function ClinicCompanyInfoForm({
 
         {/* License upload — auto-reads the details below */}
         <div className="space-y-2">
-          <div className="text-[0.68rem] text-gray-400 font-light ml-1">Upload License</div>
+          <div className="text-[0.68rem] text-gray-400 font-light ml-1">Upload License{requireLicenseFile ? "*" : ""}</div>
           <div
             onClick={() => !licenseReading && licenseFileRef.current?.click()}
             className={`border-2 border-dashed border-[#C5D3FF] bg-[#F4F7FF]/50 rounded-2xl px-5 py-4 flex items-center gap-3 transition-colors ${licenseReading ? "cursor-wait opacity-80" : "cursor-pointer hover:bg-[#EBEEFF]"}`}
@@ -270,25 +275,36 @@ export default function ClinicCompanyInfoForm({
           {licenseExtracted && (licenseExtracted.clinicName || licenseExtracted.issuingAuthority || licenseExtracted.expiryDate) && (
             <div className="text-[0.72rem] text-gray-500 ml-1 space-y-0.5">
               {licenseExtracted.clinicName && <div>Facility: <span className="text-gray-700">{licenseExtracted.clinicName}</span></div>}
+              {licenseExtracted.ownerNames?.length > 0 && (
+                <div>Owner{licenseExtracted.ownerNames.length > 1 ? "s" : ""}: <span className="text-gray-700">{licenseExtracted.ownerNames.join(", ")}</span></div>
+              )}
               {licenseExtracted.issuingAuthority && <div>Issued by: <span className="text-gray-700">{licenseExtracted.issuingAuthority}</span></div>}
+              {licenseExtracted.region && <div>Region: <span className="text-gray-700">{licenseExtracted.region}</span></div>}
               {licenseExtracted.expiryDate && (
                 <div>
-                  Valid until: <span className={licenseExpired ? "text-red-600 font-semibold" : "text-gray-700"}>{licenseExtracted.expiryDate}</span>
-                  {licenseExpired && <span className="text-red-600"> — this license appears to be expired</span>}
+                  Valid until: <span className={licenseExpired ? "text-red-600 font-semibold" : licenseExpiringSoon ? "text-amber-600 font-semibold" : "text-gray-700"}>{licenseExtracted.expiryDate}</span>
+                  {licenseExpired && <span className="text-red-600"> — this licence has expired. Please upload a current one.</span>}
+                  {licenseExpiringSoon && <span className="text-amber-600"> — expires in {daysLeft} day{daysLeft === 1 ? "" : "s"}. Please renew it soon.</span>}
                 </div>
+              )}
+              {!licenseExtracted.address && licenseExtracted.region && (
+                <div className="text-amber-600">The licence only lists the region, so please enter the clinic&apos;s full street address below.</div>
               )}
             </div>
           )}
+          <p className="text-[0.68rem] text-gray-400 font-light ml-1">
+            Our team verifies your licence with the issuing authority before your clinic goes live.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">License Number*</div>
-            <VerifyField placeholder="License Number" value={licenseNumber} onChange={setLicenseNumber} verified={licenseVerified} onVerify={() => handleVerify(setLicenseVerified, licenseNumber, "License Number")} />
+            <LicenseField placeholder="License Number" value={licenseNumber} onChange={setLicenseNumber} />
           </div>
           <div>
             <div className="text-[0.68rem] text-gray-400 font-light mb-1 ml-1">{licenseLabel}*</div>
-            <VerifyField placeholder="DOH License" value={dohLicense} onChange={setDohLicense} verified={dohVerified} onVerify={() => handleVerify(setDohVerified, dohLicense, "DOH License")} />
+            <LicenseField placeholder={licenseLabel} value={dohLicense} onChange={setDohLicense} />
           </div>
         </div>
 

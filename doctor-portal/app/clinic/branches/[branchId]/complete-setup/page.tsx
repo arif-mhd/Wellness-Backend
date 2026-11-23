@@ -91,10 +91,11 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
     setSubmitError("");
     try {
       const fileUrls: Record<string, string> = {};
-      if (companyInfo?.addressProofFile || companyInfo?.clinicImage) {
+      if (companyInfo?.addressProofFile || companyInfo?.clinicImage || companyInfo?.licenseFile) {
         const form = new FormData();
         if (companyInfo.addressProofFile) form.append("addressProofFile", companyInfo.addressProofFile);
         if (companyInfo.clinicImage) form.append("clinicImage", companyInfo.clinicImage);
+        if (companyInfo.licenseFile) form.append("licenseFile", companyInfo.licenseFile);
         const uploadRes = await apiFetch(`/api/clinics/branches/${branchId}/upload`, { method: "POST", body: form });
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
@@ -108,6 +109,8 @@ export default function CompleteBranchSetupPage({ params }: { params: Promise<{ 
         body: JSON.stringify({
           licenseNumber: companyInfo?.licenseNumber || null,
           dohLicense: companyInfo?.dohLicense || null,
+          licenseFileUrl: fileUrls.licenseFile || null,
+          licenseDetails: companyInfo?.licenseDetails ?? null,
           address: companyInfo?.address || null,
           addressProofFileUrl: fileUrls.addressProofFile || null,
           paymentSettings: companyInfo?.paymentSettings || null,

@@ -42,6 +42,7 @@ interface Clinic {
   positionInClinic: string | null;
   licenseNumber: string | null;
   dohLicense: string | null;
+  licenseVerified?: boolean;
   address: string | null;
   bio: string | null;
   clinicImageUrl?: string | null;
@@ -532,6 +533,9 @@ function ManageClinicsPageInner() {
                         LICENSE {selectedClinic.licenseNumber}
                       </p>
                     )}
+                    <p className={`text-[10px] font-medium mt-1 ${selectedClinic.licenseVerified ? "text-emerald-600" : "text-amber-600"}`}>
+                      {selectedClinic.licenseVerified ? "Licence verified" : "Licence not verified yet — review it on View Details"}
+                    </p>
                   </div>
                 </div>
               </div>

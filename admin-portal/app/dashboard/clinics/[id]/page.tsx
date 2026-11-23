@@ -39,14 +39,44 @@ interface OtherInfoRow {
   value: string;
 }
 
-interface BranchRow {
+interface LicenseDetails {
+  licenseNumber: string | null;
+  secondaryLicense: string | null;
+  clinicName: string | null;
+  address: string | null;
+  region: string | null;
+  issuingAuthority: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  ownerNames?: string[];
+  specialties?: string[];
+  verificationUrl: string | null;
+}
+
+interface LicenseCheck {
+  level: "error" | "warning" | "ok";
+  code: string;
+  message: string;
+}
+
+/** Licence fields shared by the clinic itself and each of its branches. */
+interface LicenseRecord {
+  licenseNumber?: string | null;
+  dohLicense?: string | null;
+  licenseFileUrl?: string | null;
+  licenseDetails?: LicenseDetails | null;
+  licenseChecks?: LicenseCheck[];
+  licenseVerified?: boolean;
+  licenseVerifiedAt?: string | null;
+  licenseVerificationNote?: string | null;
+}
+
+interface BranchRow extends LicenseRecord {
   id: string;
   name: string;
   address: string;
   phone: string;
   status: "requested" | "details_pending" | "pending_approval" | "active" | "rejected";
-  licenseNumber?: string | null;
-  dohLicense?: string | null;
   addressProofFileUrl?: string | null;
   consultationRates?: RateRow[];
   paymentSettings?: string | null;
@@ -54,7 +84,7 @@ interface BranchRow {
   clinicImageUrl?: string | null;
 }
 
-interface Clinic {
+interface Clinic extends LicenseRecord {
   // Which white-label organization this record belongs to. The admin API
   // already returns it (SELECT *); it drives which currency prices render in.
   tenantId?: string | null;
@@ -70,8 +100,6 @@ interface Clinic {
   languages: string | null;
   otherInfo?: OtherInfoRow[];
   insurances?: InsuranceRow[];
-  licenseNumber: string | null;
-  dohLicense: string | null;
   address: string | null;
   addressProofFileUrl?: string | null;
   consultationRates?: RateRow[];
@@ -92,6 +120,111 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
     <span className="text-[11px] text-slate-800 font-medium">{value ?? "—"}</span>
   </div>
 );
+
+const CHECK_STYLE: Record<LicenseCheck["level"], string> = {
+  error:   "bg-red-50 border-red-100 text-red-600",
+  warning: "bg-amber-50 border-amber-100 text-amber-700",
+  ok:      "bg-emerald-50 border-emerald-100 text-emerald-700",
+};
+
+/** Licence review: the uploaded document, what was read from it, automatic
+ *  checks, and the admin's verify / unverify action. */
+function LicensePanel({
+  clinicId, branchId, record, onChange,
+}: {
+  clinicId: string;
+  branchId?: string;
+  record: LicenseRecord;
+  onChange: (fields: Partial<LicenseRecord>) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const d = record.licenseDetails;
+  const checks = record.licenseChecks ?? [];
+  const hasError = checks.some((c) => c.level === "error");
+
+  const setVerified = async (verified: boolean) => {
+    if (verified && !confirm("Confirm you've checked this licence against the issuing authority's register (e.g. the TAMM licence lookup) and it is valid.")) return;
+    setSaving(true); setErr("");
+    try {
+      const res = await adminFetch(`/api/admin/clinics/${clinicId}/license-verification`, {
+        method: "PATCH",
+        body: JSON.stringify({ verified, branchId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(body.error ?? `Error ${res.status}`); return; }
+      onChange({ licenseVerified: body.licenseVerified, licenseVerifiedAt: body.licenseVerifiedAt });
+    } catch {
+      setErr("Could not reach the backend.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-medium text-slate-700">Licence verification</span>
+          <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${record.licenseVerified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+            {record.licenseVerified ? "Verified" : "Not verified"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {record.licenseFileUrl && (
+            <a href={record.licenseFileUrl} target="_blank" rel="noreferrer" className="text-[11px] text-[#6A8BFF] font-medium hover:underline">View licence</a>
+          )}
+          {d?.verificationUrl && (
+            <a href={d.verificationUrl} target="_blank" rel="noreferrer" className="text-[11px] text-[#6A8BFF] font-medium hover:underline">Check with issuer</a>
+          )}
+          {record.licenseVerified ? (
+            <button onClick={() => setVerified(false)} disabled={saving} className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-50">
+              {saving ? "Saving…" : "Unverify"}
+            </button>
+          ) : (
+            <button onClick={() => setVerified(true)} disabled={saving || hasError || (!record.licenseNumber && !record.dohLicense)} className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#6A8BFF] text-white hover:bg-[#5476FC] disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? "Saving…" : "Mark verified"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {err && <div className="text-[11px] text-red-600">{err}</div>}
+
+      {checks.length > 0 && (
+        <div className="space-y-1.5">
+          {checks.map((c, i) => (
+            <div key={i} className={`text-[11px] px-3 py-1.5 rounded-lg border ${CHECK_STYLE[c.level]}`}>{c.message}</div>
+          ))}
+        </div>
+      )}
+
+      {d ? (
+        <div className="space-y-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Read from the uploaded licence</span>
+          <DetailRow label="Licence No." value={[d.licenseNumber, d.secondaryLicense].filter((v, i, a) => v && a.indexOf(v) === i).join(" / ") || null} />
+          <DetailRow label="Facility" value={d.clinicName} />
+          <DetailRow label="Owners" value={d.ownerNames?.length ? d.ownerNames.join(", ") : null} />
+          <DetailRow label="Issued by" value={d.issuingAuthority} />
+          <DetailRow label="Region" value={d.region} />
+          <DetailRow label="Issued" value={d.issueDate} />
+          <DetailRow label="Expires" value={d.expiryDate} />
+          {d.specialties && d.specialties.length > 0 && (
+            <DetailRow label="Specialties" value={d.specialties.join(", ")} />
+          )}
+        </div>
+      ) : !record.licenseFileUrl ? null : (
+        <div className="text-[11px] text-slate-400">No details could be read from the document. Check it by hand.</div>
+      )}
+
+      {record.licenseVerified && record.licenseVerifiedAt && (
+        <div className="text-[10px] text-slate-400">
+          Verified {new Date(record.licenseVerifiedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ClinicDetailInner({ id }: { id: string }) {
   const { identityFieldsForOrg } = useOrgCurrency();
@@ -192,6 +325,11 @@ function ClinicDetailInner({ id }: { id: string }) {
               <p className="text-[12px] text-slate-700 leading-relaxed">{clinic.bio}</p>
             </div>
           )}
+          <LicensePanel
+            clinicId={clinic.id}
+            record={clinic}
+            onChange={(fields) => setClinic((c) => (c ? { ...c, ...fields } : c))}
+          />
         </div>
 
         {clinic.consultationRates && clinic.consultationRates.length > 0 && (
@@ -249,6 +387,15 @@ function ClinicDetailInner({ id }: { id: string }) {
                     <a href={b.addressProofFileUrl} target="_blank" rel="noreferrer" className="text-[11px] text-[#6A8BFF] font-medium hover:underline">View file</a>
                   </div>
                 )}
+                <LicensePanel
+                  clinicId={clinic.id}
+                  branchId={b.id}
+                  record={b}
+                  onChange={(fields) => setClinic((c) => (c ? {
+                    ...c,
+                    branches: c.branches?.map((x) => (x.id === b.id ? { ...x, ...fields } : x)),
+                  } : c))}
+                />
                 {b.consultationRates && b.consultationRates.length > 0 && (
                   <div className="pt-1 space-y-1">
                     <span className="text-[11px] text-slate-400 font-medium block">Consultation Rates</span>

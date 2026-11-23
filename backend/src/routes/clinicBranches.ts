@@ -16,6 +16,7 @@ import {
 import { logActivity } from "../utils/activityLogger";
 import { buildInClause, mainBranchFrom } from "../utils/clinicScope";
 import { uploadBlob, generateSasUrl } from "../config/blob";
+import { licenseFieldsFor, expiredLicenseError } from "../utils/clinicLicense";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -497,14 +498,14 @@ router.post("/add-request", requireRole("clinic"), async (req: SessionRequest, r
 router.post(
   "/:branchId/upload",
   requireRole("clinic"),
-  upload.fields([{ name: "addressProofFile", maxCount: 1 }, { name: "clinicImage", maxCount: 1 }]),
+  upload.fields([{ name: "addressProofFile", maxCount: 1 }, { name: "clinicImage", maxCount: 1 }, { name: "licenseFile", maxCount: 1 }]),
   async (req: Request, res: Response) => {
     const { branchId } = req.params;
     const files = req.files as Record<string, Express.Multer.File[]>;
     const urls: Record<string, string> = {};
 
     const MIME_EXT: Record<string, string> = {
-      "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "application/pdf": "pdf",
+      "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf",
     };
 
     try {
@@ -541,8 +542,12 @@ router.post("/:branchId/submit-details", requireRole("clinic"), async (req: Sess
 
   const {
     licenseNumber, dohLicense, address, addressProofFileUrl,
+    licenseFileUrl, licenseDetails,
     consultationRates, paymentSettings, bio, clinicImageUrl, slots,
   } = req.body;
+
+  const expiredError = expiredLicenseError(licenseDetails);
+  if (expiredError) { res.status(400).json({ error: expiredError }); return; }
 
   try {
     const now = new Date().toISOString();
@@ -550,6 +555,7 @@ router.post("/:branchId/submit-details", requireRole("clinic"), async (req: Sess
       if (b.id !== branch.id) return b;
       return {
         ...b,
+        ...licenseFieldsFor(b, { licenseNumber, dohLicense, licenseFileUrl, licenseDetails }),
         licenseNumber: licenseNumber ?? b.licenseNumber,
         dohLicense: dohLicense ?? b.dohLicense,
         address: address ?? b.address,

@@ -198,6 +198,7 @@ function CompleteProfileContent() {
         spcContract:   insuranceInfo?.spcContractFile   ?? null,
         addressProof:  mainCompanyInfo?.addressProofFile ?? null,
         logo:          mainCompanyInfo?.clinicImage       ?? null,
+        license:       mainCompanyInfo?.licenseFile       ?? null,
       }).catch(() => ({} as Record<string, string>));
 
       const slots = slotsFromKeys(mainAvailabilityInfo?.selectedSlots ?? []);
@@ -213,6 +214,8 @@ function CompleteProfileContent() {
         insurances,
         licenseNumber:        mainCompanyInfo?.licenseNumber || null,
         dohLicense:           mainCompanyInfo?.dohLicense || null,
+        licenseFileUrl:       fileUrls.license || null,
+        licenseDetails:       mainCompanyInfo?.licenseDetails ?? null,
         address:              mainCompanyInfo?.address || null,
         addressProofFileUrl:  fileUrls.addressProof || null,
         paymentSettings:      mainCompanyInfo?.paymentSettings || null,
@@ -252,6 +255,7 @@ function CompleteProfileContent() {
         spcContract:  insuranceInfo?.spcContractFile    ?? null,
         addressProof: mainCompanyInfo?.addressProofFile ?? null,
         logo:         mainCompanyInfo?.clinicImage       ?? null,
+        license:      mainCompanyInfo?.licenseFile       ?? null,
       }).catch(() => ({} as Record<string, string>));
 
       const insurances = (insuranceInfo?.insurances ?? []).map((row: any) => ({
@@ -264,6 +268,7 @@ function CompleteProfileContent() {
         const fileUrls = await uploadFiles({
           addressProof: b.addressProofFile ?? null,
           logo:         b.clinicImage      ?? null,
+          license:      b.licenseFile      ?? null,
         }, i).catch(() => ({} as Record<string, string>));
 
         return {
@@ -271,6 +276,8 @@ function CompleteProfileContent() {
           name:                 b.branchName || `Branch ${i + 1}`,
           licenseNumber:        b.licenseNumber || null,
           dohLicense:           b.dohLicense || null,
+          licenseFileUrl:       fileUrls.license || null,
+          licenseDetails:       b.licenseDetails ?? null,
           address:              b.address || null,
           addressProofFileUrl:  fileUrls.addressProof || null,
           paymentSettings:      b.paymentSettings || null,
@@ -287,6 +294,8 @@ function CompleteProfileContent() {
         insurances,
         licenseNumber:        mainCompanyInfo?.licenseNumber || null,
         dohLicense:           mainCompanyInfo?.dohLicense || null,
+        licenseFileUrl:       mainFileUrls.license || null,
+        licenseDetails:       mainCompanyInfo?.licenseDetails ?? null,
         address:              mainCompanyInfo?.address || null,
         addressProofFileUrl:  mainFileUrls.addressProof || null,
         paymentSettings:      mainCompanyInfo?.paymentSettings || null,
